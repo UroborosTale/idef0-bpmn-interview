@@ -1,0 +1,262 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.org/schemas/process-logic-2.0.0.json",
+  "title": "ProcessLogicModel",
+  "description": "Промежуточная модель процесса (Process Logic JSON) — единый источник истины для генерации IDEF0 и BPMN, а также для модулей развития (М1–М9). Версия схемы 2.0.0. Модели v1 (schema_version 1.x) валидны и по этой схеме: все новые поля снабжены значениями по умолчанию.",
+  "type": "object",
+  "required": ["schema_version", "process", "roles", "systems", "data", "controls", "nodes", "flows", "gaps", "statements"],
+  "properties": {
+    "schema_version": { "type": "string" },
+    "process": {
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "owner": { "type": "string" },
+        "department": { "type": "string" },
+        "type": { "enum": ["AS-IS", "TO-BE"] },
+        "goal": { "type": "string" },
+        "trigger": { "type": "string" },
+        "result": { "type": "string" },
+        "decomposition_depth": { "type": "integer", "minimum": 1 },
+        "notations": { "type": "array", "items": { "enum": ["IDEF0", "BPMN"] } },
+        "code": { "type": ["string", "null"], "description": "Код процесса в реестре (М3.1)" },
+        "level": { "enum": ["L0", "L1", "L2", "L3", null], "description": "Уровень иерархии реестра процессов (М3.1)" },
+        "parent_process_id": { "type": ["string", "null"] },
+        "version": { "type": "string", "description": "Семантическая версия модели MAJOR.MINOR (М7.1)" },
+        "status": { "enum": ["draft", "review", "approved", "archived"] },
+        "review_date": { "type": ["string", "null"], "description": "Дата планового пересмотра (М6.5), ISO 8601" },
+        "kpi": { "type": "array", "items": { "$ref": "#/definitions/kpi" } }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["internal", "external"] },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "data": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["document", "data"] },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "kind"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "kind": { "enum": ["regulation", "rule", "norm"] },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "name", "status", "confidence", "source"],
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "enum": ["task", "event", "gateway", "subprocess"] },
+          "subtype": { "type": "string" },
+          "name": { "type": "string" },
+          "role_id": { "type": ["string", "null"] },
+          "system_ids": { "type": "array", "items": { "type": "string" } },
+          "inputs": { "type": "array", "items": { "type": "string" } },
+          "outputs": { "type": "array", "items": { "type": "string" } },
+          "controls": { "type": "array", "items": { "type": "string" } },
+          "duration": { "type": ["string", "null"] },
+          "frequency": { "type": ["string", "null"] },
+          "idef0_parent": { "type": ["string", "null"] },
+          "status": { "enum": ["confirmed", "hypothesis"] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "source": { "$ref": "#/definitions/sourceList" },
+          "note": { "type": "string" },
+          "time_processing": { "type": ["string", "null"], "description": "Время обработки (М2.1)" },
+          "time_waiting": { "type": ["string", "null"], "description": "Время ожидания (М2.1)" },
+          "cost_estimate": { "type": ["string", "null"], "description": "Оценка стоимости шага (М2.2)" },
+          "requirement_ids": { "type": "array", "items": { "type": "string" }, "description": "Ссылки на requirements_links (М6.3)" },
+          "tags": { "type": "array", "items": { "type": "string" }, "description": "Маркеры для антипаттернов (М2.3), напр. manual_transfer, double_entry" }
+        }
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "properties": {
+          "id": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "condition": { "type": ["string", "null"] },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "rule", "priority", "question", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "rule": { "type": "string" },
+          "priority": { "enum": ["critical", "important", "desirable"] },
+          "element_id": { "type": ["string", "null"] },
+          "question": { "type": "string" },
+          "status": { "enum": ["open", "answered", "dismissed"] },
+          "topic": { "type": "string" },
+          "asked_count": { "type": "number" }
+        }
+      }
+    },
+    "statements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "text"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "enum": ["problem", "proposal"] },
+          "text": { "type": "string" },
+          "source": { "$ref": "#/definitions/sourceList" }
+        }
+      }
+    },
+    "interfaces": {
+      "type": "array",
+      "description": "Связи процесса со смежными процессами по входам/выходам (М3.2)",
+      "items": {
+        "type": "object",
+        "required": ["id", "direction", "data_id"],
+        "properties": {
+          "id": { "type": "string" },
+          "direction": { "enum": ["in", "out"] },
+          "data_id": { "type": "string" },
+          "linked_process_id": { "type": ["string", "null"] },
+          "linked_node_id": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "requirements_links": {
+      "type": "array",
+      "description": "Трассировка элементов модели к требованиям из реестра М6.1",
+      "items": {
+        "type": "object",
+        "required": ["requirement_id", "element_id"],
+        "properties": {
+          "requirement_id": { "type": "string" },
+          "element_id": { "type": "string" },
+          "coverage": { "enum": ["full", "partial"] }
+        }
+      }
+    },
+    "raci": {
+      "type": "array",
+      "description": "Матрица ответственности (М1.3)",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "role_id", "type"],
+        "properties": {
+          "node_id": { "type": "string" },
+          "role_id": { "type": "string" },
+          "type": { "enum": ["R", "A", "C", "I"] }
+        }
+      }
+    },
+    "respondents": {
+      "type": "array",
+      "description": "Респонденты мультиинтервью (М4.1)",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "role_id": { "type": ["string", "null"] },
+          "session_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "discrepancies": {
+      "type": "array",
+      "description": "Расхождения между респондентами мультиинтервью (М4.1)",
+      "items": {
+        "type": "object",
+        "required": ["id", "element_id"],
+        "properties": {
+          "id": { "type": "string" },
+          "element_id": { "type": "string" },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["respondent_id", "value"],
+              "properties": {
+                "respondent_id": { "type": "string" },
+                "value": { "type": "string" },
+                "source": { "$ref": "#/definitions/sourceList" }
+              }
+            }
+          },
+          "status": { "enum": ["open", "resolved"] }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "sourceList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fragment_id", "quote"],
+        "properties": {
+          "fragment_id": { "type": "string" },
+          "quote": { "type": "string" }
+        }
+      }
+    },
+    "kpi": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "target": { "type": ["string", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "source": { "$ref": "#/definitions/sourceList" }
+      }
+    }
+  }
+}

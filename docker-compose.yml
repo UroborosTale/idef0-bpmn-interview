@@ -1,0 +1,24 @@
+services:
+  server:
+    build: ./server
+    environment:
+      - PORT=8787
+      # Ключ облачного LLM-провайдера (опционально). Без него система
+      # работает в офлайн-режиме на детерминированном экстракторе — без
+      # передачи данных наружу (НФТ-4).
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-5}
+    volumes:
+      - server_data:/app/data
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  server_data:

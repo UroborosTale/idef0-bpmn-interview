@@ -1,0 +1,319 @@
+import { z } from "zod";
+
+/**
+ * Process Logic JSON — единый источник истины для IDEF0 и BPMN (ТЗ, раздел 5).
+ * Схема версионируется (SCHEMA_VERSION) и публикуется как контракт.
+ *
+ * v2 (ТЗ на развитие, раздел 2): добавлены поля реестра процессов, KPI, RACI,
+ * интерфейсов между процессами, трассировки требований, респондентов и
+ * расхождений мультиинтервью. Поля v1 не удаляются и не меняют смысла —
+ * модели v1 читаются схемой v2 без потерь (все новые поля имеют default()).
+ */
+export const SCHEMA_VERSION = "2.0.0";
+
+export const SourceRef = z.object({
+  fragment_id: z.string(),
+  quote: z.string(),
+});
+export type SourceRef = z.infer<typeof SourceRef>;
+
+export const Role = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["internal", "external"]).default("internal"),
+  source: z.array(SourceRef).default([]),
+});
+export type Role = z.infer<typeof Role>;
+
+export const SystemEntity = z.object({
+  id: z.string(),
+  name: z.string(),
+  source: z.array(SourceRef).default([]),
+});
+export type SystemEntity = z.infer<typeof SystemEntity>;
+
+export const DataEntity = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["document", "data"]).default("document"),
+  source: z.array(SourceRef).default([]),
+});
+export type DataEntity = z.infer<typeof DataEntity>;
+
+export const ControlEntity = z.object({
+  id: z.string(),
+  name: z.string(),
+  kind: z.enum(["regulation", "rule", "norm"]).default("rule"),
+  source: z.array(SourceRef).default([]),
+});
+export type ControlEntity = z.infer<typeof ControlEntity>;
+
+export const NodeType = z.enum(["task", "event", "gateway", "subprocess"]);
+export type NodeType = z.infer<typeof NodeType>;
+
+// task subtypes
+export const TaskSubtype = z.enum(["user", "service", "manual", "send", "receive", "script"]);
+// event subtypes
+export const EventSubtype = z.enum([
+  "start",
+  "end",
+  "intermediate",
+  "timer",
+  "message",
+  "error",
+  "signal",
+]);
+// gateway subtypes
+export const GatewaySubtype = z.enum(["exclusive", "parallel", "inclusive", "event_based"]);
+
+export const ProcessNode = z.object({
+  id: z.string(),
+  type: NodeType,
+  subtype: z.string().optional(),
+  name: z.string(),
+  role_id: z.string().nullable().optional(),
+  system_ids: z.array(z.string()).default([]),
+  inputs: z.array(z.string()).default([]), // data entity ids
+  outputs: z.array(z.string()).default([]), // data entity ids
+  controls: z.array(z.string()).default([]), // control entity ids
+  // Данные, выступающие управлением (IDEF0: выход одной функции — управление другой). Ссылки на data[];
+  // отсутствие поля = пусто (необязательное, чтобы не менять код, создающий узлы).
+  control_data_ids: z.array(z.string()).optional(),
+  duration: z.string().nullable().optional(),
+  frequency: z.string().nullable().optional(),
+  idef0_parent: z.string().nullable().optional(),
+  // Позиция на холсте редактора BPMN (левый верхний угол). Если задана, генератор BPMN
+  // использует её вместо авто-раскладки, чтобы экспорт совпадал с нарисованным.
+  layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  // Позиция блока на диаграмме IDEF0 A0 (редактор IDEF0); без неё блоки идут по диагонали.
+  idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  status: z.enum(["confirmed", "hypothesis"]).default("hypothesis"),
+  confidence: z.number().min(0).max(1).default(0.5),
+  source: z.array(SourceRef).default([]),
+  note: z.string().optional(),
+  // --- PLM v2 (М2 аналитика, М6 трассировка требований) ---
+  time_processing: z.string().nullable().optional(), // время обработки (в отличие от ожидания)
+  time_waiting: z.string().nullable().optional(),
+  cost_estimate: z.string().nullable().optional(),
+  requirement_ids: z.array(z.string()).default([]), // ссылки на requirements_links / реестр требований (М6)
+  tags: z.array(z.string()).default([]), // например: manual_transfer, double_entry — маркеры для антипаттернов М2.3
+  confirmed_by: z.array(z.string()).default([]), // id респондентов, подтвердивших элемент (ФТ-М4.1.2)
+});
+export type ProcessNode = z.infer<typeof ProcessNode>;
+
+export const ProcessFlow = z.object({
+  id: z.string(),
+  from: z.string(),
+  to: z.string(),
+  condition: z.string().nullable().optional(),
+  source: z.array(SourceRef).default([]),
+  confirmed_by: z.array(z.string()).default([]), // ФТ-М4.1.2
+});
+export type ProcessFlow = z.infer<typeof ProcessFlow>;
+
+export const GapPriority = z.enum(["critical", "important", "desirable"]);
+export const GapStatus = z.enum(["open", "answered", "dismissed"]);
+
+export const Gap = z.object({
+  id: z.string(),
+  rule: z.string(),
+  priority: GapPriority,
+  element_id: z.string().nullable(),
+  question: z.string(),
+  status: GapStatus.default("open"),
+  topic: z.string().optional(), // for interview "no more than N questions per topic"
+  asked_count: z.number().default(0),
+});
+export type Gap = z.infer<typeof Gap>;
+
+export const Statement = z.object({
+  id: z.string(),
+  kind: z.enum(["problem", "proposal"]),
+  text: z.string(),
+  source: z.array(SourceRef).default([]),
+});
+export type Statement = z.infer<typeof Statement>;
+
+export const Kpi = z.object({
+  id: z.string(),
+  name: z.string(),
+  target: z.string().nullable().optional(),
+  unit: z.string().nullable().optional(),
+  source: z.array(SourceRef).default([]),
+});
+export type Kpi = z.infer<typeof Kpi>;
+
+// --- PLM v2: риски процесса (для чек-листа процессного подхода, ФТ-М6.2.1) ---
+export const Risk = z.object({
+  id: z.string(),
+  name: z.string(),
+  mitigation: z.string().nullable().optional(),
+  source: z.array(SourceRef).default([]),
+});
+export type Risk = z.infer<typeof Risk>;
+
+export const ProcessMeta = z.object({
+  id: z.string(),
+  name: z.string(),
+  owner: z.string().optional(),
+  department: z.string().optional(),
+  type: z.enum(["AS-IS", "TO-BE"]).default("AS-IS"),
+  goal: z.string().optional(),
+  trigger: z.string().optional(),
+  result: z.string().optional(),
+  decomposition_depth: z.number().default(2),
+  notations: z.array(z.enum(["IDEF0", "BPMN"])).default(["IDEF0", "BPMN"]),
+  // --- PLM v2 (портфель процессов М3, жизненный цикл М7) ---
+  code: z.string().nullable().optional(), // код процесса в реестре (М3.1)
+  level: z.enum(["L0", "L1", "L2", "L3"]).nullable().optional(),
+  parent_process_id: z.string().nullable().optional(),
+  version: z.string().default("0.1"), // семантическая версия документа модели (М7.1)
+  status: z.enum(["draft", "review", "needs_rework", "approved", "archived"]).default("draft"), // ФТ-М7.2.2
+  review_date: z.string().nullable().optional(), // дата планового пересмотра (М6.5)
+  kpi: z.array(Kpi).default([]),
+  risks: z.array(Risk).default([]), // ФТ-М6.2.1
+  frequency_per_month: z.number().nullable().optional(), // ФТ-М2.2.1: частота процесса для расчёта трудозатрат/стоимости за период
+});
+export type ProcessMeta = z.infer<typeof ProcessMeta>;
+
+// --- PLM v2: связи между процессами (М3.2) ---
+export const ProcessInterface = z.object({
+  id: z.string(),
+  direction: z.enum(["in", "out"]),
+  data_id: z.string(), // id объекта в data[] текущей модели
+  linked_process_id: z.string().nullable().optional(),
+  linked_node_id: z.string().nullable().optional(),
+});
+export type ProcessInterface = z.infer<typeof ProcessInterface>;
+
+// --- PLM v2: трассировка требований (М6.3) ---
+export const RequirementLink = z.object({
+  requirement_id: z.string(),
+  element_id: z.string(),
+  coverage: z.enum(["full", "partial"]).default("full"),
+});
+export type RequirementLink = z.infer<typeof RequirementLink>;
+
+// --- PLM v2: матрица RACI (М1.3) ---
+export const RaciType = z.enum(["R", "A", "C", "I"]);
+export const RaciEntry = z.object({
+  node_id: z.string(),
+  role_id: z.string(),
+  type: RaciType,
+});
+export type RaciEntry = z.infer<typeof RaciEntry>;
+
+// --- PLM v2: респонденты мультиинтервью (М4.1) ---
+export const Respondent = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  role_id: z.string().nullable().optional(),
+  session_ids: z.array(z.string()).default([]), // внутренние id "дорожек" интервью (tracks) этого респондента
+  weight: z.number().min(0).default(1), // ФТ-М4.1.5: вес при разрешении конфликтов (исполнитель > руководитель для своего шага)
+});
+export type Respondent = z.infer<typeof Respondent>;
+
+// --- PLM v2: типы расхождений между респондентами (М4.1.3) ---
+export const DiscrepancyKind = z.enum(["step_presence", "executor", "timing", "step_order"]);
+export type DiscrepancyKind = z.infer<typeof DiscrepancyKind>;
+
+// --- PLM v2: расхождения между респондентами (М4.1) ---
+export const DiscrepancyVariant = z.object({
+  respondent_id: z.string(),
+  value: z.string(),
+  source: z.array(SourceRef).default([]),
+});
+export const Discrepancy = z.object({
+  id: z.string(),
+  element_id: z.string(),
+  kind: DiscrepancyKind.default("step_presence"),
+  question: z.string().default(""), // ФТ-М4.1.4: сгенерированный вопрос для разрешения
+  variants: z.array(DiscrepancyVariant).default([]),
+  status: z.enum(["open", "resolved"]).default("open"),
+  resolved_value: z.string().nullable().optional(),
+});
+export type Discrepancy = z.infer<typeof Discrepancy>;
+
+export const ProcessLogicModel = z.object({
+  schema_version: z.string().default(SCHEMA_VERSION),
+  process: ProcessMeta,
+  roles: z.array(Role).default([]),
+  systems: z.array(SystemEntity).default([]),
+  data: z.array(DataEntity).default([]),
+  controls: z.array(ControlEntity).default([]),
+  nodes: z.array(ProcessNode).default([]),
+  flows: z.array(ProcessFlow).default([]),
+  gaps: z.array(Gap).default([]),
+  statements: z.array(Statement).default([]),
+  // --- PLM v2 ---
+  interfaces: z.array(ProcessInterface).default([]),
+  requirements_links: z.array(RequirementLink).default([]),
+  raci: z.array(RaciEntry).default([]),
+  respondents: z.array(Respondent).default([]),
+  discrepancies: z.array(Discrepancy).default([]),
+});
+export type ProcessLogicModel = z.infer<typeof ProcessLogicModel>;
+
+export function emptyModel(meta: Partial<ProcessMeta> & { id: string; name: string }): ProcessLogicModel {
+  return ProcessLogicModel.parse({
+    schema_version: SCHEMA_VERSION,
+    process: {
+      id: meta.id,
+      name: meta.name,
+      owner: meta.owner,
+      department: meta.department,
+      type: meta.type ?? "AS-IS",
+      goal: meta.goal,
+      trigger: meta.trigger,
+      result: meta.result,
+      decomposition_depth: meta.decomposition_depth ?? 2,
+      notations: meta.notations ?? ["IDEF0", "BPMN"],
+    },
+    roles: [],
+    systems: [],
+    data: [],
+    controls: [],
+    nodes: [],
+    flows: [],
+    gaps: [],
+    statements: [],
+  });
+}
+
+// --- Text fragment & speaker types (ФТ-1) ---
+
+export const Speaker = z.enum(["interviewer", "owner", "participant", "unknown"]);
+export type Speaker = z.infer<typeof Speaker>;
+
+export const Fragment = z.object({
+  id: z.string(),
+  index: z.number(),
+  speaker: Speaker,
+  speaker_label: z.string().optional(),
+  text: z.string(),
+});
+export type Fragment = z.infer<typeof Fragment>;
+
+// --- Validation types (ФТ-5) ---
+
+export const ValidationSeverity = z.enum(["error", "warning"]);
+export const ValidationIssue = z.object({
+  id: z.string(),
+  notation: z.enum(["BPMN", "IDEF0", "MODEL"]),
+  severity: ValidationSeverity,
+  rule: z.string(),
+  message: z.string(),
+  element_id: z.string().nullable(),
+});
+export type ValidationIssue = z.infer<typeof ValidationIssue>;
+
+// --- Chat / interview types (режим Б) ---
+
+export const ChatMessage = z.object({
+  id: z.string(),
+  role: z.enum(["system", "assistant", "owner"]),
+  text: z.string(),
+  ts: z.number(),
+  gap_id: z.string().nullable().optional(),
+});
+export type ChatMessage = z.infer<typeof ChatMessage>;

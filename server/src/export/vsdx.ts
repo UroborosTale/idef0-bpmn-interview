@@ -1,0 +1,600 @@
+import JSZip from "jszip";
+import type { ProcessLogicModel } from "../types/model.js";
+import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
+import { arrowLabelPlacement, buildIdef0Diagrams, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
+
+/**
+ * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
+ * структурированных данных, что и SVG/BPMN-XML: BPMN с дорожками, IDEF0 A-0, A0 и диаграммы
+ * вложенных функций — по странице на каждую.
+ *
+ * Файл — среда редактирования: каждая фигура несёт пользовательские ячейки (User) с id элемента
+ * модели, стрелки — настоящие соединители Visio, приклеенные к фигурам. После сохранения в Visio
+ * vsdx-import.ts читает файл и возвращает правки в модель.
+ */
+
+export const PX = 1 / 96; // пиксель диаграммы → дюймы Visio
+const NS = "http://schemas.microsoft.com/office/visio/2012/main";
+const NS_R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
+const VISIO_REL = "http://schemas.microsoft.com/visio/2010/relationships";
+
+/** Версия разметки файла: при несовместимом изменении тегов растёт, импорт отвергает чужие версии. */
+export const VSDX_FORMAT = "1";
+
+const num = (n: number) => String(Math.round(n * 1e5) / 1e5);
+const esc = (s: string) =>
+  s
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+type Pt = [number, number];
+/** Часть геометрии в локальных пикселях фигуры (начало — левый верхний угол, y вниз). */
+type GeomPart = { kind: "path"; pts: Pt[]; closed?: boolean } | { kind: "ellipse"; cx: number; cy: number; rx: number; ry: number };
+
+/** Точка приклейки соединителя: координаты в локальных пикселях фигуры и направление выхода (y вниз). */
+export interface Port {
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+}
+
+interface Run {
+  text: string;
+  fontPx: number;
+  color?: string;
+  bold?: boolean;
+}
+
+interface Style {
+  fill?: string | null; // null — без заливки
+  line?: string | null; // null — без линии
+  weightPt?: number;
+  dash?: boolean;
+  roundingPx?: number;
+  endArrow?: boolean;
+  text?: string;
+  runs?: Run[]; // несколько отрезков текста с разным оформлением (вместо text)
+  fontPx?: number;
+  bold?: boolean;
+  color?: string;
+  align?: "left" | "center" | "right";
+  angle?: number; // радианы, против часовой
+  noMargins?: boolean;
+  /** Текст вне фигуры: блок шириной w под нижним краем с зазором gap (подписи событий и шлюзов). */
+  textBelow?: { w: number; h: number; gap: number };
+  /** Теги модели (ячейки User): pm_k — вид элемента, pm_id — id в модели, остальные — по виду. */
+  tag?: Record<string, string>;
+  /** Ключ для приклейки соединителей. */
+  key?: string;
+  ports?: Port[];
+}
+
+interface Endpoint {
+  key: string;
+  port?: number;
+}
+
+const userRows = (rows: Record<string, string>) =>
+  `<Section N="User">${Object.entries(rows)
+    .map(([k, v]) => `<Row N="${k}"><Cell N="Value" V="${esc(v)}" U="STR"/></Row>`)
+    .join("")}</Section>`;
+
+export class Page {
+  private shapes: string[] = [];
+  private connects: string[] = [];
+  private nextId = 1;
+  private keys = new Map<string, number>();
+  constructor(readonly name: string, readonly widthPx: number, readonly heightPx: number, readonly meta: Record<string, string> = {}) {}
+
+  /** Страница в дюймах с полем. */
+  get widthIn() {
+    return Math.max(1, this.widthPx * PX);
+  }
+  get heightIn() {
+    return Math.max(1, this.heightPx * PX);
+  }
+
+  /** Id фигуры Visio по ключу; фигуру можно приклеить к соединителю ещё до того, как она нарисована. */
+  idOf(key: string): number {
+    let id = this.keys.get(key);
+    if (id === undefined) {
+      id = this.nextId++;
+      this.keys.set(key, id);
+    }
+    return id;
+  }
+
+  private geometry(parts: GeomPart[], h: number, ix: number, noFill: boolean): string {
+    const lx = (x: number) => num(x * PX);
+    const ly = (y: number) => num((h - y) * PX);
+    const rows: string[] = [];
+    let r = 1;
+    for (const p of parts) {
+      if (p.kind === "ellipse") {
+        rows.push(
+          `<Row T="Ellipse" IX="${r++}"><Cell N="X" V="${lx(p.cx)}"/><Cell N="Y" V="${ly(p.cy)}"/><Cell N="A" V="${lx(p.cx + p.rx)}"/><Cell N="B" V="${ly(p.cy)}"/><Cell N="C" V="${lx(p.cx)}"/><Cell N="D" V="${ly(p.cy - p.ry)}"/></Row>`
+        );
+        continue;
+      }
+      const pts = p.closed ? [...p.pts, p.pts[0]] : p.pts;
+      pts.forEach(([x, y], i) => {
+        rows.push(`<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${r++}"><Cell N="X" V="${lx(x)}"/><Cell N="Y" V="${ly(y)}"/></Row>`);
+      });
+    }
+    return `<Section N="Geometry" IX="${ix}"><Cell N="NoFill" V="${noFill ? 1 : 0}"/><Cell N="NoLine" V="0"/><Cell N="NoShow" V="0"/><Cell N="NoSnap" V="0"/><Cell N="NoQuickDrag" V="0"/>${rows.join("")}</Section>`;
+  }
+
+  /** Оформление текста: ячейки Character/Paragraph для одного или нескольких отрезков. */
+  private textSections(style: Style): { xml: string; text: string } {
+    const runs: Run[] = style.runs ?? (style.text ? [{ text: style.text, fontPx: style.fontPx ?? 12, color: style.color, bold: style.bold }] : []);
+    if (runs.length === 0) return { xml: "", text: "" };
+    const chars = runs
+      .map((r, i) => `<Row IX="${i}"><Cell N="Size" V="${num((r.fontPx * 0.75) / 72)}"/><Cell N="Color" V="${r.color ?? "#1f2937"}"/><Cell N="Style" V="${r.bold ? 1 : 0}"/></Row>`)
+      .join("");
+    const text = runs.length === 1 ? esc(runs[0].text) : runs.map((r, i) => `<cp IX="${i}"/>${esc(r.text)}`).join("");
+    return {
+      xml:
+        `<Section N="Character">${chars}</Section>` +
+        `<Section N="Paragraph"><Row IX="0"><Cell N="HorzAlign" V="${style.align === "left" ? 0 : style.align === "right" ? 2 : 1}"/></Row></Section>`,
+      text,
+    };
+  }
+
+  /** Фигура по bbox (x, y — левый верхний угол в px), основной контур и необязательные символы внутри. */
+  add(box: { x: number; y: number; w: number; h: number }, main: GeomPart[], style: Style = {}, extra: GeomPart[] = []): number {
+    const id = style.key ? this.idOf(style.key) : this.nextId++;
+    const { x, y, w, h } = box;
+    const W = w * PX;
+    const H = h * PX;
+    const pinX = (x + w / 2) * PX;
+    const pinY = (this.heightPx - (y + h / 2)) * PX;
+    const fill = style.fill === undefined ? "#ffffff" : style.fill;
+    const line = style.line === undefined ? "#1f2937" : style.line;
+    const cells: string[] = [
+      `<Cell N="PinX" V="${num(pinX)}"/>`,
+      `<Cell N="PinY" V="${num(pinY)}"/>`,
+      `<Cell N="Width" V="${num(W)}"/>`,
+      `<Cell N="Height" V="${num(H)}"/>`,
+      `<Cell N="LocPinX" V="${num(W / 2)}" F="Width*0.5"/>`,
+      `<Cell N="LocPinY" V="${num(H / 2)}" F="Height*0.5"/>`,
+      `<Cell N="Angle" V="${num(style.angle ?? 0)}"/>`,
+      `<Cell N="FillForegnd" V="${fill ?? "#ffffff"}"/>`,
+      `<Cell N="FillPattern" V="${fill ? 1 : 0}"/>`,
+      `<Cell N="LineColor" V="${line ?? "#000000"}"/>`,
+      `<Cell N="LinePattern" V="${line ? (style.dash ? 2 : 1) : 0}"/>`,
+      `<Cell N="LineWeight" V="${num((style.weightPt ?? 1.2) / 72)}"/>`,
+      `<Cell N="Rounding" V="${num((style.roundingPx ?? 0) * PX)}"/>`,
+    ];
+    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="2"/>`);
+    if (style.noMargins) cells.push(`<Cell N="LeftMargin" V="0"/>`, `<Cell N="RightMargin" V="0"/>`, `<Cell N="TopMargin" V="0"/>`, `<Cell N="BottomMargin" V="0"/>`);
+    if (style.textBelow) {
+      // блок текста под фигурой, выровненный по верху: так подпись остаётся частью фигуры и двигается вместе с ней
+      const t = style.textBelow;
+      cells.push(
+        `<Cell N="VerticalAlign" V="0"/>`,
+        `<Cell N="TxtPinX" V="${num(W / 2)}" F="Width*0.5"/>`,
+        `<Cell N="TxtPinY" V="${num(-(t.gap + t.h / 2) * PX)}"/>`,
+        `<Cell N="TxtWidth" V="${num(t.w * PX)}"/>`,
+        `<Cell N="TxtHeight" V="${num(t.h * PX)}"/>`,
+        `<Cell N="TxtLocPinX" V="${num((t.w / 2) * PX)}" F="TxtWidth*0.5"/>`,
+        `<Cell N="TxtLocPinY" V="${num((t.h / 2) * PX)}" F="TxtHeight*0.5"/>`
+      );
+    }
+
+    const { xml: textXml, text } = this.textSections(style);
+    const tag: Record<string, string> = { pm_k: "deco", ...style.tag, pm_sid: String(id) };
+    const connection = style.ports?.length
+      ? `<Section N="Connection">${style.ports
+          .map(
+            (p, i) =>
+              `<Row T="Connection" IX="${i}"><Cell N="X" V="${num(p.x * PX)}" F="Width*${num(p.x / w)}"/><Cell N="Y" V="${num((h - p.y) * PX)}" F="Height*${num((h - p.y) / h)}"/><Cell N="DirX" V="${p.dx}"/><Cell N="DirY" V="${-p.dy}"/><Cell N="Type" V="0"/><Cell N="AutoGen" V="0"/></Row>`
+          )
+          .join("")}</Section>`
+      : "";
+
+    const geom = this.geometry(main, h, 0, main.every((g) => g.kind === "path" && !g.closed) || style.fill === null) + (extra.length ? this.geometry(extra, h, 1, true) : "");
+    this.shapes.push(
+      `<Shape ID="${id}" NameU="Shape.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${connection}${userRows(tag)}${textXml}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
+    );
+    return id;
+  }
+
+  rect(x: number, y: number, w: number, h: number, style: Style = {}, extra: GeomPart[] = []) {
+    return this.add({ x, y, w, h }, [{ kind: "path", pts: [[0, 0], [w, 0], [w, h], [0, h]], closed: true }], style, extra);
+  }
+  ellipse(x: number, y: number, w: number, h: number, style: Style = {}, extra: GeomPart[] = []) {
+    return this.add({ x, y, w, h }, [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2, ry: h / 2 }], style, extra);
+  }
+  diamond(x: number, y: number, w: number, h: number, style: Style = {}, extra: GeomPart[] = []) {
+    return this.add({ x, y, w, h }, [{ kind: "path", pts: [[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]], closed: true }], style, extra);
+  }
+  /** Ломаная без привязки к фигурам (оформление); при endArrow на конце рисуется стрелка. */
+  polyline(points: Pt[], style: Style = {}) {
+    const xs = points.map((p) => p[0]);
+    const ys = points.map((p) => p[1]);
+    const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
+    const [maxX, maxY] = [Math.max(...xs), Math.max(...ys)];
+    const local = points.map(([px, py]) => [px - minX, py - minY] as Pt);
+    return this.add({ x: minX, y: minY, w: maxX - minX, h: maxY - minY }, [{ kind: "path", pts: local }], { fill: null, ...style });
+  }
+  /** Только текст (без контура и заливки); anchor задаёт, к какому краю прижат текст. */
+  label(text: string, at: { x: number; y: number; anchor?: "start" | "middle" | "end"; w?: number; h?: number }, style: Style = {}) {
+    const w = at.w ?? Math.max(24, text.length * (style.fontPx ?? 11) * 0.58);
+    const h = at.h ?? (style.fontPx ?? 11) * 1.5;
+    const x = at.anchor === "end" ? at.x - w : at.anchor === "middle" || at.anchor === undefined ? at.x - w / 2 : at.x;
+    const align = at.anchor === "end" ? "right" : at.anchor === "start" ? "left" : "center";
+    return this.rect(x, at.y, w, h, { fill: null, line: null, noMargins: true, align, text, ...style });
+  }
+
+  /**
+   * Соединитель Visio (одномерная фигура): начало и конец приклеиваются к фигурам страницы, поэтому при
+   * переносе фигуры в Visio стрелка следует за ней. Нарисованный путь points совпадает с раскладкой генератора;
+   * при переносе фигур Visio перестроит его собственной маршрутизацией.
+   */
+  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean }): number {
+    const id = this.nextId++;
+    const H = this.heightPx;
+    const [bx, by] = opts.points[0];
+    const [ex, ey] = opts.points[opts.points.length - 1];
+    const BX = bx * PX;
+    const BY = (H - by) * PX;
+    const EX = ex * PX;
+    const EY = (H - ey) * PX;
+    const w = EX - BX;
+    const h = EY - BY;
+    const local = opts.points.map(([x, y]) => [(x - bx) * PX, (by - y) * PX] as Pt);
+    const glueF = (own: "Beg" | "End", other: "Beg" | "End") => `_WALKGLUE(${own}Trigger,${other}Trigger,WalkPreference)`;
+    const fromId = opts.from ? this.idOf(opts.from.key) : null;
+    const toId = opts.to ? this.idOf(opts.to.key) : null;
+
+    const fontPx = opts.fontPx ?? 10.5;
+    const text = opts.text ? esc(opts.text) : "";
+    // положение подписи — в координатах соединителя (начало — точка Begin)
+    const ctrlX = opts.textAt ? (opts.textAt[0] - bx) * PX : w / 2;
+    const ctrlY = opts.textAt ? (by - opts.textAt[1]) * PX : h / 2;
+    const cells = [
+      `<Cell N="PinX" V="${num((BX + EX) / 2)}" F="GUARD((BeginX+EndX)/2)"/>`,
+      `<Cell N="PinY" V="${num((BY + EY) / 2)}" F="GUARD((BeginY+EndY)/2)"/>`,
+      `<Cell N="Width" V="${num(w)}" F="GUARD(EndX-BeginX)"/>`,
+      `<Cell N="Height" V="${num(h)}" F="GUARD(EndY-BeginY)"/>`,
+      `<Cell N="LocPinX" V="${num(w / 2)}" F="GUARD(Width*0.5)"/>`,
+      `<Cell N="LocPinY" V="${num(h / 2)}" F="GUARD(Height*0.5)"/>`,
+      `<Cell N="Angle" V="0" F="GUARD(0DA)"/>`,
+      `<Cell N="FlipX" V="0" F="GUARD(FALSE)"/>`,
+      `<Cell N="FlipY" V="0" F="GUARD(FALSE)"/>`,
+      `<Cell N="ResizeMode" V="0"/>`,
+      `<Cell N="BeginX" V="${num(BX)}"${fromId ? ` F="${glueF("Beg", "End")}"` : ""}/>`,
+      `<Cell N="BeginY" V="${num(BY)}"${fromId ? ` F="${glueF("Beg", "End")}"` : ""}/>`,
+      `<Cell N="EndX" V="${num(EX)}"${toId ? ` F="${glueF("End", "Beg")}"` : ""}/>`,
+      `<Cell N="EndY" V="${num(EY)}"${toId ? ` F="${glueF("End", "Beg")}"` : ""}/>`,
+      `<Cell N="BegTrigger" V="2"${fromId ? ` F="_XFTRIGGER(Sheet.${fromId}!EventXFMod)"` : ""}/>`,
+      `<Cell N="EndTrigger" V="2"${toId ? ` F="_XFTRIGGER(Sheet.${toId}!EventXFMod)"` : ""}/>`,
+      `<Cell N="TxtPinX" V="${num(ctrlX)}" F="SETATREF(Controls.TextPosition)"/>`,
+      `<Cell N="TxtPinY" V="${num(ctrlY)}" F="SETATREF(Controls.TextPosition.Y)"/>`,
+      `<Cell N="TxtWidth" V="${num(Math.max(0.5, (opts.text ?? "").length * fontPx * 0.6 * PX))}"/>`,
+      `<Cell N="TxtHeight" V="${num(fontPx * 1.5 * PX)}"/>`,
+      `<Cell N="TxtLocPinX" V="${num(Math.max(0.5, (opts.text ?? "").length * fontPx * 0.6 * PX) / 2)}" F="TxtWidth*0.5"/>`,
+      `<Cell N="TxtLocPinY" V="${num((fontPx * 1.5 * PX) / 2)}" F="TxtHeight*0.5"/>`,
+      `<Cell N="TxtAngle" V="0"/>`,
+      `<Cell N="LockHeight" V="1"/>`,
+      `<Cell N="LockCalcWH" V="1"/>`,
+      `<Cell N="NoAlignBox" V="1"/>`,
+      `<Cell N="DynFeedback" V="2"/>`,
+      `<Cell N="GlueType" V="2"/>`,
+      `<Cell N="ObjType" V="2"/>`,
+      `<Cell N="NoLiveDynamics" V="1"/>`,
+      `<Cell N="ShapeSplittable" V="1"/>`,
+      `<Cell N="LineColor" V="#1f2937"/>`,
+      `<Cell N="LinePattern" V="${opts.dash ? 2 : 1}"/>`,
+      `<Cell N="LineWeight" V="${num((opts.weightPt ?? 1.1) / 72)}"/>`,
+      `<Cell N="EndArrow" V="13"/>`,
+      `<Cell N="EndArrowSize" V="2"/>`,
+      `<Cell N="TextBkgnd" V="#ffffff"/>`,
+      `<Cell N="TextBkgndTrans" V="0"/>`,
+    ];
+    const control = `<Section N="Control"><Row N="TextPosition"><Cell N="X" V="${num(ctrlX)}"/><Cell N="Y" V="${num(ctrlY)}"/><Cell N="XDyn" V="${num(ctrlX)}" F="Controls.TextPosition"/><Cell N="YDyn" V="${num(ctrlY)}" F="Controls.TextPosition.Y"/><Cell N="XCon" V="0"/><Cell N="YCon" V="0"/><Cell N="CanGlue" V="0"/></Row></Section>`;
+    const tag: Record<string, string> = { ...opts.tag, pm_sid: String(id) };
+    const chars = text ? `<Section N="Character"><Row IX="0"><Cell N="Size" V="${num((fontPx * 0.75) / 72)}"/><Cell N="Color" V="#1f2937"/></Row></Section>` : "";
+    const geomRows = local
+      .map(([x, y], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${num(x)}"/><Cell N="Y" V="${num(y)}"/></Row>`)
+      .join("");
+    const geom = `<Section N="Geometry" IX="0"><Cell N="NoFill" V="1"/><Cell N="NoLine" V="0"/><Cell N="NoShow" V="0"/><Cell N="NoSnap" V="0"/><Cell N="NoQuickDrag" V="0"/>${geomRows}</Section>`;
+    this.shapes.push(
+      `<Shape ID="${id}" NameU="Connector.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${control}${userRows(tag)}${chars}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
+    );
+
+    const glue = (from: "BeginX" | "EndX", part: number, ep: Endpoint | undefined, sheet: number | null) => {
+      if (!ep || sheet === null) return;
+      const target = ep.port === undefined ? `ToCell="PinX" ToPart="3"` : `ToCell="Connections.X${ep.port + 1}" ToPart="${100 + ep.port}"`;
+      this.connects.push(`<Connect FromSheet="${id}" FromCell="${from}" FromPart="${part}" ToSheet="${sheet}" ${target}/>`);
+    };
+    glue("BeginX", 9, opts.from, fromId);
+    glue("EndX", 12, opts.to, toId);
+    return id;
+  }
+
+  contentXml(): string {
+    const connects = this.connects.length ? `<Connects>${this.connects.join("")}</Connects>` : "";
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<PageContents xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve"><Shapes>${this.shapes.join("")}</Shapes>${connects}</PageContents>`;
+  }
+}
+
+// --- IDEF0 ---
+
+const blockKey = (nodeId: string) => `fn:${nodeId}`;
+
+/** Точки приклейки блока: по одной на каждый конец стрелки, лежащий на его границе. */
+function blockPorts(b: Idef0Block, d: Idef0DiagramData): { ports: Port[]; indexOf: (p: Pt) => number } {
+  const ports: Port[] = [];
+  const index = new Map<string, number>();
+  const add = (p: Pt) => {
+    const k = `${p[0]},${p[1]}`;
+    if (index.has(k)) return;
+    const [lx, ly] = [p[0] - b.x, p[1] - b.y];
+    const dir = lx <= 0.5 ? { dx: -1, dy: 0 } : lx >= b.w - 0.5 ? { dx: 1, dy: 0 } : ly <= 0.5 ? { dx: 0, dy: -1 } : { dx: 0, dy: 1 };
+    index.set(k, ports.length);
+    ports.push({ x: lx, y: ly, ...dir });
+  };
+  for (const a of d.arrows) {
+    if (a.startNode === b.nodeId) add(a.points[0]);
+    if (a.endNode === b.nodeId) add(a.points[a.points.length - 1]);
+  }
+  return { ports, indexOf: (p) => index.get(`${p[0]},${p[1]}`) ?? 0 };
+}
+
+function idef0Page(d: Idef0DiagramData, name: string, parentNodeId?: string): Page {
+  const editable = d.code !== "A-0";
+  const page = new Page(name, d.width, d.height, { pm_page: `idef0:${d.code}`, ...(parentNodeId ? { pm_parent: parentNodeId } : {}), ...(editable ? {} : { pm_ro: "1" }) });
+  page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
+
+  const portsOf = new Map<string, ReturnType<typeof blockPorts>>();
+  for (const b of d.blocks) {
+    const big = b.w >= 200;
+    const pp = editable ? blockPorts(b, d) : { ports: [], indexOf: () => 0 };
+    portsOf.set(b.nodeId, pp);
+    // код блока — вторым отрезком текста: при переименовании в Visio он остаётся на месте и при импорте отбрасывается
+    const runs: Run[] = [{ text: b.name, fontPx: big ? 13 : 12 }];
+    if (editable) runs.push({ text: `\n${b.code}${b.hasChildren ? " ⊞" : ""}`, fontPx: 11, color: "#374151" });
+    page.rect(b.x, b.y, b.w, b.h, { fill: "#eef2ff", weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
+    if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
+  }
+
+  for (const a of d.arrows) {
+    const lab = arrowLabelPlacement(a);
+    if (!a.ref || (!a.startNode && !a.endNode)) {
+      // стрелки контекстной диаграммы — только оформление
+      page.polyline(a.points, { endArrow: true, weightPt: 1.1 });
+      if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor }, { fontPx: 10.5, color: "#374151" });
+      continue;
+    }
+    const first = a.points[0];
+    const last = a.points[a.points.length - 1];
+    const from = a.startNode ? { key: blockKey(a.startNode), port: portsOf.get(a.startNode)?.indexOf(first) } : undefined;
+    const to = a.endNode ? { key: blockKey(a.endNode), port: portsOf.get(a.endNode)?.indexOf(last) } : undefined;
+    let textAt: Pt | undefined;
+    if (lab) {
+      const w = Math.max(24, lab.text.length * 10.5 * 0.6);
+      const cx = lab.anchor === "end" ? lab.x - w / 2 : lab.anchor === "start" ? lab.x + w / 2 : lab.x;
+      textAt = [cx, lab.y - 12 + (10.5 * 1.5) / 2];
+    }
+    page.connector({
+      points: a.points,
+      from,
+      to,
+      text: lab?.text,
+      textAt,
+      tag: { pm_k: "arrow", pm_id: a.ref.entityId, pm_a: `${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`, pm_n: lab?.text ?? "" },
+      weightPt: 1.1,
+    });
+  }
+  if (editable) page.meta.pm_manifest = JSON.stringify({ fn: d.blocks.map((b) => b.nodeId), ar: d.arrows.flatMap((a) => (a.ref ? [`${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`] : [])) });
+  d.footer.forEach((line, i) => line && page.label(line, { x: 16, y: d.height - 34 + i * 18, anchor: "start", w: Math.max(300, line.length * 7) }, { fontPx: 11, color: "#374151" }));
+  return page;
+}
+
+// --- BPMN ---
+
+type Shape = BpmnDiagramData["shapes"][number];
+
+function eventGlyph(subtype: string | undefined, w: number, h: number): GeomPart[] {
+  const [cx, cy] = [w / 2, h / 2];
+  switch (subtype) {
+    case "timer":
+      return [
+        { kind: "ellipse", cx, cy, rx: 9, ry: 9 },
+        { kind: "path", pts: [[cx, cy - 6], [cx, cy], [cx + 4, cy + 3]] },
+      ];
+    case "message":
+      return [
+        { kind: "path", pts: [[cx - 8, cy - 5.5], [cx + 8, cy - 5.5], [cx + 8, cy + 5.5], [cx - 8, cy + 5.5]], closed: true },
+        { kind: "path", pts: [[cx - 8, cy - 5.5], [cx, cy + 1], [cx + 8, cy - 5.5]] },
+      ];
+    case "signal":
+      return [{ kind: "path", pts: [[cx, cy - 8], [cx + 8, cy + 6], [cx - 8, cy + 6]], closed: true }];
+    case "error":
+      return [{ kind: "path", pts: [[cx - 4, cy + 8], [cx - 2, cy - 1], [cx + 3, cy + 2], [cx + 5, cy - 8], [cx + 2, cy - 1], [cx - 3, cy - 3]], closed: true }];
+    default:
+      return [];
+  }
+}
+
+function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPart[] {
+  const [cx, cy] = [w / 2, h / 2];
+  switch (subtype) {
+    case "parallel":
+      return [
+        { kind: "path", pts: [[cx - 9, cy], [cx + 9, cy]] },
+        { kind: "path", pts: [[cx, cy - 9], [cx, cy + 9]] },
+      ];
+    case "inclusive":
+      return [{ kind: "ellipse", cx, cy, rx: 9, ry: 9 }];
+    case "event_based":
+      return [
+        { kind: "ellipse", cx, cy, rx: 10, ry: 10 },
+        { kind: "ellipse", cx, cy, rx: 7.5, ry: 7.5 },
+      ];
+    default:
+      return [
+        { kind: "path", pts: [[cx - 7, cy - 7], [cx + 7, cy + 7]] },
+        { kind: "path", pts: [[cx + 7, cy - 7], [cx - 7, cy + 7]] },
+      ];
+  }
+}
+
+function bpmnPage(d: BpmnDiagramData, name: string): Page {
+  const page = new Page(name, d.width, d.height, { pm_page: "bpmn" });
+  // пул и дорожки
+  page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
+  // название пула вертикально в полосе шириной 20 (повёрнутая фигура, иначе текст переносится по буквам)
+  page.add(
+    { x: d.pool.x + 10 - d.pool.h / 2, y: d.pool.y + d.pool.h / 2 - 10, w: d.pool.h, h: 20 },
+    [{ kind: "path", pts: [[0, 0], [d.pool.h, 0], [d.pool.h, 20], [0, 20]], closed: true }],
+    { fill: "#e2e8f0", weightPt: 1, text: d.poolName, fontPx: 12, bold: true, angle: Math.PI / 2, tag: { pm_k: "poollabel" } }
+  );
+  for (const l of d.lanes) {
+    const laneId = l.roleId ?? "__unassigned__";
+    page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#94a3b8", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });
+    // подпись дорожки вертикально, по центру полосы шириной 30; текст редактируется — так переименовывается роль
+    page.add(
+      { x: l.x + 15 - l.h / 2, y: l.y + l.h / 2 - 15, w: l.h, h: 30 },
+      [{ kind: "path", pts: [[0, 0], [l.h, 0], [l.h, 30], [0, 30]], closed: true }],
+      { fill: "#e2e8f0", line: null, text: l.name, fontPx: 12, bold: true, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
+    );
+    page.polyline([[l.x + 30, l.y], [l.x + 30, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
+  }
+  for (const e of d.extras) {
+    if (e.kind === "data") {
+      page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1 });
+      page.label(e.name, { x: e.x + e.w / 2, y: e.y + e.h + 2, w: 90 }, { fontPx: 10 });
+    } else {
+      page.rect(e.x, e.y, e.w, e.h, { fill: null, line: "#94a3b8", dash: true, weightPt: 1, text: e.name, fontPx: 10 });
+    }
+  }
+
+  // стрелки под фигурами: соединители, приклеенные к фигурам
+  for (const edge of d.edges) {
+    let textAt: Pt | undefined;
+    if (edge.label) {
+      const i = Math.floor((edge.points.length - 1) / 2);
+      textAt = [(edge.points[i][0] + edge.points[i + 1][0]) / 2, (edge.points[i][1] + edge.points[i + 1][1]) / 2 - 10];
+    }
+    page.connector({
+      points: edge.points,
+      from: { key: edge.from },
+      to: { key: edge.to },
+      text: edge.label,
+      textAt,
+      tag: edge.flowId ? { pm_k: "flow", pm_id: edge.flowId, pm_n: edge.label ?? "" } : { pm_k: "synthflow" },
+    });
+  }
+
+  for (const s of d.shapes) drawBpmnShape(page, s);
+  // что было нарисовано: по этому списку импорт отличает удалённое в Visio от появившегося в модели позже
+  page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId ? [e.flowId] : [])) });
+  return page;
+}
+
+function drawBpmnShape(page: Page, s: Shape) {
+  const { x, y, w, h } = s;
+  const tag: Record<string, string> = s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
+  if (s.kind === "event") {
+    const isStart = s.subtype === "start";
+    const isEnd = s.subtype === "end";
+    const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
+    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id }, [...inner, ...eventGlyph(s.subtype, w, h)]);
+  } else if (s.kind === "gateway") {
+    page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id }, gatewayGlyph(s.subtype, w, h));
+  } else {
+    page.rect(x, y, w, h, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id }, s.kind === "subprocess" ? [{ kind: "path", pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]], closed: true }, { kind: "path", pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] }, { kind: "path", pts: [[w / 2, h - 14], [w / 2, h - 6]] }] : []);
+  }
+}
+
+// --- пакет ---
+
+function documentXml(meta: Record<string, string>): string {
+  // Стиль «No Style» — запасные значения для ячеек, которые фигуры не переопределяют.
+  // DocumentSheet хранит сведения о сессии: по ним импорт убеждается, что файл — из этого приложения.
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<VisioDocument xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve">
+<DocumentSettings TopPage="0" DefaultTextStyle="0" DefaultLineStyle="0" DefaultFillStyle="0" DefaultGuideStyle="0"/>
+<Colors/>
+<StyleSheets><StyleSheet ID="0" NameU="No Style" Name="No Style">
+<Cell N="EnableLineProps" V="1"/><Cell N="EnableFillProps" V="1"/><Cell N="EnableTextProps" V="1"/><Cell N="HideForApply" V="0"/>
+<Cell N="LineWeight" V="0.01388888888888889"/><Cell N="LineColor" V="#000000"/><Cell N="LinePattern" V="1"/><Cell N="Rounding" V="0"/>
+<Cell N="BeginArrow" V="0"/><Cell N="EndArrow" V="0"/><Cell N="BeginArrowSize" V="2"/><Cell N="EndArrowSize" V="2"/>
+<Cell N="FillForegnd" V="#ffffff"/><Cell N="FillBkgnd" V="#ffffff"/><Cell N="FillPattern" V="1"/>
+<Cell N="LeftMargin" V="0.05555555555555555"/><Cell N="RightMargin" V="0.05555555555555555"/><Cell N="TopMargin" V="0.05555555555555555"/><Cell N="BottomMargin" V="0.05555555555555555"/>
+<Cell N="VerticalAlign" V="1"/><Cell N="TextBkgnd" V="0"/>
+<Section N="Character"><Row IX="0"><Cell N="Size" V="0.1666666666666667"/><Cell N="Color" V="#000000"/><Cell N="Style" V="0"/></Row></Section>
+<Section N="Paragraph"><Row IX="0"><Cell N="HorzAlign" V="1"/></Row></Section>
+</StyleSheet></StyleSheets>
+<DocumentSheet NameU="TheDoc" Name="TheDoc" LineStyle="0" FillStyle="0" TextStyle="0">${userRows({ pm_fmt: VSDX_FORMAT, ...meta })}</DocumentSheet>
+</VisioDocument>`;
+}
+
+/** Без части windows.xml Visio считает пакет недопустимым и не открывает файл. */
+function windowsXml(first: Page): string {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Windows xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve" ClientWidth="1200" ClientHeight="800"><Window ID="0" WindowType="Drawing" WindowState="1073741824" WindowLeft="0" WindowTop="0" WindowWidth="1200" WindowHeight="800" ContainerType="Page" Page="0" ViewScale="-1" ViewCenterX="${num(first.widthIn / 2)}" ViewCenterY="${num(first.heightIn / 2)}"/></Windows>`;
+}
+
+function pagesXml(pages: Page[]): string {
+  const items = pages
+    .map(
+      (p, i) =>
+        `<Page ID="${i}" NameU="${esc(p.name)}" Name="${esc(p.name)}" ViewScale="-1" ViewCenterX="${num(p.widthIn / 2)}" ViewCenterY="${num(p.heightIn / 2)}"><PageSheet LineStyle="0" FillStyle="0" TextStyle="0"><Cell N="PageWidth" V="${num(p.widthIn)}"/><Cell N="PageHeight" V="${num(p.heightIn)}"/><Cell N="PageScale" V="1"/><Cell N="DrawingScale" V="1"/><Cell N="DrawingSizeType" V="3"/><Cell N="DrawingScaleType" V="0"/>${userRows(p.meta)}</PageSheet><Rel r:id="rId${i + 1}"/></Page>`
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Pages xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve">${items}</Pages>`;
+}
+
+const rels = (items: { id: string; type: string; target: string }[]) =>
+  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${REL_NS}">${items.map((r) => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join("")}</Relationships>`;
+
+/** Упаковывает страницы в OPC-пакет .vsdx. */
+export async function packVsdx(pages: Page[], docMeta: Record<string, string> = {}): Promise<Buffer> {
+  const zip = new JSZip();
+  // без записей каталогов: OPC-пакет — плоский список частей
+  const put = (name: string, data: string) => zip.file(name, data, { createFolders: false });
+  put(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/visio/document.xml" ContentType="application/vnd.ms-visio.drawing.main+xml"/><Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/><Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/>${pages
+      .map((_, i) => `<Override PartName="/visio/pages/page${i + 1}.xml" ContentType="application/vnd.ms-visio.page+xml"/>`)
+      .join("")}</Types>`
+  );
+  put("_rels/.rels", rels([{ id: "rId1", type: `${VISIO_REL}/document`, target: "visio/document.xml" }]));
+  put("visio/document.xml", documentXml(docMeta));
+  put("visio/_rels/document.xml.rels", rels([{ id: "rId1", type: `${VISIO_REL}/pages`, target: "pages/pages.xml" }, { id: "rId2", type: `${VISIO_REL}/windows`, target: "windows.xml" }]));
+  put("visio/windows.xml", windowsXml(pages[0]));
+  put("visio/pages/pages.xml", pagesXml(pages));
+  put("visio/pages/_rels/pages.xml.rels", rels(pages.map((_, i) => ({ id: `rId${i + 1}`, type: `${VISIO_REL}/page`, target: `page${i + 1}.xml` }))));
+  pages.forEach((p, i) => put(`visio/pages/page${i + 1}.xml`, p.contentXml()));
+
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+}
+
+/**
+ * Собирает .vsdx со всеми диаграммами модели. docMeta (session, base) записывается в документ,
+ * чтобы импорт мог проверить, что файл относится к той же сессии и не устарел.
+ */
+export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string, string> = {}): Promise<Buffer> {
+  const bpmn = await generateBpmn(model);
+  const idef0 = buildIdef0Diagrams(model);
+
+  // имена страниц Visio уникальны и без запрещённых символов
+  return packVsdx(
+    [
+      bpmnPage(bpmn.diagram, "BPMN"),
+      idef0Page(idef0.context, "IDEF0 A-0"),
+      idef0Page(idef0.root, "IDEF0 A0"),
+      ...idef0.children.map((c) => idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId)),
+    ],
+    docMeta
+  );
+}
