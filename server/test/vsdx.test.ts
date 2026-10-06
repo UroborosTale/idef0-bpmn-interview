@@ -83,6 +83,23 @@ describe("VSDX: выгрузка и чтение правок", () => {
     expect(r.model.nodes.find((n) => n.id === "a")!.controls).toEqual([]);
   });
 
+  it("фигуры из трафарета документа становятся элементами своего вида", async () => {
+    const JSZip = (await import("jszip")).default;
+    const m = branchingModel();
+    const zip = await JSZip.loadAsync(await buildVsdx(m, { pm_session: SID }));
+    const masters = await zip.file("visio/masters/masters.xml")!.async("string");
+    const idOf = (name: string) => masters.match(new RegExp(`<Master ID="(\\d+)" NameU="${name}"`))![1];
+    // так Visio записывает экземпляр мастера: только положение и текст, остальное наследуется
+    const inst = (id: number, master: string, text: string) => `<Shape ID="${id}" Type="Shape" Master="${master}"><Cell N="PinX" V="3"/><Cell N="PinY" V="1.5"/>${text ? `<Text>${text}</Text>` : ""}</Shape>`;
+    const page1 = await zip.file("visio/pages/page1.xml")!.async("string");
+    zip.file("visio/pages/page1.xml", page1.replace("</Shapes>", inst(900, idOf("Шлюз «или»"), "Сумма больше лимита?") + inst(901, idOf("Конечное событие"), "") + "</Shapes>"));
+    const doc = await readVsdx(await zip.generateAsync({ type: "nodebuffer" }));
+    const r = applyVisio(m, doc, SID);
+    const gw = r.model.nodes.find((n) => n.name === "Сумма больше лимита?")!;
+    expect(gw).toMatchObject({ type: "gateway", subtype: "exclusive" });
+    expect(r.model.nodes.find((n) => n.name === "Завершение")).toMatchObject({ type: "event", subtype: "end" });
+  });
+
   it("чужой файл отвергается", async () => {
     const { model, doc } = await roundtrip();
     expect(() => applyVisio(model, doc, "другая")).toThrow(/другой сессии/);

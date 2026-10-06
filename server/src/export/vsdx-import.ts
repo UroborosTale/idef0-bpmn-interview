@@ -110,9 +110,17 @@ function portsOf(shape: Node): Map<number, VPort> {
   return ports;
 }
 
-function collectShapes(container: Node | undefined, pageH: number, out: VShape[]) {
+/** Мастер трафарета: ячейки и метки, которые наследуют его экземпляры на страницах. */
+interface MasterInfo {
+  cells: Record<string, string>;
+  user: Record<string, string>;
+}
+
+function collectShapes(container: Node | undefined, pageH: number, out: VShape[], masters: Map<string, MasterInfo>) {
   for (const s of arr<Node>(container?.Shape)) {
-    const c = cellsOf(s);
+    // экземпляр мастера хранит только отличия от мастера — остальное (размер, метка pm_m) берём из мастера
+    const master = s["@_Master"] !== undefined ? masters.get(String(s["@_Master"])) : undefined;
+    const c = { ...master?.cells, ...cellsOf(s) };
     const id = Number(s["@_ID"]);
     const oneD = c.BeginX !== undefined && c.EndX !== undefined;
     const W = Number(c.Width ?? 0);
@@ -123,7 +131,7 @@ function collectShapes(container: Node | undefined, pageH: number, out: VShape[]
     const py = Number(c.PinY ?? 0);
     const shape: VShape = {
       id,
-      tag: userOf(s),
+      tag: { ...master?.user, ...userOf(s) },
       oneD,
       x: (px - locX) * IN,
       y: (pageH - (py + (H - locY))) * IN,
@@ -138,7 +146,7 @@ function collectShapes(container: Node | undefined, pageH: number, out: VShape[]
       shape.end = { x: Number(c.EndX) * IN, y: (pageH - Number(c.EndY)) * IN };
     }
     out.push(shape);
-    collectShapes(s.Shapes, pageH, out); // группы
+    collectShapes(s.Shapes, pageH, out, masters); // группы
   }
 }
 
@@ -152,6 +160,28 @@ export async function readVsdx(buf: Buffer): Promise<VDoc> {
   };
   const docXml = parser.parse(await read("visio/document.xml"));
   const meta = userOf(docXml.VisioDocument?.DocumentSheet ?? {});
+
+  // мастера трафарета документа (ссылки — через связи пакета: Visio при сохранении может перенумеровать части)
+  const masters = new Map<string, MasterInfo>();
+  const docRels = zip.file("visio/_rels/document.xml.rels");
+  const mastersTarget = docRels
+    ? arr<Node>(parser.parse(await docRels.async("string")).Relationships?.Relationship).find((r) => String(r["@_Type"]).endsWith("/masters"))?.["@_Target"]
+    : undefined;
+  if (mastersTarget) {
+    const mPath = `visio/${String(mastersTarget).replace(/^\/?(visio\/)?/, "")}`;
+    const mDir = mPath.slice(0, mPath.lastIndexOf("/") + 1);
+    const mRels = zip.file(`${mDir}_rels/${mPath.slice(mDir.length)}.rels`);
+    const mTargets = new Map<string, string>(
+      mRels ? arr<Node>(parser.parse(await mRels.async("string")).Relationships?.Relationship).map((r) => [r["@_Id"], r["@_Target"]] as const) : []
+    );
+    for (const m of arr<Node>(parser.parse(await read(mPath)).Masters?.Master)) {
+      const target = mTargets.get(arr<Node>(m.Rel)[0]?.["@_r:id"]);
+      const file = target ? zip.file(`${mDir}${String(target).replace(/^\.\//, "")}`) : null;
+      if (!file) continue;
+      const shape = arr<Node>(parser.parse(await file.async("string")).MasterContents?.Shapes?.Shape)[0];
+      if (shape) masters.set(String(m["@_ID"]), { cells: cellsOf(shape), user: userOf(shape) });
+    }
+  }
 
   const pagesXml = parser.parse(await read("visio/pages/pages.xml"));
   const relsXml = parser.parse(await read("visio/pages/_rels/pages.xml.rels"));
@@ -167,7 +197,7 @@ export async function readVsdx(buf: Buffer): Promise<VDoc> {
     const content = parser.parse(await read(`visio/pages/${file.replace(/^\/?(visio\/pages\/)?/, "")}`));
     const root = content.PageContents ?? {};
     const shapes: VShape[] = [];
-    collectShapes(root.Shapes, pageH, shapes);
+    collectShapes(root.Shapes, pageH, shapes, masters);
     const glue: VGlue[] = [];
     for (const c of arr<Node>(root.Connects?.Connect)) {
       const toCell: string = c["@_ToCell"] ?? "";
@@ -266,7 +296,25 @@ function splitCopies(shapes: VShape[]): { originals: Map<string, VShape>; copies
 }
 
 /** Фигура-кандидат на новый элемент: нарисована в Visio вручную (нет тегов), с текстом и контуром. */
-const isDrawnByHand = (s: VShape) => !s.oneD && s.tag.pm_k === undefined && clean(s.text) !== "" && s.hasOutline && s.w > 10 && s.h > 10;
+const isDrawnByHand = (s: VShape) => !s.oneD && s.tag.pm_k === undefined && s.tag.pm_m === undefined && clean(s.text) !== "" && s.hasOutline && s.w > 10 && s.h > 10;
+
+/** Фигура из трафарета документа: вид элемента задан мастером (pm_m), текст может быть пустым. */
+const fromStencil = (s: VShape) => !s.oneD && s.tag.pm_k === undefined && !!s.tag.pm_m;
+
+/** Вид элемента по метке мастера: «task», «subprocess», «gateway:exclusive», «event:start», «fn». */
+function stencilKind(pm: string): { type: ProcessNode["type"]; subtype?: string; name: string } {
+  const [kind, subtype] = pm.split(":");
+  switch (kind) {
+    case "gateway":
+      return { type: "gateway", subtype, name: "Условие?" };
+    case "event":
+      return { type: "event", subtype, name: subtype === "start" ? "Начало" : subtype === "end" ? "Завершение" : "Событие" };
+    case "subprocess":
+      return { type: "subprocess", name: "Новый подпроцесс" };
+    default:
+      return { type: "task", name: "Новый шаг" };
+  }
+}
 
 /**
  * Текст изменён пользователем в Visio — относительно того, что было записано при выгрузке (pm_n).
@@ -307,8 +355,9 @@ function applyBpmn(m: M, page: VPage, ctx: Ctx, changes: string[], warnings: str
   const visioToNode = new Map<number, string>(); // Visio-id фигуры → id узла (включая только что созданные)
   const skey = (s: VShape) => `${page.meta.pm_page}|${s.id}`;
   const handDrawn = page.shapes.filter(isDrawnByHand);
-  // копии и нарисованные фигуры, из которых шаги уже созданы при прошлом применении, — обычные существующие шаги
-  const knownShapes = [...copies, ...handDrawn].filter((s) => ctx.known[skey(s)]);
+  const stencil = page.shapes.filter(fromStencil);
+  // копии и новые фигуры, из которых шаги уже созданы при прошлом применении, — обычные существующие шаги
+  const knownShapes = [...copies, ...handDrawn, ...stencil].filter((s) => ctx.known[skey(s)]);
   const existing: [string, VShape][] = [...originals, ...knownShapes.map((s) => [ctx.known[skey(s)], s] as [string, VShape])];
   for (const [id, s] of existing) visioToNode.set(s.id, id);
 
@@ -349,14 +398,20 @@ function applyBpmn(m: M, page: VPage, ctx: Ctx, changes: string[], warnings: str
   if (movedCount) changes.push(`Перемещено фигур: ${movedCount}`);
 
   // новые шаги: копии фигур и нарисованные вручную
-  const fresh: { shape: VShape; source?: ProcessNode }[] = [
+  const fresh: { shape: VShape; source?: Pick<ProcessNode, "type" | "subtype" | "role_id">; defaultName?: string }[] = [
     ...copies.filter((s) => !ctx.known[skey(s)]).map((shape) => ({ shape, source: m.nodes.find((n) => n.id === shape.tag.pm_id) })),
     ...handDrawn.filter((s) => !ctx.known[skey(s)]).map((shape) => ({ shape })),
+    ...stencil
+      .filter((s) => !ctx.known[skey(s)])
+      .map((shape) => {
+        const k = stencilKind(shape.tag.pm_m);
+        return { shape, source: { type: k.type, subtype: k.subtype, role_id: null }, defaultName: k.name };
+      }),
   ];
-  for (const { shape, source } of fresh) {
+  for (const { shape, source, defaultName } of fresh) {
     const roleAt = laneRoleAt(shape);
     const node = newNode(m, {
-      name: clean(shape.text) || "Новый шаг",
+      name: clean(shape.text) || defaultName || "Новый шаг",
       type: source?.type ?? "task",
       subtype: source?.subtype,
       role_id: roleAt === undefined ? source?.role_id ?? null : roleAt,
@@ -538,7 +593,13 @@ function applyIdef0(m: M, page: VPage, ctx: Ctx, changes: string[], warnings: st
   const visioToNode = new Map<number, string>();
   const skey = (s: VShape) => `${page.meta.pm_page}|${s.id}`;
   const handDrawn = page.shapes.filter(isDrawnByHand);
-  const knownShapes = [...copies, ...handDrawn].filter((s) => ctx.known[skey(s)]);
+  // на диаграмме IDEF0 из трафарета берутся только функции; события и шлюзы здесь не имеют смысла
+  const stencil = page.shapes.filter(fromStencil).filter((s) => {
+    const ok = ["fn", "task", "subprocess"].includes(s.tag.pm_m);
+    if (!ok && !ctx.known[skey(s)]) warnings.push(`На странице ${q(page.name)} фигура «${s.tag.pm_m}» пропущена: на диаграмме IDEF0 можно добавлять только функции`);
+    return ok;
+  });
+  const knownShapes = [...copies, ...handDrawn, ...stencil].filter((s) => ctx.known[skey(s)]);
   const existing: [string, VShape][] = [...originals, ...knownShapes.map((s) => [ctx.known[skey(s)], s] as [string, VShape])];
   for (const [id, s] of existing) visioToNode.set(s.id, id);
 
@@ -568,7 +629,7 @@ function applyIdef0(m: M, page: VPage, ctx: Ctx, changes: string[], warnings: st
   }
   if (movedCount) changes.push(`Перемещено блоков: ${movedCount}`);
 
-  const fresh = [...copies, ...handDrawn].filter((s) => !ctx.known[skey(s)]);
+  const fresh = [...copies, ...handDrawn, ...stencil].filter((s) => !ctx.known[skey(s)]);
   for (const shape of fresh) {
     const node = newNode(m, { name: functionName(shape.text) || "Новая функция", idef0_parent: parentId, idef0_layout: { x: Math.max(20, rnd(shape.x)), y: Math.max(20, rnd(shape.y)) } });
     m = { ...m, nodes: [...m.nodes, node] };

@@ -90,7 +90,17 @@ export class Page {
   private connects: string[] = [];
   private nextId = 1;
   private keys = new Map<string, number>();
+  /** Фигура мастера трафарета: без служебных меток страницы (их унаследовал бы каждый экземпляр). */
+  private master = false;
   constructor(readonly name: string, readonly widthPx: number, readonly heightPx: number, readonly meta: Record<string, string> = {}) {}
+
+  /** Страница-заготовка для мастера: Visio не загружает фигуры мастера с id 1–4, поэтому нумерация с 5. */
+  static forMaster(name: string, widthPx: number, heightPx: number): Page {
+    const p = new Page(name, widthPx, heightPx);
+    p.master = true;
+    p.nextId = 5;
+    return p;
+  }
 
   /** Страница в дюймах с полем. */
   get widthIn() {
@@ -188,7 +198,7 @@ export class Page {
     }
 
     const { xml: textXml, text } = this.textSections(style);
-    const tag: Record<string, string> = { pm_k: "deco", ...style.tag, pm_sid: String(id) };
+    const tag: Record<string, string> = this.master ? { ...style.tag } : { pm_k: "deco", ...style.tag, pm_sid: String(id) };
     const connection = style.ports?.length
       ? `<Section N="Connection">${style.ports
           .map(
@@ -323,6 +333,59 @@ export class Page {
     const connects = this.connects.length ? `<Connects>${this.connects.join("")}</Connects>` : "";
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<PageContents xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve"><Shapes>${this.shapes.join("")}</Shapes>${connects}</PageContents>`;
   }
+
+  /** Содержимое мастера трафарета: та же разметка фигур, другой корневой элемент. */
+  masterContentXml(): string {
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<MasterContents xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve"><Shapes>${this.shapes.join("")}</Shapes></MasterContents>`;
+  }
+}
+
+// --- трафарет документа ---
+
+/**
+ * Мастера «Фигур документа» (трафарет внутри файла): перетащенная из него фигура несёт ячейку pm_m с типом
+ * элемента, и при чтении правок становится шагом, событием, шлюзом или функцией IDEF0 нужного вида.
+ */
+export interface StencilMaster {
+  nameU: string;
+  prompt: string;
+  page: Page;
+}
+
+export function stencilMasters(): StencilMaster[] {
+  const mk = (nameU: string, kind: string, prompt: string, w: number, h: number, draw: (p: Page, tag: Record<string, string>) => void): StencilMaster => {
+    const page = Page.forMaster(nameU, w, h);
+    draw(page, { pm_m: kind });
+    return { nameU, prompt, page };
+  };
+  const subMarker = (w: number, h: number): GeomPart[] => [
+    { kind: "path", pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]], closed: true },
+    { kind: "path", pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] },
+    { kind: "path", pts: [[w / 2, h - 14], [w / 2, h - 6]] },
+  ];
+  const below = (w: number) => ({ w, h: 30, gap: 3 });
+  return [
+    mk("Задача", "task", "Шаг процесса BPMN", 100, 80, (p, tag) => p.rect(0, 0, 100, 80, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
+    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 110, 80, (p, tag) => p.rect(0, 0, 110, 80, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(110, 80))),
+    mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
+    mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
+    mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#f0fdf4", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag })),
+    mk("Промежуточное событие", "event:intermediate", "Событие внутри процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { weightPt: 1.3, fontPx: 11, textBelow: below(120), tag }, [{ kind: "ellipse", cx: 18, cy: 18, rx: 14, ry: 14 }])),
+    mk("Конечное событие", "event:end", "Завершение процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#fef2f2", weightPt: 3.2, fontPx: 11, textBelow: below(120), tag })),
+    mk("Функция IDEF0", "fn", "Функциональный блок IDEF0", 170, 90, (p, tag) => p.rect(0, 0, 170, 90, { fill: "#eef2ff", weightPt: 1.4, fontPx: 12, tag })),
+  ];
+}
+
+const guid = (i: number) => `{5A1D0000-0000-4000-8000-${(i + 1).toString(16).padStart(12, "0")}}`;
+
+function mastersXml(masters: StencilMaster[]): string {
+  const items = masters
+    .map(
+      (m, i) =>
+        `<Master ID="${i + 1}" NameU="${esc(m.nameU)}" IsCustomNameU="1" Name="${esc(m.nameU)}" IsCustomName="1" Prompt="${esc(m.prompt)}" IconSize="1" AlignName="2" MatchByName="0" IconUpdate="1" UniqueID="${guid(i)}" BaseID="${guid(i + 100)}" PatternFlags="0" Hidden="0" MasterType="0"><PageSheet LineStyle="0" FillStyle="0" TextStyle="0"><Cell N="PageWidth" V="${num(m.page.widthIn)}"/><Cell N="PageHeight" V="${num(m.page.heightIn)}"/><Cell N="PageScale" V="1"/><Cell N="DrawingScale" V="1"/><Cell N="DrawingSizeType" V="4"/><Cell N="DrawingScaleType" V="0"/></PageSheet><Rel r:id="rId${i + 1}"/></Master>`
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Masters xmlns="${NS}" xmlns:r="${NS_R}" xml:space="preserve">${items}</Masters>`;
 }
 
 // --- IDEF0 ---
@@ -558,7 +621,7 @@ const rels = (items: { id: string; type: string; target: string }[]) =>
   `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="${REL_NS}">${items.map((r) => `<Relationship Id="${r.id}" Type="${r.type}" Target="${r.target}"/>`).join("")}</Relationships>`;
 
 /** Упаковывает страницы в OPC-пакет .vsdx. */
-export async function packVsdx(pages: Page[], docMeta: Record<string, string> = {}): Promise<Buffer> {
+export async function packVsdx(pages: Page[], docMeta: Record<string, string> = {}, masters: StencilMaster[] = []): Promise<Buffer> {
   const zip = new JSZip();
   // без записей каталогов: OPC-пакет — плоский список частей
   const put = (name: string, data: string) => zip.file(name, data, { createFolders: false });
@@ -566,11 +629,28 @@ export async function packVsdx(pages: Page[], docMeta: Record<string, string> = 
     "[Content_Types].xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/visio/document.xml" ContentType="application/vnd.ms-visio.drawing.main+xml"/><Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/><Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/>${pages
       .map((_, i) => `<Override PartName="/visio/pages/page${i + 1}.xml" ContentType="application/vnd.ms-visio.page+xml"/>`)
-      .join("")}</Types>`
+      .join("")}${
+      masters.length
+        ? `<Override PartName="/visio/masters/masters.xml" ContentType="application/vnd.ms-visio.masters+xml"/>` +
+          masters.map((_, i) => `<Override PartName="/visio/masters/master${i + 1}.xml" ContentType="application/vnd.ms-visio.master+xml"/>`).join("")
+        : ""
+    }</Types>`
   );
   put("_rels/.rels", rels([{ id: "rId1", type: `${VISIO_REL}/document`, target: "visio/document.xml" }]));
   put("visio/document.xml", documentXml(docMeta));
-  put("visio/_rels/document.xml.rels", rels([{ id: "rId1", type: `${VISIO_REL}/pages`, target: "pages/pages.xml" }, { id: "rId2", type: `${VISIO_REL}/windows`, target: "windows.xml" }]));
+  put(
+    "visio/_rels/document.xml.rels",
+    rels([
+      { id: "rId1", type: `${VISIO_REL}/pages`, target: "pages/pages.xml" },
+      { id: "rId2", type: `${VISIO_REL}/windows`, target: "windows.xml" },
+      ...(masters.length ? [{ id: "rId3", type: `${VISIO_REL}/masters`, target: "masters/masters.xml" }] : []),
+    ])
+  );
+  if (masters.length) {
+    put("visio/masters/masters.xml", mastersXml(masters));
+    put("visio/masters/_rels/masters.xml.rels", rels(masters.map((_, i) => ({ id: `rId${i + 1}`, type: `${VISIO_REL}/master`, target: `master${i + 1}.xml` }))));
+    masters.forEach((m, i) => put(`visio/masters/master${i + 1}.xml`, m.page.masterContentXml()));
+  }
   put("visio/windows.xml", windowsXml(pages[0]));
   put("visio/pages/pages.xml", pagesXml(pages));
   put("visio/pages/_rels/pages.xml.rels", rels(pages.map((_, i) => ({ id: `rId${i + 1}`, type: `${VISIO_REL}/page`, target: `page${i + 1}.xml` }))));
@@ -595,6 +675,7 @@ export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string
       idef0Page(idef0.root, "IDEF0 A0"),
       ...idef0.children.map((c) => idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId)),
     ],
-    docMeta
+    docMeta,
+    stencilMasters()
   );
 }
