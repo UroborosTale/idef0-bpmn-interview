@@ -26,14 +26,33 @@ export function CommitInput({ value, onCommit, placeholder, multiline }: { value
 }
 
 /** Плашка о восстановленном (или устаревшем) черновике. */
-export function DraftBanner({ restored, stale, onDiscard, onDismiss }: { restored: boolean; stale: boolean; onDiscard: () => void; onDismiss: () => void }) {
+export function DraftBanner({
+  restored,
+  stale,
+  onDiscard,
+  onDismiss,
+  onRestoreStale,
+}: {
+  restored: boolean;
+  stale: boolean;
+  onDiscard: () => void;
+  onDismiss: () => void;
+  onRestoreStale?: () => void;
+}) {
   if (!restored && !stale) return null;
   return (
     <div className="bpe-banner">
-      {restored ? "Восстановлены несохранённые правки с прошлого раза." : "Несохранённый черновик устарел (модель изменилась) и отброшен."}
+      {restored
+        ? "Восстановлены несохранённые правки с прошлого раза."
+        : "Есть несохранённый черновик, сделанный до того, как модель изменилась в другом месте (другая вкладка, Visio, повторная обработка)."}
       <span className="spacer" />
       {restored && <button onClick={onDiscard}>Отбросить правки</button>}
-      <button onClick={onDismiss}>Скрыть</button>
+      {stale && onRestoreStale && (
+        <button onClick={onRestoreStale} title="Черновик заменит текущую модель в редакторе; изменения, сделанные в другом месте, будут потеряны при сохранении">
+          Применить черновик
+        </button>
+      )}
+      <button onClick={onDismiss}>{stale ? "Отбросить черновик" : "Скрыть"}</button>
     </div>
   );
 }

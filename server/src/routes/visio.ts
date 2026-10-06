@@ -30,6 +30,9 @@ interface State {
 }
 
 const dirOf = (id: string) => path.join(root, id.replace(/[^\w-]/g, "_"));
+
+/** Удаляет рабочие файлы Visio сессии (при удалении сессии). */
+export const removeVisioFiles = (id: string) => fs.rmSync(dirOf(id), { recursive: true, force: true });
 const stateFile = (id: string) => path.join(dirOf(id), "state.json");
 
 function readState(id: string): State | null {

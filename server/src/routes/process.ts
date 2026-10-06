@@ -4,6 +4,8 @@ import { fragmentText, normalizeTerms, anonymizeFragments } from "../pipeline/fr
 import { parseUploadedFile } from "../pipeline/ingest.js";
 import { runOrchestratedPipeline } from "../pipeline/agents.js";
 import { CHUNK_SIZE } from "../pipeline/extract.js";
+import { carryOverManualEdits } from "../pipeline/carryOver.js";
+import { rebuildOutputs } from "../pipeline/run.js";
 import { logAudit } from "../db.js";
 import { db } from "../db.js";
 import { addVersion } from "../repo.js";
@@ -17,13 +19,20 @@ export const processRouter = Router();
  * Обработка интервью идёт фоновой задачей: запрос сразу возвращает задачу (202), клиент опрашивает
  * GET /jobs/:id. Ответ LLM может идти минутами — HTTP-запрос и прокси его не дождутся.
  */
-function runInBackground(session: SessionRecord, fragments: Fragment[], note: string, actor: "analyst" | "owner", action: string, details: object) {
+function runInBackground(session: SessionRecord, fragments: Fragment[], note: string, actor: "analyst" | "owner", action: string, details: object, fresh = false) {
   const prevStatus = session.model ? "ready" : "draft";
   return startJob(session.id, "pipeline", async (progress) => {
     updateSession(session.id, { status: "processing" });
     progress({ done: 0, total: Math.ceil(fragments.length / CHUNK_SIZE), stage: "извлечение" });
     try {
-      const output = await runOrchestratedPipeline(session.id, fragments, session.meta, { onProgress: progress });
+      let output = await runOrchestratedPipeline(session.id, fragments, session.meta, { onProgress: progress });
+      // ручные правки прежней модели (позиции, декомпозиция, добавленные шаги, RACI…) переносятся в новую
+      let carried = { matched: 0, kept: 0 };
+      if (session.model && !fresh) {
+        const c = carryOverManualEdits(session.model, output.model);
+        carried = { matched: c.matched, kept: c.kept };
+        output = { ...output, ...(await rebuildOutputs(c.model, output.report, session.model.gaps)) };
+      }
       updateSession(session.id, {
         model: output.model,
         validation: output.validation,
@@ -35,7 +44,7 @@ function runInBackground(session: SessionRecord, fragments: Fragment[], note: st
       });
       logAudit(session.id, actor, action, { ...details, provider: output.providerName, nodes: output.model.nodes.length, agentRunId: output.runId, iterations: output.iterations, failedChunks: output.report.failedChunks.length });
       addVersion(session.id, note);
-      return { nodes: output.model.nodes.length, failedChunks: output.report.failedChunks.length, unverified: output.report.unverified };
+      return { nodes: output.model.nodes.length, failedChunks: output.report.failedChunks.length, unverified: output.report.unverified, carried };
     } catch (e) {
       updateSession(session.id, { status: prevStatus });
       throw e;
@@ -146,7 +155,8 @@ processRouter.post("/sessions/:id/run", async (req, res) => {
     return;
   }
   try {
-    res.status(202).json(runInBackground(session, session.fragments, "Запуск конвейера извлечения", "analyst", "pipeline_run", {}));
+    const fresh = Boolean((req.body as { fresh?: boolean } | undefined)?.fresh);
+    res.status(202).json(runInBackground(session, session.fragments, "Запуск конвейера извлечения", "analyst", "pipeline_run", { fresh }, fresh));
   } catch (e) {
     res.status(e instanceof JobConflictError ? 409 : 500).json({ error: (e as Error).message });
   }

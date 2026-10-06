@@ -7,6 +7,7 @@ import { generateIdef0, type Idef0Result } from "./idef0.js";
 import { getLLMProvider } from "../llm/provider.js";
 import type { LLMProvider } from "../llm/types.js";
 import type { SessionMeta } from "../repo.js";
+import { keepGapStatuses } from "./carryOver.js";
 
 export interface PipelineOutput {
   model: ProcessLogicModel;
@@ -42,6 +43,14 @@ export function reportIssues(report: ExtractionReport): ValidationIssue[] {
     });
   }
   return issues;
+}
+
+/** Пересчитывает пробелы, проверки и диаграммы для изменённой модели (например, после переноса ручных правок). */
+export async function rebuildOutputs(model: ProcessLogicModel, report: ExtractionReport, prevGaps: ProcessLogicModel["gaps"] = []) {
+  model.gaps = keepGapStatuses(prevGaps, detectGaps(model));
+  const validation = [...reportIssues(report), ...validateModel(model)];
+  const bpmn = await generateBpmn(model);
+  return { model, validation, bpmnXml: bpmn.xml, idef0: generateIdef0(model) };
 }
 
 /**

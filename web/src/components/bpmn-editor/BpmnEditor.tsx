@@ -220,6 +220,7 @@ export default function BpmnEditor({
           persisted.forget();
         }}
         onDismiss={persisted.dismiss}
+        onRestoreStale={persisted.restoreStale}
       />
       <EditorToolbar
         canUndo={h.canUndo}

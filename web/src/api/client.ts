@@ -526,10 +526,10 @@ async function waitJob(job: Job, sessionId: string, onProgress?: (p: JobProgress
 /** Сервер ответил «требуется вход» — приложение показывает страницу входа (App.tsx). */
 export const AUTH_REQUIRED_EVENT = "pm:auth-required";
 
-async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
+async function req<T>(method: string, url: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
   const res = await fetch(BASE + url, {
     method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers: { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...extraHeaders },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 401 && !url.startsWith("/auth/")) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
@@ -562,7 +562,9 @@ export const api = {
   patchSession: (id: string, patch: { title?: string; meta?: SessionMeta }) =>
     req<SessionRecord>("PATCH", `/sessions/${id}`, patch),
   deleteSession: (id: string) => req<void>("DELETE", `/sessions/${id}`),
-  putModel: (id: string, model: SessionRecord["model"]) => req<SessionRecord>("PUT", `/sessions/${id}/model`, model),
+  /** base — updatedAt сессии, с которой начиналась правка: сервер отклонит сохранение, если модель с тех пор изменилась. */
+  putModel: (id: string, model: SessionRecord["model"], base?: string) =>
+    req<SessionRecord>("PUT", `/sessions/${id}/model`, model, base ? { "X-Base-Updated-At": base } : undefined),
   rebuildDiagrams: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/rebuild-diagrams`),
 
   // Microsoft Visio как среда редактирования (server/src/routes/visio.ts)

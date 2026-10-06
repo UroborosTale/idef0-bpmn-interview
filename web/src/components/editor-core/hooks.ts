@@ -72,8 +72,9 @@ export function useModelHistory<M>(initial: () => M) {
 
 /**
  * Черновик в localStorage: несохранённые правки переживают переход на другую вкладку/страницу.
- * Восстанавливается, только если модель на сервере не менялась с момента записи (base — её версия);
- * иначе черновик устарел и отбрасывается. Хранилище может быть недоступно — тогда всё работает без него.
+ * Восстанавливается сам, только если модель на сервере не менялась с момента записи (base — её версия);
+ * иначе черновик «устарел»: его можно применить поверх новой модели вручную (restoreStale) или отбросить.
+ * Хранилище может быть недоступно — тогда всё работает без него.
  */
 export function useDraftPersistence<M>(opts: { id: string; base: string; draft: M; dirty: boolean; restore: (m: M) => void }) {
   const { id, base, draft, dirty, restore } = opts;
@@ -83,6 +84,7 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
   const restoreRef = useRef(restore);
   restoreRef.current = restore;
   const skipFirst = useRef(true);
+  const staleModel = useRef<M | null>(null);
 
   useEffect(() => {
     try {
@@ -94,6 +96,7 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
         setRestored(true);
       } else {
         localStorage.removeItem(key);
+        staleModel.current = saved.model;
         setStale(true);
       }
     } catch {
@@ -131,6 +134,14 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
     dismiss: () => {
       setRestored(false);
       setStale(false);
+      staleModel.current = null;
+    },
+    /** Применить устаревший черновик поверх текущей модели (правки, сделанные в другом месте, будут перезаписаны при сохранении). */
+    restoreStale: () => {
+      if (staleModel.current) restoreRef.current(staleModel.current);
+      staleModel.current = null;
+      setStale(false);
+      setRestored(true);
     },
     forget: () => {
       try {

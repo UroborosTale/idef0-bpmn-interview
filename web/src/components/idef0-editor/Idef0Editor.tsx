@@ -231,6 +231,7 @@ export default function Idef0Editor({
           persisted.forget();
         }}
         onDismiss={persisted.dismiss}
+        onRestoreStale={persisted.restoreStale}
       />
       <EditorToolbar
         canUndo={h.canUndo}

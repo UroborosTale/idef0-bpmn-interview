@@ -282,6 +282,32 @@ try {
   // колонка уже существует
 }
 
+// История версий модели — отдельная таблица: раньше снимки лежали JSON-массивом в sessions.versions_json,
+// разбирались при каждом чтении сессии и обрезались до 50 последних.
+db.exec(`CREATE TABLE IF NOT EXISTS session_versions (
+  session_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  version TEXT NOT NULL,
+  major INTEGER NOT NULL DEFAULT 0,
+  ts TEXT NOT NULL,
+  note TEXT NOT NULL,
+  author TEXT NOT NULL,
+  model_json TEXT NOT NULL,
+  PRIMARY KEY (session_id, seq)
+)`);
+{
+  const legacy = db.prepare(`SELECT id, versions_json FROM sessions WHERE versions_json IS NOT NULL AND versions_json <> '[]'`).all() as { id: string; versions_json: string }[];
+  if (legacy.length) {
+    const insert = db.prepare(`INSERT OR IGNORE INTO session_versions (session_id, seq, version, major, ts, note, author, model_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    db.transaction(() => {
+      for (const row of legacy) {
+        for (const v of JSON.parse(row.versions_json) as any[]) insert.run(row.id, v.seq, v.version, v.major ? 1 : 0, v.ts, v.note ?? "", v.author ?? "аналитик", JSON.stringify(v.model));
+        db.prepare(`UPDATE sessions SET versions_json = '[]' WHERE id = ?`).run(row.id);
+      }
+    })();
+  }
+}
+
 /**
  * ФТ-М6.1.2: предзаполненный каталог требований — только коды и краткие
  * собственные формулировки ключевых пунктов ISO 9001:2015 §4.4 (СМК и её

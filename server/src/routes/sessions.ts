@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createSession, deleteSession, getSession, listSessions, updateSession, addVersion, editBlockReason } from "../repo.js";
+import { createSession, deleteSession, getSession, listSessionSummaries, updateSession, addVersion, editBlockReason, versionSummaries } from "../repo.js";
 import type { SessionMeta } from "../repo.js";
 import { ProcessLogicModel } from "../types/model.js";
 import { validateModel } from "../pipeline/validate.js";
@@ -8,6 +8,7 @@ import { generateIdef0 } from "../pipeline/idef0.js";
 import { detectGaps } from "../pipeline/gaps.js";
 import { logAudit } from "../db.js";
 import { providerStatus } from "../llm/provider.js";
+import { removeVisioFiles } from "./visio.js";
 
 export const sessionsRouter = Router();
 
@@ -16,19 +17,7 @@ sessionsRouter.get("/provider-status", (_req, res) => {
 });
 
 sessionsRouter.get("/sessions", (_req, res) => {
-  const list = listSessions().map((s) => ({
-    id: s.id,
-    title: s.title,
-    mode: s.mode,
-    status: s.status,
-    meta: s.meta,
-    updatedAt: s.updatedAt,
-    createdAt: s.createdAt,
-    gapsOpen: s.model?.gaps?.filter((g) => g.status === "open").length ?? 0,
-    hasErrors: s.validation.some((v) => v.severity === "error"),
-    diagramsStale: s.diagramsStale,
-  }));
-  res.json(list);
+  res.json(listSessionSummaries());
 });
 
 sessionsRouter.post("/sessions", (req, res) => {
@@ -50,17 +39,23 @@ sessionsRouter.post("/sessions", (req, res) => {
   res.status(201).json(session);
 });
 
+/** Сессия для клиента: версии — без моделей (снимки целиком отдаёт /sessions/:id/versions/...). */
+export function sessionForClient(session: NonNullable<ReturnType<typeof getSession>>) {
+  return { ...session, versions: versionSummaries(session.id) };
+}
+
 sessionsRouter.get("/sessions/:id", (req, res) => {
   const session = getSession(req.params.id);
   if (!session) {
     res.status(404).json({ error: "not found" });
     return;
   }
-  res.json(session);
+  res.json(sessionForClient(session));
 });
 
 sessionsRouter.delete("/sessions/:id", (req, res) => {
   deleteSession(req.params.id);
+  removeVisioFiles(req.params.id);
   res.status(204).end();
 });
 
@@ -90,6 +85,13 @@ sessionsRouter.put("/sessions/:id/model", (req, res) => {
   const block = editBlockReason(session);
   if (block) {
     res.status(409).json({ error: block });
+    return;
+  }
+  // Защита от потерянных правок: клиент присылает updatedAt сессии, с которой начинал правку.
+  // Если с тех пор модель изменилась (другая вкладка, Visio, повторная обработка) — отказ, правки остаются в черновике.
+  const base = req.header("X-Base-Updated-At");
+  if (base && base !== session.updatedAt) {
+    res.status(409).json({ error: "Модель изменилась после того, как вы начали правку (другая вкладка, Visio или повторная обработка). Ваши правки сохранены в черновике редактора: обновите страницу — редактор предложит применить черновик поверх новой модели.", conflict: true });
     return;
   }
   const parsed = ProcessLogicModel.safeParse(req.body);

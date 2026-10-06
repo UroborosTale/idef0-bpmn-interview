@@ -120,7 +120,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
   /** Сохранение из редакторов диаграмм: модель + пересборка BPMN/IDEF0, чтобы просмотр и экспорт совпали с нарисованным. */
   async function saveModel(m: NonNullable<SessionRecord["model"]>): Promise<boolean> {
     const ok = await withBusy(async () => {
-      await api.putModel(sessionId, m);
+      await api.putModel(sessionId, m, session?.updatedAt);
       setSession(await api.rebuildDiagrams(sessionId));
       return true;
     });
@@ -270,7 +270,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
                       ...model,
                       nodes: model.nodes.map((n) => (n.id === nodeId ? { ...n, ...patch } : n)),
                     };
-                    setSession(await api.putModel(sessionId, updatedModel));
+                    setSession(await api.putModel(sessionId, updatedModel, session.updatedAt));
                   })
                 }
               />

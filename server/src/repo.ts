@@ -102,8 +102,20 @@ export interface SessionRecord {
   updatedAt: string;
 }
 
+/** Снимки версий сессии по возрастанию seq (с моделями). */
+export function loadVersions(sessionId: string): VersionSnapshot[] {
+  const rows = db.prepare(`SELECT * FROM session_versions WHERE session_id = ? ORDER BY seq`).all(sessionId) as any[];
+  return rows.map((r) => ({ seq: r.seq, version: r.version, major: !!r.major, ts: r.ts, note: r.note, author: r.author, model: JSON.parse(r.model_json) }));
+}
+
+/** Версии без моделей — для списков и ответа клиенту. */
+export function versionSummaries(sessionId: string): Omit<VersionSnapshot, "model">[] {
+  const rows = db.prepare(`SELECT seq, version, major, ts, note, author FROM session_versions WHERE session_id = ? ORDER BY seq`).all(sessionId) as any[];
+  return rows.map((r) => ({ seq: r.seq, version: r.version, major: !!r.major, ts: r.ts, note: r.note, author: r.author }));
+}
+
 function rowToRecord(row: any): SessionRecord {
-  return {
+  const record = {
     id: row.id,
     title: row.title,
     mode: row.mode,
@@ -116,7 +128,7 @@ function rowToRecord(row: any): SessionRecord {
     bpmnXml: row.bpmn_xml,
     idef0: row.idef0_json ? JSON.parse(row.idef0_json) : null,
     chat: JSON.parse(row.chat_json),
-    versions: JSON.parse(row.versions_json),
+    versions: [] as VersionSnapshot[],
     comments: JSON.parse(row.comments_json),
     qa: JSON.parse(row.qa_json),
     diagramsStale: !!row.diagrams_stale,
@@ -129,6 +141,11 @@ function rowToRecord(row: any): SessionRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+  // Версии с моделями тяжёлые: читаются из таблицы только при первом обращении и не попадают в JSON-ответы
+  // (свойство неперечислимое); клиенту список версий отдаёт sessionForClient / /sessions/:id/versions.
+  let versions: VersionSnapshot[] | undefined;
+  Object.defineProperty(record, "versions", { enumerable: false, configurable: true, get: () => (versions ??= loadVersions(row.id)) });
+  return record;
 }
 
 export function createSession(input: { title: string; mode: "A" | "B"; meta: SessionMeta }): SessionRecord {
@@ -152,8 +169,46 @@ export function listSessions(): SessionRecord[] {
   return rows.map(rowToRecord);
 }
 
+/** Строки списка сессий без разбора больших JSON-полей: счётчики считает SQLite. */
+export function listSessionSummaries() {
+  const rows = db
+    .prepare(
+      `SELECT id, title, mode, status, meta_json, updated_at, created_at, diagrams_stale,
+        CASE WHEN model_json IS NULL THEN 0 ELSE
+          (SELECT COUNT(*) FROM json_each(model_json, '$.gaps') WHERE json_extract(value, '$.status') = 'open') END AS gaps_open,
+        EXISTS (SELECT 1 FROM json_each(validation_json) WHERE json_extract(value, '$.severity') = 'error') AS has_errors
+       FROM sessions ORDER BY updated_at DESC`
+    )
+    .all() as any[];
+  return rows.map((r) => ({
+    id: r.id as string,
+    title: r.title as string,
+    mode: r.mode as SessionRecord["mode"],
+    status: r.status as SessionRecord["status"],
+    meta: JSON.parse(r.meta_json) as SessionMeta,
+    updatedAt: r.updated_at as string,
+    createdAt: r.created_at as string,
+    gapsOpen: Number(r.gaps_open) || 0,
+    hasErrors: !!r.has_errors,
+    diagramsStale: !!r.diagrams_stale,
+  }));
+}
+
+/**
+ * Удаление сессии вместе со всем, что к ней относится (версии, кампании, уведомления, журналы,
+ * корпус примеров). Журнал аудита сохраняется, процессы реестра отвязываются.
+ */
 export function deleteSession(id: string): void {
-  db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
+  db.transaction(() => {
+    const campaigns = db.prepare(`SELECT id FROM campaigns WHERE session_id = ?`).all(id) as { id: string }[];
+    for (const c of campaigns) db.prepare(`DELETE FROM campaign_respondents WHERE campaign_id = ?`).run(c.id);
+    for (const table of ["session_versions", "campaigns", "notification_webhooks", "notifications", "corpus_entries", "agent_run_log", "tobe_hypotheses", "mining_logs", "mining_mappings", "jobs"]) {
+      db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(id);
+    }
+    db.prepare(`UPDATE processes SET session_id = NULL WHERE session_id = ?`).run(id);
+    db.prepare(`UPDATE tobe_hypotheses SET applied_session_id = NULL WHERE applied_session_id = ?`).run(id);
+    db.prepare(`DELETE FROM sessions WHERE id = ?`).run(id);
+  })();
   logAudit(id, "system", "session_deleted");
 }
 
@@ -240,8 +295,7 @@ export function addVersion(id: string, note: string, opts?: { major?: boolean; a
   const current = getSession(id);
   const model = opts?.modelOverride ?? current?.model;
   if (!current || !model) throw new Error("No model to snapshot");
-  const versions = [...current.versions];
-  const last = versions[versions.length - 1];
+  const last = db.prepare(`SELECT seq, version FROM session_versions WHERE session_id = ? ORDER BY seq DESC LIMIT 1`).get(id) as { seq: number; version: string } | undefined;
   let major = 0;
   let minor = 0;
   if (last) {
@@ -261,12 +315,20 @@ export function addVersion(id: string, note: string, opts?: { major?: boolean; a
     ...model,
     process: { ...model.process, version, status: opts?.major ? "approved" : model.process.status },
   };
-  versions.push({ seq, version, major: !!opts?.major, ts: new Date().toISOString(), note, author: opts?.author ?? "аналитик", model: stampedModel });
-  db.prepare(`UPDATE sessions SET versions_json = ?, model_json = ? WHERE id = ?`).run(
-    JSON.stringify(versions.slice(-50)),
-    JSON.stringify(stampedModel),
-    id
-  );
+  // история не обрезается: откат и анализ влияния опираются на любые прошлые снимки
+  db.transaction(() => {
+    db.prepare(`INSERT INTO session_versions (session_id, seq, version, major, ts, note, author, model_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      id,
+      seq,
+      version,
+      opts?.major ? 1 : 0,
+      new Date().toISOString(),
+      note,
+      opts?.author ?? "аналитик",
+      JSON.stringify(stampedModel)
+    );
+    db.prepare(`UPDATE sessions SET model_json = ?, updated_at = ? WHERE id = ?`).run(JSON.stringify(stampedModel), new Date().toISOString(), id);
+  })();
   logAudit(id, opts?.author ?? "system", opts?.major ? "version_approved" : "version_snapshot", { version, note });
 
   // ФТ-М9.1.1/9.1.5: утверждённая пара "текст — модель" пополняет корпус для
