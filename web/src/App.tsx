@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, AUTH_REQUIRED_EVENT } from "./api/client";
+import { routePath, useRoute, type Route } from "./router";
+import ErrorBoundary from "./components/ErrorBoundary";
 import LoginPage from "./pages/LoginPage";
 import SessionsListPage from "./pages/SessionsListPage";
 import NewSessionPage from "./pages/NewSessionPage";
@@ -13,34 +15,25 @@ import ChecklistRulesPage from "./pages/ChecklistRulesPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import TechnologyPage from "./pages/TechnologyPage";
 
-type View =
-  | { name: "list" }
-  | { name: "new" }
-  | { name: "workspace"; id: string }
-  | { name: "registry" }
-  | { name: "glossary" }
-  | { name: "notifications" }
-  | { name: "requirements" }
-  | { name: "checklistRules" }
-  | { name: "auditLog" }
-  | { name: "technology" };
-
-/** ФТ-М4.2.2: персональная ссылка /campaign/:campaignId/:token — отдельная публичная страница без основной навигации. */
-function matchCampaignRoute(): { campaignId: string; token: string } | null {
-  const m = window.location.pathname.match(/^\/campaign\/([^/]+)\/([^/]+)\/?$/);
-  return m ? { campaignId: m[1], token: m[2] } : null;
-}
+/** Разделы, которые нужны реже, — в меню «Ещё». */
+const MORE: { route: Route; label: string }[] = [
+  { route: { name: "glossary" }, label: "Справочники" },
+  { route: { name: "requirements" }, label: "Реестр требований" },
+  { route: { name: "checklistRules" }, label: "Чек-лист: правила" },
+  { route: { name: "auditLog" }, label: "Журнал аудита" },
+  { route: { name: "technology" }, label: "Технологии" },
+];
 
 export default function App() {
-  const campaignRoute = matchCampaignRoute();
-  const [view, setView] = useState<View>({ name: "list" });
+  const [route, navigate] = useRoute();
   const [provider, setProvider] = useState<{ name: string; live: boolean } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   // undefined — ещё не знаем; null — нужен вход
   const [user, setUser] = useState<{ login: string; authRequired: boolean } | null | undefined>(undefined);
+  const isCampaign = route.name === "campaign";
 
   useEffect(() => {
-    if (campaignRoute) return;
+    if (isCampaign) return;
     api
       .authMe()
       .then((r) => setUser(r.user ? { login: r.user.login, authRequired: r.authRequired } : null))
@@ -48,7 +41,7 @@ export default function App() {
     const onAuth = () => setUser(null);
     window.addEventListener(AUTH_REQUIRED_EVENT, onAuth);
     return () => window.removeEventListener(AUTH_REQUIRED_EVENT, onAuth);
-  }, []);
+  }, [isCampaign]);
 
   useEffect(() => {
     if (!user) return;
@@ -58,39 +51,54 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     api.listNotifications({ unread: true }).then((rows) => setUnreadCount(rows.length)).catch(() => {});
-  }, [view, user]);
+  }, [route.name, user]);
 
-  if (campaignRoute) {
-    return <RespondentInterviewPage campaignId={campaignRoute.campaignId} token={campaignRoute.token} />;
-  }
+  useEffect(() => {
+    document.title = route.name === "workspace" ? "Сессия — IDEF0 / BPMN" : "IDEF0 / BPMN — модели по интервью";
+  }, [route.name]);
+
+  // ФТ-М4.2.2: персональная ссылка респондента — отдельная публичная страница без навигации и входа
+  if (route.name === "campaign") return <RespondentInterviewPage campaignId={route.campaignId} token={route.token} />;
   if (user === undefined) return null;
   if (user === null) return <LoginPage onLoggedIn={(login) => setUser({ login, authRequired: true })} />;
+
+  /** Ссылка-кнопка: обычный клик — переход внутри приложения, средний/Ctrl — новая вкладка. */
+  const link = (r: Route, label: React.ReactNode, className?: string) => (
+    <a
+      href={routePath(r)}
+      className={`nav-link ${className ?? ""} ${route.name === r.name ? "active" : ""}`}
+      onClick={(e) => {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) return;
+        e.preventDefault();
+        navigate(r);
+      }}
+    >
+      {label}
+    </a>
+  );
 
   return (
     <div className="app-shell">
       <div className="topbar">
-        <div className="brand" onClick={() => setView({ name: "list" })}>
-          IDEF0 / BPMN — модели по интервью
-        </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        {link({ name: "list" }, "IDEF0 / BPMN — модели по интервью", "brand")}
+        <div className="topbar-nav">
           {provider && (
             <span className={`provider-badge ${provider.live ? "live" : ""}`} title="LLM-провайдер для извлечения структуры">
               {provider.live ? `LLM: ${provider.name}` : "офлайн-режим (без внешней LLM)"}
             </span>
           )}
-          {view.name !== "notifications" && (
-            <button onClick={() => setView({ name: "notifications" })}>
-              Уведомления{unreadCount > 0 ? ` (${unreadCount})` : ""}
-            </button>
-          )}
-          {view.name !== "registry" && <button onClick={() => setView({ name: "registry" })}>Реестр процессов</button>}
-          {view.name !== "glossary" && <button onClick={() => setView({ name: "glossary" })}>Справочники</button>}
-          {view.name !== "requirements" && <button onClick={() => setView({ name: "requirements" })}>Реестр требований</button>}
-          {view.name !== "checklistRules" && <button onClick={() => setView({ name: "checklistRules" })}>Чек-лист: правила</button>}
-          {view.name !== "auditLog" && <button onClick={() => setView({ name: "auditLog" })}>Журнал аудита</button>}
-          {view.name !== "technology" && <button onClick={() => setView({ name: "technology" })}>Технологии</button>}
-          {view.name !== "list" && <button onClick={() => setView({ name: "list" })}>Все сессии</button>}
-          {view.name !== "new" && <button className="primary" onClick={() => setView({ name: "new" })}>+ Новая сессия</button>}
+          {link({ name: "list" }, "Сессии")}
+          {link({ name: "registry" }, "Реестр процессов")}
+          {link({ name: "notifications" }, `Уведомления${unreadCount > 0 ? ` (${unreadCount})` : ""}`)}
+          <details className="nav-more">
+            <summary>Ещё</summary>
+            <div className="nav-more-menu" onClick={(e) => (e.currentTarget.parentElement as HTMLDetailsElement).removeAttribute("open")}>
+              {MORE.map((m) => (
+                <span key={m.route.name}>{link(m.route, m.label)}</span>
+              ))}
+            </div>
+          </details>
+          {link({ name: "new" }, "+ Новая сессия", "primary")}
           {user.authRequired && (
             <button title={`Вы вошли как ${user.login}`} onClick={() => api.logout().finally(() => setUser(null))}>
               Выйти ({user.login})
@@ -99,18 +107,26 @@ export default function App() {
         </div>
       </div>
       <div className="main-area">
-        {view.name === "list" && (
-          <SessionsListPage onOpen={(id) => setView({ name: "workspace", id })} onCreateNew={() => setView({ name: "new" })} />
-        )}
-        {view.name === "new" && <NewSessionPage onCreated={(id) => setView({ name: "workspace", id })} />}
-        {view.name === "workspace" && <WorkspacePage sessionId={view.id} onBack={() => setView({ name: "list" })} />}
-        {view.name === "registry" && <RegistryPage />}
-        {view.name === "glossary" && <GlossaryPage />}
-        {view.name === "notifications" && <NotificationsPage />}
-        {view.name === "requirements" && <RequirementsPage />}
-        {view.name === "checklistRules" && <ChecklistRulesPage />}
-        {view.name === "auditLog" && <AuditLogPage />}
-        {view.name === "technology" && <TechnologyPage />}
+        <ErrorBoundary resetKey={routePath(route)}>
+          {route.name === "list" && <SessionsListPage onOpen={(id) => navigate({ name: "workspace", id })} onCreateNew={() => navigate({ name: "new" })} />}
+          {route.name === "new" && <NewSessionPage onCreated={(id) => navigate({ name: "workspace", id })} />}
+          {route.name === "workspace" && (
+            <WorkspacePage
+              key={route.id}
+              sessionId={route.id}
+              initialTab={route.tab}
+              onTabChange={(tab) => navigate({ name: "workspace", id: route.id, tab }, { replace: true })}
+              onBack={() => navigate({ name: "list" })}
+            />
+          )}
+          {route.name === "registry" && <RegistryPage />}
+          {route.name === "glossary" && <GlossaryPage />}
+          {route.name === "notifications" && <NotificationsPage />}
+          {route.name === "requirements" && <RequirementsPage />}
+          {route.name === "checklistRules" && <ChecklistRulesPage />}
+          {route.name === "auditLog" && <AuditLogPage />}
+          {route.name === "technology" && <TechnologyPage />}
+        </ErrorBoundary>
       </div>
     </div>
   );

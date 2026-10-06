@@ -6,6 +6,7 @@ import BpmnDiagram from "../components/bpmn-editor/BpmnDiagram";
 import BpmnEditor from "../components/bpmn-editor/BpmnEditor";
 import Idef0Editor from "../components/idef0-editor/Idef0Editor";
 import VisioEditor from "../components/VisioEditor";
+import ErrorBoundary from "../components/ErrorBoundary";
 import Idef0Viewer from "../components/Idef0Viewer";
 import GapsPanel from "../components/GapsPanel";
 import ValidationPanel from "../components/ValidationPanel";
@@ -48,9 +49,31 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export default function WorkspacePage({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
+const ALL_TABS: Tab[] = [
+  "text", "bpmn", "visio", "editor", "idef0", "idef0Editor", "model", "gaps", "validation", "export", "versions", "raci", "regulation",
+  "multiInterview", "verification", "review", "analytics", "checklist", "traceability", "jobDescriptions", "agentRuns",
+  "hypotheses", "mining", "bpms", "diagramReimport", "auditPackage", "chat",
+];
+const isTab = (t: string | undefined): t is Tab => !!t && (ALL_TABS as string[]).includes(t);
+
+export default function WorkspacePage({
+  sessionId,
+  onBack,
+  initialTab,
+  onTabChange,
+}: {
+  sessionId: string;
+  onBack: () => void;
+  /** Вкладка из адреса страницы (?tab=…). */
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
+}) {
   const [session, setSession] = useState<SessionRecord | null>(null);
-  const [tab, setTab] = useState<Tab>("text");
+  const [tab, setTabState] = useState<Tab>(isTab(initialTab) ? initialTab : "text");
+  const setTab = (t: Tab) => {
+    setTabState(t);
+    onTabChange?.(t);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +113,8 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
   }, [sessionId]);
 
   useEffect(() => {
-    if (session?.mode === "B") setTab("chat");
+    // чат-интервью открывается на вкладке интервью, если в адресе не указана другая
+    if (session?.mode === "B" && !isTab(initialTab)) setTabState("chat");
   }, [session?.id]);
 
   if (!session) return <p className="muted">Загрузка сессии…</p>;
@@ -127,35 +151,69 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
     return ok === true;
   }
 
-  const tabs: { key: Tab; label: string }[] = [
-    ...(session.mode === "B" ? [{ key: "chat" as Tab, label: "Интервью" }] : []),
-    { key: "text", label: "Текст" },
-    { key: "bpmn", label: "BPMN" },
-    { key: "visio", label: "Редактор Visio" },
-    { key: "editor", label: "Редактор BPMN (встроенный)" },
-    { key: "idef0", label: "IDEF0" },
-    { key: "idef0Editor", label: "Редактор IDEF0 (встроенный)" },
-    { key: "model", label: "Модель" },
-    { key: "gaps", label: `Пробелы${model ? ` (${model.gaps.filter((g) => g.status === "open").length})` : ""}` },
-    { key: "validation", label: `Валидация${session.validation.length ? ` (${session.validation.length})` : ""}` },
-    { key: "raci", label: "RACI" },
-    { key: "analytics", label: "Аналитика" },
-    { key: "hypotheses", label: "Гипотезы TO-BE" },
-    { key: "mining", label: "Process mining" },
-    { key: "bpms", label: "Экспорт в BPMS" },
-    { key: "diagramReimport", label: "Правки из редакторов" },
-    { key: "auditPackage", label: "Пакет к аудиту" },
-    { key: "checklist", label: "Чек-лист" },
-    { key: "traceability", label: "Трассировка требований" },
-    { key: "jobDescriptions", label: "Должностные инструкции" },
-    { key: "agentRuns", label: "Журнал агентов" },
-    { key: "regulation", label: "Регламент" },
-    { key: "multiInterview", label: "Мультиинтервью" },
-    { key: "verification", label: "Верификация" },
-    { key: "review", label: "Согласование" },
-    { key: "versions", label: "Версии" },
-    { key: "export", label: "Экспорт" },
+  // Вкладки сгруппированы по задачам: сначала выбирается группа, затем вкладка в ней.
+  const openGaps = model ? model.gaps.filter((g) => g.status === "open").length : 0;
+  const errors = session.validation.filter((v) => v.severity === "error").length;
+  const groups: { key: string; label: string; tabs: { key: Tab; label: string }[] }[] = [
+    {
+      key: "model",
+      label: "Модель",
+      tabs: [
+        ...(session.mode === "B" ? [{ key: "chat" as Tab, label: "Интервью" }] : []),
+        { key: "text", label: "Текст" },
+        { key: "bpmn", label: "BPMN" },
+        { key: "idef0", label: "IDEF0" },
+        { key: "visio", label: "Редактор Visio" },
+        { key: "editor", label: "Редактор BPMN" },
+        { key: "idef0Editor", label: "Редактор IDEF0" },
+        { key: "model", label: "Модель (данные)" },
+      ],
+    },
+    {
+      key: "quality",
+      label: `Проверки${openGaps || errors ? ` (${openGaps + errors})` : ""}`,
+      tabs: [
+        { key: "gaps", label: `Пробелы${openGaps ? ` (${openGaps})` : ""}` },
+        { key: "validation", label: `Валидация${session.validation.length ? ` (${session.validation.length})` : ""}` },
+        { key: "checklist", label: "Чек-лист" },
+        { key: "verification", label: "Верификация" },
+        { key: "traceability", label: "Трассировка требований" },
+      ],
+    },
+    {
+      key: "analysis",
+      label: "Анализ",
+      tabs: [
+        { key: "raci", label: "RACI" },
+        { key: "analytics", label: "Аналитика" },
+        { key: "hypotheses", label: "Гипотезы TO-BE" },
+        { key: "mining", label: "Process mining" },
+      ],
+    },
+    {
+      key: "collab",
+      label: "Совместная работа",
+      tabs: [
+        { key: "multiInterview", label: "Мультиинтервью" },
+        { key: "review", label: "Согласование" },
+        { key: "versions", label: "Версии" },
+        { key: "diagramReimport", label: "Правки из редакторов" },
+      ],
+    },
+    {
+      key: "docs",
+      label: "Документы и выгрузка",
+      tabs: [
+        { key: "regulation", label: "Регламент" },
+        { key: "jobDescriptions", label: "Должностные инструкции" },
+        { key: "auditPackage", label: "Пакет к аудиту" },
+        { key: "bpms", label: "Экспорт в BPMS" },
+        { key: "export", label: "Экспорт" },
+        { key: "agentRuns", label: "Журнал агентов" },
+      ],
+    },
   ];
+  const activeGroup = groups.find((g) => g.tabs.some((t) => t.key === tab)) ?? groups[0];
 
   return (
     <div>
@@ -198,13 +256,21 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
         </div>
       )}
 
-      <div className="ws-tabs">
-        {tabs.map((t) => (
-          <button key={t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>
+      <div className="ws-groups" role="tablist" aria-label="Разделы сессии">
+        {groups.map((g) => (
+          <button key={g.key} role="tab" aria-selected={g === activeGroup} className={g === activeGroup ? "active" : ""} onClick={() => setTab(g.tabs[0].key)}>
+            {g.label}
+          </button>
+        ))}
+      </div>
+      <div className="ws-tabs" role="tablist" aria-label={activeGroup.label}>
+        {activeGroup.tabs.map((t) => (
+          <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>
             {t.label}
           </button>
         ))}
       </div>
+      <ErrorBoundary resetKey={tab}>
 
       {tab === "chat" && session.mode === "B" && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, height: "calc(100vh - 260px)" }}>
@@ -345,6 +411,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
           </div>
         </div>
       )}
+      </ErrorBoundary>
     </div>
   );
 }
