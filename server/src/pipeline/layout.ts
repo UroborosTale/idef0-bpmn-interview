@@ -3,6 +3,8 @@ import * as ElkNS from "elkjs";
 // elkjs публикует CJS-модуль с default-совместимой формой; в NodeNext-режиме
 // TS не всегда разрешает интероп автоматически, поэтому берём конструктор
 // явно (как это делает сам bpmn-generator-подобный тулинг).
+import { LANE_H, MIN_X, START_Y, waypoints } from "../shared/bpmnGeometry.js";
+
 const ElkCtor: new () => import("elkjs").ELK = (ElkNS as any).default ?? (ElkNS as any);
 
 export interface LayoutNodeIn {
@@ -30,10 +32,9 @@ export interface LayoutResult {
   totalHeight: number;
 }
 
-const LANE_HEIGHT = 150;
-// Дорожки начинаются с x = 80 (см. bpmn.ts), подпись дорожки занимает 30 px — фигуры начинаются правее.
-const START_X = 130;
-const START_Y = 60;
+// Дорожки начинаются с LANE_X, подпись дорожки занимает LABEL_W — фигуры начинаются правее (MIN_X).
+const LANE_HEIGHT = LANE_H;
+const START_X = MIN_X;
 
 const elk = new ElkCtor();
 
@@ -115,56 +116,10 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
 }
 
 /**
- * Ортогональные (прямоугольные) точки перегиба стрелки между двумя
- * прямоугольниками — визуальное соглашение BPMN (см. bpmn-generator:
- * "Orthogonal edge routing", "Edge endpoint clipping to shape boundaries"),
- * вместо диагональных/кривых линий, пересекающих фигуры.
+ * Ортогональные точки перегиба стрелки между двумя прямоугольниками — общая функция
+ * shared/bpmnGeometry.ts (её же использует редактор в браузере).
  */
 export function orthogonalWaypoints(from: LayoutBox, to: LayoutBox, obstacles: LayoutBox[] = []): [number, number][] {
-  const sx = from.x + from.width;
-  const sy = from.y + from.height / 2;
-  const tx = to.x;
-  const ty = to.y + to.height / 2;
-
-  // Тот же горизонтальный уровень — прямая линия без переломов, если на пути нет других фигур
-  if (Math.abs(sy - ty) < 2) {
-    const blockers = obstacles.filter((o) => o.x + o.width > sx && o.x < tx && o.y - 4 < sy && o.y + o.height + 4 > sy);
-    if (blockers.length === 0) {
-      return [
-        [sx, sy],
-        [tx, ty],
-      ];
-    }
-    const upY = Math.min(from.y, to.y, ...blockers.map((o) => o.y)) - 20;
-    return [
-      [sx, sy],
-      [sx + 12, sy],
-      [sx + 12, upY],
-      [tx - 12, upY],
-      [tx - 12, ty],
-      [tx, ty],
-    ];
-  }
-
-  // Цель находится левее источника (обратный / петлевой поток) —
-  // заводим линию вокруг узлов сверху или снизу, а не сквозь них
-  if (tx < sx + 24) {
-    const midY = sy < ty ? Math.min(from.y, to.y) - 24 : Math.max(from.y + from.height, to.y + to.height) + 24;
-    return [
-      [sx, sy],
-      [sx + 20, sy],
-      [sx + 20, midY],
-      [tx - 20, midY],
-      [tx - 20, ty],
-      [tx, ty],
-    ];
-  }
-
-  const midX = sx + (tx - sx) / 2;
-  return [
-    [sx, sy],
-    [midX, sy],
-    [midX, ty],
-    [tx, ty],
-  ];
+  const box = (b: LayoutBox) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
+  return waypoints(box(from), box(to), obstacles.map(box));
 }

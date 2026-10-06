@@ -26,7 +26,10 @@ services:
     restart: unless-stopped
 
   web:
-    build: ./web
+    # контекст — корень репозитория: клиент собирается вместе с общим модулем server/src/shared
+    build:
+      context: .
+      dockerfile: web/Dockerfile
     ports:
       - "8080:80"
     depends_on:

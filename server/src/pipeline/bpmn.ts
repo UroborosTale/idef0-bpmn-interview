@@ -1,5 +1,6 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
+import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
 export interface BpmnDiagramData {
@@ -83,15 +84,8 @@ function eventInfo(subtype?: string): { tag: string; def?: string } {
   }
 }
 
-// Размеры фигур и раскладка приведены к соглашениям OMG BPMN DI, применяемым
-// референсными редакторами (bpmn.io/Camunda Modeler): 100×80 задачи,
-// 50×50 шлюзы, 36×36 события.
-const NODE_SIZE: Record<string, { w: number; h: number }> = {
-  task: { w: 100, h: 80 },
-  subprocess: { w: 110, h: 80 },
-  gateway: { w: 50, h: 50 },
-  event: { w: 36, h: 36 },
-};
+// Размеры фигур — общие с редактором (shared/bpmnGeometry.ts).
+const NODE_SIZE = SIZE;
 
 /**
  * Детерминированная генерация BPMN 2.0 XML (ФТ-6) из промежуточной модели.
@@ -321,9 +315,9 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
   const diagramLanes: BpmnDiagramData["lanes"] = [];
   const laneShapesXml = [...laneRoles.map((r) => r.id), ...(hasUnassigned ? ["__unassigned__"] : [])].map((rid, i) => {
     const bounds = layout.laneBounds[i] ?? { y: 60, height: 150 };
-    diagramLanes.push({ roleId: rid === "__unassigned__" ? null : rid, name: rid === "__unassigned__" ? "Без исполнителя" : laneRoles[i].name, x: 80, y: bounds.y, w: poolWidth - 80, h: bounds.height });
+    diagramLanes.push({ roleId: rid === "__unassigned__" ? null : rid, name: rid === "__unassigned__" ? "Без исполнителя" : laneRoles[i].name, x: LANE_X, y: bounds.y, w: poolWidth - LANE_X, h: bounds.height });
     const laneId = rid === "__unassigned__" ? UNASSIGNED_LANE : laneIdOf(rid);
-    return `<bpmndi:BPMNShape id="${laneId}_di" bpmnElement="${laneId}" isHorizontal="true"><dc:Bounds x="80" y="${bounds.y}" width="${poolWidth - 80}" height="${bounds.height}" /></bpmndi:BPMNShape>`;
+    return `<bpmndi:BPMNShape id="${laneId}_di" bpmnElement="${laneId}" isHorizontal="true"><dc:Bounds x="${LANE_X}" y="${bounds.y}" width="${poolWidth - LANE_X}" height="${bounds.height}" /></bpmndi:BPMNShape>`;
   });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

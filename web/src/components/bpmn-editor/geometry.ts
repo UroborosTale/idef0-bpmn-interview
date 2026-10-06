@@ -1,36 +1,19 @@
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import type { Pt } from "../editor-core/hooks";
+import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
 
+// Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
+// (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
+export { SIZE, LANE_H, START_Y, LANE_X, LABEL_W, MIN_X, sizeOf, waypoints } from "@shared/bpmnGeometry";
+export type { Box } from "@shared/bpmnGeometry";
 export type { Pt };
 
-// Размеры и дорожки совпадают с генератором (server/src/pipeline/bpmn.ts, layout.ts),
-// чтобы координаты из редактора давали тот же результат в экспортированном BPMN.
-export const LANE_H = 150;
-export const START_Y = 60;
-export const LANE_X = 80; // как в экспортируемом BPMN (lane x=80), чтобы фигуры не налезали на подпись дорожки
-export const LABEL_W = 30;
-export const MIN_X = LANE_X + LABEL_W + 20;
 export const GRID = 10;
 const COL_W = 170;
-
-export const SIZE: Record<string, { w: number; h: number }> = {
-  task: { w: 100, h: 80 },
-  subprocess: { w: 110, h: 80 },
-  gateway: { w: 50, h: 50 },
-  event: { w: 36, h: 36 },
-};
-
-export interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
 
 /** Узлы диаграммы процесса: вложенные функции IDEF0 (idef0_parent) в BPMN не показываются. */
 export const visibleNodes = (m: ProcessLogicModel) => m.nodes.filter((n) => !n.idef0_parent);
 
-export const sizeOf = (n: Pick<ProcessNode, "type">) => SIZE[n.type] ?? SIZE.task;
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 
 export function boxOf(n: ProcessNode): Box {
@@ -71,27 +54,6 @@ export function clampIntoLane(m: ProcessLogicModel, n: Pick<ProcessNode, "type">
   const s = sizeOf(n);
   const top = laneTop(laneIndex);
   return [Math.max(MIN_X, x), Math.min(Math.max(y, top + 4), top + LANE_H - s.h - 4)];
-}
-
-/** Ортогональная маршрутизация — тот же алгоритм, что orthogonalWaypoints на сервере. */
-export function waypoints(from: Box, to: Box, obstacles: Box[] = []): Pt[] {
-  const sx = from.x + from.w;
-  const sy = from.y + from.h / 2;
-  const tx = to.x;
-  const ty = to.y + to.h / 2;
-  if (Math.abs(sy - ty) < 2) {
-    // прямая стрелка не должна проходить сквозь фигуры между источником и целью — обходим сверху
-    const blockers = obstacles.filter((o) => o.x + o.w > sx && o.x < tx && o.y - 4 < sy && o.y + o.h + 4 > sy);
-    if (blockers.length === 0) return [[sx, sy], [tx, ty]];
-    const upY = Math.min(from.y, to.y, ...blockers.map((o) => o.y)) - 20;
-    return [[sx, sy], [sx + 12, sy], [sx + 12, upY], [tx - 12, upY], [tx - 12, ty], [tx, ty]];
-  }
-  if (tx < sx + 24) {
-    const midY = sy < ty ? Math.min(from.y, to.y) - 24 : Math.max(from.y + from.h, to.y + to.h) + 24;
-    return [[sx, sy], [sx + 20, sy], [sx + 20, midY], [tx - 20, midY], [tx - 20, ty], [tx, ty]];
-  }
-  const midX = sx + (tx - sx) / 2;
-  return [[sx, sy], [midX, sy], [midX, ty], [tx, ty]];
 }
 
 export function labelPoint(pts: Pt[]): Pt {
