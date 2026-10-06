@@ -28,6 +28,7 @@ export interface Idef0Arrow {
   points: Pt[];
   label?: string;
   side: LabelSide;
+  labelRow?: number;
   /** Какая связь модели нарисована: функция, сущность и вид (для обратного чтения правок из Visio). */
   ref?: { kind: ArrowKind; nodeId: string; entityId: string };
   /** Блоки, к которым приклеены начало и конец стрелки (в Visio — концы соединителя). */
@@ -106,6 +107,7 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     points: a.points,
     label: a.label,
     side: a.side,
+    labelRow: a.labelRow,
     ref: { kind: a.kind, nodeId: a.nodeId, entityId: a.entityId },
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
     startNode: a.fromId ?? (a.kind === "output" ? a.nodeId : undefined),
@@ -129,14 +131,16 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
 }
 /** Контекстная диаграмма A-0. */
 function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0DiagramData {
-  const W = 640;
-  const H = 420;
-  const cb = { x: W / 2 - 110, y: H / 2 - 55, w: 220, h: 110 };
   const uniq = (arr: string[]) => [...new Set(arr)];
   const inputs = uniq(ext.inputs);
   const controls = uniq([...ext.controls, ...model.controls.map((c) => c.name)]);
   const outputs = uniq(ext.outputs.length ? ext.outputs : model.process.result ? [model.process.result] : []);
   const mechs = uniq([...ext.mechanisms, ...model.roles.map((r) => r.name)]);
+  // ширина — с запасом под самые длинные подписи входов и выходов (подписи обрезаются до 26 знаков)
+  const longest = Math.max(0, ...[...inputs, ...outputs].slice(0, 10).map((s) => Math.min(26, s.length) * 6.4));
+  const W = Math.max(640, Math.ceil(2 * (110 + 90 + longest + 16)));
+  const H = 420;
+  const cb = { x: W / 2 - 110, y: H / 2 - 55, w: 220, h: 110 };
 
   const arrows: Idef0Arrow[] = [];
   inputs.slice(0, 5).forEach((name, i) => {
@@ -145,7 +149,7 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
   });
   controls.slice(0, 5).forEach((name, i) => {
     const x = cb.x + 24 + i * 34;
-    arrows.push({ points: [[x, cb.y - 60], [x, cb.y]], label: name, side: "top" });
+    arrows.push({ points: [[x, cb.y - 60], [x, cb.y]], label: name, side: "top", labelRow: i % 3 });
   });
   outputs.slice(0, 5).forEach((name, i) => {
     const y = cb.y + 20 + i * 18;
@@ -153,7 +157,7 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
   });
   mechs.slice(0, 5).forEach((name, i) => {
     const x = cb.x + 24 + i * 34;
-    arrows.push({ points: [[x, cb.y + cb.h + 60], [x, cb.y + cb.h]], label: name, side: "bottom" });
+    arrows.push({ points: [[x, cb.y + cb.h + 60], [x, cb.y + cb.h]], label: name, side: "bottom", labelRow: i % 3 });
   });
 
   return {

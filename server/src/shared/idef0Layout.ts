@@ -61,6 +61,8 @@ export interface Arrow {
   fromId?: string; // для link/controlLink — источник
   points: Pt[];
   side: LabelSide;
+  /** Ряд подписи (0, 1, 2): соседние подписи сверху/снизу блока разносятся по высоте, чтобы не налезать. */
+  labelRow?: number;
 }
 
 export interface FunctionBlock<N extends NodeLike = NodeLike> {
@@ -108,6 +110,9 @@ export const defaultPos = (i: number) => ({ x: MARGIN + i * STEP_X, y: MARGIN + 
 
 /** Равномерно раскладывает n стрелок вдоль стороны длиной len, не плотнее max. */
 const spread = (len: number, n: number, max: number, pad: number) => (n > 1 ? Math.min(max, (len - 2 * pad) / (n - 1)) : 0);
+/** Ряд подписи i-й из n стрелок на одной стороне: подписи шире шага между стрелками, поэтому чередуем до трёх рядов. */
+const rowOf = (i: number, n: number) => (n > 1 ? i % Math.min(3, n) : 0);
+const LABEL_ROW_H = 12;
 
 /** Блоки и ICOM-стрелки диаграммы (parentId = null — A0). */
 export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: string | null = null): Idef0Layout<N> {
@@ -157,7 +162,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
         arrows.push({ key: `controlLink:${n.id}:${c.id}`, kind: "controlLink", entityId: c.id, label: c.name, nodeId: n.id, fromId: producer, points: [[sx, sy], [trunk, sy], [trunk, topY], [cx, topY], [cx, b.y]], side: "mid" });
       } else {
         const kind = c.data ? "controlData" : "control";
-        arrows.push({ key: `${kind}:${n.id}:${c.id}`, kind, entityId: c.id, label: c.name, nodeId: n.id, points: [[cx, b.y - STUB_CTRL], [cx, b.y]], side: "top" });
+        arrows.push({ key: `${kind}:${n.id}:${c.id}`, kind, entityId: c.id, label: c.name, nodeId: n.id, points: [[cx, b.y - STUB_CTRL], [cx, b.y]], side: "top", labelRow: rowOf(ci, ctrls.length) });
       }
     });
 
@@ -206,7 +211,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     const mStep = spread(b.w, mech.length, 40, 20);
     mech.forEach((mm, i) => {
       const x = b.x + 20 + i * mStep;
-      arrows.push({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom" });
+      arrows.push({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom", labelRow: rowOf(i, mech.length) });
     });
   }
   return { functions, arrows };
@@ -221,7 +226,7 @@ export function idef0Extents(layout: Idef0Layout<NodeLike>): { w: number; h: num
 }
 
 /** Положение подписи стрелки: у начала слева/сверху/снизу, у конца справа или над самым длинным горизонтальным отрезком. */
-export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
   if (!a.label) return null;
   const text = a.label.length > 26 ? a.label.slice(0, 25) + "…" : a.label;
   const first = a.points[0];
@@ -232,9 +237,9 @@ export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string }):
     case "right":
       return { x: last[0] + 4, y: last[1] + 4, anchor: "start", text };
     case "top":
-      return { x: first[0], y: first[1] - 4, anchor: "middle", text };
+      return { x: first[0], y: first[1] - 4 - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
     case "bottom":
-      return { x: first[0], y: first[1] + 14, anchor: "middle", text };
+      return { x: first[0], y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
     default: {
       let idx = -1;
       let best = -1;
