@@ -1,7 +1,7 @@
 import { extractModel } from "./extract.js";
 import { detectGaps } from "./gaps.js";
 import { validateModel } from "./validate.js";
-import { getLLMProvider } from "../llm/provider.js";
+import { resolveProvider } from "../llm/provider.js";
 import { INTERVIEW_OPENING_QUESTION, isInterviewComplete, selectNextQuestion } from "./interviewEngine.js";
 import type { ChatMessage, Fragment, ValidationIssue } from "../types/model.js";
 import type { InterviewTrack, SessionMeta, SessionRespondent } from "../repo.js";
@@ -19,7 +19,7 @@ export function chatMsg(role: ChatMessage["role"], text: string, gap_id: string 
 
 /** Извлечение "мини-модели" одной дорожки без генерации диаграмм — нужно только для gaps/next-question в процессе интервью. */
 export async function extractTrackModel(sessionId: string, track: InterviewTrack, meta: SessionMeta) {
-  const provider = getLLMProvider();
+  const provider = resolveProvider(meta.confidential);
   const model = await extractModel(track.fragments, provider, {
     processId: sessionId,
     processName: meta.processName,

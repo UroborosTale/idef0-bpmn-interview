@@ -496,6 +496,33 @@ export interface VisioPull {
   mtime?: number;
 }
 
+export interface JobProgress {
+  done: number;
+  total: number;
+  stage?: string;
+}
+
+export interface Job {
+  id: string;
+  sessionId: string | null;
+  kind: string;
+  status: "running" | "done" | "failed";
+  progress: JobProgress | null;
+  error: string | null;
+}
+
+/** Опрашивает задачу до завершения; по успеху возвращает обновлённую сессию, по ошибке — бросает её текст. */
+async function waitJob(job: Job, sessionId: string, onProgress?: (p: JobProgress) => void): Promise<SessionRecord> {
+  let cur = job;
+  while (cur.status === "running") {
+    if (cur.progress) onProgress?.(cur.progress);
+    await new Promise((r) => setTimeout(r, 1000));
+    cur = await req<Job>("GET", `/jobs/${job.id}`);
+  }
+  if (cur.status === "failed") throw new Error(cur.error ?? "обработка завершилась ошибкой");
+  return req<SessionRecord>("GET", `/sessions/${sessionId}`);
+}
+
 /** Сервер ответил «требуется вход» — приложение показывает страницу входа (App.tsx). */
 export const AUTH_REQUIRED_EVENT = "pm:auth-required";
 
@@ -563,9 +590,13 @@ export const api = {
     req<SessionRecord>("POST", `/sessions/${id}/ingest-text`, { text, ...opts }),
   uploadFile: (id: string, filename: string, contentBase64: string, opts?: { append?: boolean; anonymize?: boolean }) =>
     req<SessionRecord>("POST", `/sessions/${id}/upload`, { filename, contentBase64, ...opts }),
-  runPipeline: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/run`),
-  answerGap: (id: string, gapId: string, answerText: string) =>
-    req<SessionRecord>("POST", `/sessions/${id}/answers`, { gapId, answerText }),
+  /** Обработка интервью — фоновая задача: запускаем и ждём её завершения, сообщая прогресс. */
+  runPipeline: async (id: string, onProgress?: (p: JobProgress) => void) =>
+    waitJob(await req<Job>("POST", `/sessions/${id}/run`), id, onProgress),
+  answerGap: async (id: string, gapId: string, answerText: string, onProgress?: (p: JobProgress) => void) =>
+    waitJob(await req<Job>("POST", `/sessions/${id}/answers`, { gapId, answerText }), id, onProgress),
+  activeJob: (id: string) => req<Job | null>("GET", `/sessions/${id}/job`),
+  waitJob: (job: Job, id: string, onProgress?: (p: JobProgress) => void) => waitJob(job, id, onProgress),
 
   interviewStart: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/start`),
   interviewTurn: (id: string, text: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/turn`, { text }),

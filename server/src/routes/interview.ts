@@ -2,6 +2,7 @@ import { Router } from "express";
 import { getSession, updateSession, editBlockReason } from "../repo.js";
 import { fragmentText } from "../pipeline/fragment.js";
 import { runPipeline } from "../pipeline/run.js";
+import { resolveProvider } from "../llm/provider.js";
 import { INTERVIEW_OPENING_QUESTION, isInterviewComplete, mergeManualGaps, selectNextQuestion } from "../pipeline/interviewEngine.js";
 import { logAudit } from "../db.js";
 import { addVersion } from "../repo.js";
@@ -55,7 +56,7 @@ interviewRouter.post("/sessions/:id/interview/turn", async (req, res) => {
   updateSession(req.params.id, { fragments, chat: chatAfterOwner });
 
   try {
-    const output = await runPipeline(session.id, fragments, session.meta);
+    const output = await runPipeline(session.id, fragments, session.meta, { provider: resolveProvider(session.meta.confidential) });
     output.model.gaps = mergeManualGaps(session.model?.gaps ?? [], output.model.gaps);
 
     const complete = isInterviewComplete(output.model, output.validation);

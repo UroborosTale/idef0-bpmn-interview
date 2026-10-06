@@ -36,10 +36,15 @@ import { bpmsRouter } from "./routes/bpms.js";
 import { diagramImportRouter } from "./routes/diagramImport.js";
 import { auditPackageRouter } from "./routes/auditPackage.js";
 import { visioRouter } from "./routes/visio.js";
-import "./db.js";
+import { db } from "./db.js";
+import { failInterruptedJobs } from "./jobs.js";
 import { authRouter, rateLimit, requireAuth, securityHeaders } from "./auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Обработка, оборванная перезапуском сервера: задачи — в ошибку, сессии — из «processing» в прежнее состояние.
+failInterruptedJobs();
+db.prepare(`UPDATE sessions SET status = CASE WHEN model_json IS NULL THEN 'draft' ELSE 'ready' END WHERE status = 'processing'`).run();
 
 export const app = express();
 // за обратным прокси (nginx в docker-compose) адрес клиента и протокол берутся из X-Forwarded-*

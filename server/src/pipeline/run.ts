@@ -1,5 +1,5 @@
-import type { Fragment, ProcessLogicModel } from "../types/model.js";
-import { extractModel } from "./extract.js";
+import type { Fragment, ProcessLogicModel, ValidationIssue } from "../types/model.js";
+import { extractModel, type ExtractionReport, type ExtractProgress } from "./extract.js";
 import { detectGaps } from "./gaps.js";
 import { validateModel } from "./validate.js";
 import { generateBpmn } from "./bpmn.js";
@@ -14,6 +14,34 @@ export interface PipelineOutput {
   bpmnXml: string;
   idef0: Idef0Result;
   providerName: string;
+  report: ExtractionReport;
+}
+
+/** Сбои извлечения — предупреждения в проверках модели, чтобы неполная модель не выглядела полной. */
+export function reportIssues(report: ExtractionReport): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  report.failedChunks.forEach((c, i) => {
+    const range = c.fragmentIds.length > 1 ? `${c.fragmentIds[0]}–${c.fragmentIds[c.fragmentIds.length - 1]}` : c.fragmentIds[0];
+    issues.push({
+      id: `extract_fail_${i + 1}`,
+      notation: "MODEL",
+      severity: "warning",
+      rule: "extract_chunk_failed",
+      message: `Фрагменты ${range} не обработаны (ошибка LLM: ${c.error.slice(0, 160)}). Модель неполная — перезапустите обработку.`,
+      element_id: null,
+    });
+  });
+  if (report.unverified > 0) {
+    issues.push({
+      id: "extract_unverified",
+      notation: "MODEL",
+      severity: "warning",
+      rule: "extract_quote_unverified",
+      message: `У ${report.unverified} извлечённых элементов цитата не найдена в тексте интервью — они помечены как гипотезы, проверьте их.`,
+      element_id: null,
+    });
+  }
+  return issues;
 }
 
 /**
@@ -28,9 +56,10 @@ export async function runPipeline(
   processId: string,
   fragments: Fragment[],
   meta: SessionMeta,
-  opts?: { provider?: LLMProvider; llmModel?: string; fewShotContext?: string }
+  opts?: { provider?: LLMProvider; llmModel?: string; fewShotContext?: string; onProgress?: (p: ExtractProgress) => void }
 ): Promise<PipelineOutput> {
   const provider = opts?.provider ?? getLLMProvider();
+  const report: ExtractionReport = { failedChunks: [], dropped: 0, unverified: 0 };
   const model = await extractModel(fragments, provider, {
     processId,
     processName: meta.processName,
@@ -40,12 +69,14 @@ export async function runPipeline(
     decompositionDepth: meta.decompositionDepth,
     llmModel: opts?.llmModel,
     fewShotContext: opts?.fewShotContext,
+    onProgress: opts?.onProgress,
+    report,
   });
 
   model.gaps = detectGaps(model);
-  const validation = validateModel(model);
+  const validation = [...reportIssues(report), ...validateModel(model)];
   const bpmn = await generateBpmn(model);
   const idef0 = generateIdef0(model);
 
-  return { model, validation, bpmnXml: bpmn.xml, idef0, providerName: provider.name };
+  return { model, validation, bpmnXml: bpmn.xml, idef0, providerName: provider.name, report };
 }

@@ -2,8 +2,9 @@ import { nanoid } from "nanoid";
 import type { Fragment, ProcessLogicModel, ProcessNode, Role, SystemEntity, DataEntity, ControlEntity, ProcessFlow, Statement } from "../types/model.js";
 import { SCHEMA_VERSION } from "../types/model.js";
 import type { LLMProvider, LLMFragmentInput, ExtractionChunkResult } from "../llm/types.js";
+import { normalizeChunk } from "../llm/schema.js";
 
-const CHUNK_SIZE = 18;
+export const CHUNK_SIZE = 18;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -11,8 +12,29 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-function normKey(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
+/**
+ * Ключ сущности для склейки упоминаний: регистр, «ё», пунктуация и падежные окончания не различаются —
+ * «договор», «договора» и «Договор:» — одна сущность. Отображаемое имя — первое упоминание.
+ */
+const ENDING = /(ами|ями|ого|его|ому|ему|ыми|ими|ой|ей|ом|ем|ам|ям|ах|ях|ов|ев|ую|юю|ая|яя|ое|ее|ые|ие|ый|ий|а|я|ы|и|у|ю|е|о)$/;
+export function normKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .split(" ")
+    .map((w) => (w.length >= 5 ? w.replace(ENDING, "") : w))
+    .join(" ");
+}
+
+/** Что пошло не так при извлечении — показывается аналитику в проверках модели. */
+export interface ExtractionReport {
+  failedChunks: { index: number; fragmentIds: string[]; error: string }[];
+  /** Элементы ответа LLM неверной формы (отброшены). */
+  dropped: number;
+  /** Элементы с цитатой, которой нет в тексте (стали гипотезами). */
+  unverified: number;
 }
 
 interface EntityIndex<T extends { id: string; name: string }> {
@@ -64,6 +86,7 @@ export async function extractModel(
     onProgress?: (p: ExtractProgress) => void;
     llmModel?: string; // ФТ-М9.2.4: модель LLM, назначенная агенту-извлекателю
     fewShotContext?: string; // ФТ-М9.1.2: похожие утверждённые примеры из корпуса
+    report?: ExtractionReport;
   }
 ): Promise<ProcessLogicModel> {
   const factFragments = fragments; // интервьюер тоже передаётся как контекст (правило 3 промпта)
@@ -82,6 +105,7 @@ export async function extractModel(
   let result = opts.metaResult;
 
   let globalOrder = 0;
+  const report: ExtractionReport = opts.report ?? { failedChunks: [], dropped: 0, unverified: 0 };
 
   for (let ci = 0; ci < chunks.length; ci++) {
     const c = chunks[ci];
@@ -94,13 +118,19 @@ export async function extractModel(
 
     let chunkResult: ExtractionChunkResult;
     try {
-      chunkResult = await provider.extractChunk(
+      const raw = await provider.extractChunk(
         llmInput,
         { processName: opts.processName, modelType: opts.modelType, fewShotContext: ci === 0 ? opts.fewShotContext : undefined },
         { model: opts.llmModel }
       );
+      // ответ LLM не доверяем: проверяем форму и сверяем цитаты с текстом
+      const normalized = normalizeChunk(raw, llmInput);
+      chunkResult = normalized.result;
+      report.dropped += normalized.check.dropped;
+      report.unverified += normalized.check.unverified;
     } catch (err) {
-      console.error("LLM extractChunk failed, skipping chunk", err);
+      console.warn(`извлечение: часть ${ci + 1} из ${chunks.length} не обработана — ${(err as Error).message}`);
+      report.failedChunks.push({ index: ci, fragmentIds: c.map((f) => f.id), error: (err as Error).message });
       opts.onProgress?.({ chunkIndex: ci + 1, totalChunks: chunks.length });
       continue;
     }
@@ -201,18 +231,20 @@ export async function extractModel(
     opts.onProgress?.({ chunkIndex: ci + 1, totalChunks: chunks.length });
   }
 
-  // Резервная линейная связка узлов там, где явные flow отсутствуют,
-  // чтобы поток не обрывался даже при неполном извлечении связей.
-  const connected = new Set<string>();
-  for (const f of flows) {
-    connected.add(`${f.from}->${f.to}`);
+  if (chunks.length > 0 && report.failedChunks.length === chunks.length) {
+    throw new Error(`LLM не обработал ни одного фрагмента: ${report.failedChunks[0].error}`);
   }
+
+  // Резервная линейная связка узлов там, где явные flow отсутствуют, чтобы поток не обрывался даже
+  // при неполном извлечении связей. Такие связи без источника (source: []) — их видно как выведенные.
+  // Из конечного события и в начальное связь не ведётся: это заведомо ложный поток.
   for (let i = 0; i < nodes.length - 1; i++) {
-    const a = nodes[i].id;
-    const b = nodes[i + 1].id;
-    const hasAnyOutgoing = flows.some((f) => f.from === a);
-    if (!hasAnyOutgoing) {
-      flows.push({ id: `flow${flows.length + 1}`, from: a, to: b, condition: null, source: [], confirmed_by: [] });
+    const a = nodes[i];
+    const b = nodes[i + 1];
+    if (a.type === "event" && a.subtype === "end") continue;
+    if (b.type === "event" && b.subtype === "start") continue;
+    if (!flows.some((f) => f.from === a.id)) {
+      flows.push({ id: `flow${flows.length + 1}`, from: a.id, to: b.id, condition: null, source: [], confirmed_by: [] });
     }
   }
 

@@ -3,12 +3,57 @@ import { getSession, updateSession, editBlockReason } from "../repo.js";
 import { fragmentText, normalizeTerms, anonymizeFragments } from "../pipeline/fragment.js";
 import { parseUploadedFile } from "../pipeline/ingest.js";
 import { runOrchestratedPipeline } from "../pipeline/agents.js";
+import { CHUNK_SIZE } from "../pipeline/extract.js";
 import { logAudit } from "../db.js";
 import { db } from "../db.js";
 import { addVersion } from "../repo.js";
 import type { Fragment } from "../types/model.js";
+import { JobConflictError, startJob, activeJob, getJob } from "../jobs.js";
+import type { SessionRecord } from "../repo.js";
 
 export const processRouter = Router();
+
+/**
+ * Обработка интервью идёт фоновой задачей: запрос сразу возвращает задачу (202), клиент опрашивает
+ * GET /jobs/:id. Ответ LLM может идти минутами — HTTP-запрос и прокси его не дождутся.
+ */
+function runInBackground(session: SessionRecord, fragments: Fragment[], note: string, actor: "analyst" | "owner", action: string, details: object) {
+  const prevStatus = session.model ? "ready" : "draft";
+  return startJob(session.id, "pipeline", async (progress) => {
+    updateSession(session.id, { status: "processing" });
+    progress({ done: 0, total: Math.ceil(fragments.length / CHUNK_SIZE), stage: "извлечение" });
+    try {
+      const output = await runOrchestratedPipeline(session.id, fragments, session.meta, { onProgress: progress });
+      updateSession(session.id, {
+        model: output.model,
+        validation: output.validation,
+        bpmnXml: output.bpmnXml,
+        idef0: output.idef0,
+        status: "ready",
+        diagramsStale: false,
+        provider: output.providerName,
+      });
+      logAudit(session.id, actor, action, { ...details, provider: output.providerName, nodes: output.model.nodes.length, agentRunId: output.runId, iterations: output.iterations, failedChunks: output.report.failedChunks.length });
+      addVersion(session.id, note);
+      return { nodes: output.model.nodes.length, failedChunks: output.report.failedChunks.length, unverified: output.report.unverified };
+    } catch (e) {
+      updateSession(session.id, { status: prevStatus });
+      throw e;
+    }
+  });
+}
+
+processRouter.get("/jobs/:id", (req, res) => {
+  const job = getJob(req.params.id);
+  if (!job) return void res.status(404).json({ error: "задача не найдена" });
+  res.json(job);
+});
+
+/** Активная задача сессии (после перезагрузки страницы клиент продолжает следить за ней). */
+processRouter.get("/sessions/:id/job", (req, res) => {
+  res.json(activeJob(req.params.id));
+});
+
 
 function loadGlossary(): Record<string, string> {
   const rows = db.prepare(`SELECT key, value FROM glossary WHERE kind = 'term'`).all() as { key: string; value: string }[];
@@ -100,24 +145,10 @@ processRouter.post("/sessions/:id/run", async (req, res) => {
     res.status(409).json({ error: block });
     return;
   }
-  updateSession(req.params.id, { status: "processing" });
   try {
-    const output = await runOrchestratedPipeline(session.id, session.fragments, session.meta);
-    updateSession(req.params.id, {
-      model: output.model,
-      validation: output.validation,
-      bpmnXml: output.bpmnXml,
-      idef0: output.idef0,
-      status: "ready",
-      diagramsStale: false,
-      provider: output.providerName,
-    });
-    logAudit(req.params.id, "analyst", "pipeline_run", { provider: output.providerName, nodes: output.model.nodes.length, agentRunId: output.runId, iterations: output.iterations });
-    const updated = addVersion(req.params.id, "Запуск конвейера извлечения");
-    res.json(updated);
+    res.status(202).json(runInBackground(session, session.fragments, "Запуск конвейера извлечения", "analyst", "pipeline_run", {}));
   } catch (e) {
-    updateSession(req.params.id, { status: "draft" });
-    res.status(500).json({ error: (e as Error).message });
+    res.status(e instanceof JobConflictError ? 409 : 500).json({ error: (e as Error).message });
   }
 });
 
@@ -162,22 +193,11 @@ processRouter.post("/sessions/:id/answers", async (req, res) => {
   const newFragment: Fragment = { id: `f${offset + 1}`, index: offset + 1, speaker: "owner", speaker_label: "Ответ на уточнение", text: answerText };
   const fragments = [...session.fragments, newFragment];
   const qa = [...session.qa, { gapId, question: gap.question, answerText, ts: new Date().toISOString() }];
-  updateSession(req.params.id, { fragments, qa, status: "processing" });
-
+  if (activeJob(session.id)) return void res.status(409).json({ error: "для этой сессии уже выполняется обработка — дождитесь её завершения" });
+  const withAnswer = updateSession(req.params.id, { fragments, qa });
   try {
-    const output = await runOrchestratedPipeline(session.id, fragments, session.meta);
-    updateSession(req.params.id, {
-      model: output.model,
-      validation: output.validation,
-      bpmnXml: output.bpmnXml,
-      idef0: output.idef0,
-      status: "ready",
-      diagramsStale: false,
-    });
-    logAudit(req.params.id, "owner", "gap_answered", { gapId });
-    const updated = addVersion(req.params.id, `Ответ на уточнение: ${gap.question.slice(0, 60)}`);
-    res.json(updated);
+    res.status(202).json(runInBackground(withAnswer, fragments, `Ответ на уточнение: ${gap.question.slice(0, 60)}`, "owner", "gap_answered", { gapId }));
   } catch (e) {
-    res.status(500).json({ error: (e as Error).message });
+    res.status(e instanceof JobConflictError ? 409 : 500).json({ error: (e as Error).message });
   }
 });

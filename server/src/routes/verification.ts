@@ -4,7 +4,7 @@ import { buildParaphrase } from "../pipeline/verification.js";
 import { extractModel } from "../pipeline/extract.js";
 import { detectGaps } from "../pipeline/gaps.js";
 import { validateModel } from "../pipeline/validate.js";
-import { getLLMProvider } from "../llm/provider.js";
+import { resolveProvider } from "../llm/provider.js";
 import { fragmentText } from "../pipeline/fragment.js";
 import { diffModels } from "../pipeline/diff.js";
 import { logAudit } from "../db.js";
@@ -77,7 +77,7 @@ verificationRouter.post("/sessions/:id/verification/propose-edit", async (req, r
   const allFragments = [...session.fragments, ...newFragments];
 
   try {
-    const provider = getLLMProvider();
+    const provider = resolveProvider(session.meta.confidential);
     const proposedModel = await extractModel(allFragments, provider, {
       processId: session.id,
       processName: session.meta.processName,

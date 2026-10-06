@@ -8,7 +8,7 @@ import { detectGaps } from "../pipeline/gaps.js";
 import { validateModel } from "../pipeline/validate.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { generateIdef0 } from "../pipeline/idef0.js";
-import { getLLMProvider } from "../llm/provider.js";
+import { resolveProvider } from "../llm/provider.js";
 import { startTrackChat, turnTrackChat } from "../pipeline/trackInterview.js";
 import { mergeTracks } from "../pipeline/multiInterview.js";
 import { logAgentStep } from "../pipeline/agents.js";
@@ -171,7 +171,8 @@ multiInterviewRouter.post("/sessions/:id/tracks/merge", async (req, res) => {
     return;
   }
   try {
-    const provider = getLLMProvider();
+    // конфиденциальный процесс — только локальный провайдер (ФТ-М9.3.2)
+    const provider = resolveProvider(session.meta.confidential);
     const trackInputs = [];
     for (const t of tracksWithContent) {
       const respondent = session.respondents.find((r) => r.id === t.respondentId);

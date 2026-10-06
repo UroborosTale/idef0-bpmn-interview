@@ -68,7 +68,7 @@ export async function runOrchestratedPipeline(
   sessionId: string,
   fragments: Fragment[],
   meta: SessionMeta,
-  opts?: { maxIterations?: number }
+  opts?: { maxIterations?: number; onProgress?: (p: { done: number; total: number; stage: string }) => void }
 ): Promise<OrchestratedResult> {
   const runId = `run_${nanoid(10)}`;
   const maxIterations = Math.max(1, opts?.maxIterations ?? 2);
@@ -83,7 +83,12 @@ export async function runOrchestratedPipeline(
   let output: PipelineOutput | null = null;
   let iteration = 0;
   for (iteration = 1; iteration <= maxIterations; iteration++) {
-    output = await runPipeline(sessionId, fragments, meta, { provider, llmModel: extractorModel, fewShotContext });
+    output = await runPipeline(sessionId, fragments, meta, {
+      provider,
+      llmModel: extractorModel,
+      fewShotContext,
+      onProgress: (p) => opts?.onProgress?.({ done: p.chunkIndex, total: p.totalChunks, stage: iteration > 1 ? `повторный проход ${iteration}` : "извлечение" }),
+    });
     logAgentStep(
       sessionId,
       runId,

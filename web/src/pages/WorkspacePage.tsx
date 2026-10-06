@@ -54,6 +54,8 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
+  const onProgress = (p: { done: number; total: number; stage?: string }) => setProgress(`${p.stage ?? "обработка"}: ${p.done} из ${p.total} частей текста`);
 
   const reload = useCallback(async () => {
     const s = await api.getSession(sessionId);
@@ -63,6 +65,29 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // обработка, запущенная раньше (до перезагрузки страницы), — продолжаем следить за ней
+  useEffect(() => {
+    let alive = true;
+    api.activeJob(sessionId).then(async (job) => {
+      if (!job || !alive) return;
+      setBusy(true);
+      try {
+        const s = await api.waitJob(job, sessionId, onProgress);
+        if (alive) setSession(s);
+      } catch (e) {
+        if (alive) setError((e as Error).message);
+      } finally {
+        if (alive) {
+          setBusy(false);
+          setProgress(null);
+        }
+      }
+    }).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     if (session?.mode === "B") setTab("chat");
@@ -88,6 +113,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
       return undefined;
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   }
 
@@ -147,6 +173,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
       </div>
 
       {error && <div className="validation-item error">{error}</div>}
+      {progress && <div className="validation-item" style={{ background: "#eef2ff" }}>Идёт обработка — {progress}. Можно переключаться между вкладками.</div>}
 
       {session.mode === "A" && session.status !== "ready" && tab !== "chat" && (
         <IngestPanel
@@ -161,13 +188,13 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
               setSession(await api.uploadFile(sessionId, file.name, b64, { append, anonymize }));
             })
           }
-          onRun={() => withBusy(async () => setSession(await api.runPipeline(sessionId)))}
+          onRun={() => withBusy(async () => setSession(await api.runPipeline(sessionId, onProgress)))}
         />
       )}
 
       {session.mode === "A" && session.status === "ready" && (
         <div className="toolbar">
-          <button onClick={() => withBusy(async () => setSession(await api.runPipeline(sessionId)))}>Перезапустить обработку текста</button>
+          <button disabled={busy} onClick={() => withBusy(async () => setSession(await api.runPipeline(sessionId, onProgress)))}>Перезапустить обработку текста</button>
         </div>
       )}
 
@@ -259,7 +286,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
                   selectElement(id);
                   setTab("text");
                 }}
-                onAnswer={(gapId, text) => withBusy(async () => setSession(await api.answerGap(sessionId, gapId, text))).then(() => {})}
+                onAnswer={(gapId, text) => withBusy(async () => setSession(await api.answerGap(sessionId, gapId, text, onProgress))).then(() => {})}
               />
             )}
             {tab === "gaps" && !model && <p className="muted">Модель ещё не построена.</p>}

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ExtractionChunkResult, LLMFragmentInput, LLMProvider } from "./types.js";
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_TOOL, buildChunkUserPrompt, DIAGRAM_RECOGNITION_SYSTEM_PROMPT, buildDiagramRecognitionUserPrompt } from "./prompts.js";
 import { mockExtractChunk } from "./mockProvider.js";
+import { LLMHttpError, LLM_RETRIES, LLM_TIMEOUT_MS, postJson, withRetry } from "./http.js";
 
 const MODEL_ID = process.env.LLM_MODEL || "claude-sonnet-4-5";
 
@@ -16,7 +17,8 @@ export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
 
   constructor(apiKey: string) {
-    this.client = new Anthropic({ apiKey });
+    // SDK сам повторяет 429/5xx и обрывы; таймаут — на один запрос
+    this.client = new Anthropic({ apiKey, maxRetries: LLM_RETRIES, timeout: LLM_TIMEOUT_MS });
   }
 
   async extractChunk(
@@ -102,32 +104,28 @@ export class LocalProvider implements LLMProvider {
     context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string },
     opts?: { model?: string }
   ): Promise<ExtractionChunkResult> {
-    const res = await fetch(chatCompletionsUrl(this.baseUrl), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
-      },
-      body: JSON.stringify({
-        model: (this.honorModelOverride && opts?.model) || this.defaultModel,
-        temperature: 0,
-        messages: [
-          { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-          { role: "user", content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext) },
-        ],
-        tools: [{ type: "function", function: { name: EXTRACTION_TOOL.name, description: EXTRACTION_TOOL.description, parameters: (EXTRACTION_TOOL as any).input_schema } }],
-        tool_choice: { type: "function", function: { name: EXTRACTION_TOOL.name } },
-      }),
+    const body = {
+      model: (this.honorModelOverride && opts?.model) || this.defaultModel,
+      temperature: 0,
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        { role: "user", content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext) },
+      ],
+      tools: [{ type: "function", function: { name: EXTRACTION_TOOL.name, description: EXTRACTION_TOOL.description, parameters: (EXTRACTION_TOOL as any).input_schema } }],
+      tool_choice: { type: "function", function: { name: EXTRACTION_TOOL.name } },
+    };
+    const label = this.name === "local" ? "Локальный провайдер" : "Облачный провайдер";
+    // ответ без вызова инструмента или с битым JSON тоже повторяем: у моделей это случайный сбой
+    return withRetry(async () => {
+      const data = await postJson(chatCompletionsUrl(this.baseUrl), body, this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}, label);
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (!toolCall) throw new LLMHttpError(`${label} не вернул структурированный вызов инструмента`, 502);
+      try {
+        return JSON.parse(toolCall.function.arguments) as ExtractionChunkResult;
+      } catch {
+        throw new LLMHttpError(`${label} вернул некорректный JSON в вызове инструмента`, 502);
+      }
     });
-    if (!res.ok) {
-      throw new Error(`Локальный провайдер вернул ошибку ${res.status}: ${await res.text()}`);
-    }
-    const data = (await res.json()) as any;
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) {
-      throw new Error("Локальный провайдер не вернул структурированный вызов инструмента");
-    }
-    return JSON.parse(toolCall.function.arguments) as ExtractionChunkResult;
   }
 }
 
