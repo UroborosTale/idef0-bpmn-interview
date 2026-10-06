@@ -3,6 +3,7 @@ import type { ExtractionChunkResult, LLMFragmentInput, LLMProvider } from "./typ
 import { EXTRACTION_SYSTEM_PROMPT, EXTRACTION_TOOL, buildChunkUserPrompt, DIAGRAM_RECOGNITION_SYSTEM_PROMPT, buildDiagramRecognitionUserPrompt } from "./prompts.js";
 import { mockExtractChunk } from "./mockProvider.js";
 import { LLMHttpError, LLM_RETRIES, LLM_TIMEOUT_MS, postJson, withRetry } from "./http.js";
+import { recordUsage } from "./usage.js";
 
 const MODEL_ID = process.env.LLM_MODEL || "claude-sonnet-4-5";
 
@@ -41,6 +42,7 @@ export class AnthropicProvider implements LLMProvider {
       ],
     });
 
+    recordUsage(this.name, msg.model, msg.usage?.input_tokens, msg.usage?.output_tokens);
     const toolUse = msg.content.find((b) => b.type === "tool_use") as
       | Anthropic.ToolUseBlock
       | undefined;
@@ -73,6 +75,7 @@ export class AnthropicProvider implements LLMProvider {
         },
       ],
     });
+    recordUsage(this.name, msg.model, msg.usage?.input_tokens, msg.usage?.output_tokens);
     const toolUse = msg.content.find((b) => b.type === "tool_use") as Anthropic.ToolUseBlock | undefined;
     if (!toolUse) throw new Error("LLM did not return structured tool_use output");
     return toolUse.input as ExtractionChunkResult;
@@ -118,6 +121,7 @@ export class LocalProvider implements LLMProvider {
     // ответ без вызова инструмента или с битым JSON тоже повторяем: у моделей это случайный сбой
     return withRetry(async () => {
       const data = await postJson(chatCompletionsUrl(this.baseUrl), body, this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}, label);
+      recordUsage(this.name, data.model ?? body.model, data.usage?.prompt_tokens, data.usage?.completion_tokens);
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (!toolCall) throw new LLMHttpError(`${label} не вернул структурированный вызов инструмента`, 502);
       try {

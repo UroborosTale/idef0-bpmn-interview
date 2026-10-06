@@ -4,7 +4,7 @@ import { db, logAudit } from "../db.js";
 import { getSession, updateSession } from "../repo.js";
 import type { SessionRespondent, InterviewTrack } from "../repo.js";
 import { startTrackChat, turnTrackChat } from "../pipeline/trackInterview.js";
-import { validateWebhookUrl } from "../util/webhook.js";
+import { safeWebhookFetch, validateWebhookUrl } from "../util/webhook.js";
 
 export const campaignsRouter = Router();
 
@@ -161,7 +161,7 @@ campaignsRouter.post("/campaigns/:campaignId/remind", async (req, res) => {
   let sent = 0;
   for (const r of overdue) {
     try {
-      await fetch(campaign.reminder_webhook_url, {
+      await safeWebhookFetch(campaign.reminder_webhook_url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaign: campaign.name, respondent: r.name, due_date: campaign.due_date, status: r.status, link: `/campaign/${campaign.id}/${r.token}` }),

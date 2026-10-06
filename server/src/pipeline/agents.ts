@@ -71,8 +71,11 @@ export async function runOrchestratedPipeline(
   opts?: { maxIterations?: number; onProgress?: (p: { done: number; total: number; stage: string }) => void }
 ): Promise<OrchestratedResult> {
   const runId = `run_${nanoid(10)}`;
-  const maxIterations = Math.max(1, opts?.maxIterations ?? 2);
   const provider = resolveProvider(meta.confidential);
+  // Повторный проход отправляет в LLM тот же запрос (замечания критика в промпт пока не передаются),
+  // поэтому для платных провайдеров по умолчанию один проход; AGENT_MAX_ITERATIONS меняет это.
+  const configured = Number(process.env.AGENT_MAX_ITERATIONS);
+  const maxIterations = Math.max(1, opts?.maxIterations ?? (Number.isFinite(configured) && configured > 0 ? configured : provider.name === "mock" ? 2 : 1));
   const extractorModel = resolveModelForAgent("extractor");
 
   const rawText = fragments.map((f) => f.text).join("\n");

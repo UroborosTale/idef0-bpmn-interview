@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, logAudit } from "../db.js";
-import { validateWebhookUrl } from "../util/webhook.js";
+import { safeWebhookFetch, validateWebhookUrl } from "../util/webhook.js";
 
 export const cardRouter = Router();
 
@@ -116,7 +116,7 @@ cardRouter.post("/registry/:id/card/sync", async (req, res) => {
   for (const [k, v] of Object.entries(card)) mapped[mapping[k] ?? k] = v;
 
   try {
-    const resp = await fetch(cfg.webhook_url, {
+    const resp = await safeWebhookFetch(cfg.webhook_url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(mapped),

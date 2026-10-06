@@ -1,3 +1,4 @@
+import { safeWebhookFetch } from "../util/webhook.js";
 import { Router } from "express";
 import { nanoid } from "nanoid";
 import { getSession, updateSession, addVersion, editBlockReason } from "../repo.js";
@@ -145,7 +146,7 @@ reviewRouter.post("/sessions/:id/review/steps/current/approve", (req, res) => {
       ).run(id, session.id, r.kind, r.label, r.contact, message, diffLink, new Date().toISOString());
       notificationsSent += 1;
       if (webhookRow?.webhook_url) {
-        fetch(webhookRow.webhook_url, {
+        safeWebhookFetch(webhookRow.webhook_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ session: session.meta.processName, recipient: r.label, message, diff_link: diffLink }),

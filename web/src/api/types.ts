@@ -477,6 +477,15 @@ export interface DiagramImportResult {
   warnings: string[];
 }
 
+/** Расход LLM по сессии (server/src/llm/usage.ts). */
+export interface LlmUsage {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number | null;
+  byModel: { provider: string; model: string | null; calls: number; inputTokens: number; outputTokens: number }[];
+}
+
 export interface VisioStatus {
   available: boolean;
   exists: boolean;

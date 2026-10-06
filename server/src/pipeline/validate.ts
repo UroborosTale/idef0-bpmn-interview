@@ -3,7 +3,8 @@ import { idef0Codes, idef0Functions } from "./idef0.js";
 
 /**
  * Детерминированная валидация BPMN (5.1) и IDEF0 (5.2) + стиль наименований (5.3).
- * Ошибки (error) блокируют экспорт, предупреждения (warning) — нет (5.4).
+ * Ошибки (error) — модель некорректна (мешают завершить интервью), предупреждения (warning) — рекомендации.
+ * Экспорт диаграмм доступен в обоих случаях.
  */
 export function validateModel(model: ProcessLogicModel): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
@@ -120,17 +121,18 @@ export function validateModel(model: ProcessLogicModel): ValidationIssue[] {
   for (const n of bpmnNodes) dfs(n.id, []);
 
   // --- IDEF0 5.2 ---
-  const topLevel = model.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.idef0_parent);
-  if (topLevel.length > 0 && (topLevel.length < 3 || topLevel.length > 6)) {
-    add(
-      "IDEF0",
-      "warning",
-      "idef0_block_count",
-      `На уровне декомпозиции A0 ${topLevel.length} блок(ов) — по правилам IDEF0 рекомендуется 3–6.${
-        topLevel.length > 6 ? " Сгруппируйте близкие шаги в подпроцессы." : ""
-      }`,
-      null
-    );
+  // 3–6 блоков на диаграмме: одно замечание на диаграмму с подсказкой, как исправить
+  const fnOf = (parent: string | null) => model.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && (n.idef0_parent ?? null) === parent);
+  const topLevel = fnOf(null);
+  if (topLevel.length > 6) {
+    add("IDEF0", "warning", "idef0_block_count", `На A0 ${topLevel.length} функций — по правилам IDEF0 рекомендуется 3–6. Объедините близкие шаги: в редакторе IDEF0 создайте укрупнённую функцию и перенесите шаги в её декомпозицию.`, null);
+  } else if (topLevel.length > 0 && topLevel.length < 3) {
+    add("IDEF0", "warning", "idef0_block_count", `На A0 ${topLevel.length} функции — по правилам IDEF0 рекомендуется 3–6: процесс описан слишком крупно, уточните шаги.`, null);
+  }
+  const codesForCount = idef0Codes(model);
+  for (const parent of new Set(model.nodes.map((n) => n.idef0_parent).filter((p): p is string => !!p))) {
+    const kids = fnOf(parent);
+    if (kids.length > 6) add("IDEF0", "warning", "idef0_block_count", `На диаграмме ${codesForCount.get(parent) ?? parent} ${kids.length} функций — рекомендуется 3–6, разбейте её на подуровни.`, parent);
   }
   // Одно предупреждение на правило, а не по одному на каждую функцию: когда управление или выходы
   // не заполнены у большинства шагов, это один общий пробел, а не десяток отдельных замечаний.

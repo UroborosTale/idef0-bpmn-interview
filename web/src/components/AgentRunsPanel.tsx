@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { api, type AgentRunRow } from "../api/client";
+import { api, type AgentRunRow, type LlmUsage } from "../api/client";
 
 /** ФТ-М9.2.3: журнал шагов мультиагентного конвейера по сессии. */
 export default function AgentRunsPanel({ sessionId }: { sessionId: string }) {
   const [rows, setRows] = useState<AgentRunRow[] | null>(null);
+  const [usage, setUsage] = useState<LlmUsage | null>(null);
 
   useEffect(() => {
     api.listAgentRuns(sessionId).then(setRows);
+    api.llmUsage(sessionId).then(setUsage).catch(() => setUsage(null));
   }, [sessionId]);
+  const fmt = (n: number) => n.toLocaleString("ru-RU");
 
   if (!rows) return <p className="muted">Загрузка…</p>;
 
@@ -21,8 +24,17 @@ export default function AgentRunsPanel({ sessionId }: { sessionId: string }) {
         <h4 style={{ margin: 0 }}>Журнал агентов</h4>
       </div>
       <p className="muted" style={{ fontSize: 12 }}>
-        Шаги мультиагентного конвейера (Извлекатель → Интервьюер → Критик, с повтором до {"2"} итераций при найденных критиком ошибках; Сборщик/Аналитик/Документалист — по вызову соответствующих операций).
+        Шаги мультиагентного конвейера (Извлекатель → Интервьюер → Критик; повторный проход при ошибках критика — по настройке AGENT_MAX_ITERATIONS, для платных LLM по умолчанию один проход; Сборщик/Аналитик/Документалист — по вызову соответствующих операций).
       </p>
+      {usage && usage.calls > 0 && (
+        <div className="card" style={{ marginTop: 10 }}>
+          <b>Расход LLM по сессии:</b> {fmt(usage.calls)} вызовов, {fmt(usage.inputTokens)} входных и {fmt(usage.outputTokens)} выходных токенов
+          {usage.costUsd !== null ? ` · ≈ $${usage.costUsd}` : " · стоимость не считается (задайте LLM_PRICE_INPUT_PER_M и LLM_PRICE_OUTPUT_PER_M)"}
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            {usage.byModel.map((m) => `${m.provider}${m.model ? ` / ${m.model}` : ""}: ${fmt(m.calls)} выз., ${fmt(m.inputTokens + m.outputTokens)} ток.`).join(" · ")}
+          </div>
+        </div>
+      )}
       {runIds.length === 0 && <p className="muted">Пока нет ни одного запуска.</p>}
       {runIds.map((runId) => (
         <div key={runId} className="card" style={{ marginTop: 10, background: "#f8fafc" }}>

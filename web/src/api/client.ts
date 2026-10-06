@@ -1,5 +1,5 @@
 import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
-import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, VisioStatus, VisioPull, JobProgress, Job } from "./types";
+import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, VisioStatus, VisioPull, JobProgress, Job, LlmUsage } from "./types";
 import { BASE, req, waitJob } from "./http";
 
 export * from "./types";
@@ -54,6 +54,7 @@ export const api = {
     waitJob(await req<Job>("POST", `/sessions/${id}/run`), id, onProgress),
   answerGap: async (id: string, gapId: string, answerText: string, onProgress?: (p: JobProgress) => void) =>
     waitJob(await req<Job>("POST", `/sessions/${id}/answers`, { gapId, answerText }), id, onProgress),
+  llmUsage: (id: string) => req<LlmUsage>("GET", `/sessions/${id}/llm-usage`),
   activeJob: (id: string) => req<Job | null>("GET", `/sessions/${id}/job`),
   waitJob: (job: Job, id: string, onProgress?: (p: JobProgress) => void) => waitJob(job, id, onProgress),
 

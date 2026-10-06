@@ -9,6 +9,7 @@ import { detectGaps } from "../pipeline/gaps.js";
 import { logAudit } from "../db.js";
 import { providerStatus } from "../llm/provider.js";
 import { removeVisioFiles } from "./visio.js";
+import { usageForSession } from "../llm/usage.js";
 
 export const sessionsRouter = Router();
 
@@ -51,6 +52,11 @@ sessionsRouter.get("/sessions/:id", (req, res) => {
     return;
   }
   res.json(sessionForClient(session));
+});
+
+/** Расход LLM по сессии: вызовы, токены, оценка стоимости. */
+sessionsRouter.get("/sessions/:id/llm-usage", (req, res) => {
+  res.json(usageForSession(req.params.id));
 });
 
 sessionsRouter.delete("/sessions/:id", (req, res) => {

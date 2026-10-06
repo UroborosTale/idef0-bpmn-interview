@@ -3,6 +3,7 @@ import type { Fragment, ProcessLogicModel, ProcessNode, Role, SystemEntity, Data
 import { SCHEMA_VERSION } from "../types/model.js";
 import type { LLMProvider, LLMFragmentInput, ExtractionChunkResult } from "../llm/types.js";
 import { normalizeChunk } from "../llm/schema.js";
+import { withLlmContext } from "../llm/usage.js";
 
 export const CHUNK_SIZE = 18;
 
@@ -89,6 +90,11 @@ export async function extractModel(
     report?: ExtractionReport;
   }
 ): Promise<ProcessLogicModel> {
+  // расход токенов записывается на сессию (processId — id сессии)
+  return withLlmContext(opts.processId, () => extractModelImpl(fragments, provider, opts));
+}
+
+async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, opts: Parameters<typeof extractModel>[2]): Promise<ProcessLogicModel> {
   const factFragments = fragments; // интервьюер тоже передаётся как контекст (правило 3 промпта)
   const chunks = chunk(factFragments, CHUNK_SIZE);
 
