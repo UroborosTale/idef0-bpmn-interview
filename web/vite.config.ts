@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://localhost:8787",
+        target: "http://127.0.0.1:8787", // сервер без входа слушает только 127.0.0.1 (не ::1)
         changeOrigin: true,
       },
     },

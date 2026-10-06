@@ -2,9 +2,11 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { currentLogin } from "./util/requestContext.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = path.resolve(__dirname, "../data");
+// DATA_DIR — каталог базы и рабочих файлов (тесты подставляют временный каталог)
+export const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.resolve(__dirname, "../data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 export const db = new Database(path.join(dataDir, "app.sqlite"));
@@ -329,7 +331,9 @@ if (seedAgentsCount === 0) {
 }
 
 export function logAudit(sessionId: string | null, actor: string, action: string, details?: unknown) {
+  // действия «аналитика» записываются от имени вошедшего пользователя, если вход включён
+  const who = actor === "analyst" ? currentLogin() ?? actor : actor;
   db.prepare(
     `INSERT INTO audit_log (session_id, actor, action, details_json, ts) VALUES (?, ?, ?, ?, ?)`
-  ).run(sessionId, actor, action, details ? JSON.stringify(details) : null, new Date().toISOString());
+  ).run(sessionId, who, action, details ? JSON.stringify(details) : null, new Date().toISOString());
 }

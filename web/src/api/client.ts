@@ -496,12 +496,16 @@ export interface VisioPull {
   mtime?: number;
 }
 
+/** Сервер ответил «требуется вход» — приложение показывает страницу входа (App.tsx). */
+export const AUTH_REQUIRED_EVENT = "pm:auth-required";
+
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(BASE + url, {
     method,
     headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+  if (res.status === 401 && !url.startsWith("/auth/")) window.dispatchEvent(new Event(AUTH_REQUIRED_EVENT));
   if (!res.ok) {
     let message = res.statusText;
     try {
@@ -518,6 +522,9 @@ async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
 }
 
 export const api = {
+  authMe: () => req<{ authRequired: boolean; user: { login: string } | null }>("GET", "/auth/me"),
+  login: (login: string, password: string) => req<{ user: { login: string } }>("POST", "/auth/login", { login, password }),
+  logout: () => req<{ ok: boolean }>("POST", "/auth/logout", {}),
   providerStatus: () => req<{ name: string; live: boolean }>("GET", "/provider-status"),
   templates: () => req<{ id: string; name: string; hints: string[] }[]>("GET", "/templates"),
 

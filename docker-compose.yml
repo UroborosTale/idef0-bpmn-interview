@@ -3,11 +3,24 @@ services:
     build: ./server
     environment:
       - PORT=8787
+      # в контейнере сервер слушает все адреса, наружу его открывает только nginx (web)
+      - HOST=0.0.0.0
+      # Пользователи для входа: логин:пароль через запятую (пароль лучше хэшем:
+      # npm run hash-password -w server -- <пароль>). Без AUTH_USERS вход отключён.
+      - AUTH_USERS=${AUTH_USERS:-}
       # Ключ облачного LLM-провайдера (опционально). Без него система
       # работает в офлайн-режиме на детерминированном экстракторе — без
       # передачи данных наружу (НФТ-4).
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-claude-sonnet-4-5}
+      # OpenAI-совместимый провайдер (Mistral, Groq, OpenRouter и т. п.), если нет ключа Anthropic
+      - LLM_BASE_URL=${LLM_BASE_URL:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_OPENAI_MODEL=${LLM_OPENAI_MODEL:-}
+      # Локальный провайдер для конфиденциальных процессов
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
+      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-}
+      - LOCAL_LLM_API_KEY=${LOCAL_LLM_API_KEY:-}
     volumes:
       - server_data:/app/data
     restart: unless-stopped

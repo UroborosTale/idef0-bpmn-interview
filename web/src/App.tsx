@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "./api/client";
+import { api, AUTH_REQUIRED_EVENT } from "./api/client";
+import LoginPage from "./pages/LoginPage";
 import SessionsListPage from "./pages/SessionsListPage";
 import NewSessionPage from "./pages/NewSessionPage";
 import WorkspacePage from "./pages/WorkspacePage";
@@ -35,18 +36,35 @@ export default function App() {
   const [view, setView] = useState<View>({ name: "list" });
   const [provider, setProvider] = useState<{ name: string; live: boolean } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  // undefined — ещё не знаем; null — нужен вход
+  const [user, setUser] = useState<{ login: string; authRequired: boolean } | null | undefined>(undefined);
 
   useEffect(() => {
-    api.providerStatus().then(setProvider).catch(() => setProvider(null));
+    if (campaignRoute) return;
+    api
+      .authMe()
+      .then((r) => setUser(r.user ? { login: r.user.login, authRequired: r.authRequired } : null))
+      .catch(() => setUser(null));
+    const onAuth = () => setUser(null);
+    window.addEventListener(AUTH_REQUIRED_EVENT, onAuth);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, onAuth);
   }, []);
 
   useEffect(() => {
+    if (!user) return;
+    api.providerStatus().then(setProvider).catch(() => setProvider(null));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
     api.listNotifications({ unread: true }).then((rows) => setUnreadCount(rows.length)).catch(() => {});
-  }, [view]);
+  }, [view, user]);
 
   if (campaignRoute) {
     return <RespondentInterviewPage campaignId={campaignRoute.campaignId} token={campaignRoute.token} />;
   }
+  if (user === undefined) return null;
+  if (user === null) return <LoginPage onLoggedIn={(login) => setUser({ login, authRequired: true })} />;
 
   return (
     <div className="app-shell">
@@ -73,6 +91,11 @@ export default function App() {
           {view.name !== "technology" && <button onClick={() => setView({ name: "technology" })}>Технологии</button>}
           {view.name !== "list" && <button onClick={() => setView({ name: "list" })}>Все сессии</button>}
           {view.name !== "new" && <button className="primary" onClick={() => setView({ name: "new" })}>+ Новая сессия</button>}
+          {user.authRequired && (
+            <button title={`Вы вошли как ${user.login}`} onClick={() => api.logout().finally(() => setUser(null))}>
+              Выйти ({user.login})
+            </button>
+          )}
         </div>
       </div>
       <div className="main-area">

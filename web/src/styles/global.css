@@ -209,3 +209,8 @@ button.danger:hover { background: #fef2f2; }
 
 .bpe-crumbs { display: inline-flex; align-items: center; gap: 2px; }
 .bpe-crumbs button { padding: 3px 9px; }
+
+/* вход */
+.login-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.login-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.login-card label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }

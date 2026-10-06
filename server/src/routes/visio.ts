@@ -2,8 +2,9 @@ import express, { Router } from "express";
 import fs from "node:fs";
 import path from "node:path";
 import { execFile, spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { getSession } from "../repo.js";
+import { dataDir } from "../db.js";
+import { isLocalRequest } from "../auth.js";
 import { buildVsdx } from "../export/vsdx.js";
 import { applyVisio, readVsdx } from "../export/vsdx-import.js";
 
@@ -14,8 +15,7 @@ import { applyVisio, readVsdx } from "../export/vsdx-import.js";
  */
 export const visioRouter = Router();
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, "../../data/visio");
+const root = path.join(dataDir, "visio");
 
 interface State {
   file: string;
@@ -74,6 +74,8 @@ visioRouter.post("/sessions/:id/visio/open", async (req, res) => {
   const session = getSession(req.params.id);
   if (!session) return void res.status(404).json({ error: "not found" });
   if (!session.model) return void res.status(400).json({ error: "модель ещё не построена — выполните запуск обработки" });
+  // открытие файла запускает программу на машине сервера — только для запросов с неё же
+  if (!isLocalRequest(req)) return void res.status(403).json({ error: "открыть Visio можно только на машине, где запущен сервер; скачайте .vsdx и загрузите его обратно" });
   const id = req.params.id;
   const fresh = Boolean((req.body as { fresh?: boolean } | undefined)?.fresh);
   try {
