@@ -126,11 +126,28 @@ export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: nu
   return result;
 }
 
-/** Достраивает layout узлам, у которых его нет (force — всем). */
-export function withLayout(m: ProcessLogicModel, force = false): ProcessLogicModel {
+/**
+ * Позиции фигур из BPMN, сгенерированного сервером (раскладка ELK): id узла → левый верхний угол.
+ * Редактор начинает с них, поэтому без ручных правок показывает ту же диаграмму, что и экспорт.
+ */
+export function positionsFromBpmnXml(xml: string | null | undefined): Map<string, { x: number; y: number }> {
+  const out = new Map<string, { x: number; y: number }>();
+  if (!xml) return out;
+  for (const m of xml.matchAll(/<bpmndi:BPMNShape id="Node_(.+?)_di"[^>]*>\s*<dc:Bounds x="(-?[\d.]+)" y="(-?[\d.]+)"/g)) {
+    out.set(m[1], { x: Number(m[2]), y: Number(m[3]) });
+  }
+  return out;
+}
+
+/**
+ * Достраивает layout узлам, у которых его нет: из раскладки сервера (seed), иначе — своей авто-раскладкой.
+ * force — расставить все фигуры заново авто-раскладкой.
+ */
+export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>): ProcessLogicModel {
   if (!force && visibleNodes(m).every((n) => n.layout)) return m;
   const auto = autoLayout(m);
-  return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: auto.get(n.id)! } : n)) };
+  const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
+  return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
 }
 
 export function wrapText(text: string, maxChars: number, maxLines: number): string[] {

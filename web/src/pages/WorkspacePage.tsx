@@ -228,7 +228,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
           </div>
           <div className="card" style={{ overflow: "auto" }}>
             <h4 style={{ marginTop: 0 }}>Живое превью BPMN</h4>
-            <BpmnDiagram model={model} selectedId={selectedId} onSelect={selectElement} height={420} />
+            <BpmnDiagram model={model} selectedId={selectedId} onSelect={selectElement} height={420} bpmnXml={session.bpmnXml} />
             {selectedId && (
               <button
                 style={{ marginTop: 8 }}
@@ -244,7 +244,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
       {tab === "visio" && model && <VisioEditor session={session} busy={busy} onSave={saveModel} />}
       {tab === "visio" && !model && <p className="muted">Модели ещё нет — загрузите текст интервью и запустите обработку.</p>}
       {tab === "editor" && model && (
-        <BpmnEditor model={model} validation={session.validation} busy={busy} onSave={saveModel} draftId={`${session.id}:bpmn`} draftBase={session.updatedAt} />
+        <BpmnEditor model={model} validation={session.validation} busy={busy} onSave={saveModel} draftId={`${session.id}:bpmn`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} />
       )}
       {tab === "idef0Editor" && model && (
         <Idef0Editor model={model} validation={session.validation} busy={busy} onSave={saveModel} draftId={`${session.id}:idef0`} draftBase={session.updatedAt} />
@@ -257,7 +257,7 @@ export default function WorkspacePage({ sessionId, onBack }: { sessionId: string
         <div className="split">
           <div className="left">
             {tab === "text" && <TextPanel fragments={session.fragments} highlightId={highlightFragmentId} />}
-            {tab === "bpmn" && <BpmnDiagram model={model} selectedId={selectedId} onSelect={selectElement} />}
+            {tab === "bpmn" && <BpmnDiagram model={model} selectedId={selectedId} onSelect={selectElement} bpmnXml={session.bpmnXml} />}
             {tab === "idef0" && <Idef0Viewer idef0={session.idef0} />}
             {tab === "model" && model && (
               <ModelPanel

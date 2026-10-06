@@ -3,7 +3,7 @@ import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxOf, laneIndexAtY, modelExtents, snap, visibleNodes, withLayout } from "./geometry";
+import { MIN_X, boxOf, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
 import { PALETTE, addFlow, addNodeAt, addRole, deleteFlow, deleteNode, dropNodeIntoLane, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, FlowShape, LanesLayer, NodeShape, UNASSIGNED_LANE } from "./shapes";
 import Inspector, { type Sel } from "./Inspector";
@@ -21,6 +21,7 @@ export default function BpmnEditor({
   onSave,
   draftId,
   draftBase,
+  bpmnXml,
 }: {
   model: M;
   validation: ValidationIssue[];
@@ -29,8 +30,10 @@ export default function BpmnEditor({
   /** Ключ черновика (сессия + редактор) и версия модели, на которой он основан. */
   draftId: string;
   draftBase: string;
+  /** Сгенерированный сервером BPMN: из него берутся позиции фигур, у которых их ещё нет. */
+  bpmnXml?: string | null;
 }) {
-  const h = useModelHistory<M>(() => withLayout(model));
+  const h = useModelHistory<M>(() => withLayout(model, false, positionsFromBpmnXml(bpmnXml)));
   const { draft, draftRef, setDraft } = h;
   const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m) });
   const [sel, setSel] = useState<Sel>(null);

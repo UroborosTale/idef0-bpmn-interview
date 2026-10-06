@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { useViewport } from "../editor-core/hooks";
-import { boxOf, modelExtents, visibleNodes, withLayout } from "./geometry";
+import { boxOf, modelExtents, positionsFromBpmnXml, visibleNodes, withLayout } from "./geometry";
 import { ArrowDefs, FlowShape, LanesLayer, NodeShape } from "./shapes";
 
 /**
@@ -13,13 +13,16 @@ export default function BpmnDiagram({
   selectedId,
   onSelect,
   height = 560,
+  bpmnXml,
 }: {
   model: ProcessLogicModel | null;
   selectedId?: string | null;
   onSelect?: (nodeId: string | null) => void;
   height?: number;
+  /** Сгенерированный сервером BPMN — источник позиций фигур, которые не двигали вручную. */
+  bpmnXml?: string | null;
 }) {
-  const laid = useMemo(() => (model ? withLayout(model) : null), [model]);
+  const laid = useMemo(() => (model ? withLayout(model, false, positionsFromBpmnXml(bpmnXml)) : null), [model, bpmnXml]);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const panRef = useRef<{ sx: number; sy: number; tx: number; ty: number; moved: boolean; nodeId: string | null } | null>(null);
