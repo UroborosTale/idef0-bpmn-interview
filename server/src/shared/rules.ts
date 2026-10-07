@@ -20,7 +20,7 @@ const BARE_VERBAL_NOUNS = new Set(["анализ", "контроль", "учёт
 
 /** Отглагольное существительное («актуализация реестра», «проверка заявки») — допустимое название блока IDEF0. */
 export function hasVerbalNoun(name: string): boolean {
-  return words(name).some((w) => (/(?:ние|тие|ция|ка|ство|тка|ча)$/u.test(w) && w.length > 4) || BARE_VERBAL_NOUNS.has(w));
+  return words(name).some((w) => (/(?:ние|тие|ция|ка|ство|тка|ча|инг)$/u.test(w) && w.length > 4) || BARE_VERBAL_NOUNS.has(w));
 }
 
 /** Код функции по Соглашению в произвольном тексте (поставщик или потребитель продукта). */

@@ -364,6 +364,25 @@ describe("API агента", () => {
     expect((await app.call("GET", `/agent/sessions/${id}/tasks?status=плохо`)).status).toBe(400);
   });
 
+  it("задания от агентов: адресат и автор обязательны, неверная функция отклоняется, число незавершённых ограничено", async () => {
+    const { id } = await session();
+    const body = { text: "Доработать операцию", agent: "моделист", from: "нормоконтролёр" };
+    expect((await app.call("POST", `/agent/sessions/${id}/tasks`, { text: "Х", agent: "моделист" })).status).toBe(400); // нет «от кого»
+    expect((await app.call("POST", `/agent/sessions/${id}/tasks`, { ...body, scope: "нет" })).status).toBe(400);
+    expect((await app.call("POST", "/agent/sessions/нет/tasks", body)).status).toBe(404);
+    const first = await app.call("POST", `/agent/sessions/${id}/tasks`, { ...body, scope: "o1" });
+    expect(first.status).toBe(201);
+    expect(first.body).toMatchObject({ createdBy: "agent:нормоконтролёр", agent: "моделист", scopeNodeId: "o1", status: "open" });
+    for (let i = 1; i < 20; i++) expect((await app.call("POST", `/agent/sessions/${id}/tasks`, body)).status).toBe(201);
+    const over = await app.call("POST", `/agent/sessions/${id}/tasks`, body);
+    expect(over.status).toBe(429);
+    expect(over.body.error).toMatch(/20 незавершённых/);
+    // аналитик по-прежнему может поставить своё задание, а отмена одного агентского освобождает место
+    expect((await app.call("POST", `/sessions/${id}/tasks`, { text: "Своё задание" })).status).toBe(201);
+    await app.call("POST", `/tasks/${first.body.id}/cancel`);
+    expect((await app.call("POST", `/agent/sessions/${id}/tasks`, body)).status).toBe(201);
+  });
+
   it("задания удаляются вместе с сессией; доступ агента по токену — к заданиям, но не к постановке и отмене", async () => {
     const { id } = await session();
     const t = (await app.call("POST", `/sessions/${id}/tasks`, { text: "Проверь роли" })).body.id as string;

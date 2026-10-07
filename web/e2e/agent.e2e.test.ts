@@ -63,3 +63,49 @@ describe("предложения агентов в студии", () => {
     await ctx.close();
   });
 });
+
+describe("задания агенту в студии", () => {
+  it("аналитик ставит задание, агент берёт его и отвечает предложением, студия показывает статус и итог", async () => {
+    const id = await seedSession("Согласование договора (задания)");
+    const { ctx, page, errors } = await openContext(browser);
+    await page.goto(`${WEB}/s/${id}`);
+    await page.locator(".studio").waitFor();
+
+    // поручение из студии
+    await page.locator(".problems-head button", { hasText: "Задания агенту" }).click();
+    await page.getByPlaceholder(/Что поручить агенту/).fill("Проверь названия шагов по Соглашению");
+    await page.getByRole("button", { name: "Поручить" }).click();
+    const card = page.locator(".task", { hasText: "Проверь названия шагов" });
+    await card.waitFor();
+    expect(await card.innerText()).toContain("ждёт агента");
+
+    // агент: берёт задание, отправляет предложение, завершает
+    const tasks = await api<{ id: string }[]>("GET", `/agent/sessions/${id}/tasks`);
+    expect(tasks.body).toHaveLength(1);
+    const tid = tasks.body[0].id;
+    expect((await api("POST", `/agent/tasks/${tid}/take`, { agent: "нормоконтролёр" })).status).toBe(200);
+    const model = (await api<any>("GET", `/sessions/${id}`)).body.model;
+    const prop = await api("POST", `/agent/sessions/${id}/proposals`, {
+      agent: "нормоконтролёр",
+      title: "Уточнить цель процесса",
+      task_id: tid,
+      ops: [{ op: "set_process", patch: { goal: "Согласовать договор до подписания" } }],
+    });
+    expect(prop.status).toBe(201);
+    expect((await api("POST", `/agent/tasks/${tid}/complete`, { note: "Названия в порядке; предложена цель процесса" })).status).toBe(200);
+    void model;
+
+    // студия подхватывает статус при следующем опросе — обновляем страницу, чтобы не ждать 8 секунд
+    await page.reload();
+    await page.locator(".studio").waitFor();
+    await page.locator(".problems-head button", { hasText: "Задания агенту" }).click();
+    const done = page.locator(".task", { hasText: "Проверь названия шагов" });
+    await done.waitFor();
+    const text = await done.innerText();
+    expect(text).toContain("выполнено");
+    expect(text).toContain("Итог агента: Названия в порядке; предложена цель процесса");
+    expect(text).toContain("Уточнить цель процесса");
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+});

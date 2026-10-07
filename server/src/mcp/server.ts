@@ -43,7 +43,8 @@ const apiError = (r: { status: number; body: any }): Result =>
 const taskLabel = { open: "ждёт агента", taken: "в работе", done: "выполнено", cancelled: "отменено" } as Record<string, string>;
 
 function describeTask(t: any): string {
-  const head = `${t.id} — «${t.text}»${t.scopeNodeId ? ` (функция ${t.scopeNodeId})` : ""}${t.agent ? `, адресовано: ${t.agent}` : ""} — ${taskLabel[t.status] ?? t.status}${t.takenBy ? ` (${t.takenBy})` : ""}`;
+  const author = typeof t.createdBy === "string" && t.createdBy.startsWith("agent:") ? `, от агента ${t.createdBy.slice(6)}` : "";
+  const head = `${t.id} — «${t.text}»${t.scopeNodeId ? ` (функция ${t.scopeNodeId})` : ""}${t.agent ? `, адресовано: ${t.agent}` : ""}${author} — ${taskLabel[t.status] ?? t.status}${t.takenBy ? ` (${t.takenBy})` : ""}`;
   const lines = [head];
   if (t.resultNote) lines.push(`  Итог: ${t.resultNote}`);
   for (const p of t.proposals ?? []) lines.push(`  • предложение ${p.id}: «${p.title}» — ${statusLabel[p.status] ?? p.status}`);
@@ -157,6 +158,26 @@ export function createAgentServer(api: AgentApi): McpServer {
       const r = await api.get(`/agent/sessions/${encodeURIComponent(session_id)}/tasks?status=${status}`);
       if (r.status !== 200) return apiError(r);
       return ok(r.body.length ? r.body.map(describeTask).join("\n\n") : "Заданий нет.");
+    }
+  );
+
+  server.registerTool(
+    "create_task",
+    {
+      title: "Поручить другому агенту",
+      description:
+        "Задание другому агенту — обратная связь внутри команды: например, нормоконтролёр поручает моделисту доработать операцию по замечаниям. Задание увидит и сможет отменить аналитик; модель оно не меняет. На сессию — не больше 20 незавершённых заданий от агентов.",
+      inputSchema: {
+        session_id: z.string(),
+        text: z.string().min(1).max(2000),
+        for_agent: z.string().describe("Роль агента-исполнителя: моделист, нормоконтролёр, интервьюер, аналитик"),
+        from_agent: z.string().describe("Ваша роль"),
+        scope: z.string().optional().describe("Функция модели (id), к которой относится задание"),
+      },
+    },
+    async ({ session_id, text, for_agent, from_agent, scope }) => {
+      const r = await api.post(`/agent/sessions/${encodeURIComponent(session_id)}/tasks`, { text, agent: for_agent, from: from_agent, ...(scope ? { scope } : {}) });
+      return r.status === 201 ? ok(`Задание создано.\n${describeTask(r.body)}`) : apiError(r);
     }
   );
 

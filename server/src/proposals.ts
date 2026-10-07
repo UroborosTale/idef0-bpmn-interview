@@ -1,5 +1,8 @@
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { db } from "./db.js";
+
+// идентификаторы без «-» и «_»: их удобно передавать агентам, в командной строке и искать регулярными выражениями
+const shortId = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 8);
 import type { ModelPatch } from "./shared/patch.js";
 
 /**
@@ -88,7 +91,7 @@ const fromRow = (r: Row): Proposal => ({
 });
 
 export function createProposal(input: { sessionId: string; agent: string; title: string; rationale: string; patch: ModelPatch; delta: ProposalDelta; baseUpdatedAt: string; taskId?: string | null }): Proposal {
-  const id = `prop_${nanoid(8)}`;
+  const id = `prop_${shortId()}`;
   db.prepare(
     `INSERT INTO proposals (id, session_id, agent, title, rationale, patch_json, delta_json, base_updated_at, status, created_at, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
   ).run(id, input.sessionId, input.agent, input.title, input.rationale, JSON.stringify(input.patch), JSON.stringify(input.delta), input.baseUpdatedAt, new Date().toISOString(), input.taskId ?? null);

@@ -10,7 +10,11 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "hash-password": "tsx src/scripts/hash-password.ts",
-    "mcp": "tsx src/mcp/index.ts"
+    "mcp": "tsx src/mcp/index.ts",
+    "agent:check": "tsx src/scripts/agent-check.ts",
+    "agent:demo": "tsx src/scripts/agent-demo.ts",
+    "eval:b002": "tsx src/scripts/eval-model.ts",
+    "seed:b002": "tsx src/scripts/seed-b002.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

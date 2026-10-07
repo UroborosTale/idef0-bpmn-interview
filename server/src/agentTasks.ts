@@ -1,5 +1,8 @@
-import { nanoid } from "nanoid";
+import { customAlphabet } from "nanoid";
 import { db } from "./db.js";
+
+// идентификаторы без «-» и «_»: их удобно передавать агентам, в командной строке и искать регулярными выражениями
+const shortId = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 8);
 
 /**
  * Задания аналитика агенту. Аналитик ставит задание в студии («разбей операцию B002.01.02 на шаги»), агент (Cline)
@@ -73,7 +76,7 @@ const fromRow = (r: Row): AgentTask => ({
 });
 
 export function createTask(input: { sessionId: string; text: string; scopeNodeId?: string | null; agent?: string | null; createdBy: string }): AgentTask {
-  const id = `task_${nanoid(8)}`;
+  const id = `task_${shortId()}`;
   db.prepare(`INSERT INTO agent_tasks (id, session_id, text, scope_node_id, agent, status, created_by, created_at) VALUES (?, ?, ?, ?, ?, 'open', ?, ?)`).run(
     id,
     input.sessionId,

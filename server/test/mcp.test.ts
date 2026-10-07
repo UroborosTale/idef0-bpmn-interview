@@ -36,7 +36,7 @@ describe("MCP-сервер для Cline", () => {
   it("инструменты: правила, сессии, модель, предложение, список и карточка предложений", async () => {
     const { client, close } = await connect(api);
     const tools = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(tools).toEqual(["complete_task", "get_conventions", "get_fragments", "get_model", "get_proposal", "get_tasks", "list_proposals", "list_sessions", "propose_patch", "take_task"]);
+    expect(tools).toEqual(["complete_task", "create_task", "get_conventions", "get_fragments", "get_model", "get_proposal", "get_tasks", "list_proposals", "list_sessions", "propose_patch", "take_task"]);
     await close();
   });
 
@@ -168,6 +168,20 @@ describe("MCP-сервер для Cline", () => {
     expect(late.text).toContain("уже выполнено");
     await close();
   });
+  it("create_task: нормоконтролёр поручает моделисту; задание видно аналитику с автором", async () => {
+    const { call, close } = await connect(api);
+    const r = await call("create_task", { session_id: sid, text: "Доработать B002.01.01: события названы существительными", for_agent: "моделист", from_agent: "нормоконтролёр", scope: "o1" });
+    expect(r.isError).toBe(false);
+    expect(r.text).toMatch(/task_\w+ — «Доработать B002\.01\.01.*» \(функция o1\), адресовано: моделист, от агента нормоконтролёр — ждёт агента/);
+    const tid = /task_\w+/.exec(r.text)![0];
+    const list = (await app.call("GET", `/sessions/${sid}/tasks`)).body.find((t: any) => t.id === tid);
+    expect(list).toMatchObject({ createdBy: "agent:нормоконтролёр", agent: "моделист", status: "open" });
+    expect((await call("create_task", { session_id: sid, text: "Х", for_agent: "моделист", from_agent: "нормоконтролёр", scope: "нет-такой" })).isError).toBe(true);
+    expect((await call("get_tasks", { session_id: sid })).text).toContain("от агента нормоконтролёр");
+    await app.call("POST", `/tasks/${tid}/cancel`);
+    await close();
+  });
+
   it("нет доступа (401) — подсказка про токен", async () => {
     const denied: AgentApi = { get: async () => ({ status: 401, body: { error: "требуется вход" } }), post: async () => ({ status: 401, body: { error: "требуется вход" } }) };
     const { call, close } = await connect(denied);

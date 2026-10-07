@@ -89,6 +89,7 @@ export default function TasksPanel({
           </div>
           <div className="muted task-meta">
             {t.scopeNodeId ? `функция ${labelOf(t.scopeNodeId)} · ` : "процесс в целом · "}
+            {t.createdBy.startsWith("agent:") ? `от агента ${t.createdBy.slice(6)} · ` : ""}
             {t.agent ? `адресовано: ${t.agent} · ` : ""}
             {new Date(t.createdAt).toLocaleString("ru-RU")}
           </div>

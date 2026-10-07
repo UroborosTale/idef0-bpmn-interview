@@ -37,6 +37,14 @@ export const TaskInput = z.object({
   agent: z.string().trim().min(1).max(60).optional(),
 });
 
+/** Задание от одного агента другому (обратная связь Нормоконтролёр → Моделист): создаёт агент, видит и может отменить аналитик. */
+export const AgentTaskInput = TaskInput.extend({
+  /** Кому адресовано (обязательно): роль агента. */
+  agent: z.string().trim().min(1).max(60),
+  /** От кого: роль агента-автора. */
+  from: z.string().trim().min(1).max(60),
+});
+
 export const TakeInput = z.object({ agent: z.string().trim().min(1).max(60) });
 export const CompleteInput = z.object({ note: z.string().max(4000).default("") });
 

@@ -51,5 +51,5 @@ export async function startApp() {
     }
     return { status: res.status, body: json };
   };
-  return { call, raw, withoutCookie, close: () => new Promise<void>((r) => server.close(() => r())), resetCookie: () => (cookie = "") };
+  return { call, raw, withoutCookie, url: base.replace(/\/api$/, ""), close: () => new Promise<void>((r) => server.close(() => r())), resetCookie: () => (cookie = "") };
 }

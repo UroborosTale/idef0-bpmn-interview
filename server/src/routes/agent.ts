@@ -7,7 +7,7 @@ import { functionCodes, processCodeOf, stepCodes } from "../shared/codes.js";
 import { applyPatch, describePatch, issueDelta, type ModelPatch } from "../shared/patch.js";
 import { sourceErrors } from "../agent/sources.js";
 import { validateModel } from "../shared/validate.js";
-import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput } from "../types/patch.js";
+import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput } from "../types/patch.js";
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
 
@@ -217,6 +217,35 @@ agentRouter.get("/agent/sessions/:id/tasks", (req, res) => {
     return;
   }
   res.json(listTasks(session.id, status).map(taskWithProposals));
+});
+
+/** Сколько ожидающих и взятых заданий от агентов допустимо на сессию: защита от лавины заданий. */
+const MAX_AGENT_TASKS = 20;
+
+agentRouter.post("/agent/sessions/:id/tasks", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const parsed = AgentTaskInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "text — задание, agent — кому адресовано, from — от кого" });
+    return;
+  }
+  const scope = parsed.data.scope ?? null;
+  if (scope && !session.model?.nodes.some((n) => n.id === scope)) {
+    res.status(400).json({ error: `функции «${scope}» нет в модели` });
+    return;
+  }
+  const active = listTasks(session.id).filter((t) => t.createdBy.startsWith("agent:") && (t.status === "open" || t.status === "taken")).length;
+  if (active >= MAX_AGENT_TASKS) {
+    res.status(429).json({ error: `от агентов уже ${active} незавершённых заданий — дождитесь, пока их выполнят или отменит аналитик` });
+    return;
+  }
+  const task = createTask({ sessionId: session.id, text: parsed.data.text, scopeNodeId: scope, agent: parsed.data.agent, createdBy: `agent:${parsed.data.from}` });
+  logAudit(session.id, `agent:${parsed.data.from}`, "task_created", { id: task.id, for: parsed.data.agent });
+  res.status(201).json(taskWithProposals(task));
 });
 
 agentRouter.post("/agent/tasks/:tid/take", (req, res) => {

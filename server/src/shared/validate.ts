@@ -155,12 +155,18 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     const byId = new Map(bpmnNodes.map((n) => [n.id, n] as const));
     const insOf = (id: string) => bpmnFlows.filter((f) => f.to === id).map((f) => byId.get(f.from)).filter((x): x is (typeof bpmnNodes)[number] => !!x);
     const outsOf = (id: string) => bpmnFlows.filter((f) => f.from === id);
+    // шлюз слияния (несколько входов, один выход) решения не принимает: смотрим, что стоит перед ним
+    const sourcesBefore = (id: string, seen = new Set<string>()): (typeof bpmnNodes) => {
+      if (seen.has(id)) return [];
+      seen.add(id);
+      return insOf(id).flatMap((s) => (s.type === "gateway" && insOf(s.id).length >= 2 && outsOf(s.id).length === 1 ? sourcesBefore(s.id, seen) : [s]));
+    };
     const kindName = (n: { type: string }) => ({ event: "событие", gateway: "шлюз" }[n.type] ?? "элемент");
     for (const n of bpmnNodes) {
       if (n.type === "gateway") {
         const exclusive = !n.subtype || n.subtype === "exclusive";
         if (exclusive && outsOf(n.id).length >= 2) {
-          for (const src of insOf(n.id).filter((s) => s.type !== "task" && s.type !== "subprocess")) {
+          for (const src of sourcesBefore(n.id).filter((s) => s.type !== "task" && s.type !== "subprocess")) {
             add("BPMN", "warning", "bpmn_xor_after_task", `${where}Перед развилкой «${n.name}» должна стоять задача (в ней принимается решение), а стоит ${kindName(src)} «${src.name}».`, n.id);
           }
         }
