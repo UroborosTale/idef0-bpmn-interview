@@ -4,8 +4,10 @@ import { CommitInput, Field } from "../editor-core/fields";
 import { SUBTYPES, TYPE_LABELS, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
 import { descendantsOf } from "../idef0-editor/geometry";
 import { SLOT_ENTITY, attach, createEntity, detach, setFunctionRole, type EntityKind, type Slot } from "../idef0-editor/ops";
+import { bpmnHosts, functionDepth, processCodeOf, stepCodes } from "@shared/codes";
+import AssignmentsEditor from "./AssignmentsEditor";
 import { HistoryList, Section, SourceList } from "./PanelParts";
-import { reportDoc, type DictKind, type StudioDoc } from "./docs";
+import { bpmnDoc, reportDoc, type DictKind, type StudioDoc } from "./docs";
 import type { Selection } from "./selection";
 
 type M = ProcessLogicModel;
@@ -104,8 +106,10 @@ export default function NodeProperties({
   const node = model.nodes.find((n) => n.id === id);
   if (!node) return <p className="muted prop-note">Элемент удалён.</p>;
 
-  const isFn = node.type === "task" || node.type === "subprocess";
-  const timing = isFn;
+  // шаг диаграммы BPMN операции (подоперация) — не функция IDEF0: у него нет сторон блока, RACI и декомпозиции
+  const isStep = !!node.bpmn_scope;
+  const isFn = (node.type === "task" || node.type === "subprocess") && !isStep;
+  const timing = node.type === "task" || node.type === "subprocess";
   const subtypes = SUBTYPES[node.type] ?? [];
   const set = (patch: Partial<typeof node>) => onChange(updateNode(model, node.id, patch));
   const text = (key: "duration" | "time_processing" | "time_waiting" | "cost_estimate" | "frequency", label: string, placeholder?: string) => (
@@ -138,13 +142,26 @@ export default function NodeProperties({
   const subtree = descendantsOf(model, node.id).length;
   const raci = model.raci.filter((r) => r.node_id === node.id);
   const mine = issues.filter((i) => i.element_id === node.id);
-  const home = node.idef0_parent ? codes.get(node.idef0_parent) ?? "A?" : "A0";
+  const home = node.idef0_parent ? codes.get(node.idef0_parent) ?? "A?" : processCodeOf(model);
+  const code = codes.get(node.id) ?? stepCodes(model).get(node.id);
+  const host = isStep ? model.nodes.find((n) => n.id === node.bpmn_scope) : undefined;
+  const hasDiagram = isFn && bpmnHosts(model).some((h) => h.id === node.id);
+  const depth = functionDepth(model, node.id);
 
   return (
     <div>
       <div className="prop-kind">
         {TYPE_LABELS[node.type]}
-        {codes.get(node.id) && <span className="nav-code"> {codes.get(node.id)}</span>}
+        {code && <span className="nav-code"> {code}</span>}
+        {isStep && host && (
+          <>
+            {" "}
+            <span className="muted">· шаг операции</span>{" "}
+            <button className="link-button" onClick={() => onSelect({ kind: "node", id: host.id })}>
+              {codes.get(host.id)} {host.name}
+            </button>
+          </>
+        )}
         {node.status === "hypothesis" && <span className="prop-badge">гипотеза · {Math.round(node.confidence * 100)}%</span>}
       </div>
 
@@ -204,6 +221,13 @@ export default function NodeProperties({
       )}
 
       {isFn && (
+        <Section title="Ролевая модель" count={(model.assignments ?? []).filter((a) => a.node_id === node.id).length} open>
+          <AssignmentsEditor model={model} nodeId={node.id} defaultKind={depth <= 1 ? "owner" : "executor"} onChange={onChange} />
+          <p className="muted prop-note">Исполнитель по умолчанию (поле «Исполнитель» выше) — дорожка BPMN; назначенные роли — механизмы IDEF0.</p>
+        </Section>
+      )}
+
+      {isFn && (
         <Section title="Стороны блока IDEF0">
           {list("Входы (Input) — слева", "inputs", model.data)}
           {list("Управление: регламенты — сверху", "controls", model.controls)}
@@ -233,6 +257,7 @@ export default function NodeProperties({
       <Section title="Диаграммы">
         <div className="bpe-actions" style={{ marginTop: 0 }}>
           {!node.idef0_parent && <button onClick={() => onReveal(node.id, "bpmn")}>Показать в BPMN</button>}
+          {hasDiagram && <button onClick={() => onOpenDoc(bpmnDoc(node.id))}>Диаграмма BPMN операции</button>}
           {isFn && <button onClick={() => onReveal(node.id, "idef0")}>Показать в IDEF0 ({home})</button>}
           {isFn && <button onClick={() => onOpenDecomposition(node.id)}>{childCount > 0 ? `Декомпозиция (${childCount} функц.)` : "Декомпозировать…"}</button>}
         </div>

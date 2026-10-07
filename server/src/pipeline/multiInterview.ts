@@ -324,6 +324,7 @@ export function mergeTracks(inputs: TrackInput[], meta: SessionMeta, processId: 
     interfaces: [],
     requirements_links: [],
     raci: [],
+    assignments: [],
     respondents: inputs.map((t) => ({ id: t.respondentId, name: t.respondentName, role_id: null, session_ids: [t.trackId], weight: t.weight })),
     discrepancies,
   };

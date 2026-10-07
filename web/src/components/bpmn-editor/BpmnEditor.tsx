@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { mergeScope, scopeView } from "@shared/scope";
 import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
 import { MIN_X, boxOf, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
-import { PALETTE, addFlow, addNodeAt, addRole, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { PALETTE, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, FlowShape, LanesLayer, NodeShape, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -25,6 +26,7 @@ export default function BpmnEditor({
   history,
   focus,
   onSelectionChange,
+  scope,
 }: {
   model: M;
   busy: boolean;
@@ -40,12 +42,20 @@ export default function BpmnEditor({
   focus?: { id: string; nonce: number } | null;
   /** Выделение сообщается окну студии — по нему панель «Свойства» показывает карточку объекта. Дорожка — это запись справочника «Исполнители». */
   onSelectionChange?: (sel: Selection) => void;
+  /** Диаграмма BPMN операции (id функции IDEF0); null или не задано — общая схема процесса. */
+  scope?: string | null;
 }) {
   const local = useModelHistory<M>(() => withLayout(model, false, positionsFromBpmnXml(bpmnXml)));
   const h = history ?? local;
   const embedded = !!history;
-  const { draft, draftRef, setDraft } = h;
-  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m), enabled: !embedded });
+  const { draftRef } = h;
+  const scopeId = scope ?? null;
+  // Диаграмма операции — вид модели на её шаги и дорожки; правки вида вливаются в полную модель (shared/scope.ts).
+  const draft = useMemo(() => scopeView(h.draft, scopeId), [h.draft, scopeId]);
+  const viewRef = useRef(draft);
+  viewRef.current = draft;
+  const setDraft = (fn: (m: M) => M) => h.setDraft((full) => mergeScope(full, fn(scopeView(full, scopeId)), scopeId));
+  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft: h.draft, dirty: h.dirty, restore: (m) => h.setDraft(m), enabled: !embedded });
   const [sel, setSel] = useState<Sel>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
@@ -57,18 +67,18 @@ export default function BpmnEditor({
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<Drag | null>(null);
-  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => modelExtents(draftRef.current));
+  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => modelExtents(viewRef.current));
   useBeforeUnload(h.dirty && !embedded);
 
   // переход к элементу по запросу извне
   useEffect(() => {
     if (!focus) return;
-    const n = draftRef.current.nodes.find((x) => x.id === focus.id);
+    const n = viewRef.current.nodes.find((x) => x.id === focus.id);
     if (n && !n.idef0_parent) {
       setSel({ kind: "node", id: n.id });
       centerOn(boxOf(n));
-    } else if (draftRef.current.flows.some((f) => f.id === focus.id)) setSel({ kind: "flow", id: focus.id });
-    else if (draftRef.current.roles.some((r) => r.id === focus.id)) setSel({ kind: "lane", id: focus.id });
+    } else if (viewRef.current.flows.some((f) => f.id === focus.id)) setSel({ kind: "flow", id: focus.id });
+    else if (viewRef.current.roles.some((r) => r.id === focus.id)) setSel({ kind: "lane", id: focus.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
@@ -96,7 +106,7 @@ export default function BpmnEditor({
 
   /** Зафиксировать изменение как один шаг истории (и, если задано, сменить выделение). */
   const commit = (next: M, nextSel?: Sel) => {
-    if (h.commit(next) && nextSel !== undefined) setSel(nextSel);
+    if (h.commit(mergeScope(draftRef.current, next, scopeId, viewRef.current)) && nextSel !== undefined) setSel(nextSel);
   };
 
   const save = async () => {
@@ -136,7 +146,7 @@ export default function BpmnEditor({
       const b = boxOf(n);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       pick({ kind: "node", id });
-      dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draft, moved: false, sx: e.clientX, sy: e.clientY };
+      dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (flowEl) {
       pick({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
@@ -156,7 +166,7 @@ export default function BpmnEditor({
       d.moved = true;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setDraft((m) => moveNode(m, d.id, Math.max(MIN_X, snap(wx - d.offX)), snap(wy - d.offY)));
-      setHotLane(laneIndexAtY(draftRef.current, wy));
+      setHotLane(laneIndexAtY(viewRef.current, wy));
     } else {
       setConnectTo(toWorld(e.clientX, e.clientY));
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-node-id]")?.getAttribute("data-node-id") ?? null;
@@ -178,7 +188,7 @@ export default function BpmnEditor({
       setConnectTo(null);
       setConnectHot(null);
       if (target && target !== d.from) {
-        const r = addFlow(draftRef.current, d.from, target);
+        const r = addFlow(viewRef.current, d.from, target);
         if (r.error) showHint(r.error);
         else commit(r.model, { kind: "flow", id: r.id! });
       }
@@ -193,7 +203,7 @@ export default function BpmnEditor({
   // --- добавление элементов ---
 
   const addFromPalette = (spec: NewNodeSpec, at?: Pt) => {
-    const m = draftRef.current;
+    const m = viewRef.current;
     let cx: number, cy: number;
     const from = curSel?.kind === "node" ? m.nodes.find((n) => n.id === curSel.id) : undefined;
     if (at) {
@@ -311,7 +321,7 @@ export default function BpmnEditor({
               {p.label}
             </button>
           ))}
-          <button style={{ marginTop: 10 }} onClick={() => commit(addRole(draft).model)}>
+          <button style={{ marginTop: 10 }} onClick={() => (scopeId ? h.commit(addScopeLane(draftRef.current, scopeId).model) : commit(addRole(draft).model))} title={scopeId ? "Новая роль и исполнитель этой операции" : undefined}>
             + Дорожка
           </button>
         </div>
@@ -369,14 +379,17 @@ export default function BpmnEditor({
               name={editingNode.name}
               box={boxOf(editingNode)}
               view={view}
-              onCommit={(v) => commit(updateNode(draftRef.current, editingNode.id, { name: v }))}
+              onCommit={(v) => commit(updateNode(viewRef.current, editingNode.id, { name: v }))}
               onDone={() => setEditing(null)}
             />
           )}
           {shown.length === 0 && (
             <div className="bpe-empty">
               <b>Диаграмма пуста</b>
-              <span>Перетащите фигуру из палитры слева или нажмите на неё — например, «Начало». Выберите фигуру и потяните за ● справа, чтобы провести стрелку.</span>
+              <span>
+                Перетащите фигуру из палитры слева или нажмите на неё — например, «Начало». Выберите фигуру и потяните за ● справа, чтобы провести стрелку.
+                {scopeId && " Дорожки — исполнители операции: назначьте их в свойствах операции или добавьте кнопкой «+ Дорожка»."}
+              </span>
             </div>
           )}
           <div className="bpe-corner muted">

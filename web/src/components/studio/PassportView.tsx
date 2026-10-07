@@ -56,6 +56,7 @@ export default function PassportView({ model, onChange }: { model: M; onChange: 
           {field("Наименование", p.name, "name")}
           {field("Код процесса", p.code, "code")}
           {field("Владелец процесса", p.owner, "owner")}
+          {field("Автор процесса", p.author, "author")}
           {field("Подразделение", p.department, "department")}
           <div className="passport-field">
             <label>Тип модели</label>

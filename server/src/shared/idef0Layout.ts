@@ -4,6 +4,8 @@
  * модель описана структурно, чтобы подходили и серверные, и клиентские типы.
  */
 
+import { functionCodes } from "./codes.js";
+
 export type Pt = [number, number];
 export type LabelSide = "left" | "right" | "top" | "bottom" | "mid";
 export type ArrowKind = "input" | "link" | "output" | "control" | "controlData" | "controlLink" | "role" | "system";
@@ -30,6 +32,7 @@ export interface NodeLike {
   type: string;
   name: string;
   idef0_parent?: string | null;
+  bpmn_scope?: string | null;
   idef0_layout?: { x: number; y: number } | null;
   role_id?: string | null;
   inputs: string[];
@@ -50,6 +53,20 @@ export interface ModelLike<N extends NodeLike = NodeLike> {
   controls: Named[];
   roles: Named[];
   systems: Named[];
+  process?: { code?: string | null };
+  /** Назначения ролей: должности владельца, исполнителя, соисполнителя и контролёра — механизмы функции. */
+  assignments?: { node_id: string | null; role_id: string; kind: string }[];
+}
+
+/** Виды ролей, которые на диаграмме IDEF0 показываются механизмами (наблюдатель — только информационный поток). */
+const MECHANISM_KINDS = new Set(["owner", "executor", "coexecutor", "controller"]);
+
+/** Должности-механизмы функции: исполнитель по умолчанию, затем назначенные роли в порядке назначения. */
+export function mechanismRoleIds(m: { assignments?: { node_id: string | null; role_id: string; kind: string }[] }, node: { id: string; role_id?: string | null }): string[] {
+  const ids: string[] = [];
+  if (node.role_id) ids.push(node.role_id);
+  for (const a of m.assignments ?? []) if (a.node_id === node.id && MECHANISM_KINDS.has(a.kind) && !ids.includes(a.role_id)) ids.push(a.role_id);
+  return ids;
 }
 
 export interface Arrow {
@@ -77,7 +94,8 @@ export interface Idef0Layout<N extends NodeLike = NodeLike> {
   arrows: Arrow[];
 }
 
-const isFn = (n: NodeLike) => n.type === "task" || n.type === "subprocess";
+// Шаги диаграммы BPMN операции (bpmn_scope) — подоперации, а не функции IDEF0.
+const isFn = (n: NodeLike) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope;
 
 /**
  * Функции одной диаграммы: parentId = null — уровень A0 (верхний; если верхних нет — все задачи),
@@ -86,26 +104,18 @@ const isFn = (n: NodeLike) => n.type === "task" || n.type === "subprocess";
 export function functionsOf<N extends NodeLike>(m: { nodes: N[] }, parentId: string | null = null): N[] {
   if (parentId) return m.nodes.filter((n) => isFn(n) && n.idef0_parent === parentId);
   const top = m.nodes.filter((n) => isFn(n) && !n.idef0_parent);
-  return top.length > 0 ? top : m.nodes.filter((n) => n.type === "task");
+  return top.length > 0 ? top : m.nodes.filter((n) => n.type === "task" && !n.bpmn_scope);
 }
 
 export const hasChildren = (m: { nodes: NodeLike[] }, id: string) => m.nodes.some((c) => isFn(c) && c.idef0_parent === id);
 
-/** Иерархические коды: A1, A2 на верхнем уровне, A31, A32 — вложенные в A3. */
-export function idef0Codes(m: { nodes: NodeLike[] }): Map<string, string> {
-  const codes = new Map<string, string>();
-  const walk = (parentId: string | null, prefix: string) => {
-    functionsOf(m, parentId).forEach((n, i) => {
-      if (codes.has(n.id)) return; // защита от циклов в idef0_parent
-      const code = `${prefix}${i + 1}`;
-      codes.set(n.id, code);
-      walk(n.id, code);
-    });
-  };
-  walk(null, "A");
-  return codes;
+/**
+ * Коды функций: по Соглашению о моделировании (B002.01.00, B002.01.01), если у процесса задан код нужного вида,
+ * иначе иерархические A1, A2, A31… (подробности — shared/codes.ts).
+ */
+export function idef0Codes(m: { nodes: NodeLike[]; process?: { code?: string | null } }): Map<string, string> {
+  return functionCodes(m);
 }
-
 export const defaultPos = (i: number) => ({ x: MARGIN + i * STEP_X, y: MARGIN + i * STEP_Y });
 
 /** Равномерно раскладывает n стрелок вдоль стороны длиной len, не плотнее max. */
@@ -204,9 +214,9 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       arrows.push({ key: `output:${n.id}:${id}`, kind: "output", entityId: id, label: dataById.get(id)!.name, nodeId: n.id, points: [[b.x + b.w, y], [b.x + b.w + STUB_SIDE, y]], side: "right" });
     });
 
-    // механизмы (снизу): исполнитель и системы
+    // механизмы (снизу): должности (исполнитель и назначенные роли) и системы
     const mech: { kind: "role" | "system"; id: string; name: string }[] = [];
-    if (n.role_id && roleById.has(n.role_id)) mech.push({ kind: "role", id: n.role_id, name: roleById.get(n.role_id)!.name });
+    for (const rid of mechanismRoleIds(m, n)) if (roleById.has(rid)) mech.push({ kind: "role", id: rid, name: roleById.get(rid)!.name });
     for (const sid of n.system_ids) if (systemById.has(sid)) mech.push({ kind: "system", id: sid, name: systemById.get(sid)!.name });
     const mStep = spread(b.w, mech.length, 40, 20);
     mech.forEach((mm, i) => {

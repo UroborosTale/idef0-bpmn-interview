@@ -1,6 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
+import { mergeScope, scopeView } from "@shared/scope";
 
 // Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
 // (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
@@ -12,7 +13,7 @@ export const GRID = 10;
 const COL_W = 170;
 
 /** Узлы диаграммы процесса: вложенные функции IDEF0 (idef0_parent) в BPMN не показываются. */
-export const visibleNodes = (m: ProcessLogicModel) => m.nodes.filter((n) => !n.idef0_parent);
+export const visibleNodes = (m: ProcessLogicModel) => m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope);
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 
@@ -148,6 +149,17 @@ export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<strin
   const auto = autoLayout(m);
   const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
   return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
+}
+
+/** Расставляет шаги диаграмм операций, у которых нет позиций (например, модель пришла с сервера или из импорта). */
+export function withScopeLayouts(m: ProcessLogicModel): ProcessLogicModel {
+  let out = m;
+  for (const scope of new Set(m.nodes.map((n) => n.bpmn_scope).filter((s): s is string => !!s))) {
+    const view = scopeView(out, scope);
+    const laid = withLayout(view, false);
+    if (laid !== view) out = mergeScope(out, laid, scope, view);
+  }
+  return out;
 }
 
 export function wrapText(text: string, maxChars: number, maxLines: number): string[] {

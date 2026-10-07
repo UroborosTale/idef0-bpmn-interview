@@ -1,6 +1,8 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
+import { idef0Codes } from "../shared/idef0Layout.js";
+import { scopeView } from "../shared/scope.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
 export interface BpmnDiagramData {
@@ -92,16 +94,23 @@ const NODE_SIZE = SIZE;
  * Пул + дорожки по ролям, задачи с типами, шлюзы, события, объекты данных,
  * авто-раскладка слева направо через ElkJS (layered/Sugiyama, ФТ-6.2) с
  * ортогональной маршрутизацией стрелок. Совместим с bpmn.io / Camunda Modeler.
+ *
+ * scope — id операции: тогда строится диаграмма BPMN этой операции (её шаги и дорожки её исполнителей, имя —
+ * «код название»); null — общая схема процесса.
  */
-export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenerationResult> {
+export async function generateBpmn(model: ProcessLogicModel, scope: string | null = null): Promise<BpmnGenerationResult> {
   const elementIndex: Record<string, string> = {};
   const nodeIdOf = (mid: string) => `Node_${mid}`;
 
+  const view = scopeView(model, scope);
+  const host = scope ? model.nodes.find((n) => n.id === scope) : undefined;
+  const poolName = host ? `${idef0Codes(model).get(host.id) ?? ""} ${host.name}`.trim() : model.process.name;
+
   // Узлы с idef0_parent — детали декомпозиции IDEF0, на диаграмме процесса они не показываются
   // (родитель остаётся одним шагом). Стрелки к скрытым узлам тоже опускаем.
-  const nodes = model.nodes.filter((n) => !n.idef0_parent);
+  const nodes = view.nodes.filter((n) => !n.idef0_parent);
   const visibleIds = new Set(nodes.map((n) => n.id));
-  const flows = model.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to));
+  const flows = view.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to));
 
   // синтетические старт/конец, если явных событий нет в модели (только для рендера)
   const hasExplicitStart = nodes.some((n) => n.type === "event" && n.subtype === "start");
@@ -131,7 +140,7 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
   }
 
   // роли -> дорожки (+ "без исполнителя")
-  const laneRoles = [...model.roles];
+  const laneRoles = [...view.roles];
   const UNASSIGNED_LANE = "Lane_unassigned";
   const laneIdOf = (roleId: string | null | undefined) => (roleId ? `Lane_${roleId}` : UNASSIGNED_LANE);
   const laneIndexOf = new Map<string, number>();
@@ -223,7 +232,9 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
   // data objects
   const dataXml: string[] = [];
   const dataShapesXml: string[] = [];
-  model.data.forEach((d, i) => {
+  const usedData = new Set(nodes.flatMap((n) => [...n.inputs, ...n.outputs]));
+  const usedControls = new Set(nodes.flatMap((n) => n.controls));
+  (scope ? model.data.filter((d) => usedData.has(d.id)) : model.data).forEach((d, i) => {
     dataXml.push(`<bpmn:dataObject id="DataObj_${d.id}" name="${esc(d.name)}" />`);
     dataXml.push(`<bpmn:dataObjectReference id="DataRef_${d.id}" name="${esc(d.name)}" dataObjectRef="DataObj_${d.id}" />`);
     const x = 100 + i * 110;
@@ -237,7 +248,7 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
   const annotationXml: string[] = [];
   const annotationShapesXml: string[] = [];
   const annotationAssocXml: string[] = [];
-  model.controls.forEach((c, i) => {
+  (scope ? model.controls.filter((c) => usedControls.has(c.id)) : model.controls).forEach((c, i) => {
     const annId = `Annotation_${c.id}`;
     annotationXml.push(`<bpmn:textAnnotation id="${annId}"><bpmn:text>${esc(c.name)}</bpmn:text></bpmn:textAnnotation>`);
     const y = layout.totalHeight + 20;
@@ -321,11 +332,11 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
   });
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_${model.process.id}" targetNamespace="http://example.org/bpmn" exporter="IDEF0-BPMN Interview System" exporterVersion="1.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_${model.process.id}${scope ? `_${scope}` : ""}" targetNamespace="http://example.org/bpmn" exporter="IDEF0-BPMN Interview System" exporterVersion="1.0">
   <bpmn:collaboration id="Collaboration_1">
-    <bpmn:participant id="Participant_1" name="${esc(model.process.name)}" processRef="Process_1" />
+    <bpmn:participant id="Participant_1" name="${esc(poolName)}" processRef="Process_1" />
   </bpmn:collaboration>
-  <bpmn:process id="Process_1" name="${esc(model.process.name)}" isExecutable="false">
+  <bpmn:process id="Process_1" name="${esc(poolName)}" isExecutable="false">
     ${laneSetXml}
     ${flowElementsXml.join("\n    ")}
     ${dataXml.join("\n    ")}
@@ -346,7 +357,7 @@ export async function generateBpmn(model: ProcessLogicModel): Promise<BpmnGenera
 
   const pool = { x: 60, y: 40, w: poolWidth, h: poolHeight };
   const diagram: BpmnDiagramData = {
-    poolName: model.process.name,
+    poolName,
     width: pool.x + pool.w + 40,
     height: Math.max(pool.y + pool.h, ...diagramExtras.map((e) => e.y + e.h)) + 40,
     pool,

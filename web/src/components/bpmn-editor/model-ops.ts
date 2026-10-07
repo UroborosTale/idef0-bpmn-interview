@@ -128,6 +128,7 @@ export function deleteNode(m: M, id: string): M {
     nodes: m.nodes.filter((n) => !gone.has(n.id)),
     flows: m.flows.filter((f) => !gone.has(f.from) && !gone.has(f.to)),
     raci: m.raci.filter((r) => !gone.has(r.node_id)),
+    assignments: (m.assignments ?? []).filter((a) => !a.node_id || !gone.has(a.node_id)),
     requirements_links: m.requirements_links.filter((r) => !gone.has(r.element_id)),
     discrepancies: m.discrepancies.filter((d) => !gone.has(d.element_id)),
     interfaces: m.interfaces.map((i) => (i.linked_node_id && gone.has(i.linked_node_id) ? { ...i, linked_node_id: null } : i)),
@@ -192,9 +193,19 @@ export function addRole(m: M): OpResult {
   return { model: shiftForLanes(m, next), id };
 }
 
+/**
+ * Новая дорожка на диаграмме BPMN операции: роль создаётся в справочнике и назначается исполнителем операции —
+ * дорожки диаграммы операции строятся из назначенных ей исполнителей.
+ */
+export function addScopeLane(m: M, scope: string): OpResult {
+  const id = nextId("role", m.roles.map((r) => r.id));
+  const roles = [...m.roles, { id, name: `Роль ${m.roles.length + 1}`, kind: "internal" as const, source: [] }];
+  return { model: { ...m, roles, assignments: [...(m.assignments ?? []), { node_id: scope, role_id: id, kind: "executor" as const, functions: [] }] }, id };
+}
+
 export function deleteRole(m: M, id: string): OpResult {
   if (m.nodes.some((n) => n.role_id === id)) return { model: m, error: "В дорожке есть элементы — сначала перенесите или удалите их" };
-  const next: M = { ...m, roles: m.roles.filter((r) => r.id !== id), raci: m.raci.filter((r) => r.role_id !== id) };
+  const next: M = { ...m, roles: m.roles.filter((r) => r.id !== id), raci: m.raci.filter((r) => r.role_id !== id), assignments: (m.assignments ?? []).filter((a) => a.role_id !== id) };
   return { model: shiftForLanes(m, next) };
 }
 

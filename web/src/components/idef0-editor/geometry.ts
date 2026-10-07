@@ -14,7 +14,7 @@ export const MIN_POS = 100; // левее/выше блок не ставим: �
 export const GRID = 10;
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 
-const isFn = (n: ProcessNode) => n.type === "task" || n.type === "subprocess";
+const isFn = (n: ProcessNode) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope;
 
 /** Функции одной диаграммы: parentId = null — уровень A0, иначе — вложенные функции узла. */
 export const functionsOf = (m: ProcessLogicModel, parentId: string | null = null): ProcessNode[] => sharedFunctionsOf(m, parentId);

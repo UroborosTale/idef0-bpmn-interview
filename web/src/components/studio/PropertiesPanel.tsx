@@ -2,7 +2,9 @@ import { useEffect, useRef } from "react";
 import type { Fragment, ProcessLogicModel, ProcessMeta, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
 import { deleteFlow, updateFlow } from "../bpmn-editor/model-ops";
+import { parseProcessCode } from "@shared/codes";
 import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
+import AssignmentsEditor from "./AssignmentsEditor";
 import { removeArrow } from "../idef0-editor/ops";
 import EntryCard from "./EntryCard";
 import NodeProperties from "./NodeProperties";
@@ -201,7 +203,7 @@ export default function PropertiesPanel({
     title = "Свойства процесса";
     const p = model.process;
     const set = (patch: Partial<ProcessMeta>) => onChange({ ...model, process: { ...p, ...patch } });
-    const txt = (label: string, key: "code" | "owner" | "department", placeholder?: string) => (
+    const txt = (label: string, key: "code" | "owner" | "department" | "author", placeholder?: string) => (
       <Field label={label}>
         <CommitInput value={p[key] ?? ""} placeholder={placeholder} onCommit={(v) => set({ [key]: v.trim() } as Partial<ProcessMeta>)} />
       </Field>
@@ -221,9 +223,22 @@ export default function PropertiesPanel({
           <Field label="Наименование">
             <CommitInput required value={p.name} onCommit={(v) => set({ name: v.trim() })} />
           </Field>
-          {txt("Код процесса", "code")}
+          {txt("Код процесса", "code", "например, B002.00.00")}
+          {p.code?.trim() ? (
+            parseProcessCode(p.code) ? (
+              <p className="muted prop-note">Коды функций строятся от него: подпроцессы {parseProcessCode(p.code)!.group}{parseProcessCode(p.code)!.number}.01.00, операции …01.01.</p>
+            ) : (
+              <p className="prop-note prop-warn">Код не по шаблону: буква группы (A — основные, B — управляющие, C — вспомогательные), номер в реестре и «.00.00».</p>
+            )
+          ) : (
+            <p className="muted prop-note">Без кода функции нумеруются A1, A2… Задайте код по шаблону Соглашения — нумерация станет B002.01.00, B002.01.01…</p>
+          )}
           {txt("Владелец процесса", "owner")}
+          {txt("Автор процесса", "author")}
           {txt("Подразделение", "department")}
+        </Section>
+        <Section title="Ролевая модель процесса" count={(model.assignments ?? []).filter((a) => a.node_id === null).length}>
+          <AssignmentsEditor model={model} nodeId={null} defaultKind="owner" onChange={onChange} />
         </Section>
         <Section title="Цель и результат">
           {area("Цель процесса", "goal")}

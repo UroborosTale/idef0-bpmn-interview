@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { functionsOf, idef0Codes } from "../idef0-editor/geometry";
+import { bpmnHosts, processCodeOf } from "@shared/codes";
 import { entriesOf } from "./dict-ops";
 import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type StudioDoc, bpmnDoc, dictDoc, idef0Doc, reportDoc } from "./docs";
 
@@ -28,6 +29,7 @@ export default function Navigator({
   onOpenEntry?: (dict: DictKind, id: string) => void;
 }) {
   const codes = idef0Codes(model);
+  const hosts = new Set(bpmnHosts(model).map((n) => n.id)); // функции, у которых есть своя диаграмма BPMN
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedSections, setClosedSections] = useState<Set<string>>(new Set());
@@ -73,6 +75,19 @@ export default function Navigator({
           <span className="nav-code">{codes.get(n.id)}</span>
           <span className="nav-name">{n.name}</span>
           {kids.length > 0 && <span className="nav-badge">⊞</span>}
+          {hosts.has(n.id) && (
+            <span
+              className={`nav-bpmn ${model.nodes.some((s) => s.bpmn_scope === n.id) ? "on" : ""} ${activeKey === `bpmn:${n.id}` ? "active" : ""}`}
+              title="Диаграмма BPMN операции"
+              data-nav-bpmn={n.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDoc(bpmnDoc(n.id));
+              }}
+            >
+              ⬡
+            </span>
+          )}
         </div>
         {open && kids.map((k) => renderFn(k, depth + 1, nextSeen))}
       </div>
@@ -145,7 +160,7 @@ export default function Navigator({
           </div>
           <div className={`nav-row ${activeKey === "idef0:root" ? "active-doc" : ""}`} style={{ paddingLeft: 22 }} onClick={() => onOpenDoc(idef0Doc(null))} title="Диаграмма IDEF0 верхнего уровня">
             <span className="nav-twisty" />
-            <span className="nav-code">A0</span>
+            <span className="nav-code">{processCodeOf(model)}</span>
             <span className="nav-name">Декомпозиция процесса</span>
           </div>
           {top.map((n) => renderFn(n, 2, new Set()))}

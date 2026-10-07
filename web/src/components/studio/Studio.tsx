@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { validateModel } from "@shared/validate";
+import { bpmnHosts } from "@shared/codes";
 import { api } from "../../api/client";
 import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
 import BpmnEditor from "../bpmn-editor/BpmnEditor";
 import Idef0Editor from "../idef0-editor/Idef0Editor";
-import { positionsFromBpmnXml, visibleNodes, withLayout } from "../bpmn-editor/geometry";
+import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
 import { duplicateNode } from "../bpmn-editor/model-ops";
@@ -21,18 +22,23 @@ import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from
 
 type M = ProcessLogicModel;
 
-const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(withLayout(m, false, positionsFromBpmnXml(bpmnXml)));
+/** Начальное состояние черновика: роли и позиции фигур достроены (в черновиках, сохранённых раньше, полей новой версии модели нет). */
+const normalize = (m: M): M => (m.assignments ? m : { ...m, assignments: [] });
+const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(withScopeLayouts(withLayout(normalize(m), false, positionsFromBpmnXml(bpmnXml))));
 
 /**
  * Окно студии: единое рабочее место процессного аналитика в духе Business Studio. Слева навигатор
  * (процессы, справочники, отчёты), в центре вкладки-документы (диаграммы BPMN и IDEF0, справочники,
  * отчёты), снизу проверки, сверху лента команд. Вся модель — одна: общая история правок, одно сохранение.
  */
+/** У операции есть своя диаграмма BPMN — в модели есть её шаги. */
+const hasOperationDiagram = (m: ProcessLogicModel, id: string) => m.nodes.some((n) => n.bpmn_scope === id);
+
 export default function Studio({ session, busy, onSave }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean> }) {
   const model = session.model!;
   const h = useModelHistory<M>(() => seed(model, session.bpmnXml));
   const draft = h.draft;
-  const persisted = useDraftPersistence<M>({ id: `${session.id}:studio`, base: session.updatedAt, draft, dirty: h.dirty, restore: (m) => h.setDraft(m) });
+  const persisted = useDraftPersistence<M>({ id: `${session.id}:studio`, base: session.updatedAt, draft, dirty: h.dirty, restore: (m) => h.setDraft(normalize(m)) });
   useBeforeUnload(h.dirty);
 
   // Модель на сервере изменилась не из этого окна (повторная обработка, откат версии) — подхватываем, если нет несохранённых правок.
@@ -86,12 +92,13 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const selectFn = (id: string) => {
     const n = draft.nodes.find((x) => x.id === id);
     if (!n) return;
-    if (active.kind === "bpmn" && !n.idef0_parent) {
+    if (n.bpmn_scope) {
+      open(bpmnDoc(n.bpmn_scope));
+    } else if (active.kind === "bpmn" && active.scope === null && !n.idef0_parent) {
       setSelection({ kind: "node", id });
       goto(id);
       return;
-    }
-    open(idef0Doc(n.idef0_parent ?? null));
+    } else open(idef0Doc(n.idef0_parent ?? null));
     setSelection({ kind: "node", id });
     goto(id);
   };
@@ -100,7 +107,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const reveal = (id: string, where: "bpmn" | "idef0") => {
     const n = draft.nodes.find((x) => x.id === id);
     if (!n) return;
-    open(where === "bpmn" ? bpmnDoc() : idef0Doc(n.idef0_parent ?? null));
+    open(where === "bpmn" ? bpmnDoc(n.bpmn_scope ?? null) : idef0Doc(n.idef0_parent ?? null));
     setSelection({ kind: "node", id });
     goto(id);
   };
@@ -128,11 +135,12 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     } else if (notation === "IDEF0") {
       open(idef0Doc(null));
     } else if (n && !n.idef0_parent) {
-      open(bpmnDoc());
+      open(bpmnDoc(n.bpmn_scope ?? null));
       setSelection({ kind: "node", id: n.id });
       goto(n.id);
     } else if (elementId && (isRole || draft.flows.some((f) => f.id === elementId))) {
-      open(bpmnDoc());
+      const flow = draft.flows.find((f) => f.id === elementId);
+      open(bpmnDoc(flow ? draft.nodes.find((x) => x.id === flow.from)?.bpmn_scope ?? null : null));
       goto(elementId);
     } else if (n) {
       open(idef0Doc(n.idef0_parent ?? null));
@@ -173,7 +181,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   /** Выгрузка открытой диаграммы такой, как она на экране (в т. ч. с несохранёнными правками). */
   const exportDiagram = async (format: "svg" | "png") => {
     setExportError(null);
-    const canvas = document.querySelector<SVGSVGElement>(".doc-area svg.bpe-svg");
+    const canvas = document.querySelector<SVGSVGElement>(".doc-area svg.bpe-svg, .doc-area svg.scheme-svg");
     const out = canvas && diagramSvg(canvas);
     if (!out) {
       setExportError("Откройте диаграмму BPMN или IDEF0 — выгружать нечего.");
@@ -207,7 +215,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   );
 
   const shown = visibleNodes(draft);
-  const fnCount = draft.nodes.filter((n) => n.type === "task" || n.type === "subprocess").length;
+  const fnCount = draft.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope).length;
 
   return (
     <div className={`studio ${full ? "full" : ""}`} onKeyDown={onKeyDown}>
@@ -270,6 +278,8 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         <div className="ribbon-group">
           <div className="ribbon-buttons ribbon-links">
             {exportLink("BPMN", "bpmn")}
+            {active.kind === "bpmn" && active.scope && hasOperationDiagram(draft, active.scope) && exportLink("BPMN операции", `bpmn?scope=${encodeURIComponent(active.scope)}`)}
+            {bpmnHosts(draft).some((h) => hasOperationDiagram(draft, h.id)) && exportLink("BPMN всех операций (zip)", "bpmn.zip")}
             {exportLink("IDEF0 (SVG)", "idef0/decomposition.svg")}
             {exportLink("Visio", "vsdx")}
             {exportLink("Модель (JSON)", "model.json")}
@@ -315,7 +325,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
           </div>
           <div className="doc-area">
             {active.kind === "bpmn" && (
-              <BpmnEditor key="bpmn" model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={h} focus={focus} onSelectionChange={reportSelection} />
+              <BpmnEditor key={active.key} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={h} focus={focus} onSelectionChange={reportSelection} />
             )}
             {active.kind === "idef0" && (
               <Idef0Editor

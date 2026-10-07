@@ -418,3 +418,12 @@ button.danger:hover { background: #fef2f2; }
 .bpe-empty { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 360px; text-align: center; display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; border: 1px dashed #b6c4de; border-radius: 10px; background: rgba(255,255,255,.92); color: #475569; pointer-events: none; font-size: 13px; line-height: 1.5; }
 .nav-search { padding: 6px 8px; position: sticky; top: 0; z-index: 2; background: #fafbfd; border-bottom: 1px solid #e3e9f3; }
 .nav-search input { width: 100%; box-sizing: border-box; }
+
+/* схема перехода статусов */
+.scheme { display: flex; flex-direction: column; height: 100%; }
+.scheme-scroll { flex: 1; overflow: auto; padding: 8px 16px 16px; background: #fff; }
+.scheme-svg { display: block; margin: 0 auto; }
+.nav-bpmn { margin-left: auto; padding: 0 5px; border-radius: 4px; color: #94a3b8; font-size: 13px; line-height: 18px; }
+.nav-bpmn:hover { background: #dbe6f7; color: var(--bs-blue); }
+.nav-bpmn.on { color: var(--bs-blue); }
+.nav-bpmn.active { background: #cfe0fa; color: var(--bs-blue); }

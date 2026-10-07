@@ -46,3 +46,49 @@ export function branchingModel(): ProcessLogicModel {
     ],
   });
 }
+
+/**
+ * Модель по структуре Соглашения о моделировании: процесс B002.00.00, два подпроцесса, три операции,
+ * у первой операции — диаграмма BPMN (старт, две задачи, конец), ролевая модель и продукты.
+ */
+export function structuredModel(): ProcessLogicModel {
+  return ProcessLogicModel.parse({
+    process: { id: "p", name: "Управление процессами", code: "B002.00.00" },
+    roles: [
+      { id: "r1", name: "Начальник отдела корпоративных технологий" },
+      { id: "r2", name: "Специалист отдела корпоративных технологий", qualification: "Опыт моделирования от 1 года" },
+      { id: "r3", name: "Директор по персоналу" },
+    ],
+    data: [
+      { id: "d1", name: "Информация о выявленном процессе" },
+      { id: "d2", name: "Актуальный реестр процессов" },
+      { id: "d3", name: "Протокол интервью" },
+      { id: "d4", name: "Информация об эффективности" },
+    ],
+    controls: [{ id: "c1", name: "СТП 113-01-2025" }],
+    systems: [{ id: "s1", name: "ELMA365" }],
+    nodes: [
+      task("s1", "Моделирование процесса", { inputs: ["d1"], outputs: ["d3"], controls: ["c1"] }),
+      task("s2", "Анализ эффективности процессной модели", { inputs: ["d3"], outputs: ["d4"], controls: ["c1"] }),
+      task("o1", "Актуализация реестра процессов", { idef0_parent: "s1", inputs: ["d1"], outputs: ["d2"], controls: ["c1"], role_id: "r2" }),
+      task("o2", "Проведение первичного интервью", { idef0_parent: "s1", inputs: ["d2"], outputs: ["d3"], controls: ["c1"] }),
+      task("o3", "Анализ соответствия", { idef0_parent: "s2", inputs: ["d3"], outputs: ["d4"], controls: ["c1"], role_id: "r2" }),
+      { id: "b0", type: "event", subtype: "start", name: "Информация получена", bpmn_scope: "o1", role_id: "r2" },
+      task("b1", "Открыть реестр", { bpmn_scope: "o1", role_id: "r2", system_ids: ["s1"] }),
+      task("b2", "Внести код процесса", { bpmn_scope: "o1", role_id: "r2" }),
+      { id: "b9", type: "event", subtype: "end", name: "Реестр актуализирован", bpmn_scope: "o1", role_id: "r2" },
+    ],
+    flows: [
+      { id: "bf1", from: "b0", to: "b1" },
+      { id: "bf2", from: "b1", to: "b2" },
+      { id: "bf3", from: "b2", to: "b9" },
+    ],
+    assignments: [
+      { node_id: null, role_id: "r1", kind: "owner", functions: ["Отвечает за результат процесса"] },
+      { node_id: "s1", role_id: "r1", kind: "owner" },
+      { node_id: "s2", role_id: "r1", kind: "owner" },
+      { node_id: "o1", role_id: "r3", kind: "controller" },
+      { node_id: "o1", role_id: "r2", kind: "executor", functions: ["Внесение данных в реестр"] },
+    ],
+  });
+}

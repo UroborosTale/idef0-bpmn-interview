@@ -23,9 +23,9 @@ export interface HistoryEvent {
 
 /** Поля записи, изменения которых попадают в историю. */
 const FIELDS: Record<HistoryKind, string[]> = {
-  roles: ["name", "kind", "owner", "description"],
+  roles: ["name", "kind", "owner", "qualification", "description"],
   systems: ["name", "owner", "description"],
-  data: ["name", "kind", "owner", "description"],
+  data: ["name", "kind", "supplier", "consumer", "value", "quality_standard", "owner", "description"],
   controls: ["name", "kind", "reference", "owner", "description"],
   kpi: ["name", "target", "unit", "period", "owner", "description"],
   risks: ["name", "mitigation", "level", "owner", "description"],

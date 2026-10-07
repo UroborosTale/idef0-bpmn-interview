@@ -58,6 +58,7 @@ export function purchaseModel(): M {
     statements: [],
     interfaces: [{ id: "i1", direction: "in", data_id: "d2" }],
     requirements_links: [],
+    assignments: [],
     raci: [
       { node_id: "a", role_id: "r1", type: "R" },
       { node_id: "a", role_id: "r1", type: "A" },
@@ -93,5 +94,47 @@ export function session(model: M = purchaseModel()): SessionRecord {
     reviewRoute: null,
     createdAt: "2026-10-01T10:00:00Z",
     updatedAt: "2026-10-01T10:00:00Z",
+  };
+}
+
+/**
+ * Модель по структуре Соглашения о моделировании: процесс B002.00.00, подпроцессы s1 и s2, операции o1–o3,
+ * у операции o1 — диаграмма BPMN (старт, две задачи, конец), ролевая модель и продукты.
+ */
+export function structuredModel(): ProcessLogicModel {
+  const role = (id: string, name: string, extra: object = {}) => ({ id, name, kind: "internal" as const, source: [], ...extra });
+  const data = (id: string, name: string) => ({ id, name, kind: "document" as const, source: [] });
+  return {
+    ...purchaseModel(),
+    process: { id: "p", name: "Управление процессами", code: "B002.00.00", type: "AS-IS", decomposition_depth: 2, notations: ["IDEF0", "BPMN"], version: "0.1", status: "draft", kpi: [], risks: [] },
+    roles: [role("r1", "Начальник отдела"), role("r2", "Специалист отдела", { qualification: "Опыт моделирования" }), role("r3", "Директор")],
+    systems: [{ id: "s1", name: "ELMA365", source: [] }],
+    data: [data("d1", "Информация о процессе"), data("d2", "Реестр процессов"), data("d3", "Протокол интервью"), data("d4", "Информация об эффективности")],
+    controls: [{ id: "c1", name: "СТП 113", kind: "regulation", source: [] }],
+    nodes: [
+      node("s1", "Моделирование процесса", { inputs: ["d1"], outputs: ["d3"], controls: ["c1"] }),
+      node("s2", "Анализ эффективности", { inputs: ["d3"], outputs: ["d4"], controls: ["c1"] }),
+      node("o1", "Актуализация реестра", { idef0_parent: "s1", inputs: ["d1"], outputs: ["d2"], controls: ["c1"], role_id: "r2" }),
+      node("o2", "Проведение интервью", { idef0_parent: "s1", inputs: ["d2"], outputs: ["d3"], controls: ["c1"] }),
+      node("o3", "Анализ соответствия", { idef0_parent: "s2", inputs: ["d3"], outputs: ["d4"], controls: ["c1"], role_id: "r2" }),
+      node("b0", "Информация получена", { type: "event", subtype: "start", bpmn_scope: "o1", role_id: "r2", layout: { x: 160, y: 120 } }),
+      node("b1", "Открыть реестр", { bpmn_scope: "o1", role_id: "r2", layout: { x: 280, y: 100 } }),
+      node("b2", "Внести код процесса", { bpmn_scope: "o1", role_id: "r2", layout: { x: 440, y: 100 } }),
+      node("b9", "Реестр актуализирован", { type: "event", subtype: "end", bpmn_scope: "o1", role_id: "r2", layout: { x: 600, y: 120 } }),
+    ],
+    flows: [
+      { id: "bf1", from: "b0", to: "b1", source: [], confirmed_by: [] },
+      { id: "bf2", from: "b1", to: "b2", source: [], confirmed_by: [] },
+      { id: "bf3", from: "b2", to: "b9", source: [], confirmed_by: [] },
+    ],
+    gaps: [],
+    interfaces: [],
+    raci: [],
+    assignments: [
+      { node_id: null, role_id: "r1", kind: "owner", functions: [] },
+      { node_id: "s1", role_id: "r1", kind: "owner", functions: [] },
+      { node_id: "o1", role_id: "r3", kind: "controller", functions: [] },
+      { node_id: "o1", role_id: "r2", kind: "executor", functions: ["Внесение данных в реестр"] },
+    ],
   };
 }

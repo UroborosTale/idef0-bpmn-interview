@@ -163,6 +163,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
     interfaces: [],
     requirements_links: [],
     raci: [],
+    assignments: [],
     respondents: [],
     discrepancies: [],
   };
@@ -362,6 +363,7 @@ export function buildModelFromParsedDrawio(parsed: ParsedDrawio, meta: SessionMe
     interfaces: [],
     requirements_links: [],
     raci: [],
+    assignments: [],
     respondents: [],
     discrepancies: [],
   };

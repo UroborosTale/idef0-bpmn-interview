@@ -1,4 +1,4 @@
-import type { ProcessLogicModel, ProcessNode } from "../../types";
+import type { AssignmentKind, ProcessLogicModel, ProcessNode } from "../../types";
 import { addRole, deleteRole, nextId, renameRole, setNodeRole } from "../bpmn-editor/model-ops";
 import type { DictKind } from "./docs";
 
@@ -30,6 +30,15 @@ export const ENTRY_TITLES: Record<DictKind, string> = {
 
 export const LEVEL_OPTIONS: [string, string][] = [["low", "низкий"], ["medium", "средний"], ["high", "высокий"]];
 
+/** Роли ролевой модели: подписи в карточках и таблицах. */
+export const ASSIGNMENT_LABELS: Record<AssignmentKind, string> = {
+  owner: "Владелец",
+  executor: "Исполнитель",
+  coexecutor: "Соисполнитель",
+  controller: "Контролер",
+  observer: "Наблюдатель",
+};
+
 const isFn = (n: ProcessNode) => n.type === "task" || n.type === "subprocess";
 const items = (m: M, kind: DictKind): { id: string; name: string }[] =>
   kind === "roles" ? m.roles : kind === "systems" ? m.systems : kind === "data" ? m.data : kind === "controls" ? m.controls : kind === "kpi" ? m.process.kpi : m.process.risks;
@@ -44,7 +53,13 @@ export function usageOf(m: M, kind: DictKind, id: string): UsageItem[] {
   const out: UsageItem[] = [];
   for (const n of m.nodes) {
     const add = (how: string) => out.push({ nodeId: n.id, nodeName: n.name, how });
-    if (kind === "roles" && n.role_id === id) add("исполнитель");
+    if (kind === "roles") {
+      if (n.role_id === id) add("исполнитель");
+      // назначенные роли функции (один и тот же исполнитель дважды не показываем)
+      for (const a of m.assignments ?? []) {
+        if (a.node_id === n.id && a.role_id === id && !(a.kind === "executor" && n.role_id === id)) add(ASSIGNMENT_LABELS[a.kind].toLowerCase());
+      }
+    }
     if (kind === "systems" && n.system_ids.includes(id)) add("механизм");
     if (kind === "data") {
       if (n.inputs.includes(id)) add("вход");
@@ -116,7 +131,7 @@ export function removeEntry(m: M, kind: DictKind, id: string): M {
       // шаги уходят в дорожку «Без исполнителя» (с переносом фигур), затем удаляется сама дорожка
       let next = m;
       for (const n of m.nodes) if (n.role_id === id) next = setNodeRole(next, n.id, null);
-      next = deleteRole(next, id).model;
+      next = deleteRole(next, id).model; // вместе с ролью уходят её назначения
       // респондент мультиинтервью остаётся, но без ссылки на удалённую роль
       return next.respondents.some((r) => r.role_id === id) ? { ...next, respondents: next.respondents.map((r) => (r.role_id === id ? { ...r, role_id: null } : r)) } : next;
     }

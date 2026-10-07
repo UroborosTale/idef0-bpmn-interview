@@ -1,4 +1,5 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
+import { isStructured, processCodeOf } from "../shared/codes.js";
 import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 
 export type { ArrowKind, LabelSide, Pt };
@@ -99,7 +100,7 @@ interface External {
 /** Блоки и ICOM-стрелки диаграммы декомпозиции (parentId = null — A0). */
 function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null, codes: Map<string, string>): { data: Idef0DiagramData; ext: External } {
   const parent = parentId ? model.nodes.find((n) => n.id === parentId) : undefined;
-  const code = parentId ? codes.get(parentId) ?? "A?" : "A0";
+  const code = parentId ? codes.get(parentId) ?? "A?" : processCodeOf(model);
   const layout = layoutIdef0(model, parentId);
 
   const blocks: Idef0Block[] = layout.functions.map((f) => ({ nodeId: f.node.id, code: f.code, name: f.node.name, ...f.box, hasChildren: f.hasChildren }));
@@ -135,7 +136,9 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
   const inputs = uniq(ext.inputs);
   const controls = uniq([...ext.controls, ...model.controls.map((c) => c.name)]);
   const outputs = uniq(ext.outputs.length ? ext.outputs : model.process.result ? [model.process.result] : []);
-  const mechs = uniq([...ext.mechanisms, ...model.roles.map((r) => r.name)]);
+  // должности процесса в целом, если они назначены (ролевая модель), иначе — все роли модели
+  const processRoles = (model.assignments ?? []).filter((a) => a.node_id === null && a.kind !== "observer").map((a) => model.roles.find((r) => r.id === a.role_id)?.name ?? "").filter(Boolean);
+  const mechs = processRoles.length > 0 ? uniq([...processRoles, ...ext.mechanisms.filter((s) => !model.roles.some((r) => r.name === s))]) : uniq([...ext.mechanisms, ...model.roles.map((r) => r.name)]);
   // ширина — с запасом под самые длинные подписи входов и выходов (подписи обрезаются до 26 знаков)
   const longest = Math.max(0, ...[...inputs, ...outputs].slice(0, 10).map((s) => Math.min(26, s.length) * 6.4));
   const W = Math.max(640, Math.ceil(2 * (110 + 90 + longest + 16)));
@@ -160,12 +163,14 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
     arrows.push({ points: [[x, cb.y + cb.h + 60], [x, cb.y + cb.h]], label: name, side: "bottom", labelRow: i % 3 });
   });
 
+  const structured = isStructured(model);
+  const ctxCode = structured ? processCodeOf(model) : "A-0";
   return {
-    code: "A-0",
-    title: "A-0 — контекстная диаграмма",
+    code: ctxCode,
+    title: structured ? `${ctxCode} — ${model.process.name} (контекстная диаграмма)` : "A-0 — контекстная диаграмма",
     width: W,
     height: H + 50,
-    blocks: [{ nodeId: "__context__", code: "A-0", name: model.process.name, ...cb }],
+    blocks: [{ nodeId: "__context__", code: ctxCode, name: model.process.name, ...cb }],
     arrows,
     footer: [
       model.process.goal ? `Цель: ${model.process.goal}` : "",
@@ -266,7 +271,7 @@ function renderNodeTree(model: ProcessLogicModel, codes: Map<string, string>): s
   const height = 60 + (rows.length + 1) * ROW_H;
   const parts: string[] = [];
   parts.push(`<rect x="${X0}" y="20" width="200" height="34" fill="#eef2ff" stroke="#1f2937" />`);
-  parts.push(`<text x="${X0 + 100}" y="42" text-anchor="middle" font-size="11" font-family="Arial, sans-serif">A0 — ${esc(model.process.name.length > 26 ? model.process.name.slice(0, 24) + "…" : model.process.name)}</text>`);
+  parts.push(`<text x="${X0 + 100}" y="42" text-anchor="middle" font-size="11" font-family="Arial, sans-serif">${processCodeOf(model)} — ${esc(model.process.name.length > 26 ? model.process.name.slice(0, 24) + "…" : model.process.name)}</text>`);
   const rowY = (i: number) => 90 + i * ROW_H;
   rows.forEach((r, i) => {
     const x = X0 + r.level * INDENT;

@@ -15,6 +15,7 @@
         "name": { "type": "string" },
         "owner": { "type": "string" },
         "department": { "type": "string" },
+        "author": { "type": "string", "description": "Автор процесса (реестр, карточка документа)" },
         "type": { "enum": ["AS-IS", "TO-BE"] },
         "goal": { "type": "string" },
         "trigger": { "type": "string" },
@@ -39,6 +40,7 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["internal", "external"] },
+          "qualification": { "type": ["string", "null"], "description": "Требуемая квалификация и специализация должности" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
@@ -68,6 +70,10 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["document", "data"] },
+          "supplier": { "type": ["string", "null"], "description": "Внешний поставщик продукта" },
+          "consumer": { "type": ["string", "null"], "description": "Внешний потребитель продукта" },
+          "value": { "type": ["string", "null"], "description": "Ценность для потребителя" },
+          "quality_standard": { "type": ["string", "null"], "description": "Стандарт качества" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
@@ -107,6 +113,7 @@
           "controls": { "type": "array", "items": { "type": "string" } },
           "duration": { "type": ["string", "null"] },
           "frequency": { "type": ["string", "null"] },
+          "bpmn_scope": { "type": ["string", "null"], "description": "Шаг диаграммы BPMN операции: id функции IDEF0 (операции)" },
           "idef0_parent": { "type": ["string", "null"] },
           "status": { "enum": ["confirmed", "hypothesis"] },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -202,6 +209,20 @@
           "node_id": { "type": "string" },
           "role_id": { "type": "string" },
           "type": { "enum": ["R", "A", "C", "I"] }
+        }
+      }
+    },
+    "assignments": {
+      "type": "array",
+      "description": "Ролевая модель: должность в роли владельца, исполнителя, соисполнителя, контролёра или наблюдателя на процессе (node_id = null) или функции",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "role_id", "kind"],
+        "properties": {
+          "node_id": { "type": ["string", "null"] },
+          "role_id": { "type": "string" },
+          "kind": { "enum": ["owner", "executor", "coexecutor", "controller", "observer"] },
+          "functions": { "type": "array", "items": { "type": "string" } }
         }
       }
     },

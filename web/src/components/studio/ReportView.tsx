@@ -4,6 +4,7 @@ import JobDescriptionsPanel from "../JobDescriptionsPanel";
 import type { ReportKind } from "./docs";
 import PassportView from "./PassportView";
 import RaciMatrix from "./RaciMatrix";
+import StatusScheme from "./StatusScheme";
 
 type M = ProcessLogicModel;
 
@@ -27,6 +28,7 @@ export default function ReportView({
   onSave: () => void;
 }) {
   if (kind === "passport") return <PassportView model={model} onChange={onChange} />;
+  if (kind === "statuses") return <StatusScheme model={model} />;
   if (kind === "raci") return <RaciMatrix model={model} dirty={dirty} sessionId={session.id} onChange={onChange} />;
 
   // серверные отчёты: до сохранения они показали бы старую модель

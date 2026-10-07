@@ -29,6 +29,8 @@ export const Role = z.object({
   kind: z.enum(["internal", "external"]).default("internal"),
   source: z.array(SourceRef).default([]),
   ...Card,
+  // Должность: требуемая квалификация и специализация (таблица ролей в регламентах и инструкциях)
+  qualification: z.string().nullable().optional(),
 });
 export type Role = z.infer<typeof Role>;
 
@@ -46,6 +48,12 @@ export const DataEntity = z.object({
   kind: z.enum(["document", "data"]).default("document"),
   source: z.array(SourceRef).default([]),
   ...Card,
+  // Карточка продукта (входы и выходы по Соглашению о моделировании). Источник и назначение внутри модели
+  // выводятся из связей функций; supplier/consumer — только для внешних («Протокол совещания», «Конечный продукт»).
+  supplier: z.string().nullable().optional(),
+  consumer: z.string().nullable().optional(),
+  value: z.string().nullable().optional(), // ценность для потребителя
+  quality_standard: z.string().nullable().optional(), // стандарт качества
 });
 export type DataEntity = z.infer<typeof DataEntity>;
 
@@ -93,6 +101,9 @@ export const ProcessNode = z.object({
   duration: z.string().nullable().optional(),
   frequency: z.string().nullable().optional(),
   idef0_parent: z.string().nullable().optional(),
+  // Шаг диаграммы BPMN операции: id функции IDEF0 (операции), чью диаграмму он образует. Такой узел — не функция
+  // IDEF0, а подоперация; без поля узел относится к общей схеме процесса (прежнее поведение).
+  bpmn_scope: z.string().nullable().optional(),
   // Позиция на холсте редактора BPMN (левый верхний угол). Если задана, генератор BPMN
   // использует её вместо авто-раскладки, чтобы экспорт совпадал с нарисованным.
   layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
@@ -172,6 +183,7 @@ export const ProcessMeta = z.object({
   name: z.string(),
   owner: z.string().optional(),
   department: z.string().optional(),
+  author: z.string().optional(), // автор процесса (реестр процессов, карточка документа)
   type: z.enum(["AS-IS", "TO-BE"]).default("AS-IS"),
   goal: z.string().optional(),
   trigger: z.string().optional(),
@@ -217,6 +229,19 @@ export const RaciEntry = z.object({
   type: RaciType,
 });
 export type RaciEntry = z.infer<typeof RaciEntry>;
+
+// --- Ролевая модель (Соглашение о моделировании, разд. 2) ---
+// Должность (запись справочника «Исполнители») назначается на процесс или функцию в одной из ролей.
+// owner/executor/coexecutor/controller в IDEF0 — механизмы; observer — только получатель информации.
+export const AssignmentKind = z.enum(["owner", "executor", "coexecutor", "controller", "observer"]);
+export type AssignmentKind = z.infer<typeof AssignmentKind>;
+export const RoleAssignment = z.object({
+  node_id: z.string().nullable(), // null — процесс в целом
+  role_id: z.string(),
+  kind: AssignmentKind,
+  functions: z.array(z.string()).default([]), // функции роли в этом процессе (по одной на строку в документах)
+});
+export type RoleAssignment = z.infer<typeof RoleAssignment>;
 
 // --- PLM v2: респонденты мультиинтервью (М4.1) ---
 export const Respondent = z.object({
@@ -264,6 +289,7 @@ export const ProcessLogicModel = z.object({
   interfaces: z.array(ProcessInterface).default([]),
   requirements_links: z.array(RequirementLink).default([]),
   raci: z.array(RaciEntry).default([]),
+  assignments: z.array(RoleAssignment).default([]),
   respondents: z.array(Respondent).default([]),
   discrepancies: z.array(Discrepancy).default([]),
 });

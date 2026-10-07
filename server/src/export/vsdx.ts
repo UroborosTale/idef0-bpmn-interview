@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
-import { arrowLabelPlacement, buildIdef0Diagrams, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
+import { arrowLabelPlacement, buildIdef0Diagrams, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
+import { isStructured } from "../shared/codes.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -666,13 +667,19 @@ export async function packVsdx(pages: Page[], docMeta: Record<string, string> = 
 export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string, string> = {}): Promise<Buffer> {
   const bpmn = await generateBpmn(model);
   const idef0 = buildIdef0Diagrams(model);
+  const codes = idef0Codes(model);
+  // диаграммы BPMN операций — по странице на каждую, после общей схемы
+  const scopes = [...new Set(model.nodes.map((n) => n.bpmn_scope).filter((s): s is string => !!s))];
+  const scoped = await Promise.all(scopes.map(async (s) => ({ code: codes.get(s) ?? s, d: (await generateBpmn(model, s)).diagram })));
+  const rootName = isStructured(model) ? `IDEF0 ${idef0.root.code}` : "IDEF0 A0";
 
   // имена страниц Visio уникальны и без запрещённых символов
   return packVsdx(
     [
       bpmnPage(bpmn.diagram, "BPMN"),
-      idef0Page(idef0.context, "IDEF0 A-0"),
-      idef0Page(idef0.root, "IDEF0 A0"),
+      ...scoped.map((s) => bpmnPage(s.d, `BPMN ${s.code}`)),
+      idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0"),
+      idef0Page(idef0.root, rootName),
       ...idef0.children.map((c) => idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId)),
     ],
     docMeta,

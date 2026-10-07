@@ -3,7 +3,7 @@ import { normKey } from "./extract.js";
 
 type M = ProcessLogicModel;
 
-const CARD_FIELDS = ["description", "owner", "reference"];
+const CARD_FIELDS = ["description", "owner", "reference", "qualification", "supplier", "consumer", "value", "quality_standard"];
 
 /** Пробелы, на которые аналитик уже ответил или которые отклонил, не должны снова открываться после пересчёта. */
 export function keepGapStatuses(prev: M["gaps"], fresh: M["gaps"]): M["gaps"] {
@@ -143,9 +143,12 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
   for (const o of manual) {
     // родитель декомпозиции должен остаться в модели, иначе функция «повиснет»
     if (o.idef0_parent && !nodeMap.has(o.idef0_parent)) continue;
+    // шаг диаграммы BPMN операции остаётся при операции, которая сохранилась
+    if (o.bpmn_scope && !nodeMap.has(o.bpmn_scope)) continue;
     model.nodes.push({
       ...o,
       id: nodeMap.get(o.id)!,
+      bpmn_scope: o.bpmn_scope ? nodeMap.get(o.bpmn_scope)! : o.bpmn_scope,
       idef0_parent: o.idef0_parent ? nodeMap.get(o.idef0_parent)! : o.idef0_parent,
       role_id: o.role_id ? role(o.role_id) ?? null : o.role_id,
       inputs: mapIds(o.inputs, data),
@@ -184,6 +187,11 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
     const node = nodeOrNull(r.node_id);
     const rid = role(r.role_id);
     return node && rid ? [{ ...r, node_id: node, role_id: rid }] : [];
+  });
+  model.assignments = prev.assignments.flatMap((a) => {
+    const rid = role(a.role_id);
+    const node = a.node_id === null ? null : nodeOrNull(a.node_id);
+    return rid && node !== undefined ? [{ ...a, node_id: node, role_id: rid }] : [];
   });
   model.requirements_links = prev.requirements_links.flatMap((l) => {
     const el = nodeOrNull(l.element_id);

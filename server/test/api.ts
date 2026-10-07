@@ -34,5 +34,10 @@ export async function startApp() {
     }
     return { status: res.status, body: json };
   };
-  return { call, close: () => new Promise<void>((r) => server.close(() => r())), resetCookie: () => (cookie = "") };
+  /** Тело ответа как есть (архивы и другие бинарные выгрузки). */
+  const raw = async (url: string) => {
+    const res = await fetch(base + url, { headers: cookie ? { Cookie: cookie } : {} });
+    return { status: res.status, body: Buffer.from(await res.arrayBuffer()) };
+  };
+  return { call, raw, close: () => new Promise<void>((r) => server.close(() => r())), resetCookie: () => (cookie = "") };
 }

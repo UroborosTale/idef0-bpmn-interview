@@ -20,6 +20,8 @@ export interface Role {
   source: SourceRef[];
   description?: string | null;
   owner?: string | null;
+  /** Должность: требуемая квалификация и специализация. */
+  qualification?: string | null;
 }
 
 export interface SystemEntity {
@@ -37,6 +39,11 @@ export interface DataEntity {
   source: SourceRef[];
   description?: string | null;
   owner?: string | null;
+  /** Карточка продукта: внешние поставщик и потребитель, ценность, стандарт качества. */
+  supplier?: string | null;
+  consumer?: string | null;
+  value?: string | null;
+  quality_standard?: string | null;
 }
 
 export interface ControlEntity {
@@ -63,6 +70,8 @@ export interface ProcessNode {
   duration?: string | null;
   frequency?: string | null;
   idef0_parent?: string | null;
+  /** Шаг диаграммы BPMN операции: id функции IDEF0 (операции). */
+  bpmn_scope?: string | null;
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
   note?: string;
@@ -131,6 +140,7 @@ export interface ProcessMeta {
   name: string;
   owner?: string;
   department?: string;
+  author?: string;
   type: "AS-IS" | "TO-BE";
   goal?: string;
   trigger?: string;
@@ -168,6 +178,16 @@ export interface RaciEntry {
   type: "R" | "A" | "C" | "I";
 }
 
+export type AssignmentKind = "owner" | "executor" | "coexecutor" | "controller" | "observer";
+
+/** Ролевая модель: должность в роли на процессе (node_id = null) или функции. */
+export interface RoleAssignment {
+  node_id: string | null;
+  role_id: string;
+  kind: AssignmentKind;
+  functions: string[];
+}
+
 export interface Respondent {
   id: string;
   name?: string;
@@ -202,6 +222,7 @@ export interface ProcessLogicModel {
   interfaces: ProcessInterface[];
   requirements_links: RequirementLink[];
   raci: RaciEntry[];
+  assignments: RoleAssignment[];
   respondents: Respondent[];
   discrepancies: Discrepancy[];
 }

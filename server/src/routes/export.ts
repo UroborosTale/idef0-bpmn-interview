@@ -3,6 +3,10 @@ import { getSession } from "../repo.js";
 import { idef0ToDrawio } from "../pipeline/idef0.js";
 import { buildAlbumHtml } from "../export/album.js";
 import { buildVsdx } from "../export/vsdx.js";
+import { generateBpmn } from "../pipeline/bpmn.js";
+import { idef0Codes } from "../shared/idef0Layout.js";
+import { bpmnHosts } from "../shared/codes.js";
+import JSZip from "jszip";
 import { buildProtocolMarkdown } from "../export/protocol.js";
 import { buildStatementsMarkdown } from "../export/statements.js";
 import { buildQuestionsText } from "../export/questions.js";
@@ -33,6 +37,49 @@ function requireReady(req: any, res: any): ReturnType<typeof getSession> | null 
   }
   return session;
 }
+
+/**
+ * BPMN операции: ?scope=<id операции> строит диаграмму BPMN этой операции по текущей модели.
+ * Без scope отдаётся общая схема процесса.
+ */
+exportRouter.get("/sessions/:id/export/bpmn", async (req, res, next) => {
+  const scope = typeof req.query.scope === "string" ? req.query.scope : "";
+  if (scope) {
+    const session = requireReady(req, res);
+    if (!session) return;
+    const host = session.model!.nodes.find((n) => n.id === scope);
+    if (!host) {
+      res.status(404).json({ error: "операция не найдена" });
+      return;
+    }
+    const code = idef0Codes(session.model!).get(scope) ?? scope;
+    attachment(res, `${code} ${host.name}.bpmn`);
+    res.type("application/xml").send((await generateBpmn(session.model!, scope)).xml);
+    return;
+  }
+  next();
+});
+
+/** Атлас процессов: диаграммы BPMN всех операций с шагами — архивом, файл на операцию «код название.bpmn». */
+exportRouter.get("/sessions/:id/export/bpmn.zip", async (req, res) => {
+  const session = requireReady(req, res);
+  if (!session) return;
+  const model = session.model!;
+  const codes = idef0Codes(model);
+  const zip = new JSZip();
+  let count = 0;
+  for (const host of bpmnHosts(model)) {
+    if (!model.nodes.some((n) => n.bpmn_scope === host.id)) continue;
+    zip.file(`${codes.get(host.id)} ${host.name}.bpmn`.replace(/[\\/:*?"<>|]+/g, "_"), (await generateBpmn(model, host.id)).xml);
+    count++;
+  }
+  if (count === 0) {
+    res.status(400).json({ error: "нет операций с диаграммами BPMN" });
+    return;
+  }
+  attachment(res, `${session.meta.processName}.bpmn.zip`);
+  res.type("application/zip").send(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
+});
 
 exportRouter.get("/sessions/:id/export/bpmn", (req, res) => {
   const session = requireReady(req, res);

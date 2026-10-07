@@ -3,6 +3,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
+import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
 import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
@@ -280,7 +281,7 @@ export default function Idef0Editor({
   const { w: worldW, h: worldH } = idef0Extents(layout);
   const parentNode = cur ? draft.nodes.find((n) => n.id === cur) : undefined;
   const crumbs: { id: string | null; label: string }[] = [
-    { id: null, label: "A0" },
+    { id: null, label: processCodeOf(draft) },
     ...(cur ? [...ancestorsOf(draft, cur), cur] : []).map((id) => ({ id, label: codes.get(id) ?? "A?" })),
   ];
 
@@ -357,7 +358,7 @@ export default function Idef0Editor({
             <Idef0Defs />
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
               <text x={16} y={24} fontSize={14} fontWeight="bold" fontFamily="Arial, sans-serif" fill="#1f2937" pointerEvents="none">
-                {cur ? `${codes.get(cur) ?? ""} — ${parentNode?.name ?? ""}` : `A0 — ${draft.process.name}`}
+                {cur ? `${codes.get(cur) ?? ""} — ${parentNode?.name ?? ""}` : `${processCodeOf(draft)} — ${draft.process.name}`}
               </text>
               {layout.functions.length === 0 && (
                 <text x={16} y={60} fontSize={13} fontFamily="Arial, sans-serif" fill="#64748b" pointerEvents="none">

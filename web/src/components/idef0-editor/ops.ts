@@ -106,8 +106,12 @@ export function removeArrow(m: M, a: { kind: string; nodeId: string; entityId: s
       return detach(m, a.nodeId, "control_data_ids", a.entityId);
     case "system":
       return detach(m, a.nodeId, "system_ids", a.entityId);
-    case "role":
-      return setFunctionRole(m, a.nodeId, null);
+    case "role": {
+      // стрелка-механизм убирает должность и как исполнителя по умолчанию, и как назначенную роль функции
+      const n = m.nodes.find((x) => x.id === a.nodeId);
+      const cleared = n?.role_id === a.entityId ? setFunctionRole(m, a.nodeId, null) : m;
+      return { ...cleared, assignments: (cleared.assignments ?? []).filter((x) => !(x.node_id === a.nodeId && x.role_id === a.entityId && x.kind !== "observer")) };
+    }
     default:
       return m;
   }
