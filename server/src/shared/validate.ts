@@ -1,6 +1,8 @@
 import type { ProcessLogicModel, ValidationIssue } from "../types/model.js";
 import { idef0Codes, functionsOf as idef0Functions } from "./idef0Layout.js";
 import { bpmnHosts, functionDepth, isStructured, parseProcessCode } from "./codes.js";
+import { isBoundaryNode } from "./bpmnArtifacts.js";
+import { FUNCTION_CODE, blockKey, hasVerbalNoun, looksLikeFact, normalizeCode } from "./rules.js";
 
 /**
  * Детерминированная валидация BPMN (5.1) и IDEF0 (5.2) + стиль наименований (5.3).
@@ -52,7 +54,12 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
   // Проверки ниже должны оставаться согласованными с этой логикой.
   const startNodes = bpmnNodes.filter((n) => n.type === "event" && n.subtype === "start");
   const endNodes = bpmnNodes.filter((n) => n.type === "event" && n.subtype === "end");
-  const entryNodes = bpmnNodes.filter((n) => (inCount.get(n.id) ?? 0) === 0);
+  // граничное событие достижимо через свою задачу: у него нет входящих стрелок, но это не точка входа процесса
+  const boundary = bpmnNodes.filter((n) => isBoundaryNode(n, bpmnNodes));
+  const boundaryIds = new Set(boundary.map((n) => n.id));
+  const reachAdj = new Map(outAdj);
+  for (const b of boundary) reachAdj.set(b.attached_to!, [...(reachAdj.get(b.attached_to!) ?? []), b.id]);
+  const entryNodes = bpmnNodes.filter((n) => (inCount.get(n.id) ?? 0) === 0 && !boundaryIds.has(n.id));
   const exitNodes = bpmnNodes.filter((n) => (outAdj.get(n.id) ?? []).length === 0);
 
   if (bpmnNodes.length === 0) {
@@ -75,7 +82,7 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     const cur = queue.shift()!;
     if (reached.has(cur)) continue;
     reached.add(cur);
-    for (const next of outAdj.get(cur) ?? []) queue.push(next);
+    for (const next of reachAdj.get(cur) ?? []) queue.push(next);
   }
   if (roots.length > 0) {
     for (const n of bpmnNodes) {
@@ -90,6 +97,7 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
   if (endNodes.length > 0) {
     for (const n of bpmnNodes) {
       if (n.type === "event" && n.subtype === "end") continue;
+      if (boundaryIds.has(n.id)) continue; // у граничного события свои правила (bpmn_boundary_no_outgoing)
       if ((outAdj.get(n.id) ?? []).length === 0) {
         add("BPMN", "error", "bpmn_dead_end", `${where}Узел «${n.name}» не имеет продолжения (тупик потока): ведите стрелку дальше или к конечному событию.`, n.id);
       }
@@ -112,7 +120,7 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
   function dfs(id: string, path: string[]): void {
     if (stack.has(id)) {
       const cycle = path.slice(path.indexOf(id));
-      const hasExit = cycle.some((cid) => (outAdj.get(cid) ?? []).some((t) => !cycle.includes(t)));
+      const hasExit = cycle.some((cid) => (reachAdj.get(cid) ?? []).some((t) => !cycle.includes(t)));
       if (!hasExit) {
         add(
           "BPMN",
@@ -127,10 +135,47 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     if (visited.has(id)) return;
     visited.add(id);
     stack.add(id);
-    for (const next of outAdj.get(id) ?? []) dfs(next, [...path, id]);
+    for (const next of reachAdj.get(id) ?? []) dfs(next, [...path, id]);
     stack.delete(id);
   }
   for (const n of bpmnNodes) dfs(n.id, []);
+
+  // --- граничные события ---
+  for (const n of bpmnNodes) {
+    if (n.type !== "event" || !n.attached_to || boundaryIds.has(n.id)) continue;
+    add("BPMN", "warning", "bpmn_boundary_no_host", `${where}Граничное событие «${n.name}» прикреплено к задаче, которой нет на этой диаграмме: прикрепите его к задаче или подпроцессу.`, n.id);
+  }
+  for (const b of boundary) {
+    if ((inCount.get(b.id) ?? 0) > 0) add("BPMN", "error", "bpmn_boundary_incoming", `${where}В граничное событие «${b.name}» ведёт стрелка — граничное событие только начинает ветку, входящих стрелок у него нет.`, b.id);
+    if ((outAdj.get(b.id) ?? []).length === 0) add("BPMN", "warning", "bpmn_boundary_no_outgoing", `${where}У граничного события «${b.name}» нет продолжения: проведите стрелку к шагу, который выполняется при его наступлении.`, b.id);
+  }
+
+  // --- правила Соглашения о моделировании (только для модели со структурным кодом процесса) ---
+  if (isStructured(model)) {
+    const byId = new Map(bpmnNodes.map((n) => [n.id, n] as const));
+    const insOf = (id: string) => bpmnFlows.filter((f) => f.to === id).map((f) => byId.get(f.from)).filter((x): x is (typeof bpmnNodes)[number] => !!x);
+    const outsOf = (id: string) => bpmnFlows.filter((f) => f.from === id);
+    const kindName = (n: { type: string }) => ({ event: "событие", gateway: "шлюз" }[n.type] ?? "элемент");
+    for (const n of bpmnNodes) {
+      if (n.type === "gateway") {
+        const exclusive = !n.subtype || n.subtype === "exclusive";
+        if (exclusive && outsOf(n.id).length >= 2) {
+          for (const src of insOf(n.id).filter((s) => s.type !== "task" && s.type !== "subprocess")) {
+            add("BPMN", "warning", "bpmn_xor_after_task", `${where}Перед развилкой «${n.name}» должна стоять задача (в ней принимается решение), а стоит ${kindName(src)} «${src.name}».`, n.id);
+          }
+        }
+        continue;
+      }
+      if (boundaryIds.has(n.id)) continue;
+      if (outsOf(n.id).length >= 2) add("BPMN", "warning", "bpmn_split_without_gateway", `${where}Поток из «${n.name}» разветвляется без шлюза — добавьте шлюз (XOR, AND или OR).`, n.id);
+      const isEnd = n.type === "event" && n.subtype === "end";
+      if (!isEnd && insOf(n.id).length >= 2) add("BPMN", "warning", "bpmn_merge_without_gateway", `${where}В «${n.name}» потоки сходятся без шлюза — объедините их шлюзом.`, n.id);
+      // событие — это свершившийся факт: «Получена заявка», а не «Заявка» или «Получить заявку»
+      if (n.type === "event" && n.subtype !== "timer" && n.name.trim() && !/^[\d\s\p{P}]+$/u.test(n.name) && !looksLikeFact(n.name)) {
+        add("BPMN", "warning", "bpmn_event_not_fact", `${where}Событие «${n.name}» нужно сформулировать как факт, который произошёл (например: «Заявка получена»).`, n.id);
+      }
+    }
+  }
   }
 
   // --- IDEF0 5.2 ---
@@ -216,7 +261,8 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     (name.toLowerCase().match(/[\p{L}-]+/gu) ?? []).some((w) => /(?:ть|ться|чь|ти|тись)$/u.test(w) && !/ость$/u.test(w));
   for (const n of model.nodes) {
     if (n.type === "task" || n.type === "subprocess") {
-      if (!hasInfinitive(n.name)) {
+      // по Соглашению блок называется инфинитивом или отглагольным существительным («Актуализация реестра»)
+      if (!hasInfinitive(n.name) && !(isStructured(model) && hasVerbalNoun(n.name))) {
         add(
           "MODEL",
           "warning",
@@ -227,7 +273,8 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       }
     }
     if (n.type === "event") {
-      if (hasInfinitive(n.name)) {
+      // в модели по Соглашению о событии судит bpmn_event_not_fact
+      if (hasInfinitive(n.name) && !isStructured(model)) {
         add(
           "MODEL",
           "warning",
@@ -293,7 +340,85 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     }
   }
 
+  // --- продукты и названия блоков (Соглашение о моделировании) ---
+  if (isStructured(model)) {
+    const fnsAll = model.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope);
+    const label = (n: { id: string; name: string }) => `${codes.get(n.id) ?? ""} «${n.name}»`.trim();
+
+    // блоки IDEF0 с одинаковыми названиями: каждое название блока уникально в модели
+    const byName = new Map<string, typeof fnsAll>();
+    for (const n of fnsAll) if (n.name.trim()) byName.set(blockKey(n.name), [...(byName.get(blockKey(n.name)) ?? []), n]);
+    for (const group of byName.values()) {
+      if (group.length > 1) add("IDEF0", "warning", "idef0_duplicate_name", `Блоки с одинаковым названием «${group[0].name}»: ${group.map((g) => codes.get(g.id) ?? g.id).join(", ")}. Название блока должно быть уникальным.`, group[0].id);
+    }
+    // петли: выход функции не должен возвращаться на её же вход или управление
+    for (const n of fnsAll) {
+      const back = n.outputs.filter((id) => n.inputs.includes(id) || (n.control_data_ids ?? []).includes(id));
+      if (back.length > 0) add("IDEF0", "warning", "idef0_self_loop", `У функции ${label(n)} выход «${dataName(back[0])}» возвращается на её же вход или управление — петли в IDEF0 не допускаются.`, n.id);
+    }
+
+    // потоки сообщений: отправляет задача «Отправка» или событие-сообщение, получает задача «Получение» или событие-сообщение
+    const poolName = (id: string) => (model.pools ?? []).find((q) => q.id === id)?.name;
+    for (const msg of model.messages ?? []) {
+      const out = !!model.nodes.find((n) => n.id === msg.from);
+      const node = model.nodes.find((n) => n.id === (out ? msg.from : msg.to));
+      const pool = poolName(out ? msg.to : msg.from);
+      if (!node || pool === undefined) continue;
+      const fits = node.type === "event" ? node.subtype === "message" || node.subtype === "signal" : node.type === "task" && node.subtype === (out ? "send" : "receive");
+      if (!fits) {
+        add("BPMN", "warning", "bpmn_message_endpoint", `${out ? "Сообщение в «" : "Сообщение из «"}${pool}» ${out ? "отправляет" : "получает"} «${node.name}», а это не ${out ? "задача «Отправка»" : "задача «Получение»"} и не событие-сообщение.`, node.id);
+      }
+    }
+
+    // источник и назначение продуктов: внутри модели они выводятся из связей функций, снаружи — задаются в карточке
+    const producersOf = (id: string) => fnsAll.filter((n) => n.outputs.includes(id));
+    const consumersOf = (id: string) => fnsAll.filter((n) => n.inputs.includes(id) || (n.control_data_ids ?? []).includes(id));
+    const names = (ids: string[]) => `${ids.slice(0, 3).map((x) => `«${dataName(x)}»`).join(", ")}${ids.length > 3 ? ` и ещё ${ids.length - 3}` : ""}`;
+    const noSupplier = model.data.filter((d) => consumersOf(d.id).length > 0 && producersOf(d.id).length === 0 && !d.supplier?.trim()).map((d) => d.id);
+    const noConsumer = model.data.filter((d) => producersOf(d.id).length > 0 && consumersOf(d.id).length === 0 && !d.consumer?.trim()).map((d) => d.id);
+    if (noSupplier.length > 0) add("MODEL", "warning", "data_no_supplier", `У ${noSupplier.length} входов (${names(noSupplier)}) не определён источник: ни одна функция модели их не выпускает и внешний поставщик не указан в карточке продукта.`, noSupplier.length === 1 ? noSupplier[0] : null);
+    if (noConsumer.length > 0) add("MODEL", "warning", "data_no_consumer", `У ${noConsumer.length} выходов (${names(noConsumer)}) не определено назначение: ни одна функция модели их не использует и внешний потребитель не указан в карточке продукта.`, noConsumer.length === 1 ? noConsumer[0] : null);
+
+    // коды в полях «поставщик» и «потребитель»: код этого же процесса должен вести к функции, которая действительно выпускает или использует продукт
+    const processPrefix = processCodePrefix(model.process.code);
+    const knownCodes = new Map([...codes].map(([id, c]) => [c, id] as const));
+    const check = (d: (typeof model.data)[number], text: string | null | undefined, role: "supplier" | "consumer") => {
+      for (const raw of text?.match(FUNCTION_CODE) ?? []) {
+        const code = normalizeCode(raw);
+        if (!code.startsWith(`${processPrefix}.`)) continue; // код другого процесса — внешняя ссылка, здесь её проверить нечем
+        const fnId = knownCodes.get(code);
+        const who = role === "supplier" ? "поставщик" : "потребитель";
+        if (!fnId) {
+          add("MODEL", "warning", "data_ref_unknown_code", `У продукта «${d.name}» ${who} указан кодом ${code}, но такой функции в модели нет.`, d.id);
+          continue;
+        }
+        const linked = (role === "supplier" ? producersOf(d.id) : consumersOf(d.id)).map((n) => n.id);
+        if (linked.length > 0 && !linked.some((id) => id === fnId || isAncestorOrSelf(model, fnId, id) || isAncestorOrSelf(model, id, fnId))) {
+          add("MODEL", "warning", "data_ref_mismatch", `У продукта «${d.name}» ${who} указан ${code}, а по связям функций это ${linked.map((id) => codes.get(id) ?? id).join(", ")}.`, d.id);
+        }
+      }
+    };
+    for (const d of model.data) {
+      check(d, d.supplier, "supplier");
+      check(d, d.consumer, "consumer");
+    }
+  }
+
   return issues;
+}
+
+/** Номер процесса из кода: «B002.00.00» → «B002» (кириллица приводится к латинице). */
+function processCodePrefix(code: string | null | undefined): string {
+  return normalizeCode((code ?? "").trim().slice(0, 4));
+}
+
+/** ancestor — сама функция или её предок в дереве IDEF0. */
+function isAncestorOrSelf(model: Pick<ProcessLogicModel, "nodes">, ancestor: string, id: string): boolean {
+  const byId = new Map(model.nodes.map((n) => [n.id, n] as const));
+  for (let cur = byId.get(id), guard = 0; cur && guard < 50; cur = cur.idef0_parent ? byId.get(cur.idef0_parent) : undefined, guard++) {
+    if (cur.id === ancestor) return true;
+  }
+  return false;
 }
 
 export function hasBlockingErrors(issues: ValidationIssue[]): boolean {

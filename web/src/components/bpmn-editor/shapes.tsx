@@ -1,4 +1,5 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
+import type { Artifact } from "@shared/bpmnArtifacts";
 import { LANE_H, LANE_X, LABEL_W, labelPoint, laneCount, laneTop, waypoints, wrapText, type Box } from "./geometry";
 
 const INK = "#1e293b";
@@ -61,7 +62,7 @@ function Label({ cx, y, text }: { cx: number; y: number; text: string }) {
   );
 }
 
-export function NodeShape({ node, box, selected, hot }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean }) {
+export function NodeShape({ node, box, selected, hot, boundary = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean }) {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -76,8 +77,8 @@ export function NodeShape({ node, box, selected, hot }: { node: ProcessNode; box
     const isStart = node.subtype === "start";
     body = (
       <g>
-        <circle cx={cx} cy={cy} r={w / 2} fill={isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff"} {...common} strokeWidth={isEnd ? sw + 2 : sw} />
-        {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} />}
+        <circle cx={cx} cy={cy} r={w / 2} fill={isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff"} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
+        {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
         <EventGlyph cx={cx} cy={cy} subtype={node.subtype} />
         <Label cx={cx} y={y + h + 14} text={node.name} />
       </g>
@@ -104,7 +105,7 @@ export function NodeShape({ node, box, selected, hot }: { node: ProcessNode; box
         )}
         {node.type === "task" && node.subtype && (
           <text x={x + 8} y={y + 14} fontSize={9} fill="#64748b" pointerEvents="none">
-            {{ user: "Польз.", service: "Сервис", manual: "Ручн.", send: "Отпр.", receive: "Получ.", script: "Скрипт" }[node.subtype] ?? ""}
+            {{ user: "Польз.", service: "Сервис", manual: "Ручн.", send: "Отпр.", receive: "Получ.", script: "Скрипт", business_rule: "Правила" }[node.subtype] ?? ""}
           </text>
         )}
         <text textAnchor="middle" fontSize={12} fill={INK} pointerEvents="none">
@@ -149,6 +150,75 @@ export function FlowShape({ flow, from, to, obstacles, selected }: { flow: Proce
   );
 }
 
+const GREY = "#64748b";
+
+/** Документ (вход или выход задачи) или хранилище данных (информационная система) со связью-ассоциацией с задачей. */
+export function ArtifactShape({ artifact: a }: { artifact: Artifact }) {
+  const { x, y, w, h } = a.box;
+  const d = a.edge.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
+  const arrow = a.kind === "store" ? undefined : "url(#bpe-arrow-thin)";
+  return (
+    <g data-artifact={a.nodeId} data-artifact-kind={a.kind} style={{ cursor: "pointer" }}>
+      <title>{`${a.kind === "input" ? "Входной документ" : a.kind === "output" ? "Выходной документ" : "Хранилище данных"}: ${a.name}`}</title>
+      <path d={d} fill="none" stroke={GREY} strokeWidth={1} strokeDasharray="2 2" markerEnd={arrow} />
+      {a.kind === "store" ? (
+        <g fill="#fff" stroke={INK} strokeWidth={1.1}>
+          <path d={`M${x} ${y + 5} V${y + h - 5} A${w / 2} 4 0 0 0 ${x + w} ${y + h - 5} V${y + 5}`} />
+          <ellipse cx={x + w / 2} cy={y + 5} rx={w / 2} ry={4} />
+          <path d={`M${x} ${y + 10} A${w / 2} 4 0 0 0 ${x + w} ${y + 10}`} fill="none" />
+        </g>
+      ) : (
+        <g fill="#fff" stroke={INK} strokeWidth={1.1}>
+          <path d={`M${x} ${y} H${x + w - 7} L${x + w} ${y + 7} V${y + h} H${x} Z`} />
+          <path d={`M${x + w - 7} ${y} V${y + 7} H${x + w}`} fill="none" />
+        </g>
+      )}
+      <text x={x + w / 2} y={y - 3} textAnchor="middle" fontSize={8} fill={GREY} pointerEvents="none">
+        {a.name.length > 14 ? a.name.slice(0, 13) + "…" : a.name}
+      </text>
+    </g>
+  );
+}
+
+/** Свёрнутый внешний пул — другой процесс или внешний участник; потоки сообщений ведут к нему от шагов. */
+export function PoolShape({ pool, box }: { pool: { id: string; name: string; code?: string | null }; box: Box }) {
+  const text = `${pool.code ? `${pool.code} ` : ""}${pool.name}`;
+  const lines = wrapText(text, 26, 2);
+  return (
+    <g data-pool-id={pool.id}>
+      <title>{text}</title>
+      <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="#f8fafc" stroke={INK} strokeWidth={1.5} />
+      <rect x={box.x} y={box.y} width={22} height={box.h} fill="#e2e8f0" stroke={INK} strokeWidth={1.5} />
+      <text textAnchor="middle" fontSize={10.5} fill={INK} pointerEvents="none">
+        {lines.map((l, i) => (
+          <tspan key={i} x={box.x + 22 + (box.w - 22) / 2} y={box.y + box.h / 2 + 4 - ((lines.length - 1) * 6.5) + i * 13}>
+            {l}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+}
+
+/** Поток сообщений: пунктирная линия, кружок у отправителя и открытая стрелка у получателя. */
+export function MessageShape({ points, label }: { points: [number, number][]; label?: string | null }) {
+  const d = points.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
+  const [sx, sy] = points[0];
+  const i = Math.floor((points.length - 1) / 2);
+  const mx = (points[i][0] + points[i + 1][0]) / 2;
+  const my = (points[i][1] + points[i + 1][1]) / 2;
+  return (
+    <g>
+      <path d={d} fill="none" stroke={INK} strokeWidth={1.3} strokeDasharray="6 4" markerEnd="url(#bpe-arrow-open)" />
+      <circle cx={sx} cy={sy} r={3.5} fill="#fff" stroke={INK} strokeWidth={1.2} />
+      {label && (
+        <text x={mx + 5} y={my - 3} fontSize={9.5} fill={INK} pointerEvents="none">
+          {label.length > 28 ? label.slice(0, 27) + "…" : label}
+        </text>
+      )}
+    </g>
+  );
+}
 export const UNASSIGNED_LANE = "__unassigned__";
 
 /** Фон дорожек с подписями; lanes кликабельны только если передан data-атрибут (в редакторе). */
@@ -187,6 +257,12 @@ export function ArrowDefs() {
     <defs>
       <marker id="bpe-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path d="M0 0 L10 5 L0 10 z" fill={INK} />
+      </marker>
+      <marker id="bpe-arrow-thin" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M1 1 L9 5 L1 9" fill="none" stroke={GREY} strokeWidth="1.4" />
+      </marker>
+      <marker id="bpe-arrow-open" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <path d="M1 1 L9 5 L1 9" fill="none" stroke={INK} strokeWidth="1.4" />
       </marker>
       <marker id="bpe-arrow-sel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
         <path d="M0 0 L10 5 L0 10 z" fill={ACCENT} />

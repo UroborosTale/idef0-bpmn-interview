@@ -23,6 +23,9 @@ export interface ScopeModel<N extends ScopeNode = ScopeNode, R extends ScopeRole
   roles: R[];
   raci: { node_id: string }[];
   assignments?: { node_id: string | null; role_id: string; kind: string }[];
+  /** Внешние пулы и потоки сообщений: вид области содержит потоки её шагов и пулы, с которыми они связаны. */
+  pools?: { id: string }[];
+  messages?: { id: string; from: string; to: string }[];
 }
 
 /** Виды ролей, чьи должности образуют дорожки диаграммы операции. */
@@ -47,11 +50,14 @@ export function scopeView<M extends ScopeModel>(m: M, scope: string | null): M {
   const ids = new Set(nodes.map((n) => n.id));
   const view = scope === null ? nodes : nodes.map((n) => ({ ...n, bpmn_scope: undefined, idef0_parent: null }));
   const lanes = scope === null ? null : laneRoleIds(m, scope);
+  const messages = (m.messages ?? []).filter((x) => ids.has(x.from) || ids.has(x.to));
+  const usedPools = new Set(messages.flatMap((x) => [x.from, x.to]));
   return {
     ...m,
     nodes: view,
     flows: m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)),
     roles: lanes ? m.roles.filter((r) => lanes.has(r.id)) : m.roles,
+    ...(m.messages ? { messages, pools: (m.pools ?? []).filter((p) => usedPools.has(p.id)) } : {}),
   };
 }
 
@@ -80,6 +86,15 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
   const known = new Map(full.roles.map((r) => [r.id, r] as const));
   const roles = [...full.roles.map((r) => (next.roles.find((x) => x.id === r.id) as typeof r | undefined) ?? r), ...next.roles.filter((r) => !known.has(r.id))];
 
+  // потоки сообщений области пересобираются; пулы — общие, новые из вида добавляются
+  let messages = full.messages;
+  let pools = full.pools;
+  if (messages) {
+    messages = [...messages.filter((x) => !prevIds.has(x.from) && !prevIds.has(x.to)), ...(next.messages ?? []).filter((x) => !removed.includes(x.from) && !removed.includes(x.to))];
+    const poolIds = new Set((pools ?? []).map((p) => p.id));
+    pools = [...(pools ?? []).map((p) => (next.pools?.find((x) => x.id === p.id) as typeof p | undefined) ?? p), ...(next.pools ?? []).filter((p) => !poolIds.has(p.id))];
+  }
+
   let assignments = full.assignments;
   if (scope !== null && assignments) {
     const fresh = next.roles.filter((r) => !known.has(r.id));
@@ -94,5 +109,6 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
     roles,
     raci: removed.length ? full.raci.filter((r) => !removed.includes(r.node_id)) : full.raci,
     ...(assignments ? { assignments } : {}),
+    ...(messages ? { messages, pools } : {}),
   };
 }

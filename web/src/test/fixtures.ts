@@ -59,6 +59,8 @@ export function purchaseModel(): M {
     interfaces: [{ id: "i1", direction: "in", data_id: "d2" }],
     requirements_links: [],
     assignments: [],
+    pools: [],
+    messages: [],
     raci: [
       { node_id: "a", role_id: "r1", type: "R" },
       { node_id: "a", role_id: "r1", type: "A" },
@@ -118,7 +120,7 @@ export function structuredModel(): ProcessLogicModel {
       node("o2", "Проведение интервью", { idef0_parent: "s1", inputs: ["d2"], outputs: ["d3"], controls: ["c1"] }),
       node("o3", "Анализ соответствия", { idef0_parent: "s2", inputs: ["d3"], outputs: ["d4"], controls: ["c1"], role_id: "r2" }),
       node("b0", "Информация получена", { type: "event", subtype: "start", bpmn_scope: "o1", role_id: "r2", layout: { x: 160, y: 120 } }),
-      node("b1", "Открыть реестр", { bpmn_scope: "o1", role_id: "r2", layout: { x: 280, y: 100 } }),
+      node("b1", "Открыть реестр", { bpmn_scope: "o1", role_id: "r2", system_ids: ["s1"], layout: { x: 280, y: 100 } }),
       node("b2", "Внести код процесса", { bpmn_scope: "o1", role_id: "r2", layout: { x: 440, y: 100 } }),
       node("b9", "Реестр актуализирован", { type: "event", subtype: "end", bpmn_scope: "o1", role_id: "r2", layout: { x: 600, y: 120 } }),
     ],

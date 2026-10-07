@@ -533,11 +533,27 @@ function bpmnPage(d: BpmnDiagramData, name: string): Page {
     page.polyline([[l.x + 30, l.y], [l.x + 30, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
   }
   for (const e of d.extras) {
+    if (e.link) page.polyline(e.link, { weightPt: 0.8, line: "#64748b", dash: true });
     if (e.kind === "data") {
       page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1 });
-      page.label(e.name, { x: e.x + e.w / 2, y: e.y + e.h + 2, w: 90 }, { fontPx: 10 });
+      page.label(e.name, { x: e.x + e.w / 2, y: e.y - 14, w: 90 }, { fontPx: 9 });
+    } else if (e.kind === "store") {
+      // хранилище данных: цилиндр (корпус и две дуги крышки)
+      const r = Math.min(4, e.h / 5);
+      page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1, roundingPx: r }, [{ kind: "path", pts: [[0, r * 1.6], [e.w, r * 1.6]] }]);
+      page.label(e.name, { x: e.x + e.w / 2, y: e.y - 14, w: 90 }, { fontPx: 9 });
     } else {
       page.rect(e.x, e.y, e.w, e.h, { fill: null, line: "#94a3b8", dash: true, weightPt: 1, text: e.name, fontPx: 10 });
+    }
+  }
+
+  // свёрнутые внешние пулы и потоки сообщений
+  for (const q of d.pools) page.rect(q.x, q.y, q.w, q.h, { fill: "#f8fafc", weightPt: 1.3, text: q.name, fontPx: 11, bold: true, tag: { pm_k: "extpool", pm_id: q.id } });
+  for (const m of d.messages) {
+    page.polyline(m.points, { weightPt: 1, line: "#334155", dash: true });
+    if (m.label) {
+      const i = Math.floor((m.points.length - 1) / 2);
+      page.label(m.label, { x: (m.points[i][0] + m.points[i + 1][0]) / 2 + 4, y: (m.points[i][1] + m.points[i + 1][1]) / 2 - 6, anchor: "start" }, { fontPx: 9 });
     }
   }
 

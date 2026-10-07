@@ -72,6 +72,10 @@ export interface ProcessNode {
   idef0_parent?: string | null;
   /** Шаг диаграммы BPMN операции: id функции IDEF0 (операции). */
   bpmn_scope?: string | null;
+  /** Граничное событие: id задачи или подпроцесса, к границе которых оно прикреплено. Положение выводится из задачи. */
+  attached_to?: string | null;
+  /** Граничное событие прерывает задачу (по умолчанию) или нет. */
+  interrupting?: boolean;
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
   note?: string;
@@ -93,6 +97,21 @@ export interface ProcessFlow {
   condition?: string | null;
   source: SourceRef[];
   confirmed_by: string[];
+}
+
+/** Внешний пул: другой процесс (по коду) или внешний участник; на диаграмме — свёрнутый пул. */
+export interface ExternalPool {
+  id: string;
+  name: string;
+  code?: string | null;
+}
+
+/** Поток сообщений между шагом диаграммы и внешним пулом (from/to — id узла и id пула). */
+export interface MessageFlow {
+  id: string;
+  from: string;
+  to: string;
+  name?: string | null;
 }
 
 export type GapPriority = "critical" | "important" | "desirable";
@@ -223,6 +242,8 @@ export interface ProcessLogicModel {
   requirements_links: RequirementLink[];
   raci: RaciEntry[];
   assignments: RoleAssignment[];
+  pools: ExternalPool[];
+  messages: MessageFlow[];
   respondents: Respondent[];
   discrepancies: Discrepancy[];
 }

@@ -4,9 +4,9 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxOf, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
-import { PALETTE, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
-import { ArrowDefs, FlowShape, LanesLayer, NodeShape, UNASSIGNED_LANE } from "./shapes";
+import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
+import { PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
@@ -76,7 +76,7 @@ export default function BpmnEditor({
     const n = viewRef.current.nodes.find((x) => x.id === focus.id);
     if (n && !n.idef0_parent) {
       setSel({ kind: "node", id: n.id });
-      centerOn(boxOf(n));
+      centerOn(boxMap(visibleNodes(viewRef.current)).get(n.id) ?? boxOf(n));
     } else if (viewRef.current.flows.some((f) => f.id === focus.id)) setSel({ kind: "flow", id: focus.id });
     else if (viewRef.current.roles.some((r) => r.id === focus.id)) setSel({ kind: "lane", id: focus.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +124,8 @@ export default function BpmnEditor({
     const nodeEl = t.closest("[data-node-id]");
     const flowEl = t.closest("[data-flow-id]");
     const laneEl = t.closest("[data-lane-id]");
-    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl;
+    const artifactEl = t.closest("[data-artifact]");
+    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl && !artifactEl;
 
     if (e.button === 1 || (e.button === 0 && onEmpty)) {
       e.preventDefault();
@@ -143,11 +144,17 @@ export default function BpmnEditor({
       const id = nodeEl.getAttribute("data-node-id")!;
       const n = draft.nodes.find((x) => x.id === id);
       if (!n) return;
+      pick({ kind: "node", id });
+      if (isBoundary(n, draft.nodes)) {
+        dragRef.current = null; // граничное событие стоит на границе задачи — его не переносят
+        return;
+      }
       const b = boxOf(n);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      pick({ kind: "node", id });
       dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
+    } else if (artifactEl) {
+      pick({ kind: "node", id: artifactEl.getAttribute("data-artifact")! });
     } else if (flowEl) {
       pick({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
     } else if (laneEl) {
@@ -209,7 +216,7 @@ export default function BpmnEditor({
     if (at) {
       [cx, cy] = at;
     } else if (from) {
-      const b = boxOf(from);
+      const b = boxMap(visibleNodes(m)).get(from.id) ?? boxOf(from);
       cx = b.x + b.w + 100;
       cy = b.y + b.h / 2;
     } else {
@@ -225,6 +232,17 @@ export default function BpmnEditor({
     }
     commit(next, { kind: "node", id: added.id! });
     setEditing(added.id!);
+  };
+
+  /** Граничное событие на выбранной задаче (или на задаче, к которой прикреплено выбранное граничное событие). */
+  const addBoundary = () => {
+    const m = viewRef.current;
+    const picked = curSel?.kind === "node" ? m.nodes.find((n) => n.id === curSel.id) : undefined;
+    const hostId = picked && isBoundary(picked, m.nodes) ? picked.attached_to : picked?.id;
+    if (!hostId) return showHint("Выберите задачу, к которой нужно прикрепить событие");
+    const r = addBoundaryEvent(m, hostId);
+    if (r.error) showHint(r.error);
+    else commit(r.model, { kind: "node", id: r.id! });
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -247,7 +265,7 @@ export default function BpmnEditor({
       // стрелки сдвигают выбранную фигуру на шаг сетки (Shift — на 5 шагов); вертикально фигура остаётся в дорожке
       e.preventDefault();
       const n = draft.nodes.find((x) => x.id === curSel.id);
-      if (!n) return;
+      if (!n || isBoundary(n, draft.nodes)) return;
       const step = e.shiftKey ? 5 * 10 : 10;
       const b = boxOf(n);
       const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
@@ -268,7 +286,8 @@ export default function BpmnEditor({
   const { w: worldW, h: worldH } = modelExtents(draft);
   const W = Math.max(worldW, 1400);
   const shown = visibleNodes(draft);
-  const boxes = new Map(shown.map((n) => [n.id, boxOf(n)] as const));
+  const boxes = boxMap(shown);
+  const extras = diagramExtras(draft, shown, boxes);
   const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
 
@@ -321,6 +340,9 @@ export default function BpmnEditor({
               {p.label}
             </button>
           ))}
+          <button onClick={addBoundary} title="Таймер, сообщение или ошибка на границе выбранной задачи (вид меняется в свойствах)">
+            Гр. событие
+          </button>
           <button style={{ marginTop: 10 }} onClick={() => (scopeId ? h.commit(addScopeLane(draftRef.current, scopeId).model) : commit(addRole(draft).model))} title={scopeId ? "Новая роль и исполнитель этой операции" : undefined}>
             + Дорожка
           </button>
@@ -348,8 +370,18 @@ export default function BpmnEditor({
                 return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} selected={curSel?.kind === "flow" && curSel.id === f.id} />;
               })}
 
+              {extras.messages.map(({ message, points }) => (
+                <MessageShape key={message.id} points={points} label={message.name} />
+              ))}
+              {extras.pools.map(({ pool, box }) => (
+                <PoolShape key={pool.id} pool={pool} box={box} />
+              ))}
+              {extras.artifacts.map((a) => (
+                <ArtifactShape key={a.key} artifact={a} />
+              ))}
+
               {shown.map((n) => (
-                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} />
+                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} />
               ))}
 
               {selectedNode && !(selectedNode.type === "event" && selectedNode.subtype === "end") && !editing && (
@@ -377,7 +409,7 @@ export default function BpmnEditor({
             <RenameOverlay
               key={editingNode.id}
               name={editingNode.name}
-              box={boxOf(editingNode)}
+              box={boxes.get(editingNode.id) ?? boxOf(editingNode)}
               view={view}
               onCommit={(v) => commit(updateNode(viewRef.current, editingNode.id, { name: v }))}
               onDone={() => setEditing(null)}

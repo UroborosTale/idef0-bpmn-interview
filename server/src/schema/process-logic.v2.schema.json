@@ -114,6 +114,8 @@
           "duration": { "type": ["string", "null"] },
           "frequency": { "type": ["string", "null"] },
           "bpmn_scope": { "type": ["string", "null"], "description": "Шаг диаграммы BPMN операции: id функции IDEF0 (операции)" },
+          "attached_to": { "type": ["string", "null"], "description": "Граничное событие: id задачи или подпроцесса, к границе которых оно прикреплено" },
+          "interrupting": { "type": "boolean", "description": "Граничное событие прерывает задачу (по умолчанию да)" },
           "idef0_parent": { "type": ["string", "null"] },
           "status": { "enum": ["confirmed", "hypothesis"] },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -223,6 +225,33 @@
           "role_id": { "type": "string" },
           "kind": { "enum": ["owner", "executor", "coexecutor", "controller", "observer"] },
           "functions": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "pools": {
+      "type": "array",
+      "description": "Внешние пулы: другие процессы (по коду) и внешние участники; на диаграмме BPMN — свёрнутые пулы",
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "code": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "messages": {
+      "type": "array",
+      "description": "Потоки сообщений между шагом диаграммы и внешним пулом (from/to — id узла и id пула)",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to"],
+        "properties": {
+          "id": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "name": { "type": ["string", "null"] }
         }
       }
     },

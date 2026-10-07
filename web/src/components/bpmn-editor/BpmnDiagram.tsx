@@ -1,8 +1,8 @@
 import { useMemo, useRef } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { useViewport } from "../editor-core/hooks";
-import { boxOf, modelExtents, positionsFromBpmnXml, visibleNodes, withLayout } from "./geometry";
-import { ArrowDefs, FlowShape, LanesLayer, NodeShape } from "./shapes";
+import { boxMap, diagramExtras, isBoundary, modelExtents, positionsFromBpmnXml, visibleNodes, withLayout } from "./geometry";
+import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape } from "./shapes";
 
 /**
  * Просмотр BPMN только для чтения: те же фигуры, что в редакторе, без сторонних библиотек.
@@ -34,7 +34,8 @@ export default function BpmnDiagram({
   if (!laid) return <p className="muted">Диаграмма BPMN ещё не сгенерирована.</p>;
 
   const shown = visibleNodes(laid);
-  const boxes = new Map(shown.map((n) => [n.id, boxOf(n)] as const));
+  const boxes = boxMap(shown);
+  const extras = diagramExtras(laid, shown, boxes);
   const W = Math.max(modelExtents(laid).w, 1400);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -71,8 +72,17 @@ export default function BpmnDiagram({
             const others = shown.filter((n) => n.id !== f.from && n.id !== f.to).map((n) => boxes.get(n.id)!);
             return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} selected={false} />;
           })}
+          {extras.messages.map(({ message, points }) => (
+            <MessageShape key={message.id} points={points} label={message.name} />
+          ))}
+          {extras.pools.map(({ pool, box }) => (
+            <PoolShape key={pool.id} pool={pool} box={box} />
+          ))}
+          {extras.artifacts.map((a) => (
+            <ArtifactShape key={a.key} artifact={a} />
+          ))}
           {shown.map((n) => (
-            <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} />
+            <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} boundary={isBoundary(n, shown)} />
           ))}
         </g>
       </svg>

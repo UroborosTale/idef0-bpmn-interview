@@ -2,6 +2,7 @@ import type { ProcessLogicModel, ProcessNode } from "../../types";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
 import { mergeScope, scopeView } from "@shared/scope";
+import { POOL_H, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
 
 // Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
 // (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
@@ -22,14 +23,40 @@ export function boxOf(n: ProcessNode): Box {
   return { x: n.layout?.x ?? MIN_X, y: n.layout?.y ?? START_Y, w: s.w, h: s.h };
 }
 
-/** Размер «мира» диаграммы: ширина по самой правой фигуре, высота по числу дорожек. */
+/** Рамки фигур диаграммы; граничные события стоят на нижней границе своей задачи — их положение не хранится. */
+export function boxMap(nodes: ProcessNode[]): Map<string, Box> {
+  const out = new Map(nodes.map((n) => [n.id, boxOf(n)] as const));
+  for (const [id, b] of boundaryBoxes(nodes, out)) out.set(id, b);
+  return out;
+}
+
+/** Граничное событие, прикреплённое к существующей задаче этой диаграммы. */
+export const isBoundary = (n: ProcessNode, nodes: ProcessNode[]) => isBoundaryNode(n, nodes);
+
+/** Верх полосы свёрнутых внешних пулов — под дорожками. */
+export const poolsTop = (m: ProcessLogicModel) => laneTop(laneCount(m)) + 30;
+
+/**
+ * Добавочные элементы диаграммы, положение которых выводится из шагов: документы и хранилища данных у задач,
+ * свёрнутые внешние пулы под дорожками и потоки сообщений к ним (общая геометрия с генератором BPMN).
+ */
+export function diagramExtras(m: ProcessLogicModel, shown: ProcessNode[], boxes: Map<string, Box>) {
+  const artifacts: Artifact[] = artifactsOf(shown, boxes, { data: new Map(m.data.map((d) => [d.id, d.name])), systems: new Map(m.systems.map((s) => [s.id, s.name])) });
+  const messages = (m.messages ?? []).filter((x) => boxes.has(x.from) || boxes.has(x.to));
+  const rects = poolBoxes(m.pools ?? [], messages, boxes, poolsTop(m));
+  const pools = (m.pools ?? []).flatMap((p) => (rects.has(p.id) ? [{ pool: p, box: rects.get(p.id)! }] : []));
+  return { artifacts, pools, messages: messageEdges(messages, boxes, rects) };
+}
+
+/** Размер «мира» диаграммы: ширина по самой правой фигуре, высота по числу дорожек (и полосе внешних пулов). */
 export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
   let maxX = 900;
-  for (const n of visibleNodes(m)) {
-    const b = boxOf(n);
-    maxX = Math.max(maxX, b.x + b.w + 120);
-  }
-  return { w: maxX, h: laneTop(laneCount(m)) + 20 };
+  const shown = visibleNodes(m);
+  const boxes = boxMap(shown);
+  for (const b of boxes.values()) maxX = Math.max(maxX, b.x + b.w + 120);
+  const { pools } = diagramExtras(m, shown, boxes);
+  for (const p of pools) maxX = Math.max(maxX, p.box.x + p.box.w + 60);
+  return { w: maxX, h: laneTop(laneCount(m)) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0) };
 }
 
 /** Дорожек на одну больше числа ролей: последняя — «Без исполнителя». */
@@ -67,14 +94,18 @@ export function labelPoint(pts: Pt[]): Pt {
  * игнорируются), строка = дорожка роли. Две фигуры в одной ячейке не допускаются.
  */
 export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: number }> {
-  const shown = visibleNodes(m);
+  const all = visibleNodes(m);
+  // граничное событие в раскладке — продолжение своей задачи: его стрелки идут «от задачи», а места оно не занимает
+  const hostOf = new Map(all.filter((n) => isBoundary(n, all)).map((n) => [n.id, n.attached_to!] as const));
+  const shown = all.filter((n) => !hostOf.has(n.id));
   const ids = shown.map((n) => n.id);
   const order = new Map(ids.map((id, i) => [id, i] as const));
   const out = new Map<string, string[]>();
   const hasIn = new Set<string>();
   for (const f of m.flows) {
-    if (f.from === f.to || !order.has(f.from) || !order.has(f.to)) continue;
-    out.set(f.from, [...(out.get(f.from) ?? []), f.to]);
+    const from = hostOf.get(f.from) ?? f.from;
+    if (from === f.to || !order.has(from) || !order.has(f.to)) continue;
+    out.set(from, [...(out.get(from) ?? []), f.to]);
     hasIn.add(f.to);
   }
 
@@ -145,7 +176,8 @@ export function positionsFromBpmnXml(xml: string | null | undefined): Map<string
  * force — расставить все фигуры заново авто-раскладкой.
  */
 export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>): ProcessLogicModel {
-  if (!force && visibleNodes(m).every((n) => n.layout)) return m;
+  const all = visibleNodes(m);
+  if (!force && all.every((n) => n.layout || isBoundary(n, all))) return m;
   const auto = autoLayout(m);
   const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
   return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };

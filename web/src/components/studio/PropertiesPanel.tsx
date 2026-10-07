@@ -7,6 +7,7 @@ import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
 import { removeArrow } from "../idef0-editor/ops";
 import EntryCard from "./EntryCard";
+import { PoolsEditor } from "./MessagesEditor";
 import NodeProperties from "./NodeProperties";
 import { Section, SourceList } from "./PanelParts";
 import { reportDoc, type StudioDoc } from "./docs";
@@ -239,6 +240,9 @@ export default function PropertiesPanel({
         </Section>
         <Section title="Ролевая модель процесса" count={(model.assignments ?? []).filter((a) => a.node_id === null).length}>
           <AssignmentsEditor model={model} nodeId={null} defaultKind="owner" onChange={onChange} />
+        </Section>
+        <Section title="Внешние пулы" count={(model.pools ?? []).length} open={(model.pools ?? []).length > 0}>
+          <PoolsEditor model={model} onChange={onChange} />
         </Section>
         <Section title="Цель и результат">
           {area("Цель процесса", "goal")}

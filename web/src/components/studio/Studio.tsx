@@ -23,7 +23,7 @@ import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from
 type M = ProcessLogicModel;
 
 /** Начальное состояние черновика: роли и позиции фигур достроены (в черновиках, сохранённых раньше, полей новой версии модели нет). */
-const normalize = (m: M): M => (m.assignments ? m : { ...m, assignments: [] });
+const normalize = (m: M): M => (m.assignments && m.pools && m.messages ? m : { ...m, assignments: m.assignments ?? [], pools: m.pools ?? [], messages: m.messages ?? [] });
 const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(withScopeLayouts(withLayout(normalize(m), false, positionsFromBpmnXml(bpmnXml))));
 
 /**

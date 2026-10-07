@@ -71,7 +71,7 @@ export const NodeType = z.enum(["task", "event", "gateway", "subprocess"]);
 export type NodeType = z.infer<typeof NodeType>;
 
 // task subtypes
-export const TaskSubtype = z.enum(["user", "service", "manual", "send", "receive", "script"]);
+export const TaskSubtype = z.enum(["user", "service", "manual", "send", "receive", "script", "business_rule"]);
 // event subtypes
 export const EventSubtype = z.enum([
   "start",
@@ -104,6 +104,11 @@ export const ProcessNode = z.object({
   // Шаг диаграммы BPMN операции: id функции IDEF0 (операции), чью диаграмму он образует. Такой узел — не функция
   // IDEF0, а подоперация; без поля узел относится к общей схеме процесса (прежнее поведение).
   bpmn_scope: z.string().nullable().optional(),
+  // Граничное событие: id задачи или подпроцесса, к границе которых оно прикреплено (таймер «через 3 дня», ошибка…).
+  // Положение такого события на диаграмме не хранится — оно выводится из положения задачи.
+  attached_to: z.string().nullable().optional(),
+  // Граничное событие прерывает задачу (по умолчанию) или нет (пунктирная рамка).
+  interrupting: z.boolean().optional(),
   // Позиция на холсте редактора BPMN (левый верхний угол). Если задана, генератор BPMN
   // использует её вместо авто-раскладки, чтобы экспорт совпадал с нарисованным.
   layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
@@ -122,6 +127,23 @@ export const ProcessNode = z.object({
   confirmed_by: z.array(z.string()).default([]), // id респондентов, подтвердивших элемент (ФТ-М4.1.2)
 });
 export type ProcessNode = z.infer<typeof ProcessNode>;
+
+// Внешний пул: другой процесс (по коду из реестра) или внешний участник; на диаграмме — свёрнутый пул без дорожек.
+export const ExternalPool = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string().nullable().optional(),
+});
+export type ExternalPool = z.infer<typeof ExternalPool>;
+
+// Поток сообщений между шагом диаграммы и внешним пулом: from/to — id узла и id пула (в любом порядке).
+export const MessageFlow = z.object({
+  id: z.string(),
+  from: z.string(),
+  to: z.string(),
+  name: z.string().nullable().optional(),
+});
+export type MessageFlow = z.infer<typeof MessageFlow>;
 
 export const ProcessFlow = z.object({
   id: z.string(),
@@ -290,6 +312,8 @@ export const ProcessLogicModel = z.object({
   requirements_links: z.array(RequirementLink).default([]),
   raci: z.array(RaciEntry).default([]),
   assignments: z.array(RoleAssignment).default([]),
+  pools: z.array(ExternalPool).default([]),
+  messages: z.array(MessageFlow).default([]),
   respondents: z.array(Respondent).default([]),
   discrepancies: z.array(Discrepancy).default([]),
 });

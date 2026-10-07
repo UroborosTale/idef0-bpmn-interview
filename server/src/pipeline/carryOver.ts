@@ -150,6 +150,7 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       id: nodeMap.get(o.id)!,
       bpmn_scope: o.bpmn_scope ? nodeMap.get(o.bpmn_scope)! : o.bpmn_scope,
       idef0_parent: o.idef0_parent ? nodeMap.get(o.idef0_parent)! : o.idef0_parent,
+      attached_to: o.attached_to ? nodeMap.get(o.attached_to) ?? null : o.attached_to,
       role_id: o.role_id ? role(o.role_id) ?? null : o.role_id,
       inputs: mapIds(o.inputs, data),
       outputs: mapIds(o.outputs, data),
@@ -192,6 +193,15 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
     const rid = role(a.role_id);
     const node = a.node_id === null ? null : nodeOrNull(a.node_id);
     return rid && node !== undefined ? [{ ...a, node_id: node, role_id: rid }] : [];
+  });
+  // внешние пулы переносятся все; потоки сообщений — если оба конца остались (узел или пул)
+  model.pools = prev.pools ?? [];
+  const poolIds = new Set(model.pools.map((q) => q.id));
+  model.messages = (prev.messages ?? []).flatMap((m) => {
+    const end = (id: string) => (poolIds.has(id) ? id : nodeOrNull(id));
+    const from = end(m.from);
+    const to = end(m.to);
+    return from && to ? [{ ...m, from, to }] : [];
   });
   model.requirements_links = prev.requirements_links.flatMap((l) => {
     const el = nodeOrNull(l.element_id);

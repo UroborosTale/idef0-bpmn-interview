@@ -1,11 +1,12 @@
 import { useState } from "react";
 import type { Fragment, ProcessLogicModel, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
-import { SUBTYPES, TYPE_LABELS, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
+import { BOUNDARY_SUBTYPES, SUBTYPES, TYPE_LABELS, addBoundaryEvent, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
 import { descendantsOf } from "../idef0-editor/geometry";
 import { SLOT_ENTITY, attach, createEntity, detach, setFunctionRole, type EntityKind, type Slot } from "../idef0-editor/ops";
 import { bpmnHosts, functionDepth, processCodeOf, stepCodes } from "@shared/codes";
 import AssignmentsEditor from "./AssignmentsEditor";
+import MessagesEditor from "./MessagesEditor";
 import { HistoryList, Section, SourceList } from "./PanelParts";
 import { bpmnDoc, reportDoc, type DictKind, type StudioDoc } from "./docs";
 import type { Selection } from "./selection";
@@ -148,6 +149,15 @@ export default function NodeProperties({
   const hasDiagram = isFn && bpmnHosts(model).some((h) => h.id === node.id);
   const depth = functionDepth(model, node.id);
 
+  // элементы, которые есть на диаграмме BPMN: шаги операций и функции общей схемы процесса
+  const onDiagram = isStep || !node.idef0_parent;
+  const sameScope = (n: typeof node) => (n.bpmn_scope ?? null) === (node.bpmn_scope ?? null) && (isStep || !n.idef0_parent);
+  const isHostable = (n: typeof node) => (n.type === "task" || n.type === "subprocess") && n.id !== node.id && sameScope(n);
+  const hosts = model.nodes.filter(isHostable);
+  const attachedHost = node.attached_to ? model.nodes.find((n) => n.id === node.attached_to) : undefined;
+  const boundaries = model.nodes.filter((n) => n.type === "event" && n.attached_to === node.id);
+  const messageCount = (model.messages ?? []).filter((m) => m.from === node.id || m.to === node.id).length;
+
   return (
     <div>
       <div className="prop-kind">
@@ -217,6 +227,75 @@ export default function NodeProperties({
           {text("time_waiting", "Время ожидания")}
           {text("cost_estimate", "Стоимость")}
           {text("frequency", "Частота", "например, 20 раз в месяц")}
+        </Section>
+      )}
+
+      {node.type === "event" && (
+        <Section title="Граничное событие" open={!!attachedHost}>
+          <Field label="Прикреплено к задаче">
+            <select
+              value={attachedHost?.id ?? ""}
+              onChange={(e) => {
+                const host = hosts.find((h) => h.id === e.target.value);
+                onChange(updateNode(model, node.id, { attached_to: host?.id ?? null, ...(host ? { role_id: host.role_id ?? null } : {}) }));
+              }}
+            >
+              <option value="">Не прикреплено (обычное событие)</option>
+              {hosts.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {attachedHost && (
+            <label className="prop-check">
+              <input type="checkbox" checked={node.interrupting !== false} onChange={(e) => set({ interrupting: e.target.checked })} /> Прерывает задачу (сплошная рамка)
+            </label>
+          )}
+          <p className="muted prop-note">Граничное событие стоит на нижней границе задачи и начинает отдельную ветку: таймер «срок вышел», сообщение, ошибка. Стрелку из него ведут к шагу, который выполняется при наступлении события.</p>
+        </Section>
+      )}
+
+      {(node.type === "task" || node.type === "subprocess") && onDiagram && (
+        <Section title="Граничные события" count={boundaries.length} open={boundaries.length > 0}>
+          {boundaries.length === 0 && <p className="muted prop-note">На границе задачи событий нет.</p>}
+          {boundaries.length > 0 && (
+            <div className="bpe-chips" style={{ marginBottom: 4 }}>
+              {boundaries.map((b) => (
+                <span key={b.id} className="bpe-chip">
+                  <button className="bpe-chip-name" title="Открыть свойства события" onClick={() => onSelect({ kind: "node", id: b.id })}>
+                    {b.name}
+                  </button>
+                  <button className="bpe-chip-x" title="Удалить событие" onClick={() => onChange(deleteNode(model, b.id))}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="bpe-actions" style={{ marginTop: 0 }}>
+            {BOUNDARY_SUBTYPES.map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => {
+                  const r = addBoundaryEvent(model, node.id, k);
+                  if (!r.error) {
+                    onChange(r.model);
+                    onSelect({ kind: "node", id: r.id! });
+                  }
+                }}
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {node.type !== "gateway" && onDiagram && (
+        <Section title="Потоки сообщений" count={messageCount} open={messageCount > 0}>
+          <MessagesEditor model={model} nodeId={node.id} onChange={onChange} />
         </Section>
       )}
 
