@@ -29,7 +29,8 @@ describe("эталон B002 в студии", () => {
     expect(codes).toEqual(["B002.01.00", "B002.01.01", "B002.01.02", "B002.01.03", "B002.02.00", "B002.02.01", "B002.02.02", "B002.03.00", "B002.03.01", "B002.03.02", "B002.03.03", "B002.03.04"]);
     // дерево как в Business Studio 6: папка, процесс, A0, подпроцессы, операции, диаграммы BPMN
     expect(await page.locator("[data-nav-group] .nav-name").innerText()).toBe("Управление корпоративными процессами");
-    expect(await page.locator("[data-nav-a0] .nav-num").innerText()).toBe("A0");
+    expect(await page.locator("[data-nav-process] .nav-code").innerText()).toBe("B002.00.00");
+    expect(await page.locator("[data-nav-a0], .nav-num").count()).toBe(0); // иерархия по кодам, без A-номеров
     expect(await page.locator("[data-nav-bpmn]").count()).toBe(9);
     const shotDir = process.env.E2E_SHOTS;
     if (shotDir) {

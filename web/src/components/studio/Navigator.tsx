@@ -7,10 +7,14 @@ import { entriesOf } from "./dict-ops";
 import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type StudioDoc, bpmnDoc, dictDoc, idef0Doc, reportDoc } from "./docs";
 
 /**
- * Навигатор окна студии (как в Business Studio 6): дерево «группа процессов → процесс → диаграмма A0 → подпроцессы (A3) →
- * операции (A3.1) → диаграмма BPMN операции (A3.1.1)», справочники и отчёты. У каждой строки номер блока на диаграмме и
- * код по Соглашению (если у процесса он задан). Клик по функции открывает её диаграмму и выделяет блок; двойной щелчок по
- * функции с декомпозицией — открывает её дочернюю диаграмму; строка диаграммы BPMN открывает диаграмму операции.
+ * Навигатор окна студии (как в Business Studio 6): дерево процессов, справочники и отчёты.
+ *
+ * Модель с кодом процесса — иерархия по кодам Соглашения: группа → процесс B002.00.00 → подпроцессы B002.01.00 → операции
+ * B002.01.01 → диаграмма BPMN операции (тот же код). Уровни и подписи — сами коды, без номеров блоков.
+ * Модель без кода — прежняя схема с номерами блоков: процесс → диаграмма A0 → A1 → A1.1 → диаграмма BPMN, плюс общая схема.
+ *
+ * Клик по функции открывает её диаграмму и выделяет блок; двойной щелчок по функции с декомпозицией — её дочернюю диаграмму;
+ * строка диаграммы BPMN открывает диаграмму операции; строка процесса в модели с кодом открывает IDEF0 процесса.
  */
 export default function Navigator({
   model,
@@ -84,7 +88,6 @@ export default function Navigator({
             {expandable ? (open ? "▾" : "▸") : ""}
           </span>
           <NavIcon kind={n.idef0_parent ? "operation" : "subprocess"} />
-          {structured && <span className="nav-num">{num}</span>}
           <span className="nav-code">{labelOf(n.id)}</span>
           <span className="nav-name">{n.name}</span>
         </div>
@@ -99,7 +102,6 @@ export default function Navigator({
           >
             <span className="nav-twisty" />
             <NavIcon kind="bpmn" />
-            {structured && <span className="nav-num">{`${num}.1`}</span>}
             <span className="nav-code">{structured ? codes.get(n.id) : `${num}.1`}</span>
             <span className="nav-name">{n.name}</span>
           </div>
@@ -137,18 +139,24 @@ export default function Navigator({
       {!collapsed.has("~group") && (
         <>
           <div
-            className={`nav-row ${activeKey === "report:passport" ? "active-doc" : ""}`}
+            className={`nav-row ${activeKey === (structured ? "idef0:root" : "report:passport") ? "active-doc" : ""}`}
             style={pad(base)}
             data-nav-process
-            onClick={() => onOpenDoc(reportDoc("passport"))}
-            title="Паспорт процесса"
+            onClick={() => onOpenDoc(structured ? idef0Doc(null) : reportDoc("passport"))}
+            title={structured ? "Диаграмма IDEF0 процесса" : "Паспорт процесса"}
           >
-            {twisty("~process")}
+            {twisty("~process", structured ? top.length > 0 : true)}
             <NavIcon kind="process" />
             {structured && <span className="nav-code">{processCode}</span>}
             <span className="nav-name">{model.process.name}</span>
           </div>
-          {!collapsed.has("~process") && (
+          {!collapsed.has("~process") && structured && (
+            <>
+              {top.map((n) => renderFn(n, base + 1, new Set()))}
+              {top.length === 0 && <div className="muted nav-empty">Функций пока нет</div>}
+            </>
+          )}
+          {!collapsed.has("~process") && !structured && (
             <>
               <div
                 className={`nav-row ${activeKey === "idef0:root" ? "active-doc" : ""}`}
@@ -176,8 +184,7 @@ export default function Navigator({
                 <span className="nav-name">Схема процесса (BPMN)</span>
               </div>
             </>
-          )}
-        </>
+          )}        </>
       )}
     </>
   );
