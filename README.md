@@ -132,6 +132,5 @@ docker compose up --build
 - `POST /api/sessions/:id/ingest-text|upload`, `POST /api/sessions/:id/run` (202 + задача), `GET /api/jobs/:id` — обработка текста;
 - `POST /api/sessions/:id/interview/*` — режим Б;
 - `PUT /api/sessions/:id/model` (заголовок `X-Base-Updated-At`), `POST /api/sessions/:id/rebuild-diagrams` — редактирование и пересборка;
-- `/api/sessions/:id/visio/*` — редактирование в Visio;
 - `GET /api/sessions/:id/export/*` — экспорт;
 - `GET /api/schema/process-logic/latest` — контракт промежуточной модели для внешних систем (6.4).
