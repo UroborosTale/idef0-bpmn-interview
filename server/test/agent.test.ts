@@ -284,6 +284,104 @@ describe("API агента", () => {
     expect((await app.call("GET", `/agent/proposals/${p}`)).status).toBe(404);
   });
 
+  it("текст интервью по фрагментам со страницами", async () => {
+    const { id } = await session();
+    expect((await app.call("POST", `/sessions/${id}/ingest-text`, { text: "Специалист открывает реестр. Затем вносит код процесса.\n\nПосле этого сохраняет файл." })).status).toBe(200);
+    const all = await app.call("GET", `/agent/sessions/${id}/fragments`);
+    expect(all.status).toBe(200);
+    expect(all.body.total).toBeGreaterThan(0);
+    expect(all.body.fragments[0]).toEqual({ id: expect.any(String), index: expect.any(Number), speaker: expect.any(String), text: expect.stringContaining("Специалист открывает реестр") });
+    const page = await app.call("GET", `/agent/sessions/${id}/fragments?from=${all.body.total}&limit=5`);
+    expect(page.body.fragments).toEqual([]);
+    expect((await app.call("GET", "/agent/sessions/нет/fragments")).status).toBe(404);
+  });
+
+  it("цитаты в источниках проверяются по тексту интервью", async () => {
+    const { id } = await session();
+    await app.call("POST", `/sessions/${id}/ingest-text`, { text: "Специалист открывает реестр процессов и вносит код процесса." });
+    const fid = (await app.call("GET", `/agent/sessions/${id}/fragments`)).body.fragments[0].id as string;
+    const withSource = (source: unknown) => proposal({ ops: [step("n1", { source })] });
+
+    const good = await app.call("POST", `/agent/sessions/${id}/proposals`, withSource([{ fragment_id: fid, quote: "открывает реестр процессов" }]));
+    expect(good.status).toBe(201);
+    const inexact = await app.call("POST", `/agent/sessions/${id}/proposals`, withSource([{ fragment_id: fid, quote: "Специалист открывает реестр" }]));
+    expect(inexact.status).toBe(201); // дословность не нужна: цитата почти совпадает
+
+    const invented = await app.call("POST", `/agent/sessions/${id}/proposals`, withSource([{ fragment_id: fid, quote: "директор утверждает бюджет на следующий год" }]));
+    expect(invented.status).toBe(422);
+    expect(invented.body.errors[0]).toMatchObject({ index: 0 });
+    expect(invented.body.errors[0].message).toMatch(/цитаты «директор утверждает бюджет.*нет во фрагменте/);
+    const noFragment = await app.call("POST", `/agent/sessions/${id}/proposals`, withSource([{ fragment_id: "нет-такого", quote: "открывает реестр" }]));
+    expect(noFragment.body.errors[0].message).toMatch(/фрагмента «нет-такого» нет в интервью/);
+    expect((await app.call("POST", `/agent/sessions/${id}/proposals`, withSource("текст"))).status).toBe(422);
+    expect((await app.call("GET", `/agent/sessions/${id}/proposals`)).body).toHaveLength(2); // отклонённое не сохранилось
+  });
+
+  it("задания аналитика: поставить, взять, предложить по заданию, завершить", async () => {
+    const { id } = await session();
+    const created = await app.call("POST", `/sessions/${id}/tasks`, { text: "  Разбей операцию B002.01.02 на шаги  ", scope: "o2", agent: "моделист" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ status: "open", text: "Разбей операцию B002.01.02 на шаги", scopeNodeId: "o2", agent: "моделист", proposals: [], createdBy: "local" });
+    const tid = created.body.id as string;
+
+    expect((await app.call("GET", `/agent/sessions/${id}/tasks`)).body.map((t: any) => t.id)).toEqual([tid]);
+    const taken = await app.call("POST", `/agent/tasks/${tid}/take`, { agent: "моделист" });
+    expect(taken.body).toMatchObject({ status: "taken", takenBy: "моделист" });
+    expect((await app.call("POST", `/agent/tasks/${tid}/take`, { agent: "другой" })).status).toBe(409); // уже взято
+    expect((await app.call("GET", `/agent/sessions/${id}/tasks`)).body).toEqual([]); // ожидающих нет
+    expect((await app.call("GET", `/agent/sessions/${id}/tasks?status=taken`)).body).toHaveLength(1);
+
+    const prop = await app.call("POST", `/agent/sessions/${id}/proposals`, proposal({ task_id: tid }));
+    expect(prop.status).toBe(201);
+    const listed = (await app.call("GET", `/sessions/${id}/tasks`)).body[0];
+    expect(listed.proposals).toEqual([{ id: prop.body.id, title: "Добавить шаг проверки реестра", status: "pending" }]);
+
+    const done = await app.call("POST", `/agent/tasks/${tid}/complete`, { note: "Предложено 1 шаг; уточните исполнителя" });
+    expect(done.body).toMatchObject({ status: "done", resultNote: "Предложено 1 шаг; уточните исполнителя" });
+    expect((await app.call("POST", `/agent/tasks/${tid}/complete`, { note: "ещё" })).status).toBe(409);
+    expect((await app.call("POST", `/agent/sessions/${id}/proposals`, proposal({ task_id: tid }))).status).toBe(409); // по закрытому заданию предложений нет
+  });
+
+  it("задания: проверки входных данных, чужие и несуществующие, отмена", async () => {
+    const { id } = await session();
+    const other = (await session()).id;
+    expect((await app.call("POST", `/sessions/${id}/tasks`, { text: "" })).status).toBe(400);
+    expect((await app.call("POST", `/sessions/${id}/tasks`, { text: "Х", scope: "нет-такой" })).status).toBe(400);
+    expect((await app.call("POST", "/sessions/нет/tasks", { text: "Х" })).status).toBe(404);
+    const t = (await app.call("POST", `/sessions/${id}/tasks`, { text: "Проверь роли" })).body;
+    expect(t.scopeNodeId).toBeNull();
+    // предложение по заданию другой сессии или несуществующему отклоняется
+    expect((await app.call("POST", `/agent/sessions/${other}/proposals`, proposal({ task_id: t.id }))).status).toBe(404);
+    expect((await app.call("POST", `/agent/sessions/${id}/proposals`, proposal({ task_id: "task_нет" }))).status).toBe(404);
+    expect((await app.call("POST", "/agent/tasks/task_нет/take", { agent: "x" })).status).toBe(404);
+    expect((await app.call("POST", `/agent/tasks/${t.id}/take`, {})).status).toBe(400);
+
+    expect((await app.call("POST", `/tasks/${t.id}/cancel`)).body.status).toBe("cancelled");
+    expect((await app.call("POST", `/tasks/${t.id}/cancel`)).status).toBe(409);
+    expect((await app.call("POST", `/agent/tasks/${t.id}/take`, { agent: "x" })).status).toBe(409);
+    expect((await app.call("POST", "/tasks/task_нет/cancel")).status).toBe(404);
+    expect((await app.call("GET", `/sessions/${id}/tasks`)).body[0].status).toBe("cancelled");
+    expect((await app.call("GET", `/agent/sessions/${id}/tasks?status=плохо`)).status).toBe(400);
+  });
+
+  it("задания удаляются вместе с сессией; доступ агента по токену — к заданиям, но не к постановке и отмене", async () => {
+    const { id } = await session();
+    const t = (await app.call("POST", `/sessions/${id}/tasks`, { text: "Проверь роли" })).body.id as string;
+    process.env.AUTH_USERS = "analyst:pass";
+    process.env.AGENT_API_TOKEN = "agent-secret-token-123";
+    try {
+      const bearer = { Authorization: "Bearer agent-secret-token-123" };
+      expect((await app.withoutCookie("GET", `/agent/sessions/${id}/tasks`, bearer)).body).toHaveLength(1);
+      expect((await app.withoutCookie("POST", `/agent/tasks/${t}/take`, bearer, { agent: "моделист" })).status).toBe(200);
+      expect((await app.withoutCookie("POST", `/sessions/${id}/tasks`, bearer, { text: "Х" })).status).toBe(401);
+      expect((await app.withoutCookie("POST", `/tasks/${t}/cancel`, bearer)).status).toBe(401);
+    } finally {
+      delete process.env.AUTH_USERS;
+      delete process.env.AGENT_API_TOKEN;
+    }
+    expect((await app.call("DELETE", `/sessions/${id}`)).status).toBe(204);
+    expect((await app.call("POST", `/agent/tasks/${t}/take`, { agent: "x" })).status).toBe(404); // записи уже нет
+  });
   describe("вход агента по токену", () => {
     const TOKEN = "agent-secret-token-123";
     const setup = () => {

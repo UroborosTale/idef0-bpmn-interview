@@ -40,6 +40,16 @@ const fail = (text: string): Result => ({ content: [{ type: "text", text }], isE
 const apiError = (r: { status: number; body: any }): Result =>
   fail(r.status === 401 ? "Нет доступа: проверьте PM_AGENT_TOKEN (он должен совпадать с AGENT_API_TOKEN приложения)." : `Ошибка ${r.status}: ${typeof r.body === "string" ? r.body : r.body?.error ?? JSON.stringify(r.body)}`);
 
+const taskLabel = { open: "ждёт агента", taken: "в работе", done: "выполнено", cancelled: "отменено" } as Record<string, string>;
+
+function describeTask(t: any): string {
+  const head = `${t.id} — «${t.text}»${t.scopeNodeId ? ` (функция ${t.scopeNodeId})` : ""}${t.agent ? `, адресовано: ${t.agent}` : ""} — ${taskLabel[t.status] ?? t.status}${t.takenBy ? ` (${t.takenBy})` : ""}`;
+  const lines = [head];
+  if (t.resultNote) lines.push(`  Итог: ${t.resultNote}`);
+  for (const p of t.proposals ?? []) lines.push(`  • предложение ${p.id}: «${p.title}» — ${statusLabel[p.status] ?? p.status}`);
+  return lines.join("\n");
+}
+
 const statusLabel = { pending: "ожидает решения", applied: "применено", rejected: "отклонено" } as Record<string, string>;
 
 function describeProposal(p: any): string {
@@ -88,6 +98,22 @@ export function createAgentServer(api: AgentApi): McpServer {
   );
 
   server.registerTool(
+    "get_fragments",
+    {
+      title: "Текст интервью",
+      description: "Фрагменты интервью с id: по ним даются цитаты в source новых записей (приложение проверяет, что цитата есть во фрагменте). from и limit — страница списка.",
+      inputSchema: { session_id: z.string(), from: z.number().int().min(0).default(0), limit: z.number().int().min(1).max(200).default(60) },
+    },
+    async ({ session_id, from, limit }) => {
+      const r = await api.get(`/agent/sessions/${encodeURIComponent(session_id)}/fragments?from=${from}&limit=${limit}`);
+      if (r.status !== 200) return apiError(r);
+      const lines = (r.body.fragments as { id: string; index: number; speaker: string; text: string }[]).map((f) => `[${f.id}] (${f.speaker}): ${f.text}`);
+      const end = r.body.from + lines.length;
+      return ok(lines.length ? `${lines.join("\n")}\n\nФрагменты ${r.body.from + 1}–${end} из ${r.body.total}${end < r.body.total ? `; следующая страница: from=${end}` : ""}` : `Фрагментов нет (всего ${r.body.total}).`);
+    }
+  );
+
+  server.registerTool(
     "propose_patch",
     {
       title: "Предложить правки",
@@ -99,10 +125,11 @@ export function createAgentServer(api: AgentApi): McpServer {
         title: ProposalInput.shape.title,
         rationale: z.string().max(6000).optional().describe("Почему: цитаты интервью, правило Соглашения, замечание проверки"),
         ops: ProposalInput.shape.ops,
+        task_id: z.string().optional().describe("Задание аналитика, по которому подготовлено предложение (get_tasks)"),
       },
     },
-    async ({ session_id, agent, title, rationale, ops }) => {
-      const r = await api.post(`/agent/sessions/${encodeURIComponent(session_id)}/proposals`, { agent, title, rationale: rationale ?? "", ops });
+    async ({ session_id, agent, title, rationale, ops, task_id }) => {
+      const r = await api.post(`/agent/sessions/${encodeURIComponent(session_id)}/proposals`, { agent, title, rationale: rationale ?? "", ops, ...(task_id ? { task_id } : {}) });
       if (r.status === 201) {
         const d = r.body.delta as { introduced: { severity: string; message: string }[]; resolved: { severity: string; message: string }[] };
         const lines = [`Предложение ${r.body.id} отправлено аналитику (ожидает решения).`, ...r.body.lines.map((l: string) => `• ${l}`)];
@@ -116,6 +143,42 @@ export function createAgentServer(api: AgentApi): McpServer {
         return fail(`${r.body.error}:\n${text}\nПредложение не сохранено — исправьте и отправьте снова.`);
       }
       return apiError(r);
+    }
+  );
+
+  server.registerTool(
+    "get_tasks",
+    {
+      title: "Задания аналитика",
+      description: "Задания, которые аналитик поставил агенту в студии. По умолчанию — ожидающие (open); status=taken — взятые в работу, done — выполненные.",
+      inputSchema: { session_id: z.string(), status: z.enum(["open", "taken", "done", "cancelled"]).default("open") },
+    },
+    async ({ session_id, status }) => {
+      const r = await api.get(`/agent/sessions/${encodeURIComponent(session_id)}/tasks?status=${status}`);
+      if (r.status !== 200) return apiError(r);
+      return ok(r.body.length ? r.body.map(describeTask).join("\n\n") : "Заданий нет.");
+    }
+  );
+
+  server.registerTool(
+    "take_task",
+    { title: "Взять задание", description: "Взять ожидающее задание в работу: другой агент его уже не возьмёт. Затем готовьте предложения (propose_patch с task_id) и завершите задание (complete_task).", inputSchema: { task_id: z.string(), agent: z.string() } },
+    async ({ task_id, agent }) => {
+      const r = await api.post(`/agent/tasks/${encodeURIComponent(task_id)}/take`, { agent });
+      return r.status === 200 ? ok(`Задание взято в работу.\n${describeTask(r.body)}`) : apiError(r);
+    }
+  );
+
+  server.registerTool(
+    "complete_task",
+    {
+      title: "Завершить задание",
+      description: "Отметить задание выполненным и кратко написать итог: что предложено, что осталось неясным и какие вопросы к аналитику. Применяет предложения человек — завершение задания не значит, что правки приняты.",
+      inputSchema: { task_id: z.string(), note: z.string().max(4000).default("") },
+    },
+    async ({ task_id, note }) => {
+      const r = await api.post(`/agent/tasks/${encodeURIComponent(task_id)}/complete`, { note });
+      return r.status === 200 ? ok(`Задание завершено.\n${describeTask(r.body)}`) : apiError(r);
     }
   );
 

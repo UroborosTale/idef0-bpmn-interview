@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { validateModel } from "@shared/validate";
-import { bpmnHosts } from "@shared/codes";
+import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
 import { applyPatch } from "@shared/patch";
-import { api, type Proposal } from "../../api/client";
+import { api, type AgentTaskRow, type Proposal } from "../../api/client";
 import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
@@ -64,17 +64,25 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [full, setFull] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(true);
-  const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals"; nonce: number } | null>(null);
+  const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks"; nonce: number } | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
   const nonce = useRef(0);
 
   // Предложения агентов (Cline): подхватываем присланные, пока студия открыта; сбой связи не мешает работе
   const loadProposals = async () => {
-    try {
-      setProposals(await api.listProposals(session.id, "pending"));
-    } catch {
-      /* предложения — необязательная часть окна */
-    }
+    // предложения и задания — необязательная часть окна: при сбое связи остаётся прежний список
+    const fetched = async <T,>(load: () => Promise<T[]>): Promise<T[] | null> => {
+      try {
+        const rows = await load();
+        return Array.isArray(rows) ? rows : null;
+      } catch {
+        return null;
+      }
+    };
+    const [p, t] = await Promise.all([fetched(() => api.listProposals(session.id, "pending")), fetched(() => api.listTasks(session.id))]);
+    if (p) setProposals(p);
+    if (t) setTasks(t);
   };
   useEffect(() => {
     void loadProposals();
@@ -95,6 +103,29 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     }
     await loadProposals();
   };
+  const createTask = async (task: { text: string; scope: string | null; agent?: string }) => {
+    try {
+      await api.createTask(session.id, task);
+    } catch (e) {
+      setExportError(`Не удалось поставить задание: ${(e as Error).message}`);
+    }
+    await loadProposals();
+  };
+  const cancelTask = async (task: AgentTaskRow) => {
+    try {
+      await api.cancelTask(task.id);
+    } catch {
+      /* задание останется в списке */
+    }
+    await loadProposals();
+  };
+  const fnLabel = (id: string) => {
+    const n = draft.nodes.find((x) => x.id === id);
+    if (!n) return id;
+    const code = functionCodes(draft).get(id) ?? stepCodes(draft).get(id);
+    return `${code ? `${code} ` : ""}«${n.name}»`;
+  };
+  const selectedFn = selection?.kind === "node" && draft.nodes.some((n) => n.id === selection.id && (n.type === "task" || n.type === "subprocess")) ? { id: selection.id, label: fnLabel(selection.id) } : null;
   const rejectProposal = async (p: Proposal, reason: string) => {
     try {
       await api.resolveProposal(p.id, { status: "rejected", reason: reason || undefined });
@@ -404,7 +435,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

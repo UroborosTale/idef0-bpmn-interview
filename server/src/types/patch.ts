@@ -24,8 +24,21 @@ export const ProposalInput = z.object({
   /** Почему агент это предлагает: ссылки на цитаты интервью, правила Соглашения, замечания проверок. */
   rationale: z.string().max(6000).default(""),
   ops: z.array(Op).min(1).max(300),
+  /** Задание аналитика, по которому подготовлено предложение (get_tasks). */
+  task_id: z.string().min(1).optional(),
 });
 export type ProposalInput = z.infer<typeof ProposalInput>;
+
+export const TaskInput = z.object({
+  text: z.string().trim().min(1).max(2000),
+  /** Функция модели (id узла), к которой относится задание; без неё — процесс в целом. */
+  scope: z.string().min(1).nullable().optional(),
+  /** Роль агента, которой адресовано задание. */
+  agent: z.string().trim().min(1).max(60).optional(),
+});
+
+export const TakeInput = z.object({ agent: z.string().trim().min(1).max(60) });
+export const CompleteInput = z.object({ note: z.string().max(4000).default("") });
 
 export const ResolveInput = z.object({
   status: z.enum(["applied", "rejected"]),

@@ -23,6 +23,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS proposals (
   resolved_by TEXT
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_proposals_session ON proposals(session_id, status)`);
+// предложение, подготовленное по заданию аналитика (agentTasks.ts); столбец добавлен позже — дополняем уже созданные базы
+if (!(db.prepare(`PRAGMA table_info(proposals)`).all() as { name: string }[]).some((c) => c.name === "task_id")) db.exec(`ALTER TABLE proposals ADD COLUMN task_id TEXT`);
 
 export type ProposalStatus = "pending" | "applied" | "rejected";
 
@@ -47,6 +49,8 @@ export interface Proposal {
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
+  /** Задание аналитика, по которому подготовлено предложение. */
+  taskId: string | null;
 }
 
 interface Row {
@@ -63,6 +67,7 @@ interface Row {
   created_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  task_id: string | null;
 }
 
 const fromRow = (r: Row): Proposal => ({
@@ -79,13 +84,14 @@ const fromRow = (r: Row): Proposal => ({
   createdAt: r.created_at,
   resolvedAt: r.resolved_at,
   resolvedBy: r.resolved_by,
+  taskId: r.task_id,
 });
 
-export function createProposal(input: { sessionId: string; agent: string; title: string; rationale: string; patch: ModelPatch; delta: ProposalDelta; baseUpdatedAt: string }): Proposal {
+export function createProposal(input: { sessionId: string; agent: string; title: string; rationale: string; patch: ModelPatch; delta: ProposalDelta; baseUpdatedAt: string; taskId?: string | null }): Proposal {
   const id = `prop_${nanoid(8)}`;
   db.prepare(
-    `INSERT INTO proposals (id, session_id, agent, title, rationale, patch_json, delta_json, base_updated_at, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`
-  ).run(id, input.sessionId, input.agent, input.title, input.rationale, JSON.stringify(input.patch), JSON.stringify(input.delta), input.baseUpdatedAt, new Date().toISOString());
+    `INSERT INTO proposals (id, session_id, agent, title, rationale, patch_json, delta_json, base_updated_at, status, created_at, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+  ).run(id, input.sessionId, input.agent, input.title, input.rationale, JSON.stringify(input.patch), JSON.stringify(input.delta), input.baseUpdatedAt, new Date().toISOString(), input.taskId ?? null);
   return getProposal(id)!;
 }
 

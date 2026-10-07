@@ -36,7 +36,7 @@ describe("MCP-сервер для Cline", () => {
   it("инструменты: правила, сессии, модель, предложение, список и карточка предложений", async () => {
     const { client, close } = await connect(api);
     const tools = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(tools).toEqual(["get_conventions", "get_model", "get_proposal", "list_proposals", "list_sessions", "propose_patch"]);
+    expect(tools).toEqual(["complete_task", "get_conventions", "get_fragments", "get_model", "get_proposal", "get_tasks", "list_proposals", "list_sessions", "propose_patch", "take_task"]);
     await close();
   });
 
@@ -125,6 +125,49 @@ describe("MCP-сервер для Cline", () => {
     await close();
   });
 
+  it("get_fragments: страницы текста интервью с id для цитат", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Интервью" } })).body;
+    await app.call("POST", `/sessions/${s.id}/ingest-text`, { text: "Специалист открывает реестр.\n\nПотом вносит код процесса." });
+    const { call, close } = await connect(api);
+    const first = await call("get_fragments", { session_id: s.id });
+    expect(first.isError).toBe(false);
+    expect(first.text).toMatch(/\[[^\]]+\] \([^)]+\): Специалист открывает реестр/);
+    expect(first.text).toMatch(/Фрагменты 1–\d+ из \d+/);
+    const empty = await call("get_fragments", { session_id: s.id, from: 50 });
+    expect(empty.text).toContain("Фрагментов нет");
+    expect((await call("get_fragments", { session_id: "нет" })).isError).toBe(true);
+    await close();
+  });
+
+  it("задания: get_tasks → take_task → propose_patch с task_id → complete_task; аналитик видит итог", async () => {
+    const t = (await app.call("POST", `/sessions/${sid}/tasks`, { text: "Назначь исполнителя операции B002.01.02", scope: "o2" })).body.id as string;
+    const { call, close } = await connect(api);
+    const open = await call("get_tasks", { session_id: sid });
+    expect(open.text).toContain(`${t} — «Назначь исполнителя операции B002.01.02» (функция o2) — ждёт агента`);
+
+    const taken = await call("take_task", { task_id: t, agent: "нормоконтролёр" });
+    expect(taken.text).toContain("Задание взято в работу");
+    expect((await call("take_task", { task_id: t, agent: "другой" })).isError).toBe(true);
+
+    const prop = await call("propose_patch", {
+      session_id: sid,
+      agent: "нормоконтролёр",
+      title: "Исполнитель B002.01.02",
+      task_id: t,
+      ops: [{ op: "set_assignments", node_id: "o2", items: [{ role_id: "r2", kind: "executor" }] }],
+    });
+    expect(prop.isError).toBe(false);
+    const done = await call("complete_task", { task_id: t, note: "Назначен специалист; проверьте функции роли" });
+    expect(done.text).toContain("Итог: Назначен специалист");
+    expect(done.text).toMatch(/предложение prop_\w+: «Исполнитель B002\.01\.02» — ожидает решения/);
+    expect((await call("get_tasks", { session_id: sid })).text).not.toContain(t);
+    expect((await call("get_tasks", { session_id: sid, status: "done" })).text).toContain(t);
+    // задание закрыто — новые предложения по нему не принимаются
+    const late = await call("propose_patch", { session_id: sid, agent: "x", title: "Ещё", task_id: t, ops: [{ op: "set_process", patch: { owner: "Х" } }] });
+    expect(late.isError).toBe(true);
+    expect(late.text).toContain("уже выполнено");
+    await close();
+  });
   it("нет доступа (401) — подсказка про токен", async () => {
     const denied: AgentApi = { get: async () => ({ status: 401, body: { error: "требуется вход" } }), post: async () => ({ status: 401, body: { error: "требуется вход" } }) };
     const { call, close } = await connect(denied);

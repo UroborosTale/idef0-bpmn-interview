@@ -517,3 +517,19 @@ export interface Proposal {
   /** Модель сохраняли после создания предложения — оно подготовлено к более старой версии. */
   stale: boolean;
 }
+
+/** Задание аналитика агенту: «разбей операцию на шаги». Агент берёт его через MCP и отвечает предложениями. */
+export interface AgentTaskRow {
+  id: string;
+  sessionId: string;
+  text: string;
+  scopeNodeId: string | null;
+  agent: string | null;
+  status: "open" | "taken" | "done" | "cancelled";
+  createdBy: string;
+  createdAt: string;
+  takenBy: string | null;
+  resultNote: string | null;
+  /** Предложения, отправленные агентом по этому заданию. */
+  proposals: { id: string; title: string; status: "pending" | "applied" | "rejected" }[];
+}

@@ -5,8 +5,10 @@ import { createProposal, getProposal, listProposals, resolveProposal, type Propo
 import { getSession, listSessions } from "../repo.js";
 import { functionCodes, processCodeOf, stepCodes } from "../shared/codes.js";
 import { applyPatch, describePatch, issueDelta, type ModelPatch } from "../shared/patch.js";
+import { sourceErrors } from "../agent/sources.js";
 import { validateModel } from "../shared/validate.js";
-import { ProposalInput, ResolveInput } from "../types/patch.js";
+import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput } from "../types/patch.js";
+import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
 
 /**
@@ -59,6 +61,19 @@ agentRouter.get("/agent/sessions/:id/model", (req, res) => {
   });
 });
 
+/** Текст интервью по фрагментам: id фрагмента нужен для цитат в источниках новых записей. */
+agentRouter.get("/agent/sessions/:id/fragments", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const from = Math.max(0, Number(req.query.from) || 0);
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
+  const slice = session.fragments.slice(from, from + limit);
+  res.json({ total: session.fragments.length, from, fragments: slice.map((f) => ({ id: f.id, index: f.index, speaker: f.speaker_label ?? f.speaker, text: f.text })) });
+});
+
 agentRouter.post("/agent/sessions/:id/proposals", (req, res) => {
   const session = getSession(req.params.id);
   if (!session?.model) {
@@ -70,12 +85,28 @@ agentRouter.post("/agent/sessions/:id/proposals", (req, res) => {
     res.status(400).json({ error: "предложение не соответствует формату", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
     return;
   }
-  const { agent, title, rationale, ops } = parsed.data;
+  const { agent, title, rationale, ops, task_id } = parsed.data;
+  if (task_id) {
+    const task = getTask(task_id);
+    if (!task || task.sessionId !== session.id) {
+      res.status(404).json({ error: `задание «${task_id}» не найдено в этой сессии (get_tasks)` });
+      return;
+    }
+    if (task.status === "done" || task.status === "cancelled") {
+      res.status(409).json({ error: `задание «${task_id}» уже ${task.status === "done" ? "выполнено" : "отменено"}` });
+      return;
+    }
+  }
   const patch = { ops } as ModelPatch;
   const before = session.model;
   const applied = applyPatch(before, patch);
   if (applied.errors.length > 0) {
     res.status(422).json({ error: "предложение нельзя применить к текущей модели", errors: applied.errors });
+    return;
+  }
+  const sourceProblems = sourceErrors(ops as ModelPatch["ops"], session.fragments);
+  if (sourceProblems.length > 0) {
+    res.status(422).json({ error: "цитаты в источниках не подтверждаются текстом интервью", errors: sourceProblems });
     return;
   }
   const full = ProcessLogicModel.safeParse(applied.model);
@@ -93,6 +124,7 @@ agentRouter.post("/agent/sessions/:id/proposals", (req, res) => {
     patch,
     delta: { introduced: brief(delta.introduced), resolved: brief(delta.resolved) },
     baseUpdatedAt: session.updatedAt,
+    taskId: task_id ?? null,
   });
   logAudit(session.id, `agent:${agent}`, "proposal_created", { id: proposal.id, title, ops: ops.length });
   res.status(201).json({
@@ -159,4 +191,117 @@ agentRouter.post("/proposals/:pid/resolve", (req, res) => {
   }
   logAudit(existing.sessionId, "analyst", `proposal_${parsed.data.status}`, { id: existing.id, title: existing.title, reason: parsed.data.reason });
   res.json(resolved);
+});
+
+// --- задания аналитика агенту ---
+
+const TASK_STATUSES: TaskStatus[] = ["open", "taken", "done", "cancelled"];
+
+/** Задание с предложениями, которые по нему отправлены. */
+const taskWithProposals = (t: AgentTask) => ({
+  ...t,
+  proposals: listProposals(t.sessionId)
+    .filter((p) => p.taskId === t.id)
+    .map((p) => ({ id: p.id, title: p.title, status: p.status })),
+});
+
+agentRouter.get("/agent/sessions/:id/tasks", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const status = ((req.query.status as TaskStatus | undefined) ?? "open") as TaskStatus;
+  if (!TASK_STATUSES.includes(status)) {
+    res.status(400).json({ error: `status: ${TASK_STATUSES.join(" | ")}` });
+    return;
+  }
+  res.json(listTasks(session.id, status).map(taskWithProposals));
+});
+
+agentRouter.post("/agent/tasks/:tid/take", (req, res) => {
+  const parsed = TakeInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "agent — роль агента" });
+    return;
+  }
+  const task = getTask(req.params.tid);
+  if (!task) {
+    res.status(404).json({ error: "задание не найдено" });
+    return;
+  }
+  const taken = takeTask(task.id, parsed.data.agent);
+  if (!taken) {
+    res.status(409).json({ error: `задание уже ${task.status === "taken" ? `взято (${task.takenBy})` : task.status === "done" ? "выполнено" : "отменено"}` });
+    return;
+  }
+  logAudit(task.sessionId, `agent:${parsed.data.agent}`, "task_taken", { id: task.id });
+  res.json(taskWithProposals(taken));
+});
+
+agentRouter.post("/agent/tasks/:tid/complete", (req, res) => {
+  const parsed = CompleteInput.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "note — итог работы текстом" });
+    return;
+  }
+  const task = getTask(req.params.tid);
+  if (!task) {
+    res.status(404).json({ error: "задание не найдено" });
+    return;
+  }
+  const done = completeTask(task.id, parsed.data.note);
+  if (!done) {
+    res.status(409).json({ error: `задание уже ${task.status === "done" ? "выполнено" : "отменено"}` });
+    return;
+  }
+  logAudit(task.sessionId, `agent:${task.takenBy ?? "agent"}`, "task_done", { id: task.id });
+  res.json(taskWithProposals(done));
+});
+
+// задания: ставит и отменяет аналитик (студия)
+
+agentRouter.get("/sessions/:id/tasks", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  res.json(listTasks(session.id).map(taskWithProposals));
+});
+
+agentRouter.post("/sessions/:id/tasks", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const parsed = TaskInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "text — задание (до 2000 знаков)" });
+    return;
+  }
+  const scope = parsed.data.scope ?? null;
+  if (scope && !session.model?.nodes.some((n) => n.id === scope)) {
+    res.status(400).json({ error: `функции «${scope}» нет в модели` });
+    return;
+  }
+  const task = createTask({ sessionId: session.id, text: parsed.data.text, scopeNodeId: scope, agent: parsed.data.agent ?? null, createdBy: req.user?.login ?? "analyst" });
+  logAudit(session.id, "analyst", "task_created", { id: task.id });
+  res.status(201).json(taskWithProposals(task));
+});
+
+agentRouter.post("/tasks/:tid/cancel", (req, res) => {
+  const task = getTask(req.params.tid);
+  if (!task) {
+    res.status(404).json({ error: "задание не найдено" });
+    return;
+  }
+  const cancelled = cancelTask(task.id);
+  if (!cancelled) {
+    res.status(409).json({ error: `задание уже ${task.status === "done" ? "выполнено" : "отменено"}` });
+    return;
+  }
+  logAudit(task.sessionId, "analyst", "task_cancelled", { id: task.id });
+  res.json(taskWithProposals(cancelled));
 });

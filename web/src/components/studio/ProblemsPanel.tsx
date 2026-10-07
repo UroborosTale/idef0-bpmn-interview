@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import type { Proposal } from "../../api/client";
+import type { AgentTaskRow, Proposal } from "../../api/client";
 import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import ProposalsList from "./ProposalsList";
+import TasksPanel from "./TasksPanel";
 
 const PRIORITY: Record<string, string> = { critical: "Критично", important: "Важно", desirable: "Желательно" };
 
@@ -17,6 +18,11 @@ export default function ProblemsPanel({
   onApplyProposal,
   onRejectProposal,
   showTab,
+  tasks = [],
+  selectedFn = null,
+  labelOf = (id) => id,
+  onCreateTask,
+  onCancelTask,
 }: {
   model: ProcessLogicModel;
   /** Проверки текущего черновика (считает студия — их же показывают инспекторы редакторов). */
@@ -27,9 +33,15 @@ export default function ProblemsPanel({
   onApplyProposal?: (p: Proposal) => void | Promise<void>;
   onRejectProposal?: (p: Proposal, reason: string) => void | Promise<void>;
   /** Открыть вкладку по запросу извне (кнопка «Предложения» в ленте); nonce меняется при каждом запросе. */
-  showTab?: { tab: "issues" | "gaps" | "proposals"; nonce: number } | null;
+  showTab?: { tab: "issues" | "gaps" | "proposals" | "tasks"; nonce: number } | null;
+  /** Задания аналитика агенту и их статусы. */
+  tasks?: AgentTaskRow[];
+  selectedFn?: { id: string; label: string } | null;
+  labelOf?: (nodeId: string) => string;
+  onCreateTask?: (task: { text: string; scope: string | null; agent?: string }) => void | Promise<void>;
+  onCancelTask?: (task: AgentTaskRow) => void | Promise<void>;
 }) {
-  const [tab, setTab] = useState<"issues" | "gaps" | "proposals">("issues");
+  const [tab, setTab] = useState<"issues" | "gaps" | "proposals" | "tasks">("issues");
   useEffect(() => {
     if (showTab) setTab(showTab.tab);
   }, [showTab?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -52,6 +64,9 @@ export default function ProblemsPanel({
         </button>
         <button className={tab === "proposals" ? "active" : ""} onClick={() => setTab("proposals")}>
           Предложения агентов <span className={`pill-count ${proposals.length ? "warn" : ""}`}>{proposals.length}</span>
+        </button>
+        <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>
+          Задания агенту <span className={`pill-count ${tasks.some((t) => t.status === "open" || t.status === "taken") ? "warn" : ""}`}>{tasks.filter((t) => t.status === "open" || t.status === "taken").length}</span>
         </button>
         <span className="spacer" />
         {tab === "issues" && (
@@ -77,6 +92,9 @@ export default function ProblemsPanel({
             </div>
           ))}
         {tab === "proposals" && <ProposalsList model={model} proposals={proposals} onApply={(p) => onApplyProposal?.(p)} onReject={(p, r) => onRejectProposal?.(p, r)} />}
+        {tab === "tasks" && (
+          <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
+        )}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}
         {tab === "gaps" &&
           gaps.map((g) => (

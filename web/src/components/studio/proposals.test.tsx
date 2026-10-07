@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { api, type Proposal } from "../../api/client";
+import { api, type AgentTaskRow, type Proposal } from "../../api/client";
 import { session, structuredModel } from "../../test/fixtures";
 import type { ProcessLogicModel } from "../../types";
 import ProposalsList from "./ProposalsList";
+import TasksPanel from "./TasksPanel";
 import Studio from "./Studio";
 
 type M = ProcessLogicModel;
@@ -139,5 +140,110 @@ describe("студия: предложения агентов", () => {
     await act(async () => fireEvent.click(screen.getByText("Отклонить")));
     expect(resolve).toHaveBeenCalledWith("prop_1", { status: "rejected", reason: "Шаг уже есть" });
     expect(document.querySelector(".statusbar")!.textContent).toContain("сохранено"); // модель не менялась
+  });
+});
+
+const task = (extra: Partial<AgentTaskRow> = {}): AgentTaskRow => ({
+  id: "task_1",
+  sessionId: "s1",
+  text: "Разбей операцию на шаги",
+  scopeNodeId: "o2",
+  agent: null,
+  status: "open",
+  createdBy: "local",
+  createdAt: "2026-10-08T09:00:00.000Z",
+  takenBy: null,
+  resultNote: null,
+  proposals: [],
+  ...extra,
+});
+
+describe("задания агенту: панель", () => {
+  const panel = (tasks: AgentTaskRow[], selected: { id: string; label: string } | null = null) => {
+    const onCreate = vi.fn();
+    const onCancel = vi.fn();
+    const onShowProposals = vi.fn();
+    render(<TasksPanel tasks={tasks} selected={selected} labelOf={(id) => `«${id}»`} onCreate={onCreate} onCancel={onCancel} onShowProposals={onShowProposals} />);
+    return { onCreate, onCancel, onShowProposals };
+  };
+
+  it("без заданий — подсказка", () => {
+    panel([]);
+    expect(screen.getByText(/Агент \(Cline\) увидит поручение/)).toBeTruthy();
+  });
+
+  it("поручить: текст, привязка к выделенной функции, адресат; поле очищается", async () => {
+    const { onCreate } = panel([], { id: "o2", label: "B002.01.02 «Проведение интервью»" });
+    const send = screen.getByText("Поручить") as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText(/Что поручить агенту/), { target: { value: "  Разбей на шаги по интервью  " } });
+    fireEvent.change(screen.getByLabelText("Кому адресовано"), { target: { value: "моделист" } });
+    await act(async () => fireEvent.click(send));
+    expect(onCreate).toHaveBeenCalledWith({ text: "Разбей на шаги по интервью", scope: "o2", agent: "моделист" });
+    expect((screen.getByPlaceholderText(/Что поручить агенту/) as HTMLTextAreaElement).value).toBe("");
+  });
+
+  it("привязку к функции можно снять; без выделения — ко всему процессу", async () => {
+    const { onCreate } = panel([], { id: "o2", label: "B002.01.02 «Проведение интервью»" });
+    fireEvent.click(screen.getByLabelText(/к функции B002\.01\.02/));
+    fireEvent.change(screen.getByPlaceholderText(/Что поручить агенту/), { target: { value: "Проверь роли" } });
+    await act(async () => fireEvent.click(screen.getByText("Поручить")));
+    expect(onCreate).toHaveBeenCalledWith({ text: "Проверь роли", scope: null });
+    document.body.innerHTML = "";
+    panel([]);
+    expect(screen.getByText(/ко всему процессу/)).toBeTruthy();
+  });
+
+  it("список: статусы, итог агента, предложения по заданию, отмена только у активных", () => {
+    const { onCancel, onShowProposals } = panel([
+      task({ id: "t1", status: "taken", takenBy: "моделист", text: "Первое" }),
+      task({ id: "t2", status: "done", text: "Второе", resultNote: "Предложено 3 шага", proposals: [{ id: "prop_1", title: "Добавить шаги", status: "pending" }] }),
+      task({ id: "t3", status: "cancelled", text: "Третье" }),
+    ]);
+    expect(screen.getByText("в работе · моделист")).toBeTruthy();
+    expect(screen.getByText("выполнено")).toBeTruthy();
+    expect(screen.getByText("Итог агента: Предложено 3 шага")).toBeTruthy();
+    expect(screen.getByText(/ожидает решения/)).toBeTruthy();
+    fireEvent.click(screen.getByText("Добавить шаги"));
+    expect(onShowProposals).toHaveBeenCalled();
+    expect(screen.getAllByText("Отменить")).toHaveLength(1); // только у задания в работе
+    fireEvent.click(screen.getByText("Отменить"));
+    expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }));
+    expect(document.querySelectorAll(".task-meta")).toHaveLength(3);
+    expect(document.querySelector(".task-meta")!.textContent).toMatch(/^функция «o2» · /);
+  });
+});
+
+describe("студия: задания агенту", () => {
+  const open = (tasks: AgentTaskRow[] = []) => {
+    vi.spyOn(api, "listProposals").mockResolvedValue([]);
+    const list = vi.spyOn(api, "listTasks").mockResolvedValue(tasks);
+    const create = vi.spyOn(api, "createTask").mockResolvedValue(task());
+    const cancel = vi.spyOn(api, "cancelTask").mockResolvedValue(task({ status: "cancelled" }));
+    render(<Studio session={session(structuredModel())} busy={false} onSave={vi.fn(async () => true)} />);
+    const tab = () => [...document.querySelectorAll(".problems-head button")].find((b) => b.textContent?.startsWith("Задания агенту")) as HTMLElement;
+    return { list, create, cancel, tab };
+  };
+
+  it("вкладка «Задания агенту»: поручение уходит на сервер с привязкой к выделенной функции", async () => {
+    const { create, tab } = open();
+    await act(async () => {});
+    fireEvent.click(tab());
+    // выделяем операцию в навигаторе
+    fireEvent.click(document.querySelector('[data-nav-fn="o2"]')!);
+    fireEvent.change(screen.getByPlaceholderText(/Что поручить агенту/), { target: { value: "Разбей операцию на шаги" } });
+    await act(async () => fireEvent.click(screen.getByText("Поручить")));
+    expect(create).toHaveBeenCalledWith("sess_test", { text: "Разбей операцию на шаги", scope: "o2" });
+  });
+
+  it("задания приходят с сервера и отменяются", async () => {
+    const { cancel, tab } = open([task({ text: "Проверь роли", scopeNodeId: "o2" })]);
+    await act(async () => {});
+    await waitFor(() => expect(tab().textContent).toContain("1"));
+    fireEvent.click(tab());
+    expect(screen.getByText("Проверь роли")).toBeTruthy();
+    expect(screen.getByText(/функция B002\.01\.02 «Проведение интервью»/)).toBeTruthy(); // подпись с кодом по Соглашению
+    await act(async () => fireEvent.click(screen.getByText("Отменить")));
+    expect(cancel).toHaveBeenCalledWith("task_1");
   });
 });

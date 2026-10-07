@@ -441,3 +441,13 @@ button.danger:hover { background: #fef2f2; }
 .proposal-actions input { flex: 1; min-width: 160px; }
 .message-pool { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
 .prop-check { display: flex; gap: 6px; align-items: center; font-size: 12.5px; margin: 4px 0; }
+/* Задания агенту */
+.task-form { padding: 8px 12px; border-bottom: 1px solid #e5ebf5; display: grid; gap: 6px; }
+.task-form textarea { width: 100%; resize: vertical; font: inherit; }
+.task-form-row { display: flex; gap: 8px; align-items: center; }
+.task { padding: 8px 12px; border-bottom: 1px solid #e5ebf5; font-size: 12.5px; }
+.task-meta { font-size: 11.5px; margin-top: 2px; }
+.task-badge-open { background: #fef3c7; color: #92400e; }
+.task-badge-taken { background: #dbeafe; color: #1e40af; }
+.task-badge-done { background: #dcfce7; color: #166534; }
+.task-badge-cancelled { background: #e5e7eb; color: #4b5563; }
