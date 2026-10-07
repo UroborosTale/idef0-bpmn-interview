@@ -1,5 +1,5 @@
 import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
-import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, VisioStatus, VisioPull, JobProgress, Job, LlmUsage } from "./types";
+import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage } from "./types";
 import { BASE, req, waitJob } from "./http";
 
 export * from "./types";
@@ -24,17 +24,6 @@ export const api = {
     req<SessionRecord>("PUT", `/sessions/${id}/model`, model, base ? { "X-Base-Updated-At": base } : undefined),
   rebuildDiagrams: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/rebuild-diagrams`),
 
-  // Microsoft Visio как среда редактирования (server/src/routes/visio.ts)
-  visioStatus: (id: string) => req<VisioStatus>("GET", `/sessions/${id}/visio/status`),
-  visioOpen: (id: string, fresh = false) => req<{ file: string; launched: boolean; resumed: boolean }>("POST", `/sessions/${id}/visio/open`, { fresh }),
-  visioPull: (id: string) => req<VisioPull>("POST", `/sessions/${id}/visio/pull`),
-  visioApplied: (id: string, mtime?: number, applied = false) => req<{ ok: boolean }>("POST", `/sessions/${id}/visio/applied`, { mtime, applied }),
-  visioImport: async (id: string, file: File): Promise<VisioPull> => {
-    const res = await fetch(`${BASE}/sessions/${id}/visio/import`, { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(j.error || res.statusText);
-    return j as VisioPull;
-  },
   addVersion: (id: string, note: string) => req<SessionRecord>("POST", `/sessions/${id}/versions`, { note }),
   listVersions: (id: string) => req<VersionListItem[]>("GET", `/sessions/${id}/versions`),
   approveVersion: (id: string, note: string, author?: string) =>

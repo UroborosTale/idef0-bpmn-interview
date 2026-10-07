@@ -8,7 +8,6 @@ import { generateIdef0 } from "../pipeline/idef0.js";
 import { detectGaps } from "../pipeline/gaps.js";
 import { logAudit } from "../db.js";
 import { providerStatus } from "../llm/provider.js";
-import { removeVisioFiles } from "./visio.js";
 import { usageForSession } from "../llm/usage.js";
 
 export const sessionsRouter = Router();
@@ -61,7 +60,6 @@ sessionsRouter.get("/sessions/:id/llm-usage", (req, res) => {
 
 sessionsRouter.delete("/sessions/:id", (req, res) => {
   deleteSession(req.params.id);
-  removeVisioFiles(req.params.id);
   res.status(204).end();
 });
 
@@ -94,10 +92,10 @@ sessionsRouter.put("/sessions/:id/model", (req, res) => {
     return;
   }
   // Защита от потерянных правок: клиент присылает updatedAt сессии, с которой начинал правку.
-  // Если с тех пор модель изменилась (другая вкладка, Visio, повторная обработка) — отказ, правки остаются в черновике.
+  // Если с тех пор модель изменилась (другая вкладка, повторная обработка) — отказ, правки остаются в черновике.
   const base = req.header("X-Base-Updated-At");
   if (base && base !== session.updatedAt) {
-    res.status(409).json({ error: "Модель изменилась после того, как вы начали правку (другая вкладка, Visio или повторная обработка). Ваши правки сохранены в черновике редактора: обновите страницу — редактор предложит применить черновик поверх новой модели.", conflict: true });
+    res.status(409).json({ error: "Модель изменилась после того, как вы начали правку (другая вкладка или повторная обработка). Ваши правки сохранены в черновике редактора: обновите страницу — редактор предложит применить черновик поверх новой модели.", conflict: true });
     return;
   }
   const parsed = ProcessLogicModel.safeParse(req.body);

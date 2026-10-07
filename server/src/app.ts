@@ -35,7 +35,6 @@ import { adaptiveDepthRouter } from "./routes/adaptiveDepth.js";
 import { bpmsRouter } from "./routes/bpms.js";
 import { diagramImportRouter } from "./routes/diagramImport.js";
 import { auditPackageRouter } from "./routes/auditPackage.js";
-import { visioRouter } from "./routes/visio.js";
 import { db } from "./db.js";
 import { failInterruptedJobs } from "./jobs.js";
 import { authRouter, rateLimit, requireAuth, securityHeaders } from "./auth.js";
@@ -112,7 +111,6 @@ app.use("/api", adaptiveDepthRouter);
 app.use("/api", bpmsRouter);
 app.use("/api", diagramImportRouter);
 app.use("/api", auditPackageRouter);
-app.use("/api", visioRouter);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);

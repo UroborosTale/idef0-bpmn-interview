@@ -486,24 +486,6 @@ export interface LlmUsage {
   byModel: { provider: string; model: string | null; calls: number; inputTokens: number; outputTokens: number }[];
 }
 
-export interface VisioStatus {
-  available: boolean;
-  exists: boolean;
-  file?: string;
-  mtime?: number;
-  /** Файл сохранён в Visio после выгрузки или последнего применения. */
-  modified?: boolean;
-}
-
-export interface VisioPull {
-  model: NonNullable<SessionRecord["model"]>;
-  changes: string[];
-  warnings: string[];
-  /** Модель менялась после выгрузки файла. */
-  stale: boolean;
-  mtime?: number;
-}
-
 export interface JobProgress {
   done: number;
   total: number;
@@ -518,5 +500,3 @@ export interface Job {
   progress: JobProgress | null;
   error: string | null;
 }
-
-/** Опрашивает задачу до завершения; по успеху возвращает обновлённую сессию, по ошибке — бросает её текст. */
