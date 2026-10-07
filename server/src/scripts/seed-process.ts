@@ -1,10 +1,18 @@
-import { b002Model } from "../reference/b002.js";
+import { REFERENCE_PROCESSES } from "../reference/index.js";
 
 /**
- * Загрузить эталон B002 в приложение как новую сессию: `npm run seed:b002 -w server`.
- * Откройте её в студии и сверьте с диаграммами Visio; она же нужна для репетиции работы с агентами.
- * Создание сессии — действие аналитика, поэтому нужен вход: при включённом AUTH_USERS задайте PM_LOGIN и PM_PASSWORD.
+ * Загрузить эталонный или демонстрационный процесс в приложение новой сессией:
+ *   npm run seed:process -w server -- c025      (демонстрация возможностей: все нововведения в одном процессе)
+ *   npm run seed:process -w server -- b002      (эталон B002 из документов организации)
+ * Откройте сессию в студии. Создание сессии — действие аналитика, поэтому при включённом AUTH_USERS нужны PM_LOGIN и PM_PASSWORD.
  */
+const name = (process.argv[2] ?? "").toLowerCase();
+const entry = REFERENCE_PROCESSES[name];
+if (!entry) {
+  console.error(`Укажите процесс: ${Object.keys(REFERENCE_PROCESSES).join(" | ")}`);
+  process.exit(1);
+}
+
 const base = (process.env.PM_API_URL ?? "http://127.0.0.1:8787").replace(/\/$/, "");
 let cookie = "";
 const call = async (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
@@ -34,8 +42,8 @@ if (me.status === 200 && me.body.authRequired) {
   cookie = (login.setCookie ?? "").split(";")[0];
 }
 
-const model = b002Model();
-const created = await call("POST", "/sessions/blank", { meta: { processName: `${model.process.name} (эталон B002)`, department: model.process.department, owner: model.process.owner } });
+const model = entry.build();
+const created = await call("POST", "/sessions/blank", { meta: { processName: model.process.name, department: model.process.department, owner: model.process.owner } });
 if (created.status !== 201) {
   console.error("Не удалось создать сессию:", created.body?.error ?? created.status);
   process.exit(1);
@@ -45,4 +53,4 @@ if (saved.status !== 200) {
   console.error("Не удалось записать модель:", saved.body?.error ?? saved.status);
   process.exit(1);
 }
-console.log(`Эталон B002 загружен: сессия ${created.body.id}.\nОткройте её в студии: /s/${created.body.id}\nСравнить с моделью агента: npm run eval:b002 -w server -- <id сессии>`);
+console.log(`Загружено (${entry.title}): сессия ${created.body.id}.\nОткройте в студии: /s/${created.body.id}`);
