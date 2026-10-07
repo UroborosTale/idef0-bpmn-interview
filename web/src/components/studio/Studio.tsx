@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { validateModel } from "@shared/validate";
 import { bpmnHosts } from "@shared/codes";
-import { api } from "../../api/client";
+import { applyPatch } from "@shared/patch";
+import { api, type Proposal } from "../../api/client";
 import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
@@ -63,7 +64,45 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [full, setFull] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(true);
+  const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals"; nonce: number } | null>(null);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
   const nonce = useRef(0);
+
+  // Предложения агентов (Cline): подхватываем присланные, пока студия открыта; сбой связи не мешает работе
+  const loadProposals = async () => {
+    try {
+      setProposals(await api.listProposals(session.id, "pending"));
+    } catch {
+      /* предложения — необязательная часть окна */
+    }
+  };
+  useEffect(() => {
+    void loadProposals();
+    const timer = setInterval(() => void loadProposals(), 8000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id]);
+
+  /** Применить предложение агента: правки попадают в черновик (шагом истории — их можно отменить), сохраняет аналитик как обычно. */
+  const applyProposal = async (p: Proposal) => {
+    const r = applyPatch(h.draftRef.current, p.patch);
+    if (r.errors.length > 0) return;
+    h.commit(seed(r.model, null));
+    try {
+      await api.resolveProposal(p.id, { status: "applied" });
+    } catch {
+      /* правки уже в черновике; статус предложения обновится при следующем решении */
+    }
+    await loadProposals();
+  };
+  const rejectProposal = async (p: Proposal, reason: string) => {
+    try {
+      await api.resolveProposal(p.id, { status: "rejected", reason: reason || undefined });
+    } catch {
+      /* предложение останется в списке */
+    }
+    await loadProposals();
+  };
 
   const liveDocs = docs.filter((d) => !docIsStale(d, draft));
   const active = liveDocs.find((d) => d.key === activeKey) ?? liveDocs[0] ?? bpmnDoc();
@@ -272,6 +311,16 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             <button className={problemsOpen ? "toggled" : ""} onClick={() => setProblemsOpen(!problemsOpen)}>
               Проверки{errors + warnings > 0 ? ` (${errors + warnings})` : ""}
             </button>
+            <button
+              className={proposals.length > 0 ? "attention" : ""}
+              onClick={() => {
+                setProblemsOpen(true);
+                setProblemsTab({ tab: "proposals", nonce: ++nonce.current });
+              }}
+              title="Правки, которые предложил агент (Cline): вы решаете, применить их или отклонить"
+            >
+              Предложения{proposals.length > 0 ? ` (${proposals.length})` : ""}
+            </button>
           </div>
           <div className="ribbon-caption">Вид</div>
         </div>
@@ -355,7 +404,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

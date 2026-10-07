@@ -500,3 +500,20 @@ export interface Job {
   progress: JobProgress | null;
   error: string | null;
 }
+
+/** Предложение правок модели от агента (Cline): человек применяет его в студии или отклоняет. */
+export interface Proposal {
+  id: string;
+  sessionId: string;
+  /** Роль агента: методолог, моделист, нормоконтролёр, интервьюер, аналитик. */
+  agent: string;
+  title: string;
+  rationale: string;
+  patch: import("@shared/patch").ModelPatch;
+  delta: { introduced: { severity: string; message: string }[]; resolved: { severity: string; message: string }[] };
+  status: "pending" | "applied" | "rejected";
+  reason: string | null;
+  createdAt: string;
+  /** Модель сохраняли после создания предложения — оно подготовлено к более старой версии. */
+  stale: boolean;
+}

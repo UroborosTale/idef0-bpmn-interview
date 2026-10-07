@@ -1,5 +1,5 @@
 import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, HistoryEvent, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
-import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage } from "./types";
+import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage, Proposal } from "./types";
 import { BASE, req, waitJob } from "./http";
 
 export * from "./types";
@@ -56,6 +56,11 @@ export const api = {
   interviewFlag: (id: string, element_id: string, note?: string) =>
     req<SessionRecord>("POST", `/sessions/${id}/interview/flag-element`, { element_id, note }),
   interviewFinish: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/finish`),
+
+  /** Предложения правок от агентов по сессии (по умолчанию — ожидающие решения). */
+  listProposals: (id: string, status: Proposal["status"] = "pending") => req<Proposal[]>("GET", `/sessions/${id}/proposals?status=${status}`),
+  /** Решение аналитика: применено (правки уже в черновике студии) или отклонено с причиной — её увидит агент. */
+  resolveProposal: (proposalId: string, decision: { status: "applied" | "rejected"; reason?: string }) => req<Proposal>("POST", `/proposals/${proposalId}/resolve`, decision),
 
   exportUrl: (id: string, path: string) => `${BASE}/sessions/${id}/export/${path}`,
 

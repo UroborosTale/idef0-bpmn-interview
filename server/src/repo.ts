@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { db, logAudit } from "./db.js";
+import "./proposals.js"; // создаёт таблицу предложений агентов — её очищает deleteSession
 import type { ProcessLogicModel, Fragment, ValidationIssue, ChatMessage } from "./types/model.js";
 import type { Idef0Result } from "./pipeline/idef0.js";
 import type { ImpactReport } from "./pipeline/impactAnalysis.js";
@@ -202,7 +203,7 @@ export function deleteSession(id: string): void {
   db.transaction(() => {
     const campaigns = db.prepare(`SELECT id FROM campaigns WHERE session_id = ?`).all(id) as { id: string }[];
     for (const c of campaigns) db.prepare(`DELETE FROM campaign_respondents WHERE campaign_id = ?`).run(c.id);
-    for (const table of ["session_versions", "campaigns", "notification_webhooks", "notifications", "corpus_entries", "agent_run_log", "tobe_hypotheses", "mining_logs", "mining_mappings", "jobs", "llm_usage"]) {
+    for (const table of ["session_versions", "campaigns", "notification_webhooks", "notifications", "corpus_entries", "agent_run_log", "tobe_hypotheses", "mining_logs", "mining_mappings", "jobs", "llm_usage", "proposals"]) {
       db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(id);
     }
     db.prepare(`UPDATE processes SET session_id = NULL WHERE session_id = ?`).run(id);

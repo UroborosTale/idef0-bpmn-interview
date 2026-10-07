@@ -58,6 +58,20 @@ function userOf(req: Request): AuthUser | null {
   return { login: row.login };
 }
 
+/**
+ * Агент (Cline через MCP-сервер) входит по токену AGENT_API_TOKEN в заголовке Authorization: Bearer — и только в ручки
+ * /agent/*: чтение модели и отправка предложений. Применять предложения агент не может, это решает человек.
+ */
+function agentOf(req: Request): AuthUser | null {
+  const expected = process.env.AGENT_API_TOKEN;
+  if (!expected || !/^\/agent\//.test(req.path)) return null;
+  const given = /^Bearer (.+)$/i.exec(req.headers.authorization ?? "")?.[1];
+  if (!given) return null;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? { login: "agent" } : null;
+}
+
 /** Простое ограничение частоты по ключу (IP, токен): не больше limit запросов за windowMs. */
 export function rateLimit(limit: number, windowMs: number, keyOf: (req: Request) => string) {
   const hits = new Map<string, number[]>();
@@ -87,7 +101,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
   if (PUBLIC.some((re) => re.test(req.path))) return next();
-  const user = userOf(req);
+  const user = userOf(req) ?? agentOf(req);
   if (!user) {
     res.status(401).json({ error: "требуется вход" });
     return;

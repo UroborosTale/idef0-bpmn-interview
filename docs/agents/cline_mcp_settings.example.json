@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "process-modeling": {
+      "command": "node",
+      "args": ["C:/путь/к/process-modeling-app/server/dist/mcp/index.js"],
+      "env": {
+        "PM_API_URL": "http://127.0.0.1:8787",
+        "PM_AGENT_TOKEN": "тот же токен, что AGENT_API_TOKEN у приложения"
+      },
+      "disabled": false,
+      "autoApprove": ["get_conventions", "list_sessions", "get_model", "list_proposals", "get_proposal"]
+    }
+  }
+}
