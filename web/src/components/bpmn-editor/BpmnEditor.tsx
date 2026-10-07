@@ -4,7 +4,7 @@ import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, us
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
 import { MIN_X, boxOf, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
-import { PALETTE, addFlow, addNodeAt, addRole, deleteFlow, deleteNode, dropNodeIntoLane, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { PALETTE, addFlow, addNodeAt, addRole, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, FlowShape, LanesLayer, NodeShape, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -229,7 +229,21 @@ export default function BpmnEditor({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (isTextInput(e.target)) return;
     if (handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() })) return;
-    if ((e.key === "Delete" || e.key === "Backspace") && curSel) {
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "d" || e.code === "KeyD") && curSel?.kind === "node") {
+      e.preventDefault(); // иначе браузер добавит страницу в закладки
+      const r = duplicateNode(draft, curSel.id);
+      if (!r.error) commit(r.model, { kind: "node", id: r.id! });
+    } else if (e.key.startsWith("Arrow") && curSel?.kind === "node") {
+      // стрелки сдвигают выбранную фигуру на шаг сетки (Shift — на 5 шагов); вертикально фигура остаётся в дорожке
+      e.preventDefault();
+      const n = draft.nodes.find((x) => x.id === curSel.id);
+      if (!n) return;
+      const step = e.shiftKey ? 5 * 10 : 10;
+      const b = boxOf(n);
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      commit(dropNodeIntoLane(moveNode(draft, n.id, Math.max(MIN_X, b.x + dx), b.y + dy), n.id));
+    } else if ((e.key === "Delete" || e.key === "Backspace") && curSel) {
       e.preventDefault();
       if (curSel.kind === "node") commit(deleteNode(draft, curSel.id), null);
       else if (curSel.kind === "flow") commit(deleteFlow(draft, curSel.id), null);
@@ -269,6 +283,7 @@ export default function BpmnEditor({
         onZoomOut={() => zoomBy(1 / 1.2)}
         onZoomIn={() => zoomBy(1.2)}
         onFit={fit}
+        onActual={() => setView((v) => ({ ...v, k: 1, tx: 10, ty: 10 }))}
         dirty={h.dirty}
         busy={busy}
         hint={hint}
@@ -357,6 +372,12 @@ export default function BpmnEditor({
               onCommit={(v) => commit(updateNode(draftRef.current, editingNode.id, { name: v }))}
               onDone={() => setEditing(null)}
             />
+          )}
+          {shown.length === 0 && (
+            <div className="bpe-empty">
+              <b>Диаграмма пуста</b>
+              <span>Перетащите фигуру из палитры слева или нажмите на неё — например, «Начало». Выберите фигуру и потяните за ● справа, чтобы провести стрелку.</span>
+            </div>
           )}
           <div className="bpe-corner muted">
             {shown.length} элем. · {draft.flows.length} связей · {Math.round(worldH)}px

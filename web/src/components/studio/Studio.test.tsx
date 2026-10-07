@@ -162,4 +162,57 @@ describe("окно студии", () => {
     rerender(<Studio session={{ ...session(m), updatedAt: "2026-10-02T10:00:00Z" }} busy={false} onSave={onSave} />);
     expect(document.querySelector(".statusbar")!.textContent).toMatch(/Закупка \(новая версия\)/);
   });
+
+  it("«Дублировать»: кнопка активна только при выбранной функции, копия выбирается и открывается", () => {
+    const s = studio();
+    const btn = () => screen.getByText("Дублировать") as HTMLButtonElement;
+    expect(btn().disabled).toBe(true);
+    fireEvent.pointerDown(document.querySelector('[data-node-id="a"]')!, { button: 0, pointerId: 1 });
+    expect(btn().disabled).toBe(false);
+    fireEvent.click(btn());
+    expect(field("Название").value).toBe("оформить заявку (копия)");
+    expect(s.status()).toMatch(/несохранённые/);
+    fireEvent.click(screen.getByTitle("Отменить (Ctrl+Z)"));
+    expect(document.querySelector('[data-node-id="n6"]')).toBeNull();
+  });
+
+  it("Ctrl+D и стрелки на диаграмме BPMN", () => {
+    const s = studio();
+    const canvas = document.querySelector(".bpe")!;
+    fireEvent.pointerDown(document.querySelector('[data-node-id="a"]')!, { button: 0, pointerId: 1 });
+    const x0 = Number(document.querySelector('[data-node-id="a"] rect')!.getAttribute("x"));
+    fireEvent.keyDown(canvas, { key: "ArrowRight" });
+    fireEvent.keyDown(canvas, { key: "ArrowRight", shiftKey: true });
+    const x1 = Number(document.querySelector('[data-node-id="a"] rect')!.getAttribute("x"));
+    expect(x1 - x0).toBe(60);
+    fireEvent.keyDown(canvas, { key: "d", code: "KeyD", ctrlKey: true });
+    expect(field("Название").value).toBe("оформить заявку (копия)");
+    expect(s.title()).toBe("Свойства элемента");
+  });
+
+  it("«На весь экран» переключает режим окна", () => {
+    studio();
+    const el = document.querySelector(".studio")!;
+    expect(el.className).not.toMatch(/full/);
+    fireEvent.click(screen.getByText("На весь экран"));
+    expect(el.className).toMatch(/full/);
+    fireEvent.click(screen.getByText("Свернуть окно"));
+    expect(el.className).not.toMatch(/full/);
+  });
+
+  it("экспорт «эта диаграмма»: на вкладке справочника — понятное сообщение", () => {
+    studio();
+    fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.startsWith("Исполнители"))!);
+    fireEvent.click(screen.getByText("SVG"));
+    expect(screen.getByRole("alert").textContent).toMatch(/Откройте диаграмму/);
+  });
+
+  it("пустая модель: подсказка на холсте, диаграмма не падает", () => {
+    const empty = purchaseModel();
+    empty.nodes = [];
+    empty.flows = [];
+    empty.roles = [];
+    render(<Studio session={session(empty)} busy={false} onSave={vi.fn(async () => true)} />);
+    expect(screen.getByText("Диаграмма пуста")).toBeTruthy();
+  });
 });

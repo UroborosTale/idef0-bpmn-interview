@@ -20,7 +20,7 @@ function fileToText(file: File): Promise<string> {
 }
 
 export default function NewSessionPage({ onCreated }: { onCreated: (id: string) => void }) {
-  const [mode, setMode] = useState<"A" | "B" | "diagram">("A");
+  const [mode, setMode] = useState<"A" | "B" | "diagram" | "blank">("A");
   const [diagramFormat, setDiagramFormat] = useState<"bpmn" | "drawio" | "image">("bpmn");
   const [diagramFile, setDiagramFile] = useState<File | null>(null);
   const [processName, setProcessName] = useState("");
@@ -65,6 +65,10 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         onCreated(result.session.id);
         return;
       }
+      if (mode === "blank") {
+        onCreated((await api.createBlankSession({ meta })).id);
+        return;
+      }
       const session = await api.createSession({ mode: mode as "A" | "B", meta });
       onCreated(session.id);
     } catch (e) {
@@ -91,6 +95,9 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: mode === "diagram" ? 600 : 400 }}>
               <input type="radio" checked={mode === "diagram"} onChange={() => setMode("diagram")} /> Режим В — импорт из готовой диаграммы
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: mode === "blank" ? 600 : 400 }}>
+              <input type="radio" checked={mode === "blank"} onChange={() => setMode("blank")} /> Режим Г — рисовать с нуля в студии
             </label>
           </div>
         </div>
@@ -178,7 +185,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
 
         <div>
           <button className="primary" onClick={submit} disabled={busy}>
-            {busy ? "Создание…" : mode === "A" ? "Создать и загрузить текст" : mode === "B" ? "Создать и начать интервью" : "Распознать диаграмму и создать сессию"}
+            {busy ? "Создание…" : mode === "blank" ? "Создать пустую модель и открыть студию" : mode === "A" ? "Создать и загрузить текст" : mode === "B" ? "Создать и начать интервью" : "Распознать диаграмму и создать сессию"}
           </button>
         </div>
       </div>

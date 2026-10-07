@@ -55,7 +55,9 @@ export async function seedSession(name = "Согласование догово�
 /** Новый контекст браузера (чистое хранилище) с уже выполненным входом; ошибки страницы собираются. */
 export async function openContext(browser: Browser): Promise<{ ctx: BrowserContext; page: Page; errors: string[] }> {
   const ctx = await browser.newContext({ viewport: { width: 1600, height: 950 }, locale: "ru-RU" });
-  await ctx.request.post(`${WEB}/api/auth/login`, { data: USER });
+  // сессия входа общая на весь прогон: у сервера лимит попыток входа (10 за 10 минут), а контекстов в тестах больше
+  const [name, ...value] = (await login()).split("=");
+  await ctx.addCookies([{ name, value: value.join("="), url: WEB }]);
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -64,6 +66,7 @@ export async function openContext(browser: Browser): Promise<{ ctx: BrowserConte
 }
 
 /** Дождаться заголовка панели «Свойства» (панель перерисовывается после действия, не мгновенно). */
-export const expectPanel = (page: Page, title: string) => page.locator(".props-head b", { hasText: new RegExp(`^${title}$`) }).waitFor({ timeout: 5000 });
+export const expectPanel = (page: Page, title: string | RegExp) =>
+  page.locator(".props-head b", { hasText: typeof title === "string" ? new RegExp(`^${title}$`) : title }).waitFor({ timeout: 5000 });
 export const field = (page: Page, label: string) => page.locator(".props-body .bpe-field").filter({ has: page.locator(`> label:text-is("${label}")`) }).locator("input, textarea, select").first();
 export const statusText = (page: Page) => page.locator(".statusbar > span").last().innerText();

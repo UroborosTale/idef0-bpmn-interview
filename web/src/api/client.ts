@@ -14,6 +14,8 @@ export const api = {
 
   listSessions: () => req<SessionListItem[]>("GET", "/sessions"),
   getSession: (id: string) => req<SessionRecord>("GET", `/sessions/${id}`),
+  /** Сессия с пустой моделью — рисовать процесс с нуля в студии, без текста интервью. */
+  createBlankSession: (input: { meta: SessionMeta }) => req<SessionRecord>("POST", "/sessions/blank", input),
   createSession: (input: { title?: string; mode: "A" | "B"; meta: SessionMeta }) =>
     req<SessionRecord>("POST", "/sessions", input),
   patchSession: (id: string, patch: { title?: string; meta?: SessionMeta }) =>

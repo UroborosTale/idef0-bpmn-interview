@@ -134,6 +134,29 @@ export function deleteNode(m: M, id: string): M {
   };
 }
 
+/**
+ * Копия шага или функции рядом с оригиналом (со сдвигом на обеих диаграммах). Связи, источник в интервью и
+ * подтверждения не копируются: копия — новый элемент, созданный вручную. Вложенные функции не копируются.
+ */
+export function duplicateNode(m: M, id: string): OpResult {
+  const n = m.nodes.find((x) => x.id === id);
+  if (!n) return { model: m, error: "Элемент не найден" };
+  const copy: ProcessNode = {
+    ...structuredClone(n),
+    id: nextId("n", m.nodes.map((x) => x.id)),
+    name: `${n.name} (копия)`,
+    layout: n.layout ? { x: n.layout.x + 40, y: n.layout.y } : n.layout,
+    idef0_layout: n.idef0_layout ? { x: n.idef0_layout.x + 40, y: n.idef0_layout.y + 40 } : n.idef0_layout,
+    source: [],
+    confirmed_by: [],
+    requirement_ids: [],
+    status: "confirmed",
+    confidence: 1,
+  };
+  const next = { ...m, nodes: [...m.nodes, copy] };
+  return { model: n.layout ? dropNodeIntoLane(next, copy.id) : next, id: copy.id };
+}
+
 export function addFlow(m: M, from: string, to: string): OpResult {
   const a = m.nodes.find((n) => n.id === from);
   const b = m.nodes.find((n) => n.id === to);

@@ -111,6 +111,36 @@ describe("навигатор", () => {
   });
 });
 
+describe("поиск в навигаторе", () => {
+  const nav = (onOpenEntry = vi.fn(), onSelectFn = vi.fn()) => {
+    render(<Navigator model={purchaseModel()} activeKey="bpmn" selectedId={null} onOpenDoc={() => {}} onSelectFn={onSelectFn} onAddFunction={() => {}} onOpenEntry={onOpenEntry} />);
+    return { search: (q: string) => fireEvent.change(screen.getByLabelText("Поиск в навигаторе"), { target: { value: q } }) };
+  };
+
+  it("находит функции по названию и коду, записи справочников — по названию", () => {
+    const onOpenEntry = vi.fn();
+    const onSelectFn = vi.fn();
+    const { search } = nav(onOpenEntry, onSelectFn);
+    search("заявк");
+    const hits = [...document.querySelectorAll("[data-nav-hit]")].map((h) => h.getAttribute("data-nav-hit"));
+    expect(hits).toEqual(["a", "b", "data:d1"]); // две функции и документ «заявка»
+    fireEvent.click(document.querySelector('[data-nav-hit="b"]')!);
+    expect(onSelectFn).toHaveBeenCalledWith("b");
+    fireEvent.click(document.querySelector('[data-nav-hit="data:d1"]')!);
+    expect(onOpenEntry).toHaveBeenCalledWith("data", "d1");
+    search("A21");
+    expect([...document.querySelectorAll("[data-nav-hit]")].map((h) => h.getAttribute("data-nav-hit"))).toEqual(["b1"]);
+  });
+
+  it("ничего не найдено; Escape и пустой запрос возвращают дерево", () => {
+    const { search } = nav();
+    search("zzz");
+    expect(screen.getByText("Ничего не найдено")).toBeTruthy();
+    fireEvent.keyDown(screen.getByLabelText("Поиск в навигаторе"), { key: "Escape" });
+    expect(document.querySelectorAll("[data-nav-fn]").length).toBe(5);
+  });
+});
+
 describe("нижняя панель проверок", () => {
   it("замечания текущей модели, фильтр, переход; вкладка пробелов", () => {
     const m = purchaseModel();

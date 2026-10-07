@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createSession, deleteSession, getSession, listSessionSummaries, updateSession, addVersion, editBlockReason, versionSummaries } from "../repo.js";
 import type { SessionMeta } from "../repo.js";
-import { ProcessLogicModel } from "../types/model.js";
+import { ProcessLogicModel, emptyModel } from "../types/model.js";
 import { validateModel } from "../pipeline/validate.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { generateIdef0 } from "../pipeline/idef0.js";
@@ -37,6 +37,34 @@ sessionsRouter.post("/sessions", (req, res) => {
   };
   const session = createSession({ title: body.title || meta.processName, mode: body.mode ?? "A", meta });
   res.status(201).json(session);
+});
+
+/**
+ * Режим «рисовать с нуля»: сессия сразу с пустой моделью, без текста интервью и LLM — аналитик строит
+ * процесс в студии. Диаграммы собираются из пустой модели, первая версия фиксируется.
+ */
+sessionsRouter.post("/sessions/blank", async (req, res) => {
+  const body = req.body as { title?: string; meta?: SessionMeta };
+  if (!body?.meta?.processName?.trim()) {
+    res.status(400).json({ error: "meta.processName is required" });
+    return;
+  }
+  const meta: SessionMeta = {
+    processName: body.meta.processName.trim(),
+    department: body.meta.department,
+    owner: body.meta.owner,
+    modelType: body.meta.modelType ?? "AS-IS",
+    decompositionDepth: body.meta.decompositionDepth ?? 2,
+    notations: body.meta.notations ?? ["IDEF0", "BPMN"],
+    confidential: body.meta.confidential ?? false,
+  };
+  const session = createSession({ title: body.title || meta.processName, mode: "A", meta });
+  const model = emptyModel({ id: `proc_${Date.now()}`, name: meta.processName, owner: meta.owner, department: meta.department, type: meta.modelType, decomposition_depth: meta.decompositionDepth, notations: meta.notations });
+  const bpmn = await generateBpmn(model);
+  updateSession(session.id, { model, validation: validateModel(model), bpmnXml: bpmn.xml, idef0: generateIdef0(model), status: "ready", diagramsStale: false });
+  logAudit(session.id, "analyst", "blank_session_created");
+  addVersion(session.id, "Пустая модель");
+  res.status(201).json(sessionForClient(getSession(session.id)!));
 });
 
 /** Сессия для клиента: версии — без моделей (снимки целиком отдаёт /sessions/:id/versions/...). */

@@ -3,7 +3,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { deleteNode, updateNode } from "../bpmn-editor/model-ops";
+import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
 import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
 import { ArrowShape, BlockShape, Idef0Defs } from "./shapes";
@@ -249,7 +249,20 @@ export default function Idef0Editor({
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (isTextInput(e.target)) return;
     if (handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() })) return;
-    if ((e.key === "Delete" || e.key === "Backspace") && curSel) {
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "d" || e.code === "KeyD") && curSel?.kind === "fn") {
+      e.preventDefault(); // иначе браузер добавит страницу в закладки
+      const r = duplicateNode(draft, curSel.id);
+      if (!r.error) commit(r.model, { kind: "fn", id: r.id! });
+    } else if (e.key.startsWith("Arrow") && curSel?.kind === "fn") {
+      // стрелки сдвигают выбранный блок на шаг сетки (Shift — на 5 шагов)
+      e.preventDefault();
+      const f = blocks.get(curSel.id);
+      if (!f) return;
+      const step = e.shiftKey ? 5 * 10 : 10;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      commit(moveFunction(draft, f.node.id, Math.max(MIN_POS, f.box.x + dx), Math.max(MIN_POS, f.box.y + dy)));
+    } else if ((e.key === "Delete" || e.key === "Backspace") && curSel) {
       e.preventDefault();
       if (curSel.kind === "fn") commit(deleteNode(draft, curSel.id), null);
       else {
@@ -292,6 +305,7 @@ export default function Idef0Editor({
         onZoomOut={() => zoomBy(1 / 1.2)}
         onZoomIn={() => zoomBy(1.2)}
         onFit={fit}
+        onActual={() => setView((v) => ({ ...v, k: 1, tx: 10, ty: 10 }))}
         dirty={h.dirty}
         busy={busy}
         hint={hint}

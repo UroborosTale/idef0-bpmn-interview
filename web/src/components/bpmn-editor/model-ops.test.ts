@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { purchaseModel } from "../../test/fixtures";
 import { LANE_H, START_Y, autoLayout, boxOf, laneIndexAtY, laneIndexOfRole, positionsFromBpmnXml, visibleNodes, withLayout, wrapText } from "./geometry";
-import { addFlow, addNodeAt, addRole, deleteNode, deleteRole, dropNodeIntoLane, moveNode, nextId, setNodeRole, setNodeType } from "./model-ops";
+import { addFlow, addNodeAt, addRole, deleteNode, duplicateNode, deleteRole, dropNodeIntoLane, moveNode, nextId, setNodeRole, setNodeType } from "./model-ops";
 
 const laid = () => withLayout(purchaseModel());
 
@@ -109,5 +109,33 @@ describe("BPMN: раскладка", () => {
     // многоточие занимает место последнего символа, чтобы строка не стала шире
     expect(wrapText("проверить договор на соответствие шаблону", 12, 2)).toEqual(["проверить", "договор н…"]);
     expect(wrapText("оченьдлинноеслово", 6, 5)).toEqual(["оченьд", "линное", "слово"]);
+  });
+});
+
+describe("BPMN: дублирование", () => {
+  it("копия — новый ручной элемент рядом с оригиналом, без связей, цитат и вложенных функций", () => {
+    const m = laid();
+    const r = duplicateNode(m, "a");
+    const copy = r.model.nodes.find((n) => n.id === r.id)!;
+    const orig = r.model.nodes.find((n) => n.id === "a")!;
+    expect(r.id).not.toBe("a");
+    expect(copy).toMatchObject({ name: "оформить заявку (копия)", role_id: orig.role_id, status: "confirmed", source: [], confirmed_by: [] });
+    expect(copy.outputs).toEqual(orig.outputs); // справочные ссылки сохраняются
+    expect(copy.layout!.x).toBeGreaterThan(orig.layout!.x);
+    expect(r.model.flows).toEqual(m.flows);
+    expect(r.model.nodes).toHaveLength(m.nodes.length + 1);
+    copy.outputs.push("zzz"); // копия не делит массивы с оригиналом
+    expect(orig.outputs).not.toContain("zzz");
+  });
+
+  it("копия вложенной функции остаётся на той же диаграмме IDEF0, а в BPMN не появляется", () => {
+    const r = duplicateNode(laid(), "b1");
+    const copy = r.model.nodes.find((n) => n.id === r.id)!;
+    expect(copy.idef0_parent).toBe("b");
+    expect(visibleNodes(r.model).some((n) => n.id === r.id)).toBe(false);
+  });
+
+  it("несуществующий элемент", () => {
+    expect(duplicateNode(laid(), "нет").error).toBeTruthy();
   });
 });

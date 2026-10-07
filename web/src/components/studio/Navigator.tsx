@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { functionsOf, idef0Codes } from "../idef0-editor/geometry";
+import { entriesOf } from "./dict-ops";
 import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type StudioDoc, bpmnDoc, dictDoc, idef0Doc, reportDoc } from "./docs";
 
 /**
@@ -15,6 +16,7 @@ export default function Navigator({
   onOpenDoc,
   onSelectFn,
   onAddFunction,
+  onOpenEntry,
 }: {
   model: ProcessLogicModel;
   activeKey: string;
@@ -22,8 +24,11 @@ export default function Navigator({
   onOpenDoc: (doc: StudioDoc) => void;
   onSelectFn: (id: string) => void;
   onAddFunction: (parentId: string | null) => void;
+  /** Открыть справочник с карточкой записи (из результатов поиска). */
+  onOpenEntry?: (dict: DictKind, id: string) => void;
 }) {
   const codes = idef0Codes(model);
+  const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedSections, setClosedSections] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -101,8 +106,34 @@ export default function Navigator({
     risks: model.process.risks.length,
   };
 
+  // поиск по функциям (название и код) и по записям всех справочников
+  const q = query.trim().toLowerCase();
+  const fnHits = q ? [...codes.entries()].flatMap(([id, code]) => { const n = model.nodes.find((x) => x.id === id); return n && (n.name.toLowerCase().includes(q) || code.toLowerCase() === q) ? [{ n, code }] : []; }) : [];
+  const entryHits = q ? (Object.keys(DICT_TITLES) as DictKind[]).flatMap((k) => entriesOf(model, k).filter((e) => e.name.toLowerCase().includes(q)).map((e) => ({ k, e }))) : [];
+
   return (
     <div className="nav">
+      <div className="nav-search">
+        <input type="search" placeholder="Найти функцию или запись…" aria-label="Поиск в навигаторе" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} />
+      </div>
+      {q ? (
+        <div className="nav-results">
+          {fnHits.length + entryHits.length === 0 && <div className="muted nav-empty">Ничего не найдено</div>}
+          {fnHits.map(({ n, code }) => (
+            <div key={n.id} className="nav-row" data-nav-hit={n.id} onClick={() => onSelectFn(n.id)} title="Функция">
+              <span className="nav-code">{code}</span>
+              <span className="nav-name">{n.name}</span>
+            </div>
+          ))}
+          {entryHits.map(({ k, e }) => (
+            <div key={`${k}:${e.id}`} className="nav-row" data-nav-hit={`${k}:${e.id}`} onClick={() => onOpenEntry?.(k, e.id)} title={DICT_TITLES[k]}>
+              <span className="nav-name">{e.name}</span>
+              <span className="nav-count">{DICT_TITLES[k]}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
       {section(
         "processes",
         "Процессы",
@@ -131,6 +162,8 @@ export default function Navigator({
         "reports",
         "Отчёты",
         (Object.keys(REPORT_TITLES) as ReportKind[]).map((k) => link(reportDoc(k), REPORT_TITLES[k]))
+      )}
+        </>
       )}
     </div>
   );

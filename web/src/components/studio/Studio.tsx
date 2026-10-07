@@ -9,13 +9,15 @@ import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout } from "../bpmn-editor/geometry";
 import { functionsOf, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
+import { duplicateNode } from "../bpmn-editor/model-ops";
+import { diagramSvg, download, svgToPng } from "./export-image";
 import Navigator from "./Navigator";
 import ProblemsPanel from "./ProblemsPanel";
 import DictionaryView from "./DictionaryView";
 import ReportView from "./ReportView";
 import PropertiesPanel from "./PropertiesPanel";
 import type { Selection } from "./selection";
-import { bpmnDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
+import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
 
 type M = ProcessLogicModel;
 
@@ -52,6 +54,8 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
   const [propsOpen, setPropsOpen] = useState(true);
+  const [full, setFull] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(true);
   const nonce = useRef(0);
 
@@ -156,6 +160,34 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     setActiveKey(next.key); // выделение сохраняем: это тот же редактор, он сам сообщит новое
   };
 
+  /** Копия выбранной функции или шага рядом с оригиналом. */
+  const duplicate = () => {
+    if (selection?.kind !== "node") return;
+    const r = duplicateNode(h.draftRef.current, selection.id);
+    if (r.error) return;
+    h.commit(r.model);
+    setSelection({ kind: "node", id: r.id! });
+    goto(r.id!);
+  };
+
+  /** Выгрузка открытой диаграммы такой, как она на экране (в т. ч. с несохранёнными правками). */
+  const exportDiagram = async (format: "svg" | "png") => {
+    setExportError(null);
+    const canvas = document.querySelector<SVGSVGElement>(".doc-area svg.bpe-svg");
+    const out = canvas && diagramSvg(canvas);
+    if (!out) {
+      setExportError("Откройте диаграмму BPMN или IDEF0 — выгружать нечего.");
+      return;
+    }
+    const name = `${draft.process.name} — ${docTitle(active, draft)}`;
+    try {
+      if (format === "svg") download(new Blob([out.svg], { type: "image/svg+xml" }), `${name}.svg`);
+      else download(await svgToPng(out.svg, out.width, out.height), `${name}.png`);
+    } catch (e) {
+      setExportError((e as Error).message);
+    }
+  };
+
   const save = async () => {
     const snapshot = h.draftRef.current;
     if (await onSave(snapshot)) h.markSaved(snapshot);
@@ -178,7 +210,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const fnCount = draft.nodes.filter((n) => n.type === "task" || n.type === "subprocess").length;
 
   return (
-    <div className="studio" onKeyDown={onKeyDown}>
+    <div className={`studio ${full ? "full" : ""}`} onKeyDown={onKeyDown}>
       <DraftBanner
         restored={persisted.restored}
         stale={persisted.stale}
@@ -212,6 +244,9 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             <button onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
               + Функция
             </button>
+            <button disabled={selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
+              Дублировать
+            </button>
           </div>
           <div className="ribbon-caption">Модель</div>
         </div>
@@ -222,6 +257,9 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             </button>
             <button className={propsOpen ? "toggled" : ""} onClick={() => setPropsOpen(!propsOpen)}>
               Свойства
+            </button>
+            <button className={full ? "toggled" : ""} onClick={() => setFull(!full)} title="Окно студии на весь экран — больше места для диаграммы">
+              {full ? "Свернуть окно" : "На весь экран"}
             </button>
             <button className={problemsOpen ? "toggled" : ""} onClick={() => setProblemsOpen(!problemsOpen)}>
               Проверки{errors + warnings > 0 ? ` (${errors + warnings})` : ""}
@@ -238,11 +276,22 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
           </div>
           <div className="ribbon-caption">Выгрузка</div>
         </div>
+        <div className="ribbon-group">
+          <div className="ribbon-buttons">
+            <button onClick={() => void exportDiagram("svg")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">
+              SVG
+            </button>
+            <button onClick={() => void exportDiagram("png")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">
+              PNG
+            </button>
+          </div>
+          <div className="ribbon-caption">Эта диаграмма</div>
+        </div>
       </div>
 
       <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "270px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
-          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} />
+          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} />
         )}
         <div className="studio-main">
           <div className="doc-tabs" role="tablist">
@@ -316,6 +365,13 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         )}
       </div>
 
+      {exportError && (
+        <div className="bpe-banner" role="alert">
+          {exportError}
+          <span className="spacer" />
+          <button onClick={() => setExportError(null)}>Скрыть</button>
+        </div>
+      )}
       <div className="statusbar">
         <span>
           <b>{draft.process.name}</b> · {draft.process.type} · версия {draft.process.version} · статус: {draft.process.status}

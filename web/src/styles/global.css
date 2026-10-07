@@ -413,3 +413,8 @@ button.danger:hover { background: #fef2f2; }
 .dict-selected td { background: #e8f0fc !important; }
 .dict-table tbody tr { cursor: pointer; }
 .dict-desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* окно студии на весь экран и пустая диаграмма */
+.studio.full { position: fixed; inset: 0; z-index: 60; height: auto; min-height: 0; border-radius: 0; border: 0; }
+.bpe-empty { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: 360px; text-align: center; display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; border: 1px dashed #b6c4de; border-radius: 10px; background: rgba(255,255,255,.92); color: #475569; pointer-events: none; font-size: 13px; line-height: 1.5; }
+.nav-search { padding: 6px 8px; position: sticky; top: 0; z-index: 2; background: #fafbfd; border-bottom: 1px solid #e3e9f3; }
+.nav-search input { width: 100%; box-sizing: border-box; }

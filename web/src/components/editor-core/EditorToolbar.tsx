@@ -10,6 +10,7 @@ export default function EditorToolbar({
   onZoomOut,
   onZoomIn,
   onFit,
+  onActual,
   dirty,
   busy,
   hint,
@@ -25,6 +26,8 @@ export default function EditorToolbar({
   onZoomOut: () => void;
   onZoomIn: () => void;
   onFit: () => void;
+  /** Масштаб 100% — для чтения подписей на большой диаграмме. */
+  onActual?: () => void;
   dirty: boolean;
   busy: boolean;
   hint: string | null;
@@ -52,6 +55,11 @@ export default function EditorToolbar({
       </span>
       <button onClick={onZoomIn}>+</button>
       <button onClick={onFit}>Вписать</button>
+      {onActual && (
+        <button onClick={onActual} title="Масштаб 100%">
+          100%
+        </button>
+      )}
       {extra && <span className="bpe-sep" />}
       {extra}
       <div className="spacer" />

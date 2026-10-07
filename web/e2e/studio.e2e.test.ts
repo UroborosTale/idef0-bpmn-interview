@@ -177,4 +177,90 @@ describe("студия в браузере", () => {
     expect(after.body.model.process.owner).toBe("изменено в другой вкладке");
     await ctx.close();
   });
+
+  it("с нуля: пустая модель → фигуры из палитры → стрелки → сохранение → выгрузка SVG и PNG", async () => {
+    const { ctx, page, errors } = await openContext(browser);
+    await page.goto(`${WEB}/new`);
+    await page.getByLabel(/Режим Г/).check();
+    await page.getByPlaceholder(/например, Согласование/).fill("Найм сотрудника");
+    await page.getByRole("button", { name: "Создать пустую модель и открыть студию" }).click();
+    await page.locator(".bpe-empty").waitFor();
+    expect(await page.locator(".studio g[data-node-id]").count()).toBe(0);
+
+    // «Начало» → «Задача» (быстрое продолжение: новая фигура сразу соединяется с выбранной) → «Конец»
+    const palette = (name: string) => page.locator(".bpe-palette button", { hasText: new RegExp(`^${name}$`) });
+    const rename = async (text: string) => {
+      await page.locator(".bpe-rename").fill(text);
+      await page.locator(".bpe-rename").press("Enter");
+    };
+    await palette("Начало").click();
+    await rename("Вакансия открыта");
+    await palette("Задача").click();
+    await rename("Провести собеседование");
+    await palette("Конец").click();
+    await rename("Сотрудник принят");
+    await expect.poll(() => page.locator(".studio g[data-node-id]").count()).toBe(3);
+    expect(await page.locator(".studio [data-flow-id]").count()).toBe(2);
+    expect(await page.locator(".bpe-empty").count()).toBe(0);
+
+    // дубликат (Ctrl+D) и удаление копии
+    await page.locator(".studio g[data-node-id]").nth(1).click();
+    await page.locator(".bpe").first().focus();
+    await page.keyboard.press("Control+KeyD");
+    await expect.poll(() => page.locator(".studio g[data-node-id]").count()).toBe(4);
+    await expect.poll(() => field(page, "Название").inputValue()).toBe("Провести собеседование (копия)");
+    await page.keyboard.press("Delete");
+    await expect.poll(() => page.locator(".studio g[data-node-id]").count()).toBe(3);
+
+    // выгрузка с экрана — до сохранения
+    const svgDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "SVG", exact: true }).click();
+    const svgFile = await (await svgDownload).createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const c of svgFile!) chunks.push(c as Buffer);
+    const svg = Buffer.concat(chunks).toString("utf8");
+    expect(svg).toMatch(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+    expect(svg).toContain("Провести");
+    expect(svg).not.toContain("data-connect");
+    const pngDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "PNG", exact: true }).click();
+    const pngChunks: Buffer[] = [];
+    for await (const c of (await (await pngDownload).createReadStream())!) pngChunks.push(c as Buffer);
+    const png = Buffer.concat(pngChunks);
+    expect([...png.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    expect(png.length).toBeGreaterThan(2000);
+
+    // сохранение и проверка на сервере
+    await page.getByRole("button", { name: "Сохранить" }).first().click();
+    await page.locator(".statusbar", { hasText: "✓ сохранено" }).waitFor();
+    const id = new URL(page.url()).pathname.split("/").pop()!;
+    const s = await api("GET", `/sessions/${id}`);
+    expect(s.body.model.nodes.map((n: { name: string }) => n.name)).toEqual(["Вакансия открыта", "Провести собеседование", "Сотрудник принят"]);
+    expect(s.body.model.flows).toHaveLength(2);
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+
+  it("весь экран, поиск в навигаторе, масштаб 100%", async () => {
+    const id = await seedSession();
+    const { ctx, page } = await openContext(browser);
+    await openStudio(page, id);
+    const before = (await page.locator(".studio").boundingBox())!;
+    await page.getByRole("button", { name: "На весь экран" }).click();
+    const full = (await page.locator(".studio").boundingBox())!;
+    expect(full.height).toBeGreaterThan(before.height);
+    expect(Math.round(full.y)).toBe(0);
+    // запись справочника открывается карточкой, функция — свойствами и остаётся на диаграмме
+    await page.getByLabel("Поиск в навигаторе").fill("юрист");
+    await page.locator("[data-nav-hit^=roles]").first().click();
+    await expectPanel(page, "Карточка записи");
+    await page.locator(".doc-tab", { hasText: "BPMN" }).click();
+    await page.getByLabel("Поиск в навигаторе").fill("проверить");
+    await page.locator("[data-nav-hit]:not([data-nav-hit*=\":\"])").first().click();
+    await expectPanel(page, "Свойства элемента");
+    await page.getByRole("button", { name: "100%", exact: true }).click();
+    expect(await page.locator(".bpe-toolbar .muted").first().innerText()).toBe("100%");
+    await page.getByRole("button", { name: "Свернуть окно" }).click();
+    await ctx.close();
+  });
 });
