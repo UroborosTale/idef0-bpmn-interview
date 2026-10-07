@@ -256,18 +256,19 @@ export function handleCommonKeys(
   a: { undo: () => void; redo: () => void; save: () => void }
 ): boolean {
   const mod = e.ctrlKey || e.metaKey;
-  const key = e.key.toLowerCase();
-  if (mod && key === "z") {
+  // в русской раскладке key — «я», «н», «ы»: клавишу узнаём ещё и по физическому коду
+  const is = (letter: string) => e.key.toLowerCase() === letter || e.code === `Key${letter.toUpperCase()}`;
+  if (mod && is("z")) {
     e.preventDefault();
     e.shiftKey ? a.redo() : a.undo();
     return true;
   }
-  if (mod && key === "y") {
+  if (mod && is("y")) {
     e.preventDefault();
     a.redo();
     return true;
   }
-  if (mod && key === "s") {
+  if (mod && is("s")) {
     e.preventDefault();
     a.save();
     return true;

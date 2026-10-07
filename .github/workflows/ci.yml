@@ -15,5 +15,18 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - run: npm test # сервер + клиент (модульные тесты и тесты компонентов)
       - run: npm run build -w web
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e # браузерные сценарии студии: свой API на временной базе, офлайн-экстрактор

@@ -26,9 +26,31 @@ export function selectionExists(m: ProcessLogicModel, s: Selection): boolean {
     case "flow":
       return m.flows.some((f) => f.id === s.id);
     case "arrow":
-      return m.nodes.some((n) => n.id === s.arrow.nodeId);
+      return arrowExists(m, s.arrow);
     case "entry":
       return listOf(m, s.dict).some((e) => e.id === s.id);
+  }
+}
+
+/** Стрелка ещё есть: функция по-прежнему ссылается на её запись (стрелку могли убрать или отменить правку). */
+function arrowExists(m: ProcessLogicModel, a: Arrow): boolean {
+  const n = m.nodes.find((x) => x.id === a.nodeId);
+  if (!n) return false;
+  switch (a.kind) {
+    case "input":
+    case "link":
+      return n.inputs.includes(a.entityId) && (a.kind === "input" || m.nodes.some((f) => f.id === a.fromId && f.outputs.includes(a.entityId)));
+    case "output":
+      return n.outputs.includes(a.entityId);
+    case "control":
+      return n.controls.includes(a.entityId);
+    case "controlData":
+    case "controlLink":
+      return (n.control_data_ids ?? []).includes(a.entityId);
+    case "system":
+      return n.system_ids.includes(a.entityId);
+    case "role":
+      return n.role_id === a.entityId;
   }
 }
 

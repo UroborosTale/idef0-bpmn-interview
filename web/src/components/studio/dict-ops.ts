@@ -116,7 +116,9 @@ export function removeEntry(m: M, kind: DictKind, id: string): M {
       // шаги уходят в дорожку «Без исполнителя» (с переносом фигур), затем удаляется сама дорожка
       let next = m;
       for (const n of m.nodes) if (n.role_id === id) next = setNodeRole(next, n.id, null);
-      return deleteRole(next, id).model;
+      next = deleteRole(next, id).model;
+      // респондент мультиинтервью остаётся, но без ссылки на удалённую роль
+      return next.respondents.some((r) => r.role_id === id) ? { ...next, respondents: next.respondents.map((r) => (r.role_id === id ? { ...r, role_id: null } : r)) } : next;
     }
     case "systems":
       return { ...m, systems: m.systems.filter((s) => s.id !== id), nodes: m.nodes.map((n) => (n.system_ids.includes(id) ? { ...n, system_ids: n.system_ids.filter((x) => x !== id) } : n)) };
