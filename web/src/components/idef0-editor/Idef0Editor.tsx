@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
@@ -26,6 +26,10 @@ export default function Idef0Editor({
   onSave,
   draftId,
   draftBase,
+  history,
+  focus,
+  parentId: parentProp,
+  onParentChange,
 }: {
   model: M;
   validation: ValidationIssue[];
@@ -34,11 +38,25 @@ export default function Idef0Editor({
   /** Ключ черновика (сессия + редактор) и версия модели, на которой он основан. */
   draftId: string;
   draftBase: string;
+  /** Общая история окна студии: если задана, редактор работает с ней, а черновик и сохранение ведёт студия. */
+  history?: ReturnType<typeof useModelHistory<M>>;
+  /** Перейти к функции по запросу извне (навигатор, список проверок); nonce меняется при каждом запросе. */
+  focus?: { id: string; nonce: number } | null;
+  /** Открытая диаграмма (null — A0), если её выбирает студия; onParentChange сообщает о переходах по декомпозиции. */
+  parentId?: string | null;
+  onParentChange?: (id: string | null) => void;
 }) {
-  const h = useModelHistory<M>(() => withIdef0Layout(model));
+  const local = useModelHistory<M>(() => withIdef0Layout(model));
+  const h = history ?? local;
+  const embedded = !!history;
   const { draft, draftRef, setDraft } = h;
-  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m) });
-  const [parentId, setParentId] = useState<string | null>(null); // какая диаграмма открыта: null — A0
+  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m), enabled: !embedded });
+  const [localParent, setLocalParent] = useState<string | null>(null); // какая диаграмма открыта: null — A0
+  const parentId = parentProp !== undefined ? parentProp : localParent;
+  const setParentId = (id: string | null) => {
+    setLocalParent(id);
+    onParentChange?.(id);
+  };
   const [sel, setSel] = useState<Sel>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
@@ -55,8 +73,8 @@ export default function Idef0Editor({
   const layout = buildIdef0(draft, cur);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
-  const { view, setView, fit, toWorld, zoomBy } = useViewport(svgRef, wrapRef, () => idef0Extents(layoutRef.current), { fitKey: cur ?? "root" });
-  useBeforeUnload(h.dirty);
+  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => idef0Extents(layoutRef.current), { fitKey: cur ?? "root" });
+  useBeforeUnload(h.dirty && !embedded);
 
   const codes = idef0Codes(draft);
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
@@ -84,6 +102,19 @@ export default function Idef0Editor({
     if (home !== cur && !(cur === null && layout.functions.some((f) => f.node.id === id))) setParentId(home);
     setSel({ kind: "fn", id });
   };
+
+  // переход к функции по запросу извне; диаграмму при необходимости открывает студия, поэтому ждём, пока блок появится
+  const handledFocus = useRef(-1);
+  useEffect(() => {
+    if (!focus || handledFocus.current === focus.nonce) return;
+    const f = layoutRef.current.functions.find((x) => x.node.id === focus.id);
+    if (f) {
+      handledFocus.current = focus.nonce;
+      setSel({ kind: "fn", id: f.node.id });
+      centerOn(f.box);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce, cur]);
 
   const addAt = (at: Pt) => {
     const added = addFunction(draftRef.current, cur, at[0], at[1]);
@@ -246,6 +277,7 @@ export default function Idef0Editor({
         busy={busy}
         hint={hint}
         onSave={() => void save()}
+        compact={embedded}
         extra={
           <>
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">

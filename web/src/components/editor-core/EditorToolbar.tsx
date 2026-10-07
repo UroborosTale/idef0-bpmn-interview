@@ -15,6 +15,7 @@ export default function EditorToolbar({
   hint,
   onSave,
   extra,
+  compact = false,
 }: {
   canUndo: boolean;
   canRedo: boolean;
@@ -29,16 +30,22 @@ export default function EditorToolbar({
   hint: string | null;
   onSave: () => void;
   extra?: ReactNode;
+  /** В окне студии история и сохранение — на общей панели студии, здесь остаются только масштаб и кнопки редактора. */
+  compact?: boolean;
 }) {
   return (
     <div className="bpe-toolbar">
-      <button onClick={onUndo} disabled={!canUndo} title="Отменить (Ctrl+Z)">
-        ↶ Отменить
-      </button>
-      <button onClick={onRedo} disabled={!canRedo} title="Повторить (Ctrl+Y)">
-        ↷ Повторить
-      </button>
-      <span className="bpe-sep" />
+      {!compact && (
+        <>
+          <button onClick={onUndo} disabled={!canUndo} title="Отменить (Ctrl+Z)">
+            ↶ Отменить
+          </button>
+          <button onClick={onRedo} disabled={!canRedo} title="Повторить (Ctrl+Y)">
+            ↷ Повторить
+          </button>
+          <span className="bpe-sep" />
+        </>
+      )}
       <button onClick={onZoomOut}>−</button>
       <span className="muted" style={{ minWidth: 42, textAlign: "center" }}>
         {Math.round(zoom * 100)}%
@@ -49,10 +56,12 @@ export default function EditorToolbar({
       {extra}
       <div className="spacer" />
       {hint && <span className="bpe-hint">{hint}</span>}
-      {dirty && <span className="bpe-dirty">● Есть несохранённые изменения</span>}
-      <button className="primary" disabled={!dirty || busy} onClick={onSave} title="Сохранить (Ctrl+S)">
-        {busy ? "Сохранение…" : "Сохранить"}
-      </button>
+      {!compact && dirty && <span className="bpe-dirty">● Есть несохранённые изменения</span>}
+      {!compact && (
+        <button className="primary" disabled={!dirty || busy} onClick={onSave} title="Сохранить (Ctrl+S)">
+          {busy ? "Сохранение…" : "Сохранить"}
+        </button>
+      )}
     </div>
   );
 }

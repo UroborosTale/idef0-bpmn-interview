@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
@@ -22,6 +22,8 @@ export default function BpmnEditor({
   draftId,
   draftBase,
   bpmnXml,
+  history,
+  focus,
 }: {
   model: M;
   validation: ValidationIssue[];
@@ -32,10 +34,16 @@ export default function BpmnEditor({
   draftBase: string;
   /** Сгенерированный сервером BPMN: из него берутся позиции фигур, у которых их ещё нет. */
   bpmnXml?: string | null;
+  /** Общая история окна студии: если задана, редактор работает с ней, а черновик и сохранение ведёт студия. */
+  history?: ReturnType<typeof useModelHistory<M>>;
+  /** Перейти к элементу (из навигатора или списка проверок); nonce меняется при каждом запросе. */
+  focus?: { id: string; nonce: number } | null;
 }) {
-  const h = useModelHistory<M>(() => withLayout(model, false, positionsFromBpmnXml(bpmnXml)));
+  const local = useModelHistory<M>(() => withLayout(model, false, positionsFromBpmnXml(bpmnXml)));
+  const h = history ?? local;
+  const embedded = !!history;
   const { draft, draftRef, setDraft } = h;
-  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m) });
+  const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft, dirty: h.dirty, restore: (m) => h.setDraft(m), enabled: !embedded });
   const [sel, setSel] = useState<Sel>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
@@ -47,8 +55,20 @@ export default function BpmnEditor({
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<Drag | null>(null);
-  const { view, setView, fit, toWorld, zoomBy } = useViewport(svgRef, wrapRef, () => modelExtents(draftRef.current));
-  useBeforeUnload(h.dirty);
+  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => modelExtents(draftRef.current));
+  useBeforeUnload(h.dirty && !embedded);
+
+  // переход к элементу по запросу извне
+  useEffect(() => {
+    if (!focus) return;
+    const n = draftRef.current.nodes.find((x) => x.id === focus.id);
+    if (n && !n.idef0_parent) {
+      setSel({ kind: "node", id: n.id });
+      centerOn(boxOf(n));
+    } else if (draftRef.current.flows.some((f) => f.id === focus.id)) setSel({ kind: "flow", id: focus.id });
+    else if (draftRef.current.roles.some((r) => r.id === focus.id)) setSel({ kind: "lane", id: focus.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus?.nonce]);
 
   const nodeExists = (id: string) => draft.nodes.some((n) => n.id === id);
   const curSel: Sel =
@@ -238,6 +258,7 @@ export default function BpmnEditor({
         busy={busy}
         hint={hint}
         onSave={() => void save()}
+        compact={embedded}
         extra={
           <button onClick={() => commit(withLayout(draft, true))} title="Расставить все фигуры заново (можно отменить)">
             Авто-раскладка

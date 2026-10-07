@@ -76,8 +76,8 @@ export function useModelHistory<M>(initial: () => M) {
  * иначе черновик «устарел»: его можно применить поверх новой модели вручную (restoreStale) или отбросить.
  * Хранилище может быть недоступно — тогда всё работает без него.
  */
-export function useDraftPersistence<M>(opts: { id: string; base: string; draft: M; dirty: boolean; restore: (m: M) => void }) {
-  const { id, base, draft, dirty, restore } = opts;
+export function useDraftPersistence<M>(opts: { id: string; base: string; draft: M; dirty: boolean; restore: (m: M) => void; enabled?: boolean }) {
+  const { id, base, draft, dirty, restore, enabled = true } = opts;
   const key = `process-editor-draft:${id}`;
   const [restored, setRestored] = useState(false);
   const [stale, setStale] = useState(false);
@@ -87,6 +87,7 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
   const staleModel = useRef<M | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return;
@@ -112,6 +113,7 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
   }, [restored, dirty]);
 
   useEffect(() => {
+    if (!enabled) return;
     // первый прогон — до того, как восстановленный черновик попал в состояние: ничего не трогаем
     if (skipFirst.current) {
       skipFirst.current = false;
@@ -213,8 +215,17 @@ export function useViewport(
     return [(cx - r.left - v.tx) / v.k, (cy - r.top - v.ty) / v.k];
   };
   const zoomBy = (f: number) => setView((v) => ({ ...v, k: clamp(v.k * f, 0.2, 2.5) }));
+  /** Показать прямоугольник мира в центре холста (масштаб сохраняется) — например, при переходе к элементу из навигатора. */
+  const centerOn = useCallback(
+    (box: { x: number; y: number; w: number; h: number }) => {
+      const el = wrapRef.current;
+      if (!el) return;
+      setView((v) => ({ ...v, tx: el.clientWidth / 2 - (box.x + box.w / 2) * v.k, ty: el.clientHeight / 2 - (box.y + box.h / 2) * v.k }));
+    },
+    [wrapRef]
+  );
 
-  return { view, setView, viewRef, fit, toWorld, zoomBy };
+  return { view, setView, viewRef, fit, toWorld, zoomBy, centerOn };
 }
 
 /** Короткое сообщение об отказе операции; гаснет само. */

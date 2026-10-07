@@ -1,0 +1,220 @@
+import { useState } from "react";
+import type { ProcessLogicModel } from "../../types";
+import { DICT_TITLES, type DictKind } from "./docs";
+import { addEntry, entriesOf, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
+
+type M = ProcessLogicModel;
+
+const KIND_OPTIONS: Partial<Record<DictKind, [string, string][]>> = {
+  roles: [["internal", "внутренний"], ["external", "внешний"]],
+  data: [["document", "документ"], ["data", "данные"]],
+  controls: [["regulation", "регламент"], ["rule", "правило"], ["norm", "норма"]],
+};
+
+const HINTS: Record<DictKind, string> = {
+  roles: "Исполнители процесса — они же дорожки BPMN и механизмы IDEF0. Переименование меняет подпись дорожки.",
+  systems: "Информационные системы, в которых выполняются шаги (механизмы IDEF0).",
+  data: "Документы и данные: входы и выходы функций, а также управление, когда выход одной функции управляет другой.",
+  controls: "Регламенты, правила и нормы, по которым выполняются функции (управление IDEF0).",
+  kpi: "Показатели результативности процесса с целевыми значениями.",
+  risks: "Риски процесса и меры по их снижению.",
+};
+
+/**
+ * Справочник окна студии (как «Справочники» в Business Studio): список записей, добавление,
+ * переименование, вид записи и «где используется» с переходом к шагу. Правки идут в общую
+ * модель студии — их можно отменить и нужно сохранить вместе с диаграммами.
+ */
+export default function DictionaryView({
+  kind,
+  model,
+  onChange,
+  onGoto,
+}: {
+  kind: DictKind;
+  model: M;
+  onChange: (next: M) => void;
+  onGoto: (nodeId: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [adding, setAdding] = useState("");
+  const rows = entriesOf(model, kind);
+  const q = query.trim().toLowerCase();
+  const shown = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
+  const options = KIND_OPTIONS[kind];
+  const withUsage = kind !== "kpi" && kind !== "risks";
+  const unlinked = unlinkedCount(model, kind);
+
+  const add = () => {
+    const name = adding.trim();
+    if (!name) return;
+    onChange(addEntry(model, kind, name).model);
+    setAdding("");
+  };
+
+  const remove = (id: string, name: string) => {
+    const used = withUsage ? usageOf(model, kind, id).length : 0;
+    const warn = used > 0 ? `«${name}» используется в ${used} элем. — ссылки на неё будут убраны (шаги останутся). Удалить?` : `Удалить «${name}»?`;
+    if (window.confirm(warn)) onChange(removeEntry(model, kind, id));
+  };
+
+  return (
+    <div className="dict">
+      <div className="dict-head">
+        <h4>{DICT_TITLES[kind]}</h4>
+        <span className="muted">{rows.length} зап.</span>
+        <span className="spacer" />
+        <input className="dict-search" placeholder="Поиск…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </div>
+      <p className="muted dict-hint">
+        {HINTS[kind]}
+        {unlinked > 0 && kind === "roles" && <> У {unlinked} функц. исполнитель не назначен.</>}
+        {unlinked > 0 && kind === "systems" && <> У {unlinked} функц. система не указана.</>}
+      </p>
+
+      <div className="dict-add">
+        <input
+          placeholder={`Новая запись: ${DICT_TITLES[kind].toLowerCase()}`}
+          value={adding}
+          onChange={(e) => setAdding(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && add()}
+        />
+        <button className="primary" disabled={!adding.trim()} onClick={add}>
+          + Добавить
+        </button>
+      </div>
+
+      <table className="dict-table">
+        <thead>
+          <tr>
+            <th style={{ width: 36 }}>№</th>
+            <th>Название</th>
+            {options && <th style={{ width: 130 }}>Вид</th>}
+            {kind === "kpi" && (
+              <>
+                <th style={{ width: 130 }}>Целевое значение</th>
+                <th style={{ width: 100 }}>Ед. изм.</th>
+              </>
+            )}
+            {kind === "risks" && <th>Мера снижения</th>}
+            {withUsage && <th style={{ width: 150 }}>Используется</th>}
+            <th style={{ width: 36 }} />
+          </tr>
+        </thead>
+        <tbody>
+          {shown.length === 0 && (
+            <tr>
+              <td colSpan={7} className="muted" style={{ padding: 14 }}>
+                {rows.length === 0 ? "Справочник пуст." : "Ничего не найдено."}
+              </td>
+            </tr>
+          )}
+          {shown.map((r, i) => {
+            const usage = withUsage ? usageOf(model, kind, r.id) : [];
+            const rec = r as unknown as Record<string, string | null | undefined>;
+            return (
+              <FragmentRows key={r.id}>
+                <tr className={usage.length === 0 && withUsage ? "dict-unused" : ""}>
+                  <td className="muted">{i + 1}</td>
+                  <td>
+                    <CellInput value={r.name} onCommit={(v) => v && onChange(updateEntry(model, kind, r.id, { name: v }))} />
+                  </td>
+                  {options && (
+                    <td>
+                      <select value={rec.kind ?? ""} onChange={(e) => onChange(updateEntry(model, kind, r.id, { kind: e.target.value }))}>
+                        {options.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  )}
+                  {kind === "kpi" && (
+                    <>
+                      <td>
+                        <CellInput value={rec.target ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { target: v || null }))} />
+                      </td>
+                      <td>
+                        <CellInput value={rec.unit ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { unit: v || null }))} />
+                      </td>
+                    </>
+                  )}
+                  {kind === "risks" && (
+                    <td>
+                      <CellInput value={rec.mitigation ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { mitigation: v || null }))} />
+                    </td>
+                  )}
+                  {withUsage && (
+                    <td>
+                      {usage.length > 0 ? (
+                        <button className="link-button" onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
+                          {expanded === r.id ? "▾" : "▸"} {usage.length}
+                        </button>
+                      ) : (
+                        <span className="muted">не используется</span>
+                      )}
+                    </td>
+                  )}
+                  <td>
+                    <button className="dict-del" title="Удалить" onClick={() => remove(r.id, r.name)}>
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+                {expanded === r.id && usage.length > 0 && (
+                  <tr className="dict-usage">
+                    <td />
+                    <td colSpan={6}>
+                      {usage.map((u, k) => (
+                        <button key={k} className="usage-chip" onClick={() => onGoto(u.nodeId)} title="Перейти к элементу на диаграмме">
+                          {u.nodeName} <span className="muted">· {u.how}</span>
+                        </button>
+                      ))}
+                    </td>
+                  </tr>
+                )}
+              </FragmentRows>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Строка с раскрывающимся продолжением без лишней обёртки в таблице. */
+function FragmentRows({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
+/** Поле ячейки: правка применяется по Enter или потере фокуса, Escape возвращает прежнее значение. */
+function CellInput({ value, onCommit }: { value: string; onCommit: (v: string) => void }) {
+  const [text, setText] = useState(value);
+  const [prev, setPrev] = useState(value);
+  if (value !== prev) {
+    setPrev(value);
+    setText(value);
+  }
+  const commit = () => {
+    const v = text.trim();
+    if (v !== value) onCommit(v);
+    else setText(value);
+  };
+  return (
+    <input
+      className="cell-input"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Escape") {
+          setText(value);
+          (e.target as HTMLInputElement).blur();
+        }
+      }}
+    />
+  );
+}

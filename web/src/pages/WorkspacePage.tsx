@@ -3,9 +3,7 @@ import { api } from "../api/client";
 import type { SessionRecord } from "../types";
 import TextPanel from "../components/TextPanel";
 import BpmnDiagram from "../components/bpmn-editor/BpmnDiagram";
-import BpmnEditor from "../components/bpmn-editor/BpmnEditor";
-import Idef0Editor from "../components/idef0-editor/Idef0Editor";
-import VisioEditor from "../components/VisioEditor";
+import Studio from "../components/studio/Studio";
 import ErrorBoundary from "../components/ErrorBoundary";
 import Idef0Viewer from "../components/Idef0Viewer";
 import GapsPanel from "../components/GapsPanel";
@@ -33,7 +31,7 @@ import DiagramReimportPanel from "../components/DiagramReimportPanel";
 import AuditPackagePanel from "../components/AuditPackagePanel";
 
 type Tab =
-  | "text" | "bpmn" | "visio" | "editor" | "idef0" | "idef0Editor" | "model" | "gaps" | "validation" | "export" | "versions" | "raci" | "regulation"
+  | "text" | "bpmn" | "studio" | "idef0" | "model" | "gaps" | "validation" | "export" | "versions" | "raci" | "regulation"
   | "multiInterview" | "verification" | "review" | "analytics" | "checklist" | "traceability" | "jobDescriptions" | "agentRuns"
   | "hypotheses" | "mining" | "bpms" | "diagramReimport" | "auditPackage" | "chat";
 
@@ -50,10 +48,13 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 const ALL_TABS: Tab[] = [
-  "text", "bpmn", "visio", "editor", "idef0", "idef0Editor", "model", "gaps", "validation", "export", "versions", "raci", "regulation",
+  "text", "bpmn", "studio", "idef0", "model", "gaps", "validation", "export", "versions", "raci", "regulation",
   "multiInterview", "verification", "review", "analytics", "checklist", "traceability", "jobDescriptions", "agentRuns",
   "hypotheses", "mining", "bpms", "diagramReimport", "auditPackage", "chat",
 ];
+// прежние адреса отдельных редакторов ведут в студию
+const LEGACY: Record<string, Tab> = { editor: "studio", idef0Editor: "studio", visio: "studio" };
+const normalizeTab = (t: string | undefined): string | undefined => (t && LEGACY[t]) || t;
 const isTab = (t: string | undefined): t is Tab => !!t && (ALL_TABS as string[]).includes(t);
 
 export default function WorkspacePage({
@@ -69,7 +70,7 @@ export default function WorkspacePage({
   onTabChange?: (tab: string) => void;
 }) {
   const [session, setSession] = useState<SessionRecord | null>(null);
-  const [tab, setTabState] = useState<Tab>(isTab(initialTab) ? initialTab : "text");
+  const [tab, setTabState] = useState<Tab>(isTab(normalizeTab(initialTab)) ? (normalizeTab(initialTab) as Tab) : "text");
   const setTab = (t: Tab) => {
     setTabState(t);
     onTabChange?.(t);
@@ -113,8 +114,10 @@ export default function WorkspacePage({
   }, [sessionId]);
 
   useEffect(() => {
-    // чат-интервью открывается на вкладке интервью, если в адресе не указана другая
-    if (session?.mode === "B" && !isTab(initialTab)) setTabState("chat");
+    // без вкладки в адресе: чат-интервью — на интервью, готовая модель — в студии
+    if (isTab(normalizeTab(initialTab))) return;
+    if (session?.mode === "B") setTabState("chat");
+    else if (session?.model) setTabState("studio");
   }, [session?.id]);
 
   if (!session) return <p className="muted">Загрузка сессии…</p>;
@@ -160,12 +163,10 @@ export default function WorkspacePage({
       label: "Модель",
       tabs: [
         ...(session.mode === "B" ? [{ key: "chat" as Tab, label: "Интервью" }] : []),
+        { key: "studio", label: "Студия" },
         { key: "text", label: "Текст" },
-        { key: "bpmn", label: "BPMN" },
-        { key: "idef0", label: "IDEF0" },
-        { key: "visio", label: "Редактор Visio" },
-        { key: "editor", label: "Редактор BPMN" },
-        { key: "idef0Editor", label: "Редактор IDEF0" },
+        { key: "bpmn", label: "BPMN (просмотр)" },
+        { key: "idef0", label: "IDEF0 (просмотр)" },
         { key: "model", label: "Модель (данные)" },
       ],
     },
@@ -307,19 +308,10 @@ export default function WorkspacePage({
         </div>
       )}
 
-      {tab === "visio" && model && <VisioEditor session={session} busy={busy} onSave={saveModel} />}
-      {tab === "visio" && !model && <p className="muted">Модели ещё нет — загрузите текст интервью и запустите обработку.</p>}
-      {tab === "editor" && model && (
-        <BpmnEditor model={model} validation={session.validation} busy={busy} onSave={saveModel} draftId={`${session.id}:bpmn`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} />
-      )}
-      {tab === "idef0Editor" && model && (
-        <Idef0Editor model={model} validation={session.validation} busy={busy} onSave={saveModel} draftId={`${session.id}:idef0`} draftBase={session.updatedAt} />
-      )}
-      {(tab === "editor" || tab === "idef0Editor") && !model && (
-        <p className="muted">Модели ещё нет — загрузите текст интервью и запустите обработку.</p>
-      )}
+      {tab === "studio" && model && <Studio session={session} busy={busy} onSave={saveModel} />}
+      {tab === "studio" && !model && <p className="muted">Модели ещё нет — загрузите текст интервью и запустите обработку.</p>}
 
-      {tab !== "chat" && tab !== "visio" && tab !== "editor" && tab !== "idef0Editor" && (
+      {tab !== "chat" && tab !== "studio" && (
         <div className="split">
           <div className="left">
             {tab === "text" && <TextPanel fragments={session.fragments} highlightId={highlightFragmentId} />}
