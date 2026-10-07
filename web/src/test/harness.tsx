@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from "react";
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ProcessLogicModel } from "../types";
 
 type M = ProcessLogicModel;
@@ -19,14 +19,10 @@ export function renderWithModel(initial: M, ui: (m: M, onChange: (next: M) => vo
   return { ...r, model: () => ref.current, changes: () => ref.changes };
 }
 
-/** Поле панели по подписи (подпись в разметке не связана с полем — см. отчёт). */
-export function field(label: string, root: ParentNode = document.body): HTMLInputElement {
-  const box = [...root.querySelectorAll(".bpe-field")].find((f) => f.querySelector(":scope > label")?.textContent === label);
-  const el = box?.querySelector("input, textarea, select");
-  if (!el) throw new Error(`Поле «${label}» не найдено`);
-  return el as HTMLInputElement;
+/** Поле панели по подписи — через связь подписи с полем, как это делает экранный диктор. */
+export function field(label: string): HTMLInputElement {
+  return screen.getByLabelText(label) as HTMLInputElement;
 }
-
 /** Ввод в поле с фиксацией по потере фокуса (как в CommitInput). */
 export function commit(el: HTMLElement, value: string) {
   fireEvent.change(el, { target: { value } });

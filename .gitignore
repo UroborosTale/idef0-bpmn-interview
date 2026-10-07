@@ -377,3 +377,4 @@ server/data/*.sqlite-*
 # данные приложения (БД, файлы Visio) и временные файлы
 server/data/
 *.log
+web/coverage/

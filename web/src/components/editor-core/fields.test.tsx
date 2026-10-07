@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { CommitInput, DraftBanner, RenameOverlay } from "./fields";
+import { CommitInput, DraftBanner, Field, RenameOverlay } from "./fields";
 
 describe("поле с фиксацией правки", () => {
   it("значение фиксируется по Enter/потере фокуса одним вызовом", () => {
@@ -89,5 +89,42 @@ describe("плашка черновика", () => {
   it("текст не упоминает удалённую связку с Visio", () => {
     render(<DraftBanner restored={false} stale onDiscard={() => {}} onDismiss={() => {}} />);
     expect(document.body.textContent).not.toMatch(/Visio/);
+  });
+});
+
+describe("подпись поля", () => {
+  it("связана с полем ввода: поле находится по подписи, у составного поля — группа с именем", () => {
+    render(
+      <>
+        <Field label="Название">
+          <CommitInput value="x" onCommit={() => {}} />
+        </Field>
+        <Field label="Вид">
+          <select>
+            <option>a</option>
+          </select>
+        </Field>
+        <Field label="Системы">
+          <button>1С</button>
+        </Field>
+      </>
+    );
+    expect((screen.getByLabelText("Название") as HTMLInputElement).value).toBe("x");
+    expect(screen.getByLabelText("Вид").tagName).toBe("SELECT");
+    expect(screen.getByRole("group", { name: "Системы" })).toBeTruthy();
+  });
+
+  it("два поля с одинаковой подписью не путаются", () => {
+    render(
+      <>
+        <Field label="Название">
+          <input defaultValue="первое" />
+        </Field>
+        <Field label="Название">
+          <input defaultValue="второе" />
+        </Field>
+      </>
+    );
+    expect((screen.getAllByLabelText("Название") as HTMLInputElement[]).map((i) => i.value)).toEqual(["первое", "второе"]);
   });
 });

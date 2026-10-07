@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { View } from "./hooks";
 
 /** Поле, которое фиксирует значение по потере фокуса/Enter — одна правка = один шаг undo. */
@@ -58,12 +58,36 @@ export function DraftBanner({
   );
 }
 
-export const Field =({ label, children }: { label: string; children: React.ReactNode }) => (
-  <div className="bpe-field">
-    <label>{label}</label>
-    {children}
-  </div>
-);
+/**
+ * Поле панели: подпись связана с первым полем ввода внутри (для экранного диктора и для поиска по подписи),
+ * а составные поля (списки чипов) получают role="group" с именем по подписи.
+ */
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const id = useId();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const control = box.current?.querySelector<HTMLElement>("input, select, textarea");
+    const lab = box.current?.querySelector("label");
+    if (control && !control.id) control.id = `${id}-control`;
+    // поле ввода есть — подпись связана с ним; иначе (чипы, списки) именем помечается вся группа
+    const wrap = box.current;
+    if (control) {
+      lab?.setAttribute("for", control.id);
+      wrap?.removeAttribute("role");
+      wrap?.removeAttribute("aria-labelledby");
+    } else {
+      lab?.removeAttribute("for");
+      wrap?.setAttribute("role", "group");
+      wrap?.setAttribute("aria-labelledby", `${id}-label`);
+    }
+  });
+  return (
+    <div className="bpe-field" ref={box}>
+      <label id={`${id}-label`}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
 /** Поле переименования поверх холста, по центру фигуры (box — в мировых координатах). */
 export function RenameOverlay({
