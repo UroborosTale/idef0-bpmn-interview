@@ -288,7 +288,7 @@ button.danger:hover { background: #fef2f2; }
 .doc-close:hover { background: #dbe3f2; color: #b91c1c; }
 .doc-area { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
 .studio .bpe { height: 100%; display: flex; flex-direction: column; }
-.studio .bpe-body { flex: 1; height: auto; min-height: 0; }
+.studio .bpe-body { flex: 1; height: auto; min-height: 0; grid-template-columns: 150px minmax(0, 1fr); }
 .studio .bpe-toolbar { margin-bottom: 8px; }
 
 /* проверки */
@@ -383,3 +383,33 @@ button.danger:hover { background: #fef2f2; }
   .no-print { display: none !important; }
   .passport-field input, .passport-field textarea, .passport-field select { border: none; padding: 0; resize: none; appearance: none; background: transparent; }
 }
+
+/* панель «Свойства» и карточки записей */
+.studio-main { border-right: 0; }
+.props { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border); background: #fafbfd; font-size: 13px; }
+.props-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: var(--bs-light); border-bottom: 1px solid #d3deef; color: var(--bs-blue); }
+.props-head button { border: none; background: none; padding: 0 6px; font-size: 16px; line-height: 20px; color: inherit; }
+.props-head button:hover { background: #dbe6f7; }
+.props-body { flex: 1; overflow: auto; padding: 0 10px 14px; }
+.prop-kind { padding: 10px 0 6px; font-weight: 600; }
+.prop-badge { margin-left: 8px; padding: 1px 7px; border-radius: 9px; background: #fef3c7; color: #92400e; font-size: 11px; font-weight: 500; }
+.prop-section { border-top: 1px solid #e3e9f3; }
+.prop-section > summary { cursor: pointer; padding: 7px 0; font-weight: 600; color: var(--bs-blue); user-select: none; list-style: none; }
+.prop-section > summary::-webkit-details-marker { display: none; }
+.prop-section > summary::before { content: "▸"; display: inline-block; width: 14px; }
+.prop-section[open] > summary::before { content: "▾"; }
+.prop-count { margin-left: 6px; padding: 0 6px; border-radius: 8px; background: #e6edf9; font-size: 11px; font-weight: 500; }
+.prop-body { padding: 0 0 10px; }
+.prop-note { margin: 4px 0 8px; font-size: 12px; line-height: 1.45; }
+.prop-warn { padding: 6px 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; }
+.prop-link { display: block; margin: -4px 0 8px; font-size: 12px; }
+.prop-list { margin: 0 0 8px; padding-left: 18px; }
+.prop-sources blockquote { margin: 0 0 8px; padding: 4px 8px; border-left: 3px solid #c5d3ea; background: #fff; font-size: 12px; line-height: 1.45; }
+.prop-sources footer { margin-top: 2px; font-size: 11px; }
+.prop-history { margin: 0 0 6px; padding: 0; list-style: none; }
+.prop-history li { padding: 5px 0 6px 10px; border-left: 2px solid #c5d3ea; margin-bottom: 4px; font-size: 12px; }
+.prop-change { margin-top: 2px; }
+.props .bpe-field input, .props .bpe-field select, .props .bpe-field textarea { width: 100%; box-sizing: border-box; }
+.dict-selected td { background: #e8f0fc !important; }
+.dict-table tbody tr { cursor: pointer; }
+.dict-desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -17,11 +17,18 @@ export const SourceRef = z.object({
 });
 export type SourceRef = z.infer<typeof SourceRef>;
 
+// Карточка записи справочника (как в Business Studio): описание и ответственный необязательны у любой записи.
+const Card = {
+  description: z.string().nullable().optional(),
+  owner: z.string().nullable().optional(), // у исполнителя — подразделение, у остальных — ответственный
+};
+
 export const Role = z.object({
   id: z.string(),
   name: z.string(),
   kind: z.enum(["internal", "external"]).default("internal"),
   source: z.array(SourceRef).default([]),
+  ...Card,
 });
 export type Role = z.infer<typeof Role>;
 
@@ -29,6 +36,7 @@ export const SystemEntity = z.object({
   id: z.string(),
   name: z.string(),
   source: z.array(SourceRef).default([]),
+  ...Card,
 });
 export type SystemEntity = z.infer<typeof SystemEntity>;
 
@@ -37,6 +45,7 @@ export const DataEntity = z.object({
   name: z.string(),
   kind: z.enum(["document", "data"]).default("document"),
   source: z.array(SourceRef).default([]),
+  ...Card,
 });
 export type DataEntity = z.infer<typeof DataEntity>;
 
@@ -45,6 +54,8 @@ export const ControlEntity = z.object({
   name: z.string(),
   kind: z.enum(["regulation", "rule", "norm"]).default("rule"),
   source: z.array(SourceRef).default([]),
+  ...Card,
+  reference: z.string().nullable().optional(), // реквизиты документа: номер, дата, пункт
 });
 export type ControlEntity = z.infer<typeof ControlEntity>;
 
@@ -140,6 +151,8 @@ export const Kpi = z.object({
   target: z.string().nullable().optional(),
   unit: z.string().nullable().optional(),
   source: z.array(SourceRef).default([]),
+  ...Card,
+  period: z.string().nullable().optional(), // периодичность измерения
 });
 export type Kpi = z.infer<typeof Kpi>;
 
@@ -149,6 +162,8 @@ export const Risk = z.object({
   name: z.string(),
   mitigation: z.string().nullable().optional(),
   source: z.array(SourceRef).default([]),
+  ...Card,
+  level: z.enum(["low", "medium", "high"]).nullable().optional(), // уровень риска
 });
 export type Risk = z.infer<typeof Risk>;
 

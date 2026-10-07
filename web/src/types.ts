@@ -18,12 +18,16 @@ export interface Role {
   name: string;
   kind: "internal" | "external";
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
 }
 
 export interface SystemEntity {
   id: string;
   name: string;
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
 }
 
 export interface DataEntity {
@@ -31,6 +35,8 @@ export interface DataEntity {
   name: string;
   kind: "document" | "data";
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
 }
 
 export interface ControlEntity {
@@ -38,6 +44,9 @@ export interface ControlEntity {
   name: string;
   kind: "regulation" | "rule" | "norm";
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
+  reference?: string | null;
 }
 
 export interface ProcessNode {
@@ -102,6 +111,9 @@ export interface Kpi {
   target?: string | null;
   unit?: string | null;
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
+  period?: string | null;
 }
 
 export interface Risk {
@@ -109,6 +121,9 @@ export interface Risk {
   name: string;
   mitigation?: string | null;
   source: SourceRef[];
+  description?: string | null;
+  owner?: string | null;
+  level?: "low" | "medium" | "high" | null;
 }
 
 export interface ProcessMeta {
@@ -330,4 +345,21 @@ export interface SessionListItem {
   gapsOpen: number;
   hasErrors: boolean;
   diagramsStale: boolean;
+}
+
+export interface HistoryChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
+
+/** Событие в истории записи справочника или шага (по сохранённым версиям модели). */
+export interface HistoryEvent {
+  seq: number;
+  version: string;
+  ts: string;
+  author: string;
+  note: string;
+  event: "created" | "changed" | "removed";
+  changes: HistoryChange[];
 }

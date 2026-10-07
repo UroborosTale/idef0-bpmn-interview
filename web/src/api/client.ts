@@ -1,4 +1,4 @@
-import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
+import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, HistoryEvent, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
 import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage } from "./types";
 import { BASE, req, waitJob } from "./http";
 
@@ -30,6 +30,8 @@ export const api = {
     req<SessionRecord>("POST", `/sessions/${id}/versions/approve`, { note, author }),
   rollbackVersion: (id: string, seq: number, author?: string) =>
     req<SessionRecord>("POST", `/sessions/${id}/versions/${seq}/rollback`, { author }),
+  /** История записи справочника или шага по сохранённым версиям (карточка в студии). */
+  entryHistory: (id: string, kind: string, entryId: string) => req<HistoryEvent[]>("GET", `/sessions/${id}/history/${kind}/${encodeURIComponent(entryId)}`),
   diffVersions: (id: string, a: number | string, b: number | string) => req<any>("GET", `/sessions/${id}/versions/${a}/diff/${b}`),
   addComment: (id: string, element_id: string | null, text: string, author?: string) =>
     req<SessionRecord>("POST", `/sessions/${id}/comments`, { element_id, text, author }),

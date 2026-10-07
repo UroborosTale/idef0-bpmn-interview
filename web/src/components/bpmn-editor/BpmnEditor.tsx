@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import type { ProcessLogicModel, ValidationIssue } from "../../types";
+import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
 import { MIN_X, boxOf, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
 import { PALETTE, addFlow, addNodeAt, addRole, deleteFlow, deleteNode, dropNodeIntoLane, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, FlowShape, LanesLayer, NodeShape, UNASSIGNED_LANE } from "./shapes";
-import Inspector, { type Sel } from "./Inspector";
+import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
+type Sel = { kind: "node" | "flow" | "lane"; id: string } | null;
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
@@ -16,7 +17,6 @@ type Drag =
 
 export default function BpmnEditor({
   model,
-  validation,
   busy,
   onSave,
   draftId,
@@ -24,9 +24,9 @@ export default function BpmnEditor({
   bpmnXml,
   history,
   focus,
+  onSelectionChange,
 }: {
   model: M;
-  validation: ValidationIssue[];
   busy: boolean;
   onSave: (m: M) => Promise<boolean>;
   /** Ключ черновика (сессия + редактор) и версия модели, на которой он основан. */
@@ -38,6 +38,8 @@ export default function BpmnEditor({
   history?: ReturnType<typeof useModelHistory<M>>;
   /** Перейти к элементу (из навигатора или списка проверок); nonce меняется при каждом запросе. */
   focus?: { id: string; nonce: number } | null;
+  /** Выделение сообщается окну студии — по нему панель «Свойства» показывает карточку объекта. Дорожка — это запись справочника «Исполнители». */
+  onSelectionChange?: (sel: Selection) => void;
 }) {
   const local = useModelHistory<M>(() => withLayout(model, false, positionsFromBpmnXml(bpmnXml)));
   const h = history ?? local;
@@ -70,6 +72,13 @@ export default function BpmnEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
+  const toSelection = (s: Sel): Selection => (!s ? null : s.kind === "lane" ? { kind: "entry", dict: "roles", id: s.id } : { kind: s.kind, id: s.id });
+  /** Выбор мышью: сообщаем студии всегда, даже если выделен тот же элемент (панель могла уйти к другой записи). */
+  const pick = (s: Sel) => {
+    setSel(s);
+    onSelectionChange?.(toSelection(s));
+  };
+
   const nodeExists = (id: string) => draft.nodes.some((n) => n.id === id);
   const curSel: Sel =
     sel &&
@@ -78,6 +87,12 @@ export default function BpmnEditor({
       (sel.kind === "lane" && draft.roles.some((r) => r.id === sel.id)))
       ? sel
       : null;
+
+  // выделение изменилось не мышью (переход из навигатора, новая фигура, удаление) — тоже сообщаем
+  useEffect(() => {
+    onSelectionChange?.(toSelection(curSel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSel?.kind, curSel?.id]);
 
   /** Зафиксировать изменение как один шаг истории (и, если задано, сменить выделение). */
   const commit = (next: M, nextSel?: Sel) => {
@@ -103,7 +118,7 @@ export default function BpmnEditor({
 
     if (e.button === 1 || (e.button === 0 && onEmpty)) {
       e.preventDefault();
-      if (e.button === 0) setSel(null);
+      if (e.button === 0) pick(null);
       dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty };
       svgRef.current!.setPointerCapture(e.pointerId);
       return;
@@ -120,14 +135,14 @@ export default function BpmnEditor({
       if (!n) return;
       const b = boxOf(n);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      setSel({ kind: "node", id });
+      pick({ kind: "node", id });
       dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draft, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (flowEl) {
-      setSel({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
+      pick({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
     } else if (laneEl) {
       const id = laneEl.getAttribute("data-lane-id")!;
-      setSel(id === UNASSIGNED_LANE ? null : { kind: "lane", id });
+      pick(id === UNASSIGNED_LANE ? null : { kind: "lane", id });
     }
   };
 
@@ -346,10 +361,6 @@ export default function BpmnEditor({
           <div className="bpe-corner muted">
             {shown.length} элем. · {draft.flows.length} связей · {Math.round(worldH)}px
           </div>
-        </div>
-
-        <div className="bpe-inspector">
-          <Inspector model={draft} sel={curSel} validation={validation} onChange={commit} onSelect={setSel} onHint={showHint} />
         </div>
       </div>
     </div>

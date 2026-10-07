@@ -11,11 +11,33 @@ export interface UsageItem {
   how: string;
 }
 
+/** Значения поля «Вид» у справочников, где оно есть. */
+export const KIND_OPTIONS: Partial<Record<DictKind, [string, string][]>> = {
+  roles: [["internal", "внутренний"], ["external", "внешний"]],
+  data: [["document", "документ"], ["data", "данные"]],
+  controls: [["regulation", "регламент"], ["rule", "правило"], ["norm", "норма"]],
+};
+
+/** Название вида записи в единственном числе — заголовок карточки. */
+export const ENTRY_TITLES: Record<DictKind, string> = {
+  roles: "Исполнитель",
+  systems: "Информационная система",
+  data: "Документ / данные",
+  controls: "Регламент / норма",
+  kpi: "Показатель (KPI)",
+  risks: "Риск",
+};
+
+export const LEVEL_OPTIONS: [string, string][] = [["low", "низкий"], ["medium", "средний"], ["high", "высокий"]];
+
 const isFn = (n: ProcessNode) => n.type === "task" || n.type === "subprocess";
 const items = (m: M, kind: DictKind): { id: string; name: string }[] =>
   kind === "roles" ? m.roles : kind === "systems" ? m.systems : kind === "data" ? m.data : kind === "controls" ? m.controls : kind === "kpi" ? m.process.kpi : m.process.risks;
 
 export const entriesOf = items;
+
+/** Запись справочника по id. */
+export const entryOf = (m: M, kind: DictKind, id: string) => items(m, kind).find((e) => e.id === id);
 
 /** Где используется запись справочника (по шагам и функциям модели). KPI и риски относятся ко всему процессу. */
 export function usageOf(m: M, kind: DictKind, id: string): UsageItem[] {

@@ -3,6 +3,8 @@ import { normKey } from "./extract.js";
 
 type M = ProcessLogicModel;
 
+const CARD_FIELDS = ["description", "owner", "reference"];
+
 /** Пробелы, на которые аналитик уже ответил или которые отклонил, не должны снова открываться после пересчёта. */
 export function keepGapStatuses(prev: M["gaps"], fresh: M["gaps"]): M["gaps"] {
   const closed = new Map(prev.filter((g) => g.status !== "open").map((g) => [`${g.rule}|${g.question}`, g] as const));
@@ -30,6 +32,16 @@ export function keepGapStatuses(prev: M["gaps"], fresh: M["gaps"]): M["gaps"] {
 export function carryOverManualEdits(prev: M, next: M): { model: M; matched: number; kept: number } {
   const model: M = structuredClone(next);
 
+  // карточка записи (описание, ответственный, реквизиты) — ручной ввод, из текста не извлекается: у сопоставленной записи сохраняется
+  const inherit = <T extends { id: string; name: string }>(newList: T[], hitId: string, old: T) => {
+    const target = newList.find((x) => x.id === hitId) as Record<string, unknown> | undefined;
+    if (!target) return;
+    for (const k of CARD_FIELDS) {
+      const v = (old as Record<string, unknown>)[k];
+      if (v != null && v !== "" && (target[k] == null || target[k] === "")) target[k] = v;
+    }
+  };
+
   // --- справочники: id прежней сущности → id в новой модели ---
   const mapEntities = <T extends { id: string; name: string }>(oldList: T[], newList: T[], prefix: string): Map<string, string> => {
     const byKey = new Map(newList.map((e) => [normKey(e.name), e.id] as const));
@@ -38,6 +50,7 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
     for (const e of oldList) {
       const hit = byKey.get(normKey(e.name));
       if (hit) {
+        inherit(newList, hit, e);
         map.set(e.id, hit);
         continue;
       }
@@ -60,6 +73,7 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       if (!e) return undefined;
       const hit = byKey.get(normKey(e.name));
       if (hit) {
+        inherit(newList, hit, e);
         map.set(oldId, hit);
         return hit;
       }
@@ -70,6 +84,22 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       return id;
     };
   };
+  // карточки переносятся всем сопоставленным записям, даже если ни один перенесённый шаг на них не ссылается
+  for (const [oldList, newList] of [[prev.roles, model.roles], [prev.data, model.data], [prev.controls, model.controls], [prev.systems, model.systems]] as const) {
+    const byKey = new Map((newList as { id: string; name: string }[]).map((e) => [normKey(e.name), e.id] as const));
+    for (const e of oldList as { id: string; name: string }[]) {
+      const hit = byKey.get(normKey(e.name));
+      if (hit) inherit(newList as { id: string; name: string }[], hit, e);
+    }
+  }
+  // карточки переносятся всем сопоставленным записям, даже если ни один перенесённый шаг на них не ссылается
+  for (const [oldList, newList] of [[prev.roles, model.roles], [prev.data, model.data], [prev.controls, model.controls], [prev.systems, model.systems]] as const) {
+    const byKey = new Map((newList as { id: string; name: string }[]).map((e) => [normKey(e.name), e.id] as const));
+    for (const e of oldList as { id: string; name: string }[]) {
+      const hit = byKey.get(normKey(e.name));
+      if (hit) inherit(newList as { id: string; name: string }[], hit, e);
+    }
+  }
   const role = lazy(prev.roles, model.roles, "role");
   const data = lazy(prev.data, model.data, "data");
   const control = lazy(prev.controls, model.controls, "ctl");

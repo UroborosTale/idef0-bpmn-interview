@@ -2,14 +2,15 @@ import { useEffect, useState } from "react";
 import type { View } from "./hooks";
 
 /** Поле, которое фиксирует значение по потере фокуса/Enter — одна правка = один шаг undo. */
-export function CommitInput({ value, onCommit, placeholder, multiline }: { value: string; onCommit: (v: string) => void; placeholder?: string; multiline?: boolean }) {
+export function CommitInput({ value, onCommit, placeholder, multiline, required, rows }: { value: string; onCommit: (v: string) => void; placeholder?: string; multiline?: boolean; required?: boolean; rows?: number }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const commit = () => {
-    if (v !== value) onCommit(v);
+    if (required && !v.trim()) setV(value); // пустое значение не принимается — возвращаем прежнее
+    else if (v !== value) onCommit(v);
   };
   if (multiline) {
-    return <textarea rows={3} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} />;
+    return <textarea rows={rows ?? 3} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} />;
   }
   return (
     <input

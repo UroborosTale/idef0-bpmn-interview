@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getSession, addVersion, rollbackToVersion, editBlockReason } from "../repo.js";
 import { diffModels } from "../pipeline/diff.js";
+import { entryHistory, HISTORY_KINDS, type HistoryKind } from "../pipeline/entryHistory.js";
 import { logAudit } from "../db.js";
 
 export const versionsRouter = Router();
@@ -24,6 +25,21 @@ versionsRouter.get("/sessions/:id/versions", (req, res) => {
       flowCount: v.model.flows.length,
     }))
   );
+});
+
+/** История одной записи справочника или шага по сохранённым версиям (карточка записи в студии). */
+versionsRouter.get("/sessions/:id/history/:kind/:entryId", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const kind = req.params.kind as HistoryKind;
+  if (!HISTORY_KINDS.includes(kind)) {
+    res.status(400).json({ error: "unknown kind" });
+    return;
+  }
+  res.json(entryHistory(session.versions, kind, req.params.entryId));
 });
 
 /** Ручной снимок версии (минорная). Каждое значимое сохранение также создаёт снимок автоматически (см. routes/sessions.ts, routes/process.ts). */

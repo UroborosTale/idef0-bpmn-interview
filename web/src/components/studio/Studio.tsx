@@ -13,6 +13,8 @@ import Navigator from "./Navigator";
 import ProblemsPanel from "./ProblemsPanel";
 import DictionaryView from "./DictionaryView";
 import ReportView from "./ReportView";
+import PropertiesPanel from "./PropertiesPanel";
+import type { Selection } from "./selection";
 import { bpmnDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
 
 type M = ProcessLogicModel;
@@ -47,8 +49,9 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [docs, setDocs] = useState<StudioDoc[]>(() => [bpmnDoc(), idef0Doc(null)]);
   const [activeKey, setActiveKey] = useState("bpmn");
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
+  const [propsOpen, setPropsOpen] = useState(true);
   const [problemsOpen, setProblemsOpen] = useState(true);
   const nonce = useRef(0);
 
@@ -58,15 +61,20 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const errors = issues.filter((i) => i.severity === "error").length;
   const warnings = issues.length - errors;
 
+  /** Выделение принадлежит документу: при смене вкладки панель возвращается к свойствам процесса, пока документ не сообщит своё. */
+  const activate = (key: string) => {
+    if (key !== activeKey) setSelection(null);
+    setActiveKey(key);
+  };
   const open = (doc: StudioDoc) => {
     setDocs((ds) => (ds.some((d) => d.key === doc.key) ? ds : [...ds, doc]));
-    setActiveKey(doc.key);
+    activate(doc.key);
   };
   const close = (key: string) => {
     const rest = liveDocs.filter((d) => d.key !== key);
     if (rest.length === 0) return; // последний документ остаётся
     setDocs(rest);
-    if (active.key === key) setActiveKey(rest[Math.max(0, liveDocs.findIndex((d) => d.key === key) - 1)].key);
+    if (active.key === key) activate(rest[Math.max(0, liveDocs.findIndex((d) => d.key === key) - 1)].key);
   };
   const goto = (id: string) => setFocus({ id, nonce: ++nonce.current });
 
@@ -74,14 +82,36 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const selectFn = (id: string) => {
     const n = draft.nodes.find((x) => x.id === id);
     if (!n) return;
-    setSelectedId(id);
     if (active.kind === "bpmn" && !n.idef0_parent) {
+      setSelection({ kind: "node", id });
       goto(id);
       return;
     }
     open(idef0Doc(n.idef0_parent ?? null));
+    setSelection({ kind: "node", id });
     goto(id);
   };
+
+  /** Показать элемент на диаграмме выбранной нотации (из панели свойств). */
+  const reveal = (id: string, where: "bpmn" | "idef0") => {
+    const n = draft.nodes.find((x) => x.id === id);
+    if (!n) return;
+    open(where === "bpmn" ? bpmnDoc() : idef0Doc(n.idef0_parent ?? null));
+    setSelection({ kind: "node", id });
+    goto(id);
+  };
+
+  /** Выделение изменилось на диаграмме: одинаковое не перезаписываем, чтобы не гонять лишние перерисовки. */
+  const reportSelection = (s: Selection) =>
+    setSelection((prev) => {
+      if (!s && !prev) return prev;
+      if (s && prev && s.kind === prev.kind && !prev.back) {
+        if (s.kind === "arrow" && prev.kind === "arrow" && s.arrow.key === prev.arrow.key) return prev;
+        if (s.kind === "entry" && prev.kind === "entry" && s.dict === prev.dict && s.id === prev.id) return prev;
+        if ((s.kind === "node" || s.kind === "flow") && "id" in prev && s.id === prev.id) return prev;
+      }
+      return s;
+    });
 
   /** Переход к элементу из списка проверок: нужная диаграмма и выделение. */
   const gotoIssue = ({ elementId, notation }: { elementId: string | null; notation: ValidationIssue["notation"] }) => {
@@ -89,13 +119,13 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     const isRole = !!elementId && draft.roles.some((r) => r.id === elementId);
     if (notation === "IDEF0" && n) {
       open(idef0Doc(n.idef0_parent ?? null));
-      setSelectedId(n.id);
+      setSelection({ kind: "node", id: n.id });
       goto(n.id);
     } else if (notation === "IDEF0") {
       open(idef0Doc(null));
     } else if (n && !n.idef0_parent) {
       open(bpmnDoc());
-      setSelectedId(n.id);
+      setSelection({ kind: "node", id: n.id });
       goto(n.id);
     } else if (elementId && (isRole || draft.flows.some((f) => f.id === elementId))) {
       open(bpmnDoc());
@@ -112,7 +142,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     const r = addFunction(h.draftRef.current, parentId, 300, 300);
     h.commit(r.model);
     open(idef0Doc(parentId));
-    setSelectedId(r.id!);
+    setSelection({ kind: "node", id: r.id! });
     goto(r.id!);
   };
 
@@ -123,7 +153,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
       const without = ds.filter((d) => d.key !== fromKey);
       return without.some((d) => d.key === next.key) ? without : ds.map((d) => (d.key === fromKey ? next : d));
     });
-    setActiveKey(next.key);
+    setActiveKey(next.key); // выделение сохраняем: это тот же редактор, он сам сообщит новое
   };
 
   const save = async () => {
@@ -131,9 +161,10 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     if (await onSave(snapshot)) h.markSaved(snapshot);
   };
 
-  // История и сохранение на вкладках без собственного редактора (справочники, отчёты)
+  // История и сохранение вне редакторов диаграмм
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (active.kind === "bpmn" || active.kind === "idef0" || isTextInput(e.target)) return;
+    // диаграммы обрабатывают клавиши сами; остальное (справочники, отчёты, панель свойств) — здесь
+    if ((e.target as Element).closest?.(".bpe") || isTextInput(e.target)) return;
     handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() });
   };
 
@@ -189,6 +220,9 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             <button className={navOpen ? "toggled" : ""} onClick={() => setNavOpen(!navOpen)}>
               Навигатор
             </button>
+            <button className={propsOpen ? "toggled" : ""} onClick={() => setPropsOpen(!propsOpen)}>
+              Свойства
+            </button>
             <button className={problemsOpen ? "toggled" : ""} onClick={() => setProblemsOpen(!problemsOpen)}>
               Проверки{errors + warnings > 0 ? ` (${errors + warnings})` : ""}
             </button>
@@ -206,14 +240,14 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         </div>
       </div>
 
-      <div className={`studio-body ${navOpen ? "" : "nav-closed"}`}>
+      <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "270px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
-          <Navigator model={draft} activeKey={active.key} selectedId={selectedId} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} />
+          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} />
         )}
         <div className="studio-main">
           <div className="doc-tabs" role="tablist">
             {liveDocs.map((d) => (
-              <div key={d.key} role="tab" aria-selected={d.key === active.key} className={`doc-tab ${d.key === active.key ? "active" : ""}`} onClick={() => setActiveKey(d.key)}>
+              <div key={d.key} role="tab" aria-selected={d.key === active.key} className={`doc-tab ${d.key === active.key ? "active" : ""}`} onClick={() => activate(d.key)}>
                 {docTitle(d, draft)}
                 {liveDocs.length > 1 && (
                   <button
@@ -232,28 +266,54 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
           </div>
           <div className="doc-area">
             {active.kind === "bpmn" && (
-              <BpmnEditor key="bpmn" model={draft} validation={issues} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={h} focus={focus} />
+              <BpmnEditor key="bpmn" model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={h} focus={focus} onSelectionChange={reportSelection} />
             )}
             {active.kind === "idef0" && (
               <Idef0Editor
                 key={active.key}
                 model={draft}
-                validation={issues}
                 busy={busy}
                 onSave={onSave}
                 draftId={`${session.id}:studio`}
                 draftBase={session.updatedAt}
                 history={h}
                 focus={focus}
+                onSelectionChange={reportSelection}
                 parentId={active.parent}
                 onParentChange={(p) => navigateIdef0(active.key, p)}
               />
             )}
-            {active.kind === "dict" && <DictionaryView key={active.key} kind={active.dict} model={draft} onChange={h.commit} onGoto={(id) => gotoIssue({ elementId: id, notation: "BPMN" })} />}
+            {active.kind === "dict" && (
+              <DictionaryView
+                key={active.key}
+                kind={active.dict}
+                model={draft}
+                selectedId={selection?.kind === "entry" && selection.dict === active.dict ? selection.id : null}
+                onSelect={(id) => setSelection({ kind: "entry", dict: active.dict, id })}
+                onChange={h.commit}
+                onGoto={(id) => gotoIssue({ elementId: id, notation: "BPMN" })}
+              />
+            )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
           {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} />}
         </div>
+        {propsOpen && (
+          <PropertiesPanel
+            model={draft}
+            selection={selection}
+            session={session}
+            issues={issues}
+            activeKind={active.kind}
+            onChange={h.commit}
+            onSelect={setSelection}
+            onGoto={selectFn}
+            onReveal={reveal}
+            onOpenDecomposition={(id) => open(idef0Doc(id))}
+            onOpenDoc={open}
+            onClose={() => setPropsOpen(false)}
+          />
+        )}
       </div>
 
       <div className="statusbar">

@@ -1,15 +1,9 @@
 import { useState } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { DICT_TITLES, type DictKind } from "./docs";
-import { addEntry, entriesOf, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
+import { KIND_OPTIONS, addEntry, entriesOf, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
 
 type M = ProcessLogicModel;
-
-const KIND_OPTIONS: Partial<Record<DictKind, [string, string][]>> = {
-  roles: [["internal", "внутренний"], ["external", "внешний"]],
-  data: [["document", "документ"], ["data", "данные"]],
-  controls: [["regulation", "регламент"], ["rule", "правило"], ["norm", "норма"]],
-};
 
 const HINTS: Record<DictKind, string> = {
   roles: "Исполнители процесса — они же дорожки BPMN и механизмы IDEF0. Переименование меняет подпись дорожки.",
@@ -23,16 +17,21 @@ const HINTS: Record<DictKind, string> = {
 /**
  * Справочник окна студии (как «Справочники» в Business Studio): список записей, добавление,
  * переименование, вид записи и «где используется» с переходом к шагу. Правки идут в общую
- * модель студии — их можно отменить и нужно сохранить вместе с диаграммами.
+ * модель студии — их можно отменить и нужно сохранить вместе с диаграммами. Выбранная запись
+ * открывается карточкой в панели «Свойства».
  */
 export default function DictionaryView({
   kind,
   model,
+  selectedId,
+  onSelect,
   onChange,
   onGoto,
 }: {
   kind: DictKind;
   model: M;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onChange: (next: M) => void;
   onGoto: (nodeId: string) => void;
 }) {
@@ -98,6 +97,7 @@ export default function DictionaryView({
               </>
             )}
             {kind === "risks" && <th>Мера снижения</th>}
+            <th style={{ width: 200 }}>Описание</th>
             {withUsage && <th style={{ width: 150 }}>Используется</th>}
             <th style={{ width: 36 }} />
           </tr>
@@ -105,7 +105,7 @@ export default function DictionaryView({
         <tbody>
           {shown.length === 0 && (
             <tr>
-              <td colSpan={7} className="muted" style={{ padding: 14 }}>
+              <td colSpan={8} className="muted" style={{ padding: 14 }}>
                 {rows.length === 0 ? "Справочник пуст." : "Ничего не найдено."}
               </td>
             </tr>
@@ -115,7 +115,7 @@ export default function DictionaryView({
             const rec = r as unknown as Record<string, string | null | undefined>;
             return (
               <FragmentRows key={r.id}>
-                <tr className={usage.length === 0 && withUsage ? "dict-unused" : ""}>
+                <tr className={`${usage.length === 0 && withUsage ? "dict-unused" : ""} ${selectedId === r.id ? "dict-selected" : ""}`} onClick={() => onSelect(r.id)}>
                   <td className="muted">{i + 1}</td>
                   <td>
                     <CellInput value={r.name} onCommit={(v) => v && onChange(updateEntry(model, kind, r.id, { name: v }))} />
@@ -146,6 +146,9 @@ export default function DictionaryView({
                       <CellInput value={rec.mitigation ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { mitigation: v || null }))} />
                     </td>
                   )}
+                  <td className="dict-desc muted" title={rec.description ?? undefined}>
+                    {rec.description || "—"}
+                  </td>
                   {withUsage && (
                     <td>
                       {usage.length > 0 ? (
@@ -166,7 +169,7 @@ export default function DictionaryView({
                 {expanded === r.id && usage.length > 0 && (
                   <tr className="dict-usage">
                     <td />
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       {usage.map((u, k) => (
                         <button key={k} className="usage-chip" onClick={() => onGoto(u.nodeId)} title="Перейти к элементу на диаграмме">
                           {u.nodeName} <span className="muted">· {u.how}</span>

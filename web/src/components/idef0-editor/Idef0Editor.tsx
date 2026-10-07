@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ProcessLogicModel, ValidationIssue } from "../../types";
+import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
@@ -7,9 +7,10 @@ import { deleteNode, updateNode } from "../bpmn-editor/model-ops";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
 import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
 import { ArrowShape, BlockShape, Idef0Defs } from "./shapes";
-import Inspector, { type Sel } from "./Inspector";
+import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
+type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string } | null;
 type Zone = "input" | "control";
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
@@ -21,7 +22,6 @@ const CONTROL_ZONE = 0.3;
 
 export default function Idef0Editor({
   model,
-  validation,
   busy,
   onSave,
   draftId,
@@ -30,9 +30,9 @@ export default function Idef0Editor({
   focus,
   parentId: parentProp,
   onParentChange,
+  onSelectionChange,
 }: {
   model: M;
-  validation: ValidationIssue[];
   busy: boolean;
   onSave: (m: M) => Promise<boolean>;
   /** Ключ черновика (сессия + редактор) и версия модели, на которой он основан. */
@@ -45,6 +45,8 @@ export default function Idef0Editor({
   /** Открытая диаграмма (null — A0), если её выбирает студия; onParentChange сообщает о переходах по декомпозиции. */
   parentId?: string | null;
   onParentChange?: (id: string | null) => void;
+  /** Выделение сообщается окну студии — по нему панель «Свойства» показывает карточку функции или стрелки. */
+  onSelectionChange?: (sel: Selection) => void;
 }) {
   const local = useModelHistory<M>(() => withIdef0Layout(model));
   const h = history ?? local;
@@ -80,6 +82,23 @@ export default function Idef0Editor({
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
   const curSel: Sel =
     sel && ((sel.kind === "fn" && blocks.has(sel.id)) || (sel.kind === "arrow" && layout.arrows.some((a) => a.key === sel.id))) ? sel : null;
+
+  const toSelection = (s: Sel): Selection => {
+    if (!s) return null;
+    if (s.kind === "fn") return { kind: "node", id: s.id };
+    const arrow = layout.arrows.find((a) => a.key === s.id);
+    return arrow ? { kind: "arrow", arrow } : null;
+  };
+  /** Выбор мышью: сообщаем студии всегда, даже если выделен тот же элемент (панель могла уйти к другой записи). */
+  const pick = (s: Sel) => {
+    setSel(s);
+    onSelectionChange?.(toSelection(s));
+  };
+  // выделение изменилось не мышью (переход из навигатора, новая функция, удаление) — тоже сообщаем
+  useEffect(() => {
+    onSelectionChange?.(toSelection(curSel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curSel?.kind, curSel?.id]);
 
   const commit = (next: M, nextSel?: Sel) => {
     if (h.commit(next) && nextSel !== undefined) setSel(nextSel);
@@ -146,7 +165,7 @@ export default function Idef0Editor({
 
     if (e.button === 1 || (e.button === 0 && onEmpty)) {
       e.preventDefault();
-      if (e.button === 0) setSel(null);
+      if (e.button === 0) pick(null);
       dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty };
       svgRef.current!.setPointerCapture(e.pointerId);
       return;
@@ -162,11 +181,11 @@ export default function Idef0Editor({
       const f = blocks.get(id);
       if (!f) return;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      setSel({ kind: "fn", id });
+      pick({ kind: "fn", id });
       dragRef.current = { kind: "fn", id, offX: wx - f.box.x, offY: wy - f.box.y, startModel: draft, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (arrowEl) {
-      setSel({ kind: "arrow", id: arrowEl.getAttribute("data-arrow-key")! });
+      pick({ kind: "arrow", id: arrowEl.getAttribute("data-arrow-key")! });
     }
   };
 
@@ -385,19 +404,6 @@ export default function Idef0Editor({
           <div className="bpe-corner muted">
             {layout.functions.length} функц. · {layout.arrows.length} стрелок · {Math.round(worldW)}×{Math.round(worldH)}
           </div>
-        </div>
-
-        <div className="bpe-inspector">
-          <Inspector
-            model={draft}
-            sel={curSel}
-            arrows={layout.arrows}
-            codes={codes}
-            validation={validation}
-            onChange={commit}
-            onSelect={(s) => (s?.kind === "fn" ? selectFn(s.id) : setSel(s))}
-            onOpen={openDiagram}
-          />
         </div>
       </div>
     </div>

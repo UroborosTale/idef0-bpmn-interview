@@ -39,7 +39,9 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["internal", "external"] },
-          "source": { "$ref": "#/definitions/sourceList" }
+          "source": { "$ref": "#/definitions/sourceList" },
+          "description": { "type": ["string", "null"] },
+          "owner": { "type": ["string", "null"] }
         }
       }
     },
@@ -51,7 +53,9 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
-          "source": { "$ref": "#/definitions/sourceList" }
+          "source": { "$ref": "#/definitions/sourceList" },
+          "description": { "type": ["string", "null"] },
+          "owner": { "type": ["string", "null"] }
         }
       }
     },
@@ -64,7 +68,9 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["document", "data"] },
-          "source": { "$ref": "#/definitions/sourceList" }
+          "source": { "$ref": "#/definitions/sourceList" },
+          "description": { "type": ["string", "null"] },
+          "owner": { "type": ["string", "null"] }
         }
       }
     },
@@ -77,7 +83,10 @@
           "id": { "type": "string" },
           "name": { "type": "string" },
           "kind": { "enum": ["regulation", "rule", "norm"] },
-          "source": { "$ref": "#/definitions/sourceList" }
+          "reference": { "type": ["string", "null"] },
+          "source": { "$ref": "#/definitions/sourceList" },
+          "description": { "type": ["string", "null"] },
+          "owner": { "type": ["string", "null"] }
         }
       }
     },
@@ -255,6 +264,9 @@
         "name": { "type": "string" },
         "target": { "type": ["string", "null"] },
         "unit": { "type": ["string", "null"] },
+        "period": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "owner": { "type": ["string", "null"] },
         "source": { "$ref": "#/definitions/sourceList" }
       }
     }
