@@ -204,7 +204,7 @@ export default function PropertiesPanel({
     title = "Свойства процесса";
     const p = model.process;
     const set = (patch: Partial<ProcessMeta>) => onChange({ ...model, process: { ...p, ...patch } });
-    const txt = (label: string, key: "code" | "owner" | "department" | "author", placeholder?: string) => (
+    const txt = (label: string, key: "code" | "owner" | "department" | "author" | "group", placeholder?: string) => (
       <Field label={label}>
         <CommitInput value={p[key] ?? ""} placeholder={placeholder} onCommit={(v) => set({ [key]: v.trim() } as Partial<ProcessMeta>)} />
       </Field>
@@ -237,6 +237,7 @@ export default function PropertiesPanel({
           {txt("Владелец процесса", "owner")}
           {txt("Автор процесса", "author")}
           {txt("Подразделение", "department")}
+          {txt("Группа процессов", "group", "папка в навигаторе, например «Организация ДПО персонала»")}
         </Section>
         <Section title="Ролевая модель процесса" count={(model.assignments ?? []).filter((a) => a.node_id === null).length}>
           <AssignmentsEditor model={model} nodeId={null} defaultKind="owner" onChange={onChange} />

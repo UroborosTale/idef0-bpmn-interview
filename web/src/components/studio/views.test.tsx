@@ -95,7 +95,7 @@ describe("навигатор", () => {
     const onOpenDoc = vi.fn();
     render(<Navigator model={purchaseModel()} activeKey="bpmn" selectedId="b1" onOpenDoc={onOpenDoc} onSelectFn={onSelectFn} onAddFunction={() => {}} />);
     const rows = [...document.querySelectorAll("[data-nav-fn]")];
-    expect(rows.map((r) => r.querySelector(".nav-code")!.textContent)).toEqual(["A1", "A2", "A21", "A22", "A3"]);
+    expect(rows.map((r) => r.querySelector(".nav-code")!.textContent)).toEqual(["A1", "A2", "A2.1", "A2.2", "A3"]);
     expect(rows[2].className).toMatch(/selected/);
     fireEvent.click(rows[4]);
     expect(onSelectFn).toHaveBeenCalledWith("c");

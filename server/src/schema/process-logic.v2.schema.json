@@ -16,6 +16,7 @@
         "owner": { "type": "string" },
         "department": { "type": "string" },
         "author": { "type": "string", "description": "Автор процесса (реестр, карточка документа)" },
+        "group": { "type": ["string", "null"], "description": "Группа процессов — папка верхнего уровня в навигаторе" },
         "type": { "enum": ["AS-IS", "TO-BE"] },
         "goal": { "type": "string" },
         "trigger": { "type": "string" },

@@ -71,6 +71,25 @@ export function functionCodes<N extends CodeNode>(m: CodeModel<N>): Map<string, 
   return codes;
 }
 
+/**
+ * Номера блоков, как в Business Studio: A1, A2 — подпроцессы на диаграмме A0, A3.1 — операция в подпроцессе A3. Номер — позиция
+ * блока на своей диаграмме, поэтому он есть и у моделей без кода процесса. Диаграмме BPMN операции соответствует номер
+ * «<номер операции>.1» (A3.1.1) — его вычисляет навигатор.
+ */
+export function blockNumbers<N extends CodeNode>(m: CodeModel<N>): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (parentId: string | null, prefix: string) => {
+    siblings(m, parentId).forEach((n, i) => {
+      if (out.has(n.id)) return; // защита от циклов в idef0_parent
+      const num = prefix ? `${prefix}.${i + 1}` : `A${i + 1}`;
+      out.set(n.id, num);
+      walk(n.id, num);
+    });
+  };
+  walk(null, "");
+  return out;
+}
+
 /** Глубина функции в дереве IDEF0: 1 — верхний уровень (подпроцесс), 2 — операция. 0 — не функция. */
 export function functionDepth<N extends CodeNode>(m: CodeModel<N>, id: string): number {
   const byId = new Map(m.nodes.map((n) => [n.id, n] as const));

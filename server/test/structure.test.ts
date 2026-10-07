@@ -4,7 +4,7 @@ import { startApp } from "./api.js";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
 import { generateIdef0 } from "../src/pipeline/idef0.js";
 import { carryOverManualEdits } from "../src/pipeline/carryOver.js";
-import { bpmnHosts, functionCodes, functionDepth, isStructured, parseProcessCode, processCodeOf, stepCodes } from "../src/shared/codes.js";
+import { blockNumbers, bpmnHosts, functionCodes, functionDepth, isStructured, parseProcessCode, processCodeOf, stepCodes } from "../src/shared/codes.js";
 import { idef0Codes, layoutIdef0, mechanismRoleIds } from "../src/shared/idef0Layout.js";
 import { laneRoleIds, mergeScope, scopeView } from "../src/shared/scope.js";
 import { validateModel } from "../src/shared/validate.js";
@@ -28,6 +28,14 @@ describe("коды по Соглашению о моделировании", () 
     expect(processCodeOf(m)).toBe("B002.00.00");
     expect(isStructured(m)).toBe(true);
     expect(idef0Codes(m).get("o2")).toBe("B002.01.02"); // тот же расчёт использует раскладка IDEF0
+  });
+
+  it("номера блоков как в Business Studio: A1, A1.1, A2.1 — позиция блока на своей диаграмме, шаги BPMN не считаются", () => {
+    expect(Object.fromEntries(blockNumbers(structuredModel()))).toEqual({ s1: "A1", o1: "A1.1", o2: "A1.2", s2: "A2", o3: "A2.1" });
+    expect(Object.fromEntries(blockNumbers(purchaseModel()))).toEqual({ a: "A1", b: "A2", b1: "A2.1", b2: "A2.2", c: "A3" });
+    const m = structuredModel();
+    m.nodes = m.nodes.filter((n) => n.id !== "o1");
+    expect(blockNumbers(m).get("o2")).toBe("A1.1"); // после удаления блока следующие сдвигаются, как и коды
   });
 
   it("шаги BPMN операции — подоперации B002.01.01/001; события кода не получают", () => {

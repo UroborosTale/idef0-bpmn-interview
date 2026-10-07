@@ -25,7 +25,7 @@ export type PatchOp =
   /** Ролевая модель процесса (node_id = null) или функции: полностью заменяет назначения этого узла. */
   | { op: "set_assignments"; node_id: string | null; items: { role_id: string; kind: AssignmentKindName; functions?: string[] }[] }
   /** Атрибуты процесса. */
-  | { op: "set_process"; patch: Partial<Record<"name" | "owner" | "department" | "author" | "goal" | "trigger" | "result" | "code", string>> };
+  | { op: "set_process"; patch: Partial<Record<"name" | "owner" | "department" | "author" | "goal" | "trigger" | "result" | "code" | "group", string>> };
 
 export interface ModelPatch {
   ops: PatchOp[];
@@ -55,7 +55,7 @@ export interface PatchModel {
 }
 
 const NODE_TYPES = ["task", "event", "gateway", "subprocess"];
-const PROCESS_FIELDS = ["name", "owner", "department", "author", "goal", "trigger", "result", "code"];
+const PROCESS_FIELDS = ["name", "owner", "department", "author", "goal", "trigger", "result", "code", "group"];
 const ASSIGNMENT_KINDS = ["owner", "executor", "coexecutor", "controller", "observer"];
 
 const LABEL: Record<PatchCollection, string> = { roles: "должность", systems: "информационная система", data: "документ или данные", controls: "регламент или правило", nodes: "шаг", flows: "стрелка", pools: "внешний пул", messages: "поток сообщений" };
@@ -321,6 +321,7 @@ const FIELD_NAMES: Record<string, string> = {
   result: "результат",
   department: "подразделение",
   author: "автор",
+  group: "группа процессов",
   qualification: "квалификация",
   attached_to: "прикреплено к",
   interrupting: "прерывает задачу",

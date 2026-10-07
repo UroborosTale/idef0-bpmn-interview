@@ -379,7 +379,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         </div>
       </div>
 
-      <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "270px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
+      <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "330px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
           <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} />
         )}

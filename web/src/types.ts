@@ -159,6 +159,8 @@ export interface ProcessMeta {
   name: string;
   owner?: string;
   department?: string;
+  /** Группа процессов — папка верхнего уровня в навигаторе (укрупнённый процесс, к которому относится этот). */
+  group?: string | null;
   author?: string;
   type: "AS-IS" | "TO-BE";
   goal?: string;

@@ -1,14 +1,16 @@
 import { useState } from "react";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { functionsOf, idef0Codes } from "../idef0-editor/geometry";
-import { bpmnHosts, processCodeOf } from "@shared/codes";
+import { blockNumbers, bpmnHosts, isStructured, processCodeOf } from "@shared/codes";
+import NavIcon from "./NavIcon";
 import { entriesOf } from "./dict-ops";
 import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type StudioDoc, bpmnDoc, dictDoc, idef0Doc, reportDoc } from "./docs";
 
 /**
- * Навигатор окна студии (как в Business Studio): дерево процессов с декомпозицией, диаграммы,
- * справочники и отчёты. Клик по функции открывает её диаграмму и выделяет блок; двойной щелчок
- * по функции с декомпозицией — открывает её дочернюю диаграмму.
+ * Навигатор окна студии (как в Business Studio 6): дерево «группа процессов → процесс → диаграмма A0 → подпроцессы (A3) →
+ * операции (A3.1) → диаграмма BPMN операции (A3.1.1)», справочники и отчёты. У каждой строки номер блока на диаграмме и
+ * код по Соглашению (если у процесса он задан). Клик по функции открывает её диаграмму и выделяет блок; двойной щелчок по
+ * функции с декомпозицией — открывает её дочернюю диаграмму; строка диаграммы BPMN открывает диаграмму операции.
  */
 export default function Navigator({
   model,
@@ -29,6 +31,8 @@ export default function Navigator({
   onOpenEntry?: (dict: DictKind, id: string) => void;
 }) {
   const codes = idef0Codes(model);
+  const nums = blockNumbers(model);
+  const structured = isStructured(model);
   const hosts = new Set(bpmnHosts(model).map((n) => n.id)); // функции, у которых есть своя диаграмма BPMN
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -48,11 +52,18 @@ export default function Navigator({
       return n;
     });
 
+  /** Код строки: по Соглашению — «B002.02.01» рядом с номером блока; без кода процесса номер блока (A2.1) и есть обозначение. */
+  const labelOf = (id: string) => (structured ? codes.get(id) : nums.get(id));
+
   const renderFn = (n: ProcessNode, depth: number, seen: Set<string>): React.ReactNode => {
     if (seen.has(n.id)) return null; // защита от циклов в idef0_parent
     const kids = functionsOf(model, n.id);
+    const isHost = hosts.has(n.id);
+    const expandable = kids.length > 0 || isHost;
     const open = !collapsed.has(n.id);
     const nextSeen = new Set(seen).add(n.id);
+    const num = nums.get(n.id) ?? "";
+    const hasSteps = model.nodes.some((s) => s.bpmn_scope === n.id);
     return (
       <div key={n.id}>
         <div
@@ -67,34 +78,109 @@ export default function Navigator({
             className="nav-twisty"
             onClick={(e) => {
               e.stopPropagation();
-              if (kids.length) toggle(n.id);
+              if (expandable) toggle(n.id);
             }}
           >
-            {kids.length ? (open ? "▾" : "▸") : ""}
+            {expandable ? (open ? "▾" : "▸") : ""}
           </span>
-          <span className="nav-code">{codes.get(n.id)}</span>
+          <NavIcon kind={n.idef0_parent ? "operation" : "subprocess"} />
+          {structured && <span className="nav-num">{num}</span>}
+          <span className="nav-code">{labelOf(n.id)}</span>
           <span className="nav-name">{n.name}</span>
-          {kids.length > 0 && <span className="nav-badge">⊞</span>}
-          {hosts.has(n.id) && (
-            <span
-              className={`nav-bpmn ${model.nodes.some((s) => s.bpmn_scope === n.id) ? "on" : ""} ${activeKey === `bpmn:${n.id}` ? "active" : ""}`}
-              title="Диаграмма BPMN операции"
-              data-nav-bpmn={n.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenDoc(bpmnDoc(n.id));
-              }}
-            >
-              ⬡
-            </span>
-          )}
         </div>
         {open && kids.map((k) => renderFn(k, depth + 1, nextSeen))}
+        {open && isHost && (
+          <div
+            className={`nav-row nav-bpmn-row ${hasSteps ? "on" : ""} ${activeKey === `bpmn:${n.id}` ? "active-doc" : ""}`}
+            style={{ paddingLeft: 8 + (depth + 1) * 14 }}
+            data-nav-bpmn={n.id}
+            onClick={() => onOpenDoc(bpmnDoc(n.id))}
+            title={hasSteps ? "Диаграмма BPMN операции" : "Диаграмма BPMN операции ещё пуста — откройте и опишите шаги"}
+          >
+            <span className="nav-twisty" />
+            <NavIcon kind="bpmn" />
+            {structured && <span className="nav-num">{`${num}.1`}</span>}
+            <span className="nav-code">{structured ? codes.get(n.id) : `${num}.1`}</span>
+            <span className="nav-name">{n.name}</span>
+          </div>
+        )}
       </div>
     );
   };
-
   const top = functionsOf(model, null);
+  // Дерево процессов как в Business Studio 6: [группа] → процесс → диаграмма A0 → подпроцессы → операции → диаграмма BPMN
+  const group = model.process.group?.trim();
+  const processCode = structured ? processCodeOf(model) : "";
+  const base = group ? 1 : 0;
+  const pad = (d: number) => ({ paddingLeft: 8 + d * 14 });
+  const twisty = (id: string, show = true) => (
+    <span
+      className="nav-twisty"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (show) toggle(id);
+      }}
+    >
+      {show ? (collapsed.has(id) ? "▸" : "▾") : ""}
+    </span>
+  );
+  const tree = (
+    <>
+      {group && (
+        <div className="nav-row nav-group" style={pad(0)} data-nav-group onClick={() => toggle("~group")} title="Группа процессов">
+          {twisty("~group")}
+          <NavIcon kind="folder" />
+          {structured && <span className="nav-code">{processCode}</span>}
+          <span className="nav-name">{group}</span>
+        </div>
+      )}
+      {!collapsed.has("~group") && (
+        <>
+          <div
+            className={`nav-row ${activeKey === "report:passport" ? "active-doc" : ""}`}
+            style={pad(base)}
+            data-nav-process
+            onClick={() => onOpenDoc(reportDoc("passport"))}
+            title="Паспорт процесса"
+          >
+            {twisty("~process")}
+            <NavIcon kind="process" />
+            {structured && <span className="nav-code">{processCode}</span>}
+            <span className="nav-name">{model.process.name}</span>
+          </div>
+          {!collapsed.has("~process") && (
+            <>
+              <div
+                className={`nav-row ${activeKey === "idef0:root" ? "active-doc" : ""}`}
+                style={pad(base + 1)}
+                data-nav-a0
+                onClick={() => onOpenDoc(idef0Doc(null))}
+                title="Диаграмма IDEF0 верхнего уровня (A0)"
+              >
+                {twisty("~a0", top.length > 0)}
+                <NavIcon kind="diagram" />
+                <span className="nav-num">A0</span>
+                <span className="nav-name">{model.process.name}</span>
+              </div>
+              {!collapsed.has("~a0") && top.map((n) => renderFn(n, base + 2, new Set()))}
+              {top.length === 0 && <div className="muted nav-empty">Функций пока нет</div>}
+              <div
+                className={`nav-row ${activeKey === "bpmn" ? "active-doc" : ""}`}
+                style={pad(base + 1)}
+                data-nav-scheme
+                onClick={() => onOpenDoc(bpmnDoc())}
+                title="Общая схема процесса BPMN"
+              >
+                <span className="nav-twisty" />
+                <NavIcon kind="bpmn" />
+                <span className="nav-name">Схема процесса (BPMN)</span>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
   const section = (id: string, title: string, body: React.ReactNode, action?: React.ReactNode) => (
     <div className="nav-section">
       <div className="nav-section-head" onClick={() => toggleSection(id)}>
@@ -152,20 +238,7 @@ export default function Navigator({
       {section(
         "processes",
         "Процессы",
-        <>
-          <div className={`nav-row ${activeKey === "bpmn" ? "active-doc" : ""}`} style={{ paddingLeft: 8 }} onClick={() => onOpenDoc(bpmnDoc())} title="Диаграмма процесса BPMN">
-            <span className="nav-twisty" />
-            <span className="nav-code">⬡</span>
-            <span className="nav-name">{model.process.name}</span>
-          </div>
-          <div className={`nav-row ${activeKey === "idef0:root" ? "active-doc" : ""}`} style={{ paddingLeft: 22 }} onClick={() => onOpenDoc(idef0Doc(null))} title="Диаграмма IDEF0 верхнего уровня">
-            <span className="nav-twisty" />
-            <span className="nav-code">{processCodeOf(model)}</span>
-            <span className="nav-name">Декомпозиция процесса</span>
-          </div>
-          {top.map((n) => renderFn(n, 2, new Set()))}
-          {top.length === 0 && <div className="muted nav-empty">Функций пока нет</div>}
-        </>,
+        tree,
         <button className="nav-mini" title="Добавить функцию на диаграмму A0" onClick={(e) => { e.stopPropagation(); onAddFunction(null); }}>+</button>
       )}
       {section(

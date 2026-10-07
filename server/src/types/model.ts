@@ -205,6 +205,7 @@ export const ProcessMeta = z.object({
   name: z.string(),
   owner: z.string().optional(),
   department: z.string().optional(),
+  group: z.string().nullable().optional(), // группа процессов (папка в навигаторе: укрупнённый процесс, к которому относится этот)
   author: z.string().optional(), // автор процесса (реестр процессов, карточка документа)
   type: z.enum(["AS-IS", "TO-BE"]).default("AS-IS"),
   goal: z.string().optional(),
