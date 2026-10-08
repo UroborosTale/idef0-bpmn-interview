@@ -36,7 +36,7 @@ describe("MCP-сервер для Cline", () => {
   it("инструменты: правила, сессии, модель, предложение, список и карточка предложений", async () => {
     const { client, close } = await connect(api);
     const tools = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(tools).toEqual(["complete_task", "create_task", "get_conventions", "get_fragments", "get_model", "get_proposal", "get_tasks", "list_proposals", "list_sessions", "propose_patch", "take_task"]);
+    expect(tools).toEqual(["add_questions", "add_report", "complete_task", "create_task", "get_conventions", "get_fragments", "get_model", "get_proposal", "get_report", "get_tasks", "list_proposals", "list_questions", "list_reports", "list_sessions", "propose_patch", "take_task"]);
     await close();
   });
 
@@ -188,6 +188,49 @@ describe("MCP-сервер для Cline", () => {
     const r = await call("list_sessions");
     expect(r.isError).toBe(true);
     expect(r.text).toContain("PM_AGENT_TOKEN");
+    await close();
+  });
+
+  it("вопросы и отчёты: сохранить, увидеть повтор и статус, прочитать целиком; ошибки формата понятны", async () => {
+    const { call, close } = await connect(api);
+    const added = await call("add_questions", {
+      session_id: sid,
+      agent: "интервьюер",
+      questions: [{ text: "Кто утверждает реестр процессов?", addressee: "Начальник отдела", reason: "нет владельца", priority: "critical" }, { text: "Как часто обновляется реестр?" }],
+    });
+    expect(added.isError).toBe(false);
+    expect(added.text).toContain("Сохранено вопросов: 2");
+    expect(added.text).toContain("[критично] «Кто утверждает реестр процессов?»");
+    const repeat = await call("add_questions", { session_id: sid, agent: "интервьюер", questions: [{ text: "кто утверждает реестр процессов" }] });
+    expect(repeat.text).toContain("Сохранено вопросов: 0");
+    expect(repeat.text).toContain("Уже были");
+    expect((await call("list_questions", { session_id: sid, status: "open" })).text).toContain("Как часто обновляется реестр?");
+    expect((await call("list_questions", { session_id: sid, status: "answered" })).text).toBe("Вопросов нет.");
+    const badScope = await call("add_questions", { session_id: sid, agent: "интервьюер", questions: [{ text: "Вопрос про чужую функцию?", scope: "B999.99.99" }] });
+    expect(badScope.isError).toBe(true);
+    expect(badScope.text).toContain("B999.99.99");
+
+    const rep = await call("add_report", {
+      session_id: sid,
+      agent: "аналитик",
+      title: "Узкие места реестра",
+      summary: "Основное время уходит на ожидание",
+      body: "# Подробности\nТекст",
+      findings: [{ what: "Ожидание подписи", where: "B002.01.01", impact: "high", confidence: "medium", recommendation: "Ввести срок" }],
+    });
+    expect(rep.isError).toBe(false);
+    const rid = /rep_[a-z0-9]+/.exec(rep.text)![0];
+    expect(rep.text).toContain("выводов: 1");
+    const listed = await call("list_reports", { session_id: sid });
+    expect(listed.text).toContain(rid);
+    expect(listed.text).toContain("get_report"); // подсказка, что есть полный текст
+    expect(listed.text).not.toContain("Подробности");
+    const full = await call("get_report", { report_id: rid });
+    expect(full.text).toContain("1. [высокое] Ожидание подписи — где: B002.01.01 — уверенность: среднее — рекомендация: Ввести срок");
+    expect(full.text).toContain("# Подробности");
+    const empty = await call("add_report", { session_id: sid, agent: "аналитик", title: "Пустой отчёт" });
+    expect(empty.isError).toBe(true);
+    expect((await call("get_report", { report_id: "rep_нет" })).isError).toBe(true);
     await close();
   });
 });

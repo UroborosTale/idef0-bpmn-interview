@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import type { AgentTaskRow, Proposal } from "../../api/client";
+import type { AgentQuestionRow, AgentReportRow, AgentTaskRow, Proposal } from "../../api/client";
 import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import ProposalsList from "./ProposalsList";
 import TasksPanel from "./TasksPanel";
+import QuestionsPanel, { isLiveQuestion } from "./QuestionsPanel";
+import ReportsPanel from "./ReportsPanel";
 import { ruleTitle } from "./rule-titles";
 import type { QuickFix } from "./quick-fixes";
 
@@ -27,6 +29,10 @@ export default function ProblemsPanel({
   labelOf = (id) => id,
   onCreateTask,
   onCancelTask,
+  questions = [],
+  onQuestionStatus,
+  reports = [],
+  onReportStatus,
   acceptedIssues = [],
   fixFor,
   onFix,
@@ -42,13 +48,18 @@ export default function ProblemsPanel({
   onApplyProposal?: (p: Proposal) => void | Promise<void>;
   onRejectProposal?: (p: Proposal, reason: string) => void | Promise<void>;
   /** Открыть вкладку по запросу извне (кнопка «Предложения» в ленте); nonce меняется при каждом запросе. */
-  showTab?: { tab: "issues" | "gaps" | "proposals" | "tasks"; nonce: number } | null;
+  showTab?: { tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null;
   /** Задания аналитика агенту и их статусы. */
   tasks?: AgentTaskRow[];
   selectedFn?: { id: string; label: string } | null;
   labelOf?: (nodeId: string) => string;
   onCreateTask?: (task: { text: string; scope: string | null; agent?: string }) => void | Promise<void>;
   onCancelTask?: (task: AgentTaskRow) => void | Promise<void>;
+  /** Вопросы к интервью (готовит интервьюер) и отчёты агентов; решения аналитика. */
+  questions?: AgentQuestionRow[];
+  onQuestionStatus?: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
+  reports?: AgentReportRow[];
+  onReportStatus?: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
   /** Принятые аналитиком замечания с причиной: в счётчики не входят, показываются по флажку. */
   acceptedIssues?: AcceptedRow[];
   /** Однозначное исправление замечания, если оно есть. */
@@ -58,7 +69,7 @@ export default function ProblemsPanel({
   onAccept?: (issue: ValidationIssue, reason: string) => void;
   onRevoke?: (issue: ValidationIssue) => void;
 }) {
-  const [tab, setTab] = useState<"issues" | "gaps" | "proposals" | "tasks">("issues");
+  const [tab, setTab] = useState<"issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports">("issues");
   useEffect(() => {
     if (showTab) setTab(showTab.tab);
   }, [showTab?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -94,6 +105,12 @@ export default function ProblemsPanel({
         </button>
         <button className={tab === "tasks" ? "active" : ""} onClick={() => setTab("tasks")}>
           Задания агенту <span className={`pill-count ${tasks.some((t) => t.status === "open" || t.status === "taken") ? "warn" : ""}`}>{tasks.filter((t) => t.status === "open" || t.status === "taken").length}</span>
+        </button>
+        <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}>
+          Вопросы <span className={`pill-count ${questions.some(isLiveQuestion) ? "warn" : ""}`}>{questions.filter(isLiveQuestion).length}</span>
+        </button>
+        <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>
+          Отчёты <span className={`pill-count ${reports.some((r) => r.status === "new") ? "warn" : ""}`}>{reports.filter((r) => r.status === "new").length}</span>
         </button>
         <span className="spacer" />
         {tab === "issues" && (
@@ -193,6 +210,8 @@ export default function ProblemsPanel({
         {tab === "tasks" && (
           <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
         )}
+        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} />}
+        {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} />}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}
         {tab === "gaps" &&
           gaps.map((g) => (

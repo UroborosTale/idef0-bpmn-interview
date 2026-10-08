@@ -7,9 +7,11 @@ import { functionCodes, processCodeOf, stepCodes } from "../shared/codes.js";
 import { applyPatch, describePatch, issueDelta, type ModelPatch } from "../shared/patch.js";
 import { sourceErrors } from "../agent/sources.js";
 import { splitAccepted, validateModel } from "../shared/validate.js";
-import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput } from "../types/patch.js";
+import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput, QuestionsInput, ReportInput, QuestionStatusInput, ReportStatusInput } from "../types/patch.js";
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
+import { addQuestion, getQuestion, listQuestions, setQuestionStatus, QUESTION_STATUSES, type QuestionStatus } from "../agentQuestions.js";
+import { addReport, getReport, listReports, setReportStatus, REPORT_STATUSES, type ReportStatus } from "../agentReports.js";
 
 /**
  * Работа агентов с моделью. Агент (Cline и его субагенты через MCP-сервер, server/src/mcp) читает модель и проверки и
@@ -336,4 +338,206 @@ agentRouter.post("/tasks/:tid/cancel", (req, res) => {
   }
   logAudit(task.sessionId, "analyst", "task_cancelled", { id: task.id });
   res.json(taskWithProposals(cancelled));
+});
+
+// --- вопросы к интервью и отчёты агентов ---
+
+/** Функция по id или по коду Соглашения (B002.01.02): id узла, null — не указана, undefined — такой нет. */
+function resolveScope(model: ProcessLogicModel | null, scope: string | undefined): string | null | undefined {
+  if (!scope) return null;
+  if (!model) return undefined;
+  if (model.nodes.some((n) => n.id === scope)) return scope;
+  const code = [...functionCodes(model), ...stepCodes(model)].find(([, c]) => c === scope);
+  return code ? code[0] : undefined;
+}
+
+/** Задание, к которому относится запись: должно быть в этой сессии и не закрыто. Возвращает текст ошибки или null. */
+function taskProblem(sessionId: string, taskId: string | undefined): { status: number; error: string } | null {
+  if (!taskId) return null;
+  const task = getTask(taskId);
+  if (!task || task.sessionId !== sessionId) return { status: 404, error: `задание «${taskId}» не найдено в этой сессии (get_tasks)` };
+  if (task.status === "done" || task.status === "cancelled") return { status: 409, error: `задание «${taskId}» уже ${task.status === "done" ? "выполнено" : "отменено"}` };
+  return null;
+}
+
+/** Сколько вопросов, ожидающих ответа, и сколько новых отчётов допустимо на сессию: защита от лавины записей. */
+const MAX_LIVE_QUESTIONS = 60;
+const MAX_QUESTIONS_PER_SCOPE = 10;
+const MAX_NEW_REPORTS = 30;
+
+agentRouter.get("/agent/sessions/:id/questions", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const status = req.query.status as QuestionStatus | undefined;
+  if (status && !QUESTION_STATUSES.includes(status)) {
+    res.status(400).json({ error: `status: ${QUESTION_STATUSES.join(" | ")}` });
+    return;
+  }
+  res.json(listQuestions(session.id, status));
+});
+
+agentRouter.post("/agent/sessions/:id/questions", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const parsed = QuestionsInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "вопросы не соответствуют формату", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
+    return;
+  }
+  const bad = taskProblem(session.id, parsed.data.task_id);
+  if (bad) {
+    res.status(bad.status).json({ error: bad.error });
+    return;
+  }
+  // функции проверяем все сразу: пакет принимается целиком или не принимается
+  const scopes = parsed.data.questions.map((q) => resolveScope(session.model, q.scope));
+  const unknown = parsed.data.questions.filter((_, i) => scopes[i] === undefined).map((q) => q.scope);
+  if (unknown.length > 0) {
+    res.status(400).json({ error: `в модели нет функций: ${[...new Set(unknown)].join(", ")} (используйте код вида B002.01.02 или id из get_model)` });
+    return;
+  }
+  const live = listQuestions(session.id).filter((q) => q.status === "open" || q.status === "asked");
+  if (live.length >= MAX_LIVE_QUESTIONS) {
+    res.status(429).json({ error: `уже ${live.length} вопросов ждут интервью — дождитесь, пока аналитик их зададит или снимет` });
+    return;
+  }
+  const perScope = new Map<string | null, number>();
+  for (const q of live) perScope.set(q.scopeNodeId, (perScope.get(q.scopeNodeId) ?? 0) + 1);
+  const added: { question: ReturnType<typeof addQuestion>["question"]; duplicate: boolean }[] = [];
+  const skipped: { text: string; reason: string }[] = [];
+  parsed.data.questions.forEach((q, i) => {
+    const scope = scopes[i] ?? null;
+    if ((perScope.get(scope) ?? 0) >= MAX_QUESTIONS_PER_SCOPE) {
+      skipped.push({ text: q.text, reason: `по этой теме уже ${MAX_QUESTIONS_PER_SCOPE} вопросов — отложите на следующий раз` });
+      return;
+    }
+    const r = addQuestion({ sessionId: session.id, text: q.text, addressee: q.addressee, scopeNodeId: scope, reason: q.reason, priority: q.priority, agent: parsed.data.agent, taskId: parsed.data.task_id });
+    if (!r.duplicate) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
+    added.push(r);
+  });
+  if (added.some((a) => !a.duplicate)) logAudit(session.id, `agent:${parsed.data.agent}`, "questions_added", { count: added.filter((a) => !a.duplicate).length });
+  res.status(201).json({ added: added.filter((a) => !a.duplicate).map((a) => a.question), duplicates: added.filter((a) => a.duplicate).map((a) => ({ id: a.question.id, text: a.question.text, status: a.question.status })), skipped });
+});
+
+agentRouter.get("/agent/sessions/:id/reports", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const status = req.query.status as ReportStatus | undefined;
+  if (status && !REPORT_STATUSES.includes(status)) {
+    res.status(400).json({ error: `status: ${REPORT_STATUSES.join(" | ")}` });
+    return;
+  }
+  // список — без полного текста: он может быть большим, читается отдельно (get_report)
+  res.json(listReports(session.id, status).map(({ body, ...r }) => ({ ...r, hasBody: !!body })));
+});
+
+agentRouter.get("/agent/reports/:rid", (req, res) => {
+  const report = getReport(req.params.rid);
+  if (!report) {
+    res.status(404).json({ error: "отчёт не найден" });
+    return;
+  }
+  res.json(report);
+});
+
+agentRouter.post("/agent/sessions/:id/reports", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const parsed = ReportInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "отчёт не соответствует формату", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
+    return;
+  }
+  const { agent, kind, title, summary, body, findings, scope, task_id } = parsed.data;
+  if (!summary && !body && findings.length === 0) {
+    res.status(400).json({ error: "в отчёте нет содержания: нужен summary, body или findings" });
+    return;
+  }
+  const bad = taskProblem(session.id, task_id);
+  if (bad) {
+    res.status(bad.status).json({ error: bad.error });
+    return;
+  }
+  const scopeId = resolveScope(session.model, scope);
+  if (scopeId === undefined) {
+    res.status(400).json({ error: `функции «${scope}» нет в модели (используйте код вида B002.01.02 или id из get_model)` });
+    return;
+  }
+  const fresh = listReports(session.id, "new").length;
+  if (fresh >= MAX_NEW_REPORTS) {
+    res.status(429).json({ error: `уже ${fresh} непрочитанных отчётов — дождитесь, пока аналитик их просмотрит` });
+    return;
+  }
+  const report = addReport({ sessionId: session.id, agent, kind, title, summary, body, findings, scopeNodeId: scopeId, taskId: task_id ?? null });
+  logAudit(session.id, `agent:${agent}`, "report_added", { id: report.id, title, findings: findings.length });
+  res.status(201).json(report);
+});
+
+// вопросы и отчёты: решает аналитик (студия)
+
+agentRouter.get("/sessions/:id/agent-questions", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  res.json(listQuestions(session.id));
+});
+
+agentRouter.post("/agent-questions/:qid/status", (req, res) => {
+  const parsed = QuestionStatusInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: `status: ${QUESTION_STATUSES.join(" | ")}` });
+    return;
+  }
+  const question = getQuestion(req.params.qid);
+  if (!question) {
+    res.status(404).json({ error: "вопрос не найден" });
+    return;
+  }
+  const { status, answer, fragment_id } = parsed.data;
+  if (fragment_id && !getSession(question.sessionId)?.fragments.some((f) => f.id === fragment_id)) {
+    res.status(400).json({ error: `фрагмента «${fragment_id}» нет в интервью` });
+    return;
+  }
+  const updated = setQuestionStatus(question.id, status, { answer, fragmentId: fragment_id });
+  logAudit(question.sessionId, "analyst", `question_${status}`, { id: question.id });
+  res.json(updated);
+});
+
+agentRouter.get("/sessions/:id/agent-reports", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  res.json(listReports(session.id));
+});
+
+agentRouter.post("/agent-reports/:rid/status", (req, res) => {
+  const parsed = ReportStatusInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: `status: ${REPORT_STATUSES.join(" | ")}` });
+    return;
+  }
+  const report = getReport(req.params.rid);
+  if (!report) {
+    res.status(404).json({ error: "отчёт не найден" });
+    return;
+  }
+  const updated = setReportStatus(report.id, parsed.data.status);
+  logAudit(report.sessionId, "analyst", `report_${parsed.data.status}`, { id: report.id });
+  res.json(updated);
 });

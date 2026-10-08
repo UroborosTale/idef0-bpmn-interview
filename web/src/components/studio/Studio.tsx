@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
 import { applyPatch } from "@shared/patch";
-import { api, type AgentTaskRow, type Proposal } from "../../api/client";
+import { api, type AgentQuestionRow, type AgentReportRow, type AgentTaskRow, type Proposal } from "../../api/client";
 import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
@@ -68,10 +68,12 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [full, setFull] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(true);
-  const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks"; nonce: number } | null>(null);
+  const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
+  const [questions, setQuestions] = useState<AgentQuestionRow[]>([]);
+  const [reports, setReports] = useState<AgentReportRow[]>([]);
   const nonce = useRef(0);
 
   // Предложения агентов (Cline): подхватываем присланные, пока студия открыта; сбой связи не мешает работе
@@ -85,9 +87,16 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         return null;
       }
     };
-    const [p, t] = await Promise.all([fetched(() => api.listProposals(session.id, "pending")), fetched(() => api.listTasks(session.id))]);
+    const [p, t, q, r] = await Promise.all([
+      fetched(() => api.listProposals(session.id, "pending")),
+      fetched(() => api.listTasks(session.id)),
+      fetched(() => api.listQuestions(session.id)),
+      fetched(() => api.listReports(session.id)),
+    ]);
     if (p) setProposals(p);
     if (t) setTasks(t);
+    if (q) setQuestions(q);
+    if (r) setReports(r);
   };
   useEffect(() => {
     void loadProposals();
@@ -158,6 +167,22 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
       await api.cancelTask(task.id);
     } catch {
       /* задание останется в списке */
+    }
+    await loadProposals();
+  };
+  const setQuestionStatus = async (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => {
+    try {
+      await api.setQuestionStatus(q.id, { status, ...(answer ? { answer } : {}) });
+    } catch {
+      /* вопрос останется в прежнем состоянии */
+    }
+    await loadProposals();
+  };
+  const setReportStatus = async (r: AgentReportRow, status: AgentReportRow["status"]) => {
+    try {
+      await api.setReportStatus(r.id, status);
+    } catch {
+      /* отчёт останется в прежнем состоянии */
     }
     await loadProposals();
   };
@@ -483,7 +508,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

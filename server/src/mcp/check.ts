@@ -17,7 +17,7 @@ export interface CheckLine {
   hint?: string;
 }
 
-export const EXPECTED_TOOLS = ["get_conventions", "list_sessions", "get_model", "get_fragments", "propose_patch", "list_proposals", "get_proposal", "get_tasks", "create_task", "take_task", "complete_task"];
+export const EXPECTED_TOOLS = ["get_conventions", "list_sessions", "get_model", "get_fragments", "propose_patch", "list_proposals", "get_proposal", "get_tasks", "create_task", "take_task", "complete_task", "add_questions", "list_questions", "add_report", "list_reports", "get_report"];
 
 export interface CheckOptions {
   baseUrl: string;

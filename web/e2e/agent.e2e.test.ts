@@ -109,3 +109,65 @@ describe("задания агенту в студии", () => {
     await ctx.close();
   });
 });
+
+describe("вопросы и отчёты агентов в студии", () => {
+  it("интервьюер присылает вопросы, аналитик отмечает заданный и ответ; аналитик-агент присылает отчёт, студия показывает выводы и архив", async () => {
+    const id = await seedSession("Согласование договора (вопросы)");
+    const model = (await api<any>("GET", `/agent/sessions/${id}/model`)).body;
+    const [fnId, fnCode] = Object.entries<string>(model.codes).find(([nid]) => model.model.nodes.some((n: any) => n.id === nid && n.type === "task"))!;
+
+    // агенты (по тому же API, что и MCP-сервер) сохраняют вопросы и отчёт
+    const qs = await api<any>("POST", `/agent/sessions/${id}/questions`, {
+      agent: "интервьюер",
+      questions: [
+        { text: "Кто подписывает договор на стороне заказчика?", addressee: "Юрист", scope: fnCode, reason: "нет исполнителя", priority: "critical" },
+        { text: "Сколько дней занимает согласование?", priority: "desirable" },
+      ],
+    });
+    expect(qs.status).toBe(201);
+    expect((await api<any>("POST", `/agent/sessions/${id}/reports`, {
+      agent: "аналитик",
+      title: "Узкие места согласования",
+      summary: "Основное время — ожидание подписи",
+      body: "Подробный разбор",
+      findings: [{ what: "Ожидание подписи", where: fnCode, impact: "high", confidence: "medium", recommendation: "Ввести срок" }],
+    })).status).toBe(201);
+
+    const { ctx, page, errors } = await openContext(browser);
+    await page.goto(`${WEB}/s/${id}`);
+    await page.locator(".studio").waitFor();
+
+    // вопросы: счётчик, порядок по важности, отметки
+    const qTab = page.locator(".problems-head button", { hasText: "Вопросы" });
+    await qTab.locator(".pill-count", { hasText: "2" }).waitFor(); // студия подтягивает записи сразу после открытия
+    await qTab.click();
+    const first = page.locator(".question").first();
+    expect(await first.innerText()).toContain("Кто подписывает договор");
+    expect(await first.innerText()).toContain("спросить: Юрист");
+    await first.getByRole("button", { name: "Задан" }).click();
+    await page.locator(".question", { hasText: "Кто подписывает" }).getByText("задан", { exact: true }).waitFor();
+    await page.locator(".question", { hasText: "Сколько дней" }).getByRole("button", { name: "Получен ответ" }).click();
+    await page.getByPlaceholder(/Ответ респондента/).fill("Три дня");
+    await page.getByRole("button", { name: "Ответ получен" }).click();
+    await page.getByLabel(/с отвеченными и снятыми/).check();
+    await page.locator(".question", { hasText: "Сколько дней" }).getByText("Ответ: Три дня").waitFor();
+    const stored = (await api<any[]>("GET", `/agent/sessions/${id}/questions`)).body;
+    expect(stored.map((q) => q.status).sort()).toEqual(["answered", "asked"]);
+    expect(stored.find((q) => q.status === "asked").scopeNodeId).toBe(fnId);
+
+    // отчёт: открытие отмечает прочитанным, архив убирает из списка
+    const rTab = page.locator(".problems-head button", { hasText: "Отчёты" });
+    await rTab.locator(".pill-count", { hasText: "1" }).waitFor();
+    await rTab.click();
+    await page.locator(".report-head", { hasText: "Узкие места согласования" }).click();
+    await page.locator(".report-findings").waitFor();
+    expect(await page.locator(".report-findings tbody").innerText()).toContain("Ввести срок");
+    expect(await page.locator(".report-text").innerText()).toBe("Подробный разбор");
+    await rTab.locator(".pill-count", { hasText: "0" }).waitFor();
+    await page.getByRole("button", { name: "В архив" }).click();
+    await page.locator(".report").waitFor({ state: "detached" });
+    expect(((await api<any[]>("GET", `/agent/sessions/${id}/reports`)).body)[0].status).toBe("archived");
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+});

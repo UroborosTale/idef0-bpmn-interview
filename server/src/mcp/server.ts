@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { ProposalInput } from "../types/patch.js";
+import { FindingInput, ProposalInput, QuestionItem } from "../types/patch.js";
 import { outline, type ModelView } from "./outline.js";
 
 /**
@@ -60,6 +60,37 @@ function describeProposal(p: any): string {
   return lines.join("\n");
 }
 
+const questionLabel = { open: "ждёт интервью", asked: "задан", answered: "получен ответ", dismissed: "снят" } as Record<string, string>;
+const priorityLabel = { critical: "критично", important: "важно", desirable: "желательно" } as Record<string, string>;
+const levelLabel = { high: "высокое", medium: "среднее", low: "низкое" } as Record<string, string>;
+const reportLabel = { new: "новый", read: "прочитан", archived: "в архиве" } as Record<string, string>;
+const kindLabel = { analysis: "анализ", review: "проверка", methodology: "методология", other: "прочее" } as Record<string, string>;
+
+function describeQuestion(q: any): string {
+  const lines = [`${q.id} — [${priorityLabel[q.priority] ?? q.priority}] «${q.text}»${q.scopeNodeId ? ` (функция ${q.scopeNodeId})` : ""}${q.addressee ? `, адресат: ${q.addressee}` : ""} — ${questionLabel[q.status] ?? q.status}`];
+  if (q.reason) lines.push(`  Зачем: ${q.reason}`);
+  if (q.status === "answered") lines.push(`  Ответ${q.fragmentId ? ` [${q.fragmentId}]` : ""}: ${q.answer ?? "дан на интервью"}`);
+  return lines.join("\n");
+}
+
+function describeFinding(f: any, i: number): string {
+  const parts = [`${i + 1}. [${levelLabel[f.impact] ?? f.impact}] ${f.what}`];
+  if (f.where) parts.push(`где: ${f.where}`);
+  if (f.basis) parts.push(`основание: ${f.basis}`);
+  parts.push(`уверенность: ${levelLabel[f.confidence] ?? f.confidence}`);
+  if (f.recommendation) parts.push(`рекомендация: ${f.recommendation}`);
+  return parts.join(" — ");
+}
+
+function describeReport(r: any, full = false): string {
+  const lines = [`${r.id} — «${r.title}» (${r.agent}, ${kindLabel[r.kind] ?? r.kind}), ${reportLabel[r.status] ?? r.status}${r.scopeNodeId ? `, функция ${r.scopeNodeId}` : ""}; выводов: ${r.findings?.length ?? 0}`];
+  if (r.summary) lines.push(`  ${r.summary}`);
+  if (full) {
+    (r.findings ?? []).forEach((f: any, i: number) => lines.push(`  ${describeFinding(f, i)}`));
+    if (r.body) lines.push("", r.body);
+  } else if (r.hasBody) lines.push("  (есть полный текст — get_report)");
+  return lines.join("\n");
+}
 export function createAgentServer(api: AgentApi): McpServer {
   const server = new McpServer({ name: "process-modeling", version: "1.0.0" });
 
@@ -226,5 +257,90 @@ export function createAgentServer(api: AgentApi): McpServer {
     }
   );
 
+  server.registerTool(
+    "add_questions",
+    {
+      title: "Сохранить вопросы к интервью",
+      description:
+        "Сохранить в приложении вопросы к следующему интервью (роль «интервьюер»): они появятся у аналитика во вкладке «Вопросы» с адресатом и приоритетом, он отметит заданные и полученные ответы. Повторы существующих вопросов не создаются. Не больше 20 вопросов за вызов, около 5 на одну функцию. Модель вопросы не меняют.",
+      inputSchema: {
+        session_id: z.string(),
+        agent: z.string().describe("Ваша роль"),
+        questions: z.array(QuestionItem).min(1).max(20).describe("text, addressee (должность), scope (код функции B002.01.02), reason (зачем), priority (critical | important | desirable)"),
+        task_id: z.string().optional().describe("Задание аналитика, по которому подготовлены вопросы"),
+      },
+    },
+    async ({ session_id, agent, questions, task_id }) => {
+      const r = await api.post(`/agent/sessions/${encodeURIComponent(session_id)}/questions`, { agent, questions, ...(task_id ? { task_id } : {}) });
+      if (r.status === 400 && r.body?.details) return fail(`${r.body.error}:\n${(r.body.details as string[]).map((d) => `• ${d}`).join("\n")}\nВопросы не сохранены — исправьте и отправьте снова.`);
+      if (r.status !== 201) return apiError(r);
+      const lines = [`Сохранено вопросов: ${r.body.added.length}.`, ...r.body.added.map(describeQuestion)];
+      if (r.body.duplicates.length) lines.push(`Уже были (не добавлены): ${r.body.duplicates.map((d: any) => `${d.id} «${d.text}» — ${questionLabel[d.status] ?? d.status}`).join("; ")}`);
+      if (r.body.skipped.length) lines.push(`Не добавлены: ${r.body.skipped.map((s: any) => `«${s.text}» — ${s.reason}`).join("; ")}`);
+      return ok(lines.join("\n"));
+    }
+  );
+
+  server.registerTool(
+    "list_questions",
+    {
+      title: "Вопросы к интервью",
+      description: "Вопросы сессии со статусами: что уже задано и на что получен ответ (с id фрагмента). Смотрите до составления нового списка, чтобы не повторяться. Без status — все.",
+      inputSchema: { session_id: z.string(), status: z.enum(["open", "asked", "answered", "dismissed"]).optional() },
+    },
+    async ({ session_id, status }) => {
+      const r = await api.get(`/agent/sessions/${encodeURIComponent(session_id)}/questions${status ? `?status=${status}` : ""}`);
+      if (r.status !== 200) return apiError(r);
+      return ok(r.body.length ? r.body.map(describeQuestion).join("\n\n") : "Вопросов нет.");
+    }
+  );
+
+  server.registerTool(
+    "add_report",
+    {
+      title: "Сохранить отчёт",
+      description:
+        "Сохранить в приложении отчёт (роли «аналитик», «нормоконтролёр», «методолог»): аналитик увидит его во вкладке «Отчёты». Выводы — структурой (что, где, основание, влияние, уверенность, рекомендация); полный текст — в body (markdown). Модель отчёт не меняет — правки предлагаются отдельно через propose_patch.",
+      inputSchema: {
+        session_id: z.string(),
+        agent: z.string().describe("Ваша роль"),
+        kind: z.enum(["analysis", "review", "methodology", "other"]).default("analysis"),
+        title: z.string().min(3).max(200),
+        summary: z.string().max(2000).optional().describe("Главное в 2–3 предложениях"),
+        findings: z.array(FindingInput).max(50).default([]).describe("Выводы по влиянию, не больше 10 важных"),
+        body: z.string().max(30000).optional().describe("Полный текст отчёта, markdown"),
+        scope: z.string().optional().describe("Функция (код B002.01.02), к которой относится отчёт"),
+        task_id: z.string().optional(),
+      },
+    },
+    async ({ session_id, agent, kind, title, summary, findings, body, scope, task_id }) => {
+      const r = await api.post(`/agent/sessions/${encodeURIComponent(session_id)}/reports`, { agent, kind, title, findings, ...(summary ? { summary } : {}), ...(body ? { body } : {}), ...(scope ? { scope } : {}), ...(task_id ? { task_id } : {}) });
+      if (r.status === 400 && r.body?.details) return fail(`${r.body.error}:\n${(r.body.details as string[]).map((d) => `• ${d}`).join("\n")}\nОтчёт не сохранён — исправьте и отправьте снова.`);
+      return r.status === 201 ? ok(`Отчёт сохранён и ждёт аналитика.\n${describeReport(r.body)}`) : apiError(r);
+    }
+  );
+
+  server.registerTool(
+    "list_reports",
+    {
+      title: "Отчёты сессии",
+      description: "Отчёты агентов по сессии: заголовок, роль, статус (новый, прочитан, в архиве) и краткое содержание. Полный текст — get_report.",
+      inputSchema: { session_id: z.string(), status: z.enum(["new", "read", "archived"]).optional() },
+    },
+    async ({ session_id, status }) => {
+      const r = await api.get(`/agent/sessions/${encodeURIComponent(session_id)}/reports${status ? `?status=${status}` : ""}`);
+      if (r.status !== 200) return apiError(r);
+      return ok(r.body.length ? r.body.map((x: any) => describeReport(x)).join("\n\n") : "Отчётов нет.");
+    }
+  );
+
+  server.registerTool(
+    "get_report",
+    { title: "Отчёт", description: "Один отчёт целиком: выводы и полный текст.", inputSchema: { report_id: z.string() } },
+    async ({ report_id }) => {
+      const r = await api.get(`/agent/reports/${encodeURIComponent(report_id)}`);
+      return r.status === 200 ? ok(describeReport(r.body, true)) : apiError(r);
+    }
+  );
   return server;
 }

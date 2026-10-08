@@ -508,3 +508,17 @@ button.danger:hover { background: #fef2f2; }
 .bpe-palette-more summary { cursor: pointer; color: #475569; margin-bottom: 4px; }
 .bpe-palette-group { font-size: 10.5px; margin: 6px 0 2px; }
 .prop-checks { display: grid; gap: 2px; }
+/* вопросы к интервью и отчёты агентов */
+.questions-bar { padding: 6px 12px; border-bottom: 1px solid #e5ebf5; }
+.question-prio-critical { background: #fee2e2; color: #991b1b; }
+.question-prio-important { background: #fef3c7; color: #92400e; }
+.question-prio-desirable { background: #e5e7eb; color: #4b5563; }
+.question-dismissed, .question-answered { opacity: 0.75; }
+.report-head { cursor: pointer; }
+.report-body { margin: 6px 0; }
+.report-findings { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0; }
+.report-findings th, .report-findings td { border: 1px solid #e5ebf5; padding: 3px 6px; text-align: left; vertical-align: top; }
+.report-findings th { background: #f4f7fc; font-weight: 600; }
+.finding-high td:first-child { color: #991b1b; font-weight: 600; }
+.report-text { white-space: pre-wrap; font: inherit; background: #f8fafc; border: 1px solid #e5ebf5; border-radius: 4px; padding: 8px; margin: 6px 0; max-height: 320px; overflow: auto; }
+.report-archived { opacity: 0.7; }

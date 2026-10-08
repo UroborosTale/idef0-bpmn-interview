@@ -1,5 +1,5 @@
 import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, HistoryEvent, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
-import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage, Proposal, AgentTaskRow } from "./types";
+import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage, Proposal, AgentTaskRow, AgentQuestionRow, AgentReportRow } from "./types";
 import { BASE, req, waitJob } from "./http";
 
 export * from "./types";
@@ -66,6 +66,10 @@ export const api = {
   listTasks: (id: string) => req<AgentTaskRow[]>("GET", `/sessions/${id}/tasks`),
   createTask: (id: string, task: { text: string; scope?: string | null; agent?: string }) => req<AgentTaskRow>("POST", `/sessions/${id}/tasks`, task),
   cancelTask: (taskId: string) => req<AgentTaskRow>("POST", `/tasks/${taskId}/cancel`, {}),
+  listQuestions: (id: string) => req<AgentQuestionRow[]>("GET", `/sessions/${id}/agent-questions`),
+  setQuestionStatus: (qid: string, body: { status: AgentQuestionRow["status"]; answer?: string }) => req<AgentQuestionRow>("POST", `/agent-questions/${qid}/status`, body),
+  listReports: (id: string) => req<AgentReportRow[]>("GET", `/sessions/${id}/agent-reports`),
+  setReportStatus: (rid: string, status: AgentReportRow["status"]) => req<AgentReportRow>("POST", `/agent-reports/${rid}/status`, { status }),
 
   exportUrl: (id: string, path: string) => `${BASE}/sessions/${id}/export/${path}`,
 

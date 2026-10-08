@@ -533,3 +533,48 @@ export interface AgentTaskRow {
   /** Предложения, отправленные агентом по этому заданию. */
   proposals: { id: string; title: string; status: "pending" | "applied" | "rejected" }[];
 }
+
+/** Вопрос к следующему интервью: его готовит агент-интервьюер, а аналитик отмечает, что задано и что отвечено. */
+export interface AgentQuestionRow {
+  id: string;
+  sessionId: string;
+  text: string;
+  addressee: string | null;
+  scopeNodeId: string | null;
+  reason: string | null;
+  priority: "critical" | "important" | "desirable";
+  status: "open" | "asked" | "answered" | "dismissed";
+  answer: string | null;
+  fragmentId: string | null;
+  agent: string;
+  taskId: string | null;
+  createdAt: string;
+}
+
+export type FindingLevel = "high" | "medium" | "low";
+
+/** Вывод отчёта агента: что, где, основание, влияние, уверенность и рекомендация. */
+export interface ReportFinding {
+  what: string;
+  where?: string;
+  basis?: string;
+  impact: FindingLevel;
+  confidence: FindingLevel;
+  recommendation?: string;
+}
+
+/** Отчёт агента (аналитика, нормоконтролёра, методолога): модель не меняет, аналитик читает и архивирует. */
+export interface AgentReportRow {
+  id: string;
+  sessionId: string;
+  agent: string;
+  kind: "analysis" | "review" | "methodology" | "other";
+  title: string;
+  summary: string | null;
+  body: string | null;
+  findings: ReportFinding[];
+  scopeNodeId: string | null;
+  taskId: string | null;
+  status: "new" | "read" | "archived";
+  createdAt: string;
+}

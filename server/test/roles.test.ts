@@ -44,7 +44,7 @@ describe("инструкции ролей агентов", () => {
 
   it("инструкции ссылаются только на существующие инструменты MCP и известные поля и параметры", async () => {
     const tools = new Set(await toolNames());
-    expect(tools.size).toBe(11);
+    expect(tools.size).toBe(16);
     const used = new Set<string>();
     for (const role of AGENT_ROLES) {
       for (const name of snake(roleInstruction(role))) {
@@ -55,7 +55,7 @@ describe("инструкции ролей агентов", () => {
     // общие правила тоже
     for (const name of snake(fs.readFileSync(path.join(repoRoot, ".clinerules", "00-process-modeling.md"), "utf8"))) expect(tools.has(name) || KNOWN.has(name), name).toBe(true);
     // и каждый инструмент где-нибудь описан в инструкциях ролей
-    for (const t of ["get_conventions", "get_model", "get_fragments", "propose_patch", "list_proposals", "get_tasks", "take_task", "complete_task", "create_task", "list_sessions"]) expect(used.has(t), t).toBe(true);
+    for (const t of ["get_conventions", "get_model", "get_fragments", "propose_patch", "list_proposals", "get_tasks", "take_task", "complete_task", "create_task", "list_sessions", "add_questions", "list_questions", "add_report", "list_reports"]) expect(used.has(t), t).toBe(true);
   });
 
   it("поля модели, которые называет аналитик, существуют в схеме узла; поручения и роли в agent допустимы", () => {
