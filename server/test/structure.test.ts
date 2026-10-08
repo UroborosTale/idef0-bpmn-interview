@@ -82,6 +82,25 @@ describe("диаграмма BPMN операции как область мод�
     expect(scopeView(m, null).nodes.map((n) => n.id)).toEqual(["s1", "s2", "o1", "o2", "o3"]);
   });
 
+  it("новые узлы и стрелки, чьи id совпали с чужими (редактор не видит других диаграмм), получают свободные id", () => {
+    const m = structuredModel();
+    m.flows.push({ id: "xf", from: "o1", to: "o2" } as (typeof m.flows)[number]); // стрелка вне диаграммы o1
+    const v = scopeView(m, "o1");
+    const clash = { ...v.nodes[1], id: "o2", name: "Новый шаг" }; // id занят функцией o2
+    const edge = { id: "xf", from: "b2", to: "o2" } as (typeof m.flows)[number]; // id занят чужой стрелкой
+    const merged = mergeScope(m, { ...v, nodes: [...v.nodes, clash], flows: [...v.flows, edge] }, "o1", v);
+    const ids = merged.nodes.map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(new Set(merged.flows.map((f) => f.id)).size).toBe(merged.flows.length);
+    const added = merged.nodes.find((n) => n.name === "Новый шаг")!;
+    expect(added.id).not.toBe("o2");
+    expect(added.bpmn_scope).toBe("o1");
+    expect(merged.nodes.find((n) => n.id === "o2")!.name).toBe("Проведение первичного интервью"); // функция не затёрта
+    const newFlow = merged.flows.find((f) => f.from === "b2" && f.to === added.id)!;
+    expect(newFlow.id).not.toBe("xf");
+    expect(merged.flows.find((f) => f.id === "xf")).toMatchObject({ from: "o1", to: "o2" });
+  });
+
   it("модель без диаграмм операций: вид общей схемы — сама модель", () => {
     const m = purchaseModel();
     expect(scopeView(m, null)).toBe(m);

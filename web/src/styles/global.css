@@ -492,3 +492,14 @@ button.danger:hover { background: #fef2f2; }
 .wizard-preview li.sub { font-weight: 600; margin-top: 6px; }
 .wizard-preview li.op { margin-left: 18px; }
 .wizard-problems p { margin: 2px 0; }
+/* Выделение группой и миникарта диаграммы */
+.bpe-canvas { position: relative; }
+.bpe-selbar { position: absolute; bottom: 28px; left: 10px; display: flex; flex-wrap: wrap; max-width: calc(100% - 230px); gap: 6px; align-items: center; background: #fff; border: 1px solid #c4d1e6; border-radius: 6px; padding: 4px 8px; box-shadow: 0 2px 8px rgba(30, 41, 59, 0.15); font-size: 12px; z-index: 5; }
+.bpe-selbar button, .bpe-selbar span { padding: 2px 8px; white-space: nowrap; }
+.bpe-minimap { position: absolute; right: 10px; bottom: 28px; background: rgba(255, 255, 255, 0.92); border: 1px solid #c4d1e6; border-radius: 4px; box-shadow: 0 2px 8px rgba(30, 41, 59, 0.15); z-index: 4; line-height: 0; }
+.bpe-minimap svg { cursor: pointer; touch-action: none; }
+.mm-node { fill: #9fb3d1; stroke: none; }
+.mm-event { fill: #7fa87f; }
+.mm-gateway { fill: #d6a64a; }
+.mm-sel { fill: #4338ca; }
+.mm-view { fill: rgba(67, 56, 202, 0.08); stroke: #4338ca; stroke-width: 1; }

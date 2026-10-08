@@ -62,6 +62,44 @@ export function scopeView<M extends ScopeModel>(m: M, scope: string | null): M {
 }
 
 /**
+ * Редактор выдаёт id новым узлам и стрелкам по виду области, не зная о шагах других диаграмм: «n4» мог уже быть узлом
+ * другой диаграммы. Такие совпадения получают свободные id; ссылки в новых узлах, стрелках и потоках сообщений
+ * переписываются.
+ */
+function freshenIds<M extends ScopeModel>(full: M, next: M, prevIds: Set<string>, scope: string | null): M {
+  const taken = new Set([...full.nodes.map((n) => n.id), ...next.nodes.map((n) => n.id)]);
+  const nodeMap = new Map<string, string>();
+  for (const n of next.nodes) {
+    if (prevIds.has(n.id) || !full.nodes.some((x) => x.id === n.id)) continue;
+    let i = taken.size + 1;
+    while (taken.has(`n${i}`)) i++;
+    nodeMap.set(n.id, `n${i}`);
+    taken.add(`n${i}`);
+  }
+  const keptFlows = new Set(full.flows.filter((f) => !(prevIds.has(f.from) && prevIds.has(f.to))).map((f) => f.id));
+  const flowTaken = new Set([...full.flows.map((f) => f.id), ...next.flows.map((f) => f.id)]);
+  const flowMap = new Map<string, string>();
+  for (const f of next.flows) {
+    if (!keptFlows.has(f.id)) continue;
+    let i = flowTaken.size + 1;
+    while (flowTaken.has(`flow${i}`)) i++;
+    flowMap.set(f.id, `flow${i}`);
+    flowTaken.add(`flow${i}`);
+  }
+  if (nodeMap.size === 0 && flowMap.size === 0) return next;
+  const node = (id: string) => nodeMap.get(id) ?? id;
+  return {
+    ...next,
+    nodes: next.nodes.map((n) => {
+      const attached = (n as { attached_to?: string | null }).attached_to;
+      return nodeMap.has(n.id) || (attached && nodeMap.has(attached)) ? { ...n, id: node(n.id), ...(attached ? { attached_to: node(attached) } : {}) } : n;
+    }),
+    flows: next.flows.map((f) => (nodeMap.has(f.from) || nodeMap.has(f.to) || flowMap.has(f.id) ? { ...f, id: flowMap.get(f.id) ?? f.id, from: node(f.from), to: node(f.to) } : f)),
+    ...(next.messages ? { messages: next.messages.map((x) => (nodeMap.has(x.from) || nodeMap.has(x.to) ? { ...x, from: node(x.from), to: node(x.to) } : x)) } : {}),
+  };
+}
+
+/**
  * Вливает правки вида области в полную модель: узлы области заменяются (порядок сохраняется, новые — в конец),
  * потоки области пересобираются, новые дорожки становятся ролями модели и исполнителями операции.
  * Если вид не менялся (next === prevView), возвращается сама модель.
@@ -70,6 +108,7 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
   if (prevView && next === prevView) return full;
   if (scope === null && next === full) return full;
   const prevIds = new Set(full.nodes.filter((n) => inScope(n, scope)).map((n) => n.id));
+  next = freshenIds(full, next, prevIds, scope);
   const nextById = new Map(next.nodes.map((n) => [n.id, n] as const));
   const mark = <N extends ScopeNode>(n: N): N => (scope === null ? n : { ...n, bpmn_scope: scope, idef0_parent: null });
 
