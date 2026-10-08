@@ -1,3 +1,4 @@
+import { allowedTriggers, eventSpec, withTrigger, type EventPosition, type EventTrigger, type TriggerType } from "@shared/events";
 import type { ExternalPool, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, boxOf } from "./geometry";
 
@@ -12,6 +13,8 @@ export interface NewNodeSpec {
   type: ProcessNode["type"];
   subtype?: string;
   name: string;
+  /** Событие: триггер (таймер, сообщение…). */
+  trigger?: EventTrigger;
 }
 
 export const PALETTE: { label: string; spec: NewNodeSpec }[] = [
@@ -26,9 +29,30 @@ export const PALETTE: { label: string; spec: NewNodeSpec }[] = [
   { label: "Шлюз OR", spec: { type: "gateway", subtype: "inclusive", name: "Один или несколько" } },
 ];
 
+/** События с триггерами: заготовки с названием-фактом; вид и параметры потом уточняются в свойствах. */
+export const EVENT_PALETTE: { label: string; group: string; spec: NewNodeSpec }[] = [
+  { group: "Начало", label: "Начало: сообщение", spec: { type: "event", subtype: "start", name: "Сообщение получено", trigger: { type: "message" } } },
+  { group: "Начало", label: "Начало: таймер", spec: { type: "event", subtype: "start", name: "Наступил срок", trigger: { type: "timer" } } },
+  { group: "Начало", label: "Начало: условие", spec: { type: "event", subtype: "start", name: "Условие выполнено", trigger: { type: "conditional" } } },
+  { group: "Начало", label: "Начало: сигнал", spec: { type: "event", subtype: "start", name: "Сигнал получен", trigger: { type: "signal" } } },
+  { group: "Ожидание", label: "Ждать сообщение", spec: { type: "event", subtype: "intermediate", name: "Сообщение получено", trigger: { type: "message", direction: "catch" } } },
+  { group: "Ожидание", label: "Ждать таймер", spec: { type: "event", subtype: "intermediate", name: "Срок наступил", trigger: { type: "timer", direction: "catch" } } },
+  { group: "Ожидание", label: "Ждать условие", spec: { type: "event", subtype: "intermediate", name: "Условие выполнено", trigger: { type: "conditional", direction: "catch" } } },
+  { group: "Ожидание", label: "Ждать сигнал", spec: { type: "event", subtype: "intermediate", name: "Сигнал получен", trigger: { type: "signal", direction: "catch" } } },
+  { group: "Ожидание", label: "Ссылка: принять", spec: { type: "event", subtype: "intermediate", name: "Переход принят", trigger: { type: "link", direction: "catch" } } },
+  { group: "Отправка", label: "Отправить сообщение", spec: { type: "event", subtype: "intermediate", name: "Сообщение отправлено", trigger: { type: "message", direction: "throw" } } },
+  { group: "Отправка", label: "Выбросить сигнал", spec: { type: "event", subtype: "intermediate", name: "Сигнал отправлен", trigger: { type: "signal", direction: "throw" } } },
+  { group: "Отправка", label: "Ссылка: перейти", spec: { type: "event", subtype: "intermediate", name: "Переход выполнен", trigger: { type: "link", direction: "throw" } } },
+  { group: "Отправка", label: "Эскалация", spec: { type: "event", subtype: "intermediate", name: "Вопрос эскалирован", trigger: { type: "escalation", direction: "throw" } } },
+  { group: "Конец", label: "Конец: сообщение", spec: { type: "event", subtype: "end", name: "Уведомление отправлено", trigger: { type: "message" } } },
+  { group: "Конец", label: "Конец: ошибка", spec: { type: "event", subtype: "end", name: "Процесс завершён с ошибкой", trigger: { type: "error" } } },
+  { group: "Конец", label: "Конец: сигнал", spec: { type: "event", subtype: "end", name: "Сигнал отправлен", trigger: { type: "signal" } } },
+  { group: "Конец", label: "Конец: терминатор", spec: { type: "event", subtype: "end", name: "Процесс прекращён", trigger: { type: "terminate" } } },
+];
+
 export const SUBTYPES: Record<string, [string, string][]> = {
   task: [["", "Обычная"], ["user", "Пользовательская"], ["service", "Сервисная"], ["manual", "Ручная"], ["send", "Отправка"], ["receive", "Получение"], ["script", "Скрипт"], ["business_rule", "Бизнес-правила"]],
-  event: [["start", "Начало"], ["intermediate", "Промежуточное"], ["timer", "Таймер"], ["message", "Сообщение"], ["signal", "Сигнал"], ["error", "Ошибка"], ["end", "Конец"]],
+  event: [["start", "Начальное"], ["intermediate", "Промежуточное"], ["end", "Конечное"]],
   gateway: [["exclusive", "Исключающий (XOR)"], ["parallel", "Параллельный (AND)"], ["inclusive", "Включающий (OR)"], ["event_based", "По событию"]],
   subprocess: [],
 };
@@ -54,6 +78,7 @@ export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpRe
     id: nextId("n", m.nodes.map((n) => n.id)),
     type: spec.type,
     subtype: spec.subtype,
+    ...(spec.trigger ? { trigger: structuredClone(spec.trigger) } : {}),
     name: spec.name,
     role_id: roleIdOfLane(m, lane),
     system_ids: [],
@@ -108,6 +133,7 @@ export function setNodeType(m: M, id: string, type: ProcessNode["type"]): M {
     ...nn,
     type,
     subtype,
+    trigger: type === "event" ? nn.trigger : null,
     layout: { x: snap(old.x + (old.w - size.w) / 2), y: old.y + (old.h - size.h) / 2 }, // центр остаётся на месте
   }));
 }
@@ -227,18 +253,30 @@ export const renameRole = (m: M, id: string, name: string): M => ({
 
 // --- граничные события, внешние пулы и потоки сообщений ---
 
-const BOUNDARY_NAMES: Record<string, string> = { timer: "Срок истёк", message: "Сообщение получено", error: "Ошибка выполнения", signal: "Сигнал получен" };
-export const BOUNDARY_SUBTYPES: [string, string][] = [["timer", "Таймер"], ["message", "Сообщение"], ["error", "Ошибка"], ["signal", "Сигнал"]];
+const BOUNDARY_NAMES: Partial<Record<TriggerType, string>> = {
+  timer: "Срок истёк",
+  message: "Сообщение получено",
+  error: "Ошибка выполнения",
+  signal: "Сигнал получен",
+  conditional: "Условие выполнено",
+  escalation: "Вопрос эскалирован",
+  compensation: "Требуется компенсация",
+  cancel: "Операция отменена",
+};
+/** Триггеры граничного события, которые предлагаются кнопками; остальные — в списке «Другой триггер». */
+export const BOUNDARY_MAIN: TriggerType[] = ["timer", "message", "error", "signal"];
+export const BOUNDARY_TRIGGERS: TriggerType[] = allowedTriggers("boundary").filter((t) => t !== "multiple" && t !== "parallel_multiple");
 
 /** Граничное событие на границе задачи или подпроцесса: стоит на нижней границе, ветку из него ведут обычной стрелкой. */
-export function addBoundaryEvent(m: M, hostId: string, subtype = "timer"): OpResult {
+export function addBoundaryEvent(m: M, hostId: string, trigger: TriggerType = "timer"): OpResult {
   const host = m.nodes.find((n) => n.id === hostId);
   if (!host || (host.type !== "task" && host.type !== "subprocess")) return { model: m, error: "Граничное событие прикрепляется к задаче или подпроцессу" };
   const node: ProcessNode = {
     id: nextId("n", m.nodes.map((n) => n.id)),
     type: "event",
-    subtype,
-    name: BOUNDARY_NAMES[subtype] ?? "Событие",
+    subtype: "intermediate",
+    trigger: { type: trigger },
+    name: BOUNDARY_NAMES[trigger] ?? "Событие",
     role_id: host.role_id ?? null,
     attached_to: hostId,
     interrupting: true,
@@ -257,6 +295,44 @@ export function addBoundaryEvent(m: M, hostId: string, subtype = "timer"): OpRes
   return { model: { ...m, nodes: [...m.nodes, node] }, id: node.id };
 }
 
+// --- вид и триггер события ---
+
+const isBoundaryOf = (m: M, n: ProcessNode) => !!n.attached_to && m.nodes.some((x) => x.id === n.attached_to);
+
+/** Вид события: начальное, промежуточное, конечное. Триггер, который новому виду не подходит, сбрасывается. */
+export function setEventPosition(m: M, id: string, position: Exclude<EventPosition, "boundary">): M {
+  const n = m.nodes.find((x) => x.id === id);
+  if (!n || n.type !== "event") return m;
+  const cur = eventSpec(n, isBoundaryOf(m, n));
+  const moved = { ...n, subtype: position, trigger: cur.trigger === "none" ? null : { ...cur.details, direction: position === "intermediate" ? cur.details.direction : undefined } };
+  const spec = eventSpec(moved, false);
+  const ok = allowedTriggers(spec.position, spec.throwing).includes(spec.trigger);
+  return { ...m, nodes: m.nodes.map((x) => (x.id === id ? (ok ? moved : { ...moved, trigger: null }) : x)) };
+}
+
+/** Триггер события целиком (тип и параметры). Направление промежуточного события, которого тип не допускает, исправляется. */
+export function setEventTrigger(m: M, id: string, trigger: EventTrigger | null): M {
+  const n = m.nodes.find((x) => x.id === id);
+  if (!n || n.type !== "event") return m;
+  const boundary = isBoundaryOf(m, n);
+  let next = trigger;
+  if (next && !boundary && (n.subtype === "intermediate" || !n.subtype || ["timer", "message", "error", "signal"].includes(n.subtype))) {
+    // промежуточное событие: если выбранный тип не допускает текущее направление, берём допустимое
+    let throwing = next.direction ? next.direction === "throw" : eventSpec({ ...n, trigger: { type: next.type } }, false).throwing;
+    if (!allowedTriggers("intermediate", throwing).includes(next.type)) throwing = !throwing;
+    next = { ...next, direction: throwing ? "throw" : "catch" };
+  }
+  return { ...m, nodes: m.nodes.map((x) => (x.id === id ? withTrigger(x, next) : x)) };
+}
+
+/** Направление промежуточного события: ждёт (catch) или выбрасывает (throw); если триггер так не бывает, он сбрасывается. */
+export function setEventDirection(m: M, id: string, direction: "catch" | "throw"): M {
+  const n = m.nodes.find((x) => x.id === id);
+  if (!n || n.type !== "event") return m;
+  const spec = eventSpec(n, isBoundaryOf(m, n));
+  const t = { ...spec.details, direction };
+  return setEventTrigger(m, id, allowedTriggers("intermediate", direction === "throw").includes(spec.trigger) ? t : { type: "none", direction });
+}
 export function addPool(m: M, name: string, code?: string | null): OpResult {
   const pool: ExternalPool = { id: nextId("pool", (m.pools ?? []).map((p) => p.id)), name: name.trim() || "Внешний процесс", code: code?.trim() || null };
   return { model: { ...m, pools: [...(m.pools ?? []), pool] }, id: pool.id };

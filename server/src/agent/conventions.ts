@@ -25,14 +25,29 @@ export const CONVENTIONS = `# Правила работы агента с про
   Названия блоков уникальны в модели; петель (выход блока на его же вход) нет.
 - Стрелки и продукты (документы, данные) — существительные.
 - **Событие — свершившийся факт**: «Заявка получена», «Реестр актуализирован», а не «Заявка» и не «Получить заявку».
-  Исключение — таймер («Через 3 дня»).
+  Исключение — событие с триггером «таймер» («Через 3 дня»).
 
 ## BPMN
 - Развилка XOR: перед ней стоит задача, в которой принимается решение; исходящие стрелки несут условия.
 - Поток не разветвляется и не сливается без шлюза (кроме слияния в конечном событии).
 - Задачи бывают типов: user, service, manual, send, receive, script, business_rule («Бизнес-правила»).
-- Граничное событие — узел type=event с attached_to = id задачи (subtype: timer, message, error, signal; interrupting: false —
-  не прерывает задачу). Входящих стрелок у него нет, из него ведут стрелку к шагу ветки.
+- Граничное событие — узел type=event с attached_to = id задачи и триггером (trigger: timer, message, error, signal, conditional,
+  escalation, compensation, cancel; interrupting: false — не прерывает задачу). Входящих стрелок у него нет, из него ведут
+  стрелку к шагу ветки.
+- **События и триггеры.** Вид события — subtype: start (начальное), intermediate (промежуточное), end (конечное); граничное —
+  событие с attached_to. Что его запускает или что оно выбрасывает — trigger: {type, direction?, name?, timer?, condition?, members?}.
+  Допустимые type: none, message, timer, conditional, signal, error, escalation, compensation, cancel, link, terminate,
+  multiple, parallel_multiple. Допустимо по виду: начальное — none, message, timer, conditional, signal, multiple,
+  parallel_multiple; конечное — none, message, signal, error, escalation, compensation, cancel, terminate, multiple;
+  граничное — message, timer, conditional, signal, error, escalation, compensation, cancel, multiple, parallel_multiple;
+  промежуточное ждущее (direction: catch) — message, timer, conditional, signal, link, multiple, parallel_multiple;
+  промежуточное выбрасывающее (direction: throw) — none, message, signal, escalation, compensation, link, multiple.
+  Параметры: timer — {kind: date | duration | cycle, value} (ISO 8601: P3D, PT2H, R/P1W, 2026-12-31T09:00:00);
+  conditional — condition (текст условия); message, signal, error, escalation, link — name (название или код);
+  multiple и parallel_multiple — members (из чего состоит, не меньше двух). Событие-отправка уведомления — конец или
+  промежуточное с message и direction: throw, получение — начало или промежуточное с message и direction: catch.
+  Ссылки (link): у выбросившего и принимающего одно name на одной диаграмме. Прежняя запись, где в subtype лежал
+  timer/message/error/signal, читается, но новые события записывают через subtype + trigger.
 - Документы и хранилища данных рисует приложение: входы и выходы шага (inputs, outputs) — документы, system_ids —
   хранилища данных (информационные системы).
 - Внешний процесс — пул (коллекция pools: id, name, code); связь шага с ним — поток сообщений (messages: id, from, to, name).

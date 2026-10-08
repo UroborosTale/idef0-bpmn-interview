@@ -7,7 +7,7 @@ import EditorToolbar from "../editor-core/EditorToolbar";
 import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { EVENT_PALETTE, PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -487,6 +487,19 @@ export default function BpmnEditor({
               {p.label}
             </button>
           ))}
+          <details className="bpe-palette-more">
+            <summary title="Начало, ожидание, отправка и конец с триггером: сообщение, таймер, условие, сигнал, ошибка, ссылка…">События с триггером</summary>
+            {["Начало", "Ожидание", "Отправка", "Конец"].map((group) => (
+              <div key={group}>
+                <div className="muted bpe-palette-group">{group}</div>
+                {EVENT_PALETTE.filter((p) => p.group === group).map((p) => (
+                  <button key={p.label} draggable onDragStart={(e) => e.dataTransfer.setData("application/x-bpmn-new", JSON.stringify(p.spec))} onClick={() => addFromPalette(p.spec)}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </details>
           <button onClick={addBoundary} title="Таймер, сообщение или ошибка на границе выбранной задачи (вид меняется в свойствах)">
             Гр. событие
           </button>

@@ -4,6 +4,7 @@ import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { isStructured } from "../shared/codes.js";
 import { flowLabelPoint } from "../shared/bpmnGeometry.js";
+import { triggerGlyph, type Glyph } from "../shared/events.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -467,28 +468,30 @@ function idef0Page(d: Idef0DiagramData, name: string, parentNodeId?: string): Pa
 
 type Shape = BpmnDiagramData["shapes"][number];
 
-function eventGlyph(subtype: string | undefined, w: number, h: number): GeomPart[] {
+/** Незалитые части значка триггера (контуры); залитые рисуются отдельными фигурами — см. drawEventFilled. */
+function eventGlyph(glyphs: Glyph[], w: number, h: number): GeomPart[] {
   const [cx, cy] = [w / 2, h / 2];
-  switch (subtype) {
-    case "timer":
-      return [
-        { kind: "ellipse", cx, cy, rx: 9, ry: 9 },
-        { kind: "path", pts: [[cx, cy - 6], [cx, cy], [cx + 4, cy + 3]] },
-      ];
-    case "message":
-      return [
-        { kind: "path", pts: [[cx - 8, cy - 5.5], [cx + 8, cy - 5.5], [cx + 8, cy + 5.5], [cx - 8, cy + 5.5]], closed: true },
-        { kind: "path", pts: [[cx - 8, cy - 5.5], [cx, cy + 1], [cx + 8, cy - 5.5]] },
-      ];
-    case "signal":
-      return [{ kind: "path", pts: [[cx, cy - 8], [cx + 8, cy + 6], [cx - 8, cy + 6]], closed: true }];
-    case "error":
-      return [{ kind: "path", pts: [[cx - 4, cy + 8], [cx - 2, cy - 1], [cx + 3, cy + 2], [cx + 5, cy - 8], [cx + 2, cy - 1], [cx - 3, cy - 3]], closed: true }];
-    default:
-      return [];
+  const parts: GeomPart[] = [];
+  for (const g of glyphs) {
+    if (g.kind === "circle" && !g.filled) parts.push({ kind: "ellipse", cx, cy, rx: g.r, ry: g.r });
+    else if (g.kind === "poly" && !g.filled && !g.light) parts.push({ kind: "path", pts: g.pts.map(([x, y]) => [cx + x, cy + y] as Pt), closed: g.closed });
   }
+  return parts;
 }
 
+/** Залитые части значка (выбрасывающее событие, терминатор) — чёрные фигуры поверх события; белые линии (сгиб конверта) — поверх них. */
+function drawEventFilled(page: Page, glyphs: Glyph[], x: number, y: number, w: number, h: number) {
+  const [cx, cy] = [x + w / 2, y + h / 2];
+  for (const g of glyphs) {
+    if (g.kind === "circle" && g.filled) page.ellipse(cx - g.r, cy - g.r, g.r * 2, g.r * 2, { fill: "#1f2937", line: "#1f2937", weightPt: 0.5 });
+    else if (g.kind === "poly" && g.filled) {
+      const xs = g.pts.map((p) => p[0]);
+      const ys = g.pts.map((p) => p[1]);
+      const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+      page.add({ x: cx + x0, y: cy + y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0 }, [{ kind: "path", pts: g.pts.map(([px, py]) => [px - x0, py - y0] as Pt), closed: true }], { fill: "#1f2937", line: "#1f2937", weightPt: 0.5 });
+    } else if (g.kind === "poly" && g.light) page.polyline(g.pts.map(([px, py]) => [cx + px, cy + py] as Pt), { weightPt: 0.8, line: "#ffffff" });
+  }
+}
 function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPart[] {
   const [cx, cy] = [w / 2, h / 2];
   switch (subtype) {
@@ -585,10 +588,13 @@ function drawBpmnShape(page: Page, s: Shape) {
   const { x, y, w, h } = s;
   const tag: Record<string, string> = s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
   if (s.kind === "event") {
-    const isStart = s.subtype === "start";
-    const isEnd = s.subtype === "end";
+    const position = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");
+    const isStart = position === "start";
+    const isEnd = position === "end";
     const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
-    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id }, [...inner, ...eventGlyph(s.subtype, w, h)]);
+    const glyphs = triggerGlyph(s.event?.trigger ?? "none", s.event?.throwing ?? false);
+    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id }, [...inner, ...eventGlyph(glyphs, w, h)]);
+    drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
     page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id }, gatewayGlyph(s.subtype, w, h));
   } else {

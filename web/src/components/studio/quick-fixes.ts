@@ -1,7 +1,8 @@
 import { parseProcessCode } from "@shared/codes";
 import type { ProcessFlow, ProcessLogicModel, ProcessNode, ValidationIssue } from "../../types";
 import { boxOf, sizeOf, withScopeLayouts } from "../bpmn-editor/geometry";
-import { nextId } from "../bpmn-editor/model-ops";
+import { TRIGGER_LABELS, allowedTriggers, eventSpec, type TriggerType } from "@shared/events";
+import { nextId, setEventTrigger } from "../bpmn-editor/model-ops";
 
 type M = ProcessLogicModel;
 
@@ -155,6 +156,18 @@ export function quickFixFor(m: M, issue: IssueRef): QuickFix | null {
     case "bpmn_boundary_incoming":
       if (!node) return null;
       return { label: "Убрать входящие стрелки события", apply: (x) => ({ ...x, flows: x.flows.filter((f) => f.to !== node.id) }) };
+
+    case "bpmn_event_trigger_invalid":
+    case "bpmn_boundary_no_trigger": {
+      if (!node || node.type !== "event") return null;
+      const spec = eventSpec(node, !!node.attached_to && m.nodes.some((n) => n.id === node.attached_to));
+      const choices = allowedTriggers(spec.position, spec.throwing) as TriggerType[];
+      return {
+        label: "Выбрать подходящий триггер…",
+        options: choices.map((t) => ({ id: t, label: TRIGGER_LABELS[t] })),
+        apply: (x, t) => (t ? setEventTrigger(x, node.id, t === "none" ? null : { type: t as TriggerType, ...(spec.position === "intermediate" ? { direction: spec.throwing ? "throw" : "catch" } : {}) }) : x),
+      };
+    }
 
     case "bpmn_message_endpoint":
       if (!node) return null;

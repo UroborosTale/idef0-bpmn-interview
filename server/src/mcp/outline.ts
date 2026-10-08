@@ -1,3 +1,5 @@
+import { POSITION_LABELS, eventSpec, triggerSummary, type EventTrigger } from "../shared/events.js";
+
 /**
  * Модель в виде текста для агента: структура по кодам Соглашения с id для ссылок в предложениях. Полный JSON модели
  * велик (цитаты интервью, раскладка), поэтому агент по умолчанию читает этот конспект.
@@ -17,6 +19,7 @@ interface N {
   idef0_parent?: string | null;
   bpmn_scope?: string | null;
   attached_to?: string | null;
+  trigger?: EventTrigger | null;
   status?: string;
 }
 
@@ -39,6 +42,14 @@ export interface ModelView {
     pools?: { id: string; name: string; code?: string | null }[];
     messages?: { id: string; from: string; to: string; name?: string | null }[];
   };
+}
+
+/** Событие в конспекте: вид и триггер с параметрами, например «промежуточное, ждёт — Таймер: P3D». */
+function eventLabel(n: N): string {
+  const spec = eventSpec(n, !!n.attached_to);
+  const tr = spec.trigger === "none" ? "" : ` — ${triggerSummary(spec)}`;
+  const dir = spec.position === "intermediate" ? (spec.throwing ? ", выбрасывает" : ", ждёт") : "";
+  return `${POSITION_LABELS[spec.position].toLowerCase()}${dir}${tr}`;
 }
 
 const isFn = (n: N) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope;
@@ -95,7 +106,7 @@ export function outline(view: ModelView, scope?: string): string {
       if (steps.length > 0) {
         lines.push(`${indent}  BPMN операции:`);
         for (const s of steps) {
-          const kind = s.type === "event" ? `событие ${s.subtype ?? ""}` : s.type === "gateway" ? `шлюз ${s.subtype ?? ""}` : `задача ${s.subtype ?? ""}`.trim();
+          const kind = s.type === "event" ? `событие ${eventLabel(s)}` : s.type === "gateway" ? `шлюз ${s.subtype ?? ""}` : `задача ${s.subtype ?? ""}`.trim();
           const extra = [s.role_id ? `исполнитель ${s.role_id}` : "", s.attached_to ? `на границе ${s.attached_to}` : "", s.inputs?.length ? `вход ${s.inputs.join(",")}` : "", s.outputs?.length ? `выход ${s.outputs.join(",")}` : "", s.system_ids?.length ? `системы ${s.system_ids.join(",")}` : ""].filter(Boolean);
           lines.push(`${indent}    ${codes[s.id] ? `${codes[s.id]} ` : ""}[${s.id}] ${kind.trim()} «${s.name}»${extra.length ? ` (${extra.join("; ")})` : ""}`);
         }

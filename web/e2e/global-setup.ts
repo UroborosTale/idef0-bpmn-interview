@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer, type ViteDevServer } from "vite";
-import { API, API_PORT, USER, WEB_PORT } from "./env";
+import { API, API_PORT, USER, WEB_PORT, login } from "./env";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDir = path.resolve(here, "..");
@@ -56,6 +56,8 @@ export async function setup() {
   } catch (e) {
     throw new Error(`${(e as Error).message}\n${stderr}`);
   }
+
+  process.env.E2E_COOKIE = await login();
 
   vite = await createServer({
     configFile: path.join(webDir, "vite.config.ts"),

@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import type { ProcessLogicModel, ProcessNode, ProcessFlow, Role, NodeType } from "../types/model.js";
 import { SCHEMA_VERSION } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
+import type { EventTrigger, TriggerType } from "../shared/events.js";
 
 /**
  * ФТ-М9.4.1/9.5.2: разбор структурированных форматов диаграмм (.bpmn, .drawio).
@@ -38,6 +39,10 @@ export interface ParsedBpmnElement {
   sourceRef?: string;
   targetRef?: string;
   condition?: string | null;
+  /** Событие: триггер из eventDefinition и, для граничного, к чему прикреплено. */
+  trigger?: EventTrigger;
+  attachedToRef?: string;
+  cancelActivity?: boolean;
 }
 export interface ParsedBpmn {
   elements: ParsedBpmnElement[];
@@ -66,7 +71,22 @@ export function parseBpmnXml(xml: string): ParsedBpmn {
   while ((m = nodeRe.exec(xml))) {
     const attrs = parseAttrs(m[2]);
     if (!attrs.id) continue;
-    elements.push({ id: attrs.id, tag: m[1], name: attrs.name ?? null });
+    elements.push({ id: attrs.id, tag: m[1], name: attrs.name ?? null, ...(EVENT_TAGS.includes(m[1]) ? { attachedToRef: attrs.attachedToRef, cancelActivity: attrs.cancelActivity === undefined ? undefined : attrs.cancelActivity !== "false" } : {}) });
+  }
+
+  // триггеры событий: определения лежат внутри элемента события, названия сообщений, сигналов и ошибок — в корневых элементах
+  const decls = new Map<string, { name: string; code?: string }>();
+  const declRe = /<(?:\w+:)?(message|signal|error|escalation)\s+([^>]*?)\/?>/g;
+  while ((m = declRe.exec(xml))) {
+    const a = parseAttrs(m[2]);
+    if (a.id) decls.set(a.id, { name: a.name ?? a.errorCode ?? a.escalationCode ?? "", code: a.errorCode ?? a.escalationCode });
+  }
+  for (const el of elements) {
+    if (!EVENT_TAGS.includes(el.tag)) continue;
+    const block = new RegExp(`<(?:\\w+:)?${el.tag}\\s+[^>]*?\\bid="${el.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*?(?:/>|>([\\s\\S]*?)</(?:\\w+:)?${el.tag}>)`).exec(xml);
+    const opening = block ? /^<[^>]*>/.exec(block[0])![0] : "";
+    const trigger = block?.[1] !== undefined ? parseEventDefinitions(block[1], /parallelMultiple="true"/.test(opening), decls) : undefined;
+    if (trigger) el.trigger = trigger;
   }
 
   const flowRe = /<(?:\w+:)?sequenceFlow\s+([^>]*?)(?:\/>|>)/g;
@@ -78,6 +98,58 @@ export function parseBpmnXml(xml: string): ParsedBpmn {
 
   if (elements.length === 0) warnings.push("Не найдено ни одного распознаваемого элемента BPMN — проверьте, что файл экспортирован из bpmn.io/Camunda Modeler и содержит стандартные теги.");
   return { elements, lanes, warnings };
+}
+
+const DEFINITION_TYPES: Record<string, TriggerType> = {
+  messageEventDefinition: "message",
+  timerEventDefinition: "timer",
+  conditionalEventDefinition: "conditional",
+  signalEventDefinition: "signal",
+  errorEventDefinition: "error",
+  escalationEventDefinition: "escalation",
+  compensateEventDefinition: "compensation",
+  cancelEventDefinition: "cancel",
+  terminateEventDefinition: "terminate",
+  linkEventDefinition: "link",
+};
+
+/** Триггер события по его eventDefinition (одному или нескольким); undefined — определений нет (событие без триггера). */
+function parseEventDefinitions(inner: string, parallel: boolean, decls: Map<string, { name: string; code?: string }>): EventTrigger | undefined {
+  const found: { type: TriggerType; attrs: Record<string, string>; body: string }[] = [];
+  const re = /<(?:\w+:)?(\w+EventDefinition)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?\1>)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(inner))) {
+    const type = DEFINITION_TYPES[m[1]];
+    if (type) found.push({ type, attrs: parseAttrs(m[2]), body: m[3] ?? "" });
+  }
+  if (found.length === 0) return undefined;
+  if (found.length > 1) return { type: parallel ? "parallel_multiple" : "multiple", members: found.map((f) => f.type) };
+  const { type, attrs, body } = found[0];
+  const trigger: EventTrigger = { type };
+  const text = (tag: string) => {
+    const t = new RegExp(`<(?:\\w+:)?${tag}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${tag}>`).exec(body);
+    return t ? unescapeXml(t[1].trim()) : undefined;
+  };
+  if (type === "timer") {
+    for (const [tag, kind] of [["timeDate", "date"], ["timeDuration", "duration"], ["timeCycle", "cycle"]] as const) {
+      const v = text(tag);
+      if (v) trigger.timer = { kind, value: v };
+    }
+  } else if (type === "conditional") {
+    trigger.condition = text("condition") ?? null;
+  } else if (type === "link") {
+    trigger.name = attrs.name ?? null;
+  } else {
+    const ref = attrs.messageRef ?? attrs.signalRef ?? attrs.errorRef ?? attrs.escalationRef;
+    if (ref && decls.get(ref)?.name) trigger.name = decls.get(ref)!.name;
+  }
+  return trigger;
+}
+/** Триггер, направление и прерывание события из разобранного элемента. */
+function eventFields(e: ParsedBpmnElement): Partial<ProcessNode> {
+  if (!EVENT_TAGS.includes(e.tag)) return {};
+  const direction = e.tag === "intermediateThrowEvent" ? "throw" : e.tag === "intermediateCatchEvent" ? "catch" : undefined;
+  return { ...(e.trigger ? { trigger: { ...e.trigger, ...(direction ? { direction } : {}) } } : {}), ...(e.tag === "boundaryEvent" && e.cancelActivity === false ? { interrupting: false } : {}) };
 }
 
 function bpmnTagToNode(tag: string): { type: NodeType; subtype?: string } {
@@ -107,6 +179,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
       id: plmId,
       type,
       subtype,
+      ...eventFields(e),
       name: e.name ?? "(без названия)",
       role_id: null,
       system_ids: [],
@@ -123,6 +196,11 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
       tags: ["from_diagram_import"],
       confirmed_by: [],
     };
+  });
+  // граничные события: прикрепление к задаче по ссылке attachedToRef
+  nodeEls.forEach((e, i) => {
+    const host = e.tag === "boundaryEvent" && e.attachedToRef ? idMap.get(e.attachedToRef) : undefined;
+    if (host) nodes[i].attached_to = host;
   });
   if (!nodeEls.some((e) => e.name)) warnings.push("Часть элементов диаграммы без названия — они отмечены как гипотезы.");
 
@@ -204,6 +282,7 @@ export function reconcileBpmnEdit(model: ProcessLogicModel, parsed: ParsedBpmn):
         id: `imp_${nanoid(8)}`,
         type,
         subtype,
+        ...eventFields(e),
         name: e.name ?? "(без названия)",
         role_id: null,
         system_ids: [],

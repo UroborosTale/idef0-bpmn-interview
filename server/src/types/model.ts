@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRIGGER_TYPES } from "../shared/events.js";
 
 /**
  * Process Logic JSON — единый источник истины для IDEF0 и BPMN (ТЗ, раздел 5).
@@ -85,10 +86,22 @@ export const EventSubtype = z.enum([
 // gateway subtypes
 export const GatewaySubtype = z.enum(["exclusive", "parallel", "inclusive", "event_based"]);
 
+// Триггер события: что его запускает или выбрасывает и параметры (подробнее — shared/events.ts).
+export const EventTriggerSchema = z.object({
+  type: z.enum(TRIGGER_TYPES),
+  direction: z.enum(["catch", "throw"]).optional(),
+  name: z.string().nullable().optional(),
+  timer: z.object({ kind: z.enum(["date", "duration", "cycle"]), value: z.string() }).nullable().optional(),
+  condition: z.string().nullable().optional(),
+  members: z.array(z.enum(TRIGGER_TYPES)).optional(),
+});
+
 export const ProcessNode = z.object({
   id: z.string(),
   type: NodeType,
   subtype: z.string().optional(),
+  // Событие: триггер (сообщение, таймер, условие, сигнал, ошибка…). Вид события (начало, промежуточное, конец) — subtype.
+  trigger: EventTriggerSchema.nullable().optional(),
   name: z.string(),
   role_id: z.string().nullable().optional(),
   system_ids: z.array(z.string()).default([]),

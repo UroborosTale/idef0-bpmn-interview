@@ -503,3 +503,8 @@ button.danger:hover { background: #fef2f2; }
 .mm-gateway { fill: #d6a64a; }
 .mm-sel { fill: #4338ca; }
 .mm-view { fill: rgba(67, 56, 202, 0.08); stroke: #4338ca; stroke-width: 1; }
+/* События с триггером: палитра и значки */
+.bpe-palette-more { margin: 4px 0; font-size: 12px; }
+.bpe-palette-more summary { cursor: pointer; color: #475569; margin-bottom: 4px; }
+.bpe-palette-group { font-size: 10.5px; margin: 6px 0 2px; }
+.prop-checks { display: grid; gap: 2px; }

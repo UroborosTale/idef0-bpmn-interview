@@ -18,8 +18,10 @@ export function launch(): Promise<Browser> {
   return chromium.launch({ channel, headless: process.env.E2E_HEADED ? false : true });
 }
 
-let cookie = "";
-async function login(): Promise<string> {
+// Вход один на весь прогон: global-setup входит заранее и передаёт cookie через E2E_COOKIE (у сервера лимит попыток входа,
+// а тестовых файлов уже больше десяти — каждый со своим входом упирался бы в 429).
+let cookie = process.env.E2E_COOKIE ?? "";
+export async function login(): Promise<string> {
   if (cookie) return cookie;
   const r = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(USER) });
   if (!r.ok) throw new Error(`вход не удался: ${r.status}`);

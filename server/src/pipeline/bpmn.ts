@@ -3,6 +3,7 @@ import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeI
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
+import { eventSpec, type EventPosition, type EventSpec, type TriggerType } from "../shared/events.js";
 import { artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../shared/bpmnArtifacts.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
@@ -14,7 +15,7 @@ export interface BpmnDiagramData {
   /** roleId — id роли дорожки; null у дорожки «Без исполнителя». */
   lanes: { roleId: string | null; name: string; x: number; y: number; w: number; h: number }[];
   /** nodeId — id узла модели; у служебных начала/конца (их нет в модели) его нет. */
-  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean }[];
+  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; /** Событие: вид, триггер и направление (залитый значок у выбрасывающих) */ event?: { position: EventPosition; trigger: TriggerType; throwing: boolean }; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean }[];
   /** flowId — id потока модели (у служебных стрелок отсутствует); from/to — id фигур. */
   edges: { id: string; flowId?: string; from: string; to: string; points: [number, number][]; label?: string }[];
   /** data — документ, store — хранилище данных (информационная система), annotation — регламент; link — ассоциация с задачей. */
@@ -75,29 +76,85 @@ function gatewayTag(subtype?: string): string {
   }
 }
 
-function eventInfo(subtype?: string, boundary = false): { tag: string; def?: string } {
-  if (boundary) {
-    const def = { timer: "timerEventDefinition", message: "messageEventDefinition", error: "errorEventDefinition", signal: "signalEventDefinition" }[subtype ?? ""];
-    return { tag: "boundaryEvent", def };
-  }
-  switch (subtype) {
+/** Элемент BPMN события: по виду и направлению (ждёт или выбрасывает). */
+export function eventTag(spec: EventSpec): string {
+  switch (spec.position) {
     case "start":
-      return { tag: "startEvent" };
+      return "startEvent";
     case "end":
-      return { tag: "endEvent" };
-    case "timer":
-      return { tag: "intermediateCatchEvent", def: "timerEventDefinition" };
-    case "message":
-      return { tag: "intermediateCatchEvent", def: "messageEventDefinition" };
-    case "error":
-      return { tag: "endEvent", def: "errorEventDefinition" }; // ошибку вне границы задачи можно только выбросить
-    case "signal":
-      return { tag: "intermediateThrowEvent", def: "signalEventDefinition" };
+      return "endEvent";
+    case "boundary":
+      return "boundaryEvent";
     default:
-      return { tag: "intermediateThrowEvent" };
+      return spec.throwing ? "intermediateThrowEvent" : "intermediateCatchEvent";
   }
 }
 
+const TIMER_TAG = { date: "timeDate", duration: "timeDuration", cycle: "timeCycle" } as const;
+
+/**
+ * Определения триггера события (eventDefinition) с параметрами: таймер с датой, сроком или периодом, условие, имена
+ * сообщения, сигнала, ошибки и эскалации (объявляются на уровне документа через declare), имя ссылки.
+ */
+export function eventDefinitionsXml(spec: EventSpec, eventName: string, declare: (kind: "message" | "signal" | "error" | "escalation", name: string) => string): string {
+  const one = (type: TriggerType, detailed: boolean): string => {
+    const d = detailed ? spec.details : { type };
+    const name = d.name?.trim();
+    const ref = (kind: "message" | "signal" | "error" | "escalation", attr: string) => (name ? ` ${attr}="${declare(kind, name)}"` : "");
+    switch (type) {
+      case "message":
+        return `<bpmn:messageEventDefinition${ref("message", "messageRef")} />`;
+      case "timer": {
+        const t = d.timer?.value?.trim() ? d.timer : null;
+        return t ? `<bpmn:timerEventDefinition><bpmn:${TIMER_TAG[t.kind]} xsi:type="bpmn:tFormalExpression">${esc(t.value.trim())}</bpmn:${TIMER_TAG[t.kind]}></bpmn:timerEventDefinition>` : "<bpmn:timerEventDefinition />";
+      }
+      case "conditional":
+        return `<bpmn:conditionalEventDefinition><bpmn:condition xsi:type="bpmn:tFormalExpression">${esc(d.condition?.trim())}</bpmn:condition></bpmn:conditionalEventDefinition>`;
+      case "signal":
+        return `<bpmn:signalEventDefinition${ref("signal", "signalRef")} />`;
+      case "error":
+        return `<bpmn:errorEventDefinition${ref("error", "errorRef")} />`;
+      case "escalation":
+        return `<bpmn:escalationEventDefinition${ref("escalation", "escalationRef")} />`;
+      case "compensation":
+        return "<bpmn:compensateEventDefinition />";
+      case "cancel":
+        return "<bpmn:cancelEventDefinition />";
+      case "terminate":
+        return "<bpmn:terminateEventDefinition />";
+      case "link":
+        return `<bpmn:linkEventDefinition name="${esc(name || eventName)}" />`;
+      default:
+        return "";
+    }
+  };
+  if (spec.trigger === "multiple" || spec.trigger === "parallel_multiple") return (spec.details.members ?? []).filter((m) => m !== "multiple" && m !== "parallel_multiple").map((m) => one(m, false)).join("");
+  return one(spec.trigger, true);
+}
+/**
+ * Запись событий BPMN: элемент с определениями триггера; сообщения, сигналы, ошибки и эскалации, на которые события
+ * ссылаются, собираются в declarations() — их кладут в документ перед процессом.
+ */
+export function createEventWriter() {
+  const decls = new Map<string, string>();
+  const declare = (kind: "message" | "signal" | "error" | "escalation", name: string) => {
+    const key = `${kind}:${name}`;
+    if (!decls.has(key)) {
+      const id = `${kind[0].toUpperCase()}${kind.slice(1)}_${[...decls.keys()].filter((k) => k.startsWith(`${kind}:`)).length + 1}`;
+      decls.set(key, `<bpmn:${kind} id="${id}" name="${esc(name)}"${kind === "error" ? ` errorCode="${esc(name)}"` : kind === "escalation" ? ` escalationCode="${esc(name)}"` : ""} />`);
+    }
+    return /id="([^"]+)"/.exec(decls.get(key)!)![1];
+  };
+  return {
+    /** extraAttrs — например attachedToRef и cancelActivity у граничного события. */
+    eventXml(id: string, name: string, spec: EventSpec, extraAttrs = ""): string {
+      const tag = eventTag(spec);
+      const attrs = extraAttrs + (spec.trigger === "parallel_multiple" ? ' parallelMultiple="true"' : "");
+      return `<bpmn:${tag} id="${id}" name="${esc(name)}"${attrs}>${eventDefinitionsXml(spec, name, declare)}</bpmn:${tag}>`;
+    },
+    declarations: () => [...decls.values()],
+  };
+}
 // Размеры фигур — общие с редактором (shared/bpmnGeometry.ts).
 const NODE_SIZE = SIZE;
 
@@ -215,13 +272,10 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const artifacts = artifactsOf(nodes, hostBoxes, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) });
   const artId = (a: { nodeId: string; kind: string; entityId: string }) => `${a.kind === "store" ? "StoreRef" : "DataRef"}_${a.nodeId}_${a.entityId}`;
 
-  function pushEventXml(id: string, name: string, subtype: string | undefined, attach?: { hostId: string; interrupting: boolean }) {
-    const info = eventInfo(subtype, !!attach);
-    const defXml = info.def ? `<bpmn:${info.def} />` : "";
-    const attrs = attach ? ` attachedToRef="${nodeIdOf(attach.hostId)}" cancelActivity="${attach.interrupting}"` : "";
-    flowElementsXml.push(`<bpmn:${info.tag} id="${id}" name="${esc(name)}"${attrs}>${defXml}</bpmn:${info.tag}>`);
+  const events = createEventWriter();
+  function pushEventXml(id: string, name: string, spec: EventSpec, attach?: { hostId: string; interrupting: boolean }) {
+    flowElementsXml.push(events.eventXml(id, name, spec, attach ? ` attachedToRef="${nodeIdOf(attach.hostId)}" cancelActivity="${attach.interrupting}"` : ""));
   }
-
   for (const n of nodes) {
     const id = nodeIdOf(n.id);
     elementIndex[n.id] = id;
@@ -243,10 +297,10 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
       const tag = gatewayTag(n.subtype);
       flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}" />`);
     } else if (n.type === "event") {
-      pushEventXml(id, n.name, n.subtype, isBoundary(n) ? { hostId: n.attached_to!, interrupting: n.interrupting !== false } : undefined);
+      pushEventXml(id, n.name, eventSpec(n, isBoundary(n)), isBoundary(n) ? { hostId: n.attached_to!, interrupting: n.interrupting !== false } : undefined);
     }
   }
-  for (const se of synthEvents) pushEventXml(se.id, se.name, se.kind);
+  for (const se of synthEvents) pushEventXml(se.id, se.name, eventSpec({ type: "event", subtype: se.kind }));
 
   for (const f of flows) {
     const condXml = f.condition
@@ -335,9 +389,10 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
 
   // shapes (nodes)
   const allNodeIds = [...nodes.map((n) => nodeIdOf(n.id)), ...synthEvents.map((s) => s.id)];
-  const shapeMeta = new Map<string, { nodeId?: string; kind: BpmnDiagramData["shapes"][number]["kind"]; subtype?: string; name: string; attachedTo?: string; interrupting?: boolean }>([
-    ...nodes.map((n) => [nodeIdOf(n.id), { nodeId: n.id, kind: n.type, subtype: n.subtype, name: n.name, ...(isBoundary(n) ? { attachedTo: nodeIdOf(n.attached_to!), interrupting: n.interrupting !== false } : {}) }] as const),
-    ...synthEvents.map((s) => [s.id, { kind: "event" as const, subtype: s.kind, name: s.name }] as const),
+  const eventDetail = (s: EventSpec) => ({ position: s.position, trigger: s.trigger, throwing: s.throwing });
+  const shapeMeta = new Map<string, { nodeId?: string; kind: BpmnDiagramData["shapes"][number]["kind"]; subtype?: string; event?: BpmnDiagramData["shapes"][number]["event"]; name: string; attachedTo?: string; interrupting?: boolean }>([
+    ...nodes.map((n) => [nodeIdOf(n.id), { nodeId: n.id, kind: n.type, subtype: n.subtype, ...(n.type === "event" ? { event: eventDetail(eventSpec(n, isBoundary(n))) } : {}), name: n.name, ...(isBoundary(n) ? { attachedTo: nodeIdOf(n.attached_to!), interrupting: n.interrupting !== false } : {}) }] as const),
+    ...synthEvents.map((s) => [s.id, { kind: "event" as const, subtype: s.kind, event: eventDetail(eventSpec({ type: "event", subtype: s.kind })), name: s.name }] as const),
   ]);
   for (const id of allNodeIds) {
     const box = layout.boxes.get(id);
@@ -418,6 +473,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_${model.process.id}${scope ? `_${scope}` : ""}" targetNamespace="http://example.org/bpmn" exporter="IDEF0-BPMN Interview System" exporterVersion="1.0">
+  ${events.declarations().join("\n  ")}
   <bpmn:collaboration id="Collaboration_1">
     <bpmn:participant id="Participant_1" name="${esc(poolName)}" processRef="Process_1" />
     ${participantsXml.join("\n    ")}

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import type { Fragment, ProcessLogicModel, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
-import { BOUNDARY_SUBTYPES, SUBTYPES, TYPE_LABELS, addBoundaryEvent, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
+import { BOUNDARY_MAIN, BOUNDARY_TRIGGERS, SUBTYPES, TYPE_LABELS, addBoundaryEvent, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
 import { descendantsOf } from "../idef0-editor/geometry";
 import { SLOT_ENTITY, attach, createEntity, detach, setFunctionRole, type EntityKind, type Slot } from "../idef0-editor/ops";
 import { bpmnHosts, functionDepth, processCodeOf, stepCodes } from "@shared/codes";
+import { TRIGGER_LABELS, type TriggerType } from "@shared/events";
 import AssignmentsEditor from "./AssignmentsEditor";
+import EventProperties from "./EventProperties";
 import MessagesEditor from "./MessagesEditor";
 import { HistoryList, Section, SourceList } from "./PanelParts";
 import { bpmnDoc, reportDoc, type DictKind, type StudioDoc } from "./docs";
@@ -111,7 +113,7 @@ export default function NodeProperties({
   const isStep = !!node.bpmn_scope;
   const isFn = (node.type === "task" || node.type === "subprocess") && !isStep;
   const timing = node.type === "task" || node.type === "subprocess";
-  const subtypes = SUBTYPES[node.type] ?? [];
+  const subtypes = node.type === "event" ? [] : SUBTYPES[node.type] ?? []; // у событий вид и триггер — в блоке «Событие и триггер»
   const set = (patch: Partial<typeof node>) => onChange(updateNode(model, node.id, patch));
   const text = (key: "duration" | "time_processing" | "time_waiting" | "cost_estimate" | "frequency", label: string, placeholder?: string) => (
     <Field label={label}>
@@ -156,6 +158,13 @@ export default function NodeProperties({
   const hosts = model.nodes.filter(isHostable);
   const attachedHost = node.attached_to ? model.nodes.find((n) => n.id === node.attached_to) : undefined;
   const boundaries = model.nodes.filter((n) => n.type === "event" && n.attached_to === node.id);
+  const addBoundary = (trigger: TriggerType) => {
+    const r = addBoundaryEvent(model, node.id, trigger);
+    if (!r.error) {
+      onChange(r.model);
+      onSelect({ kind: "node", id: r.id! });
+    }
+  };
   const messageCount = (model.messages ?? []).filter((m) => m.from === node.id || m.to === node.id).length;
 
   return (
@@ -230,6 +239,8 @@ export default function NodeProperties({
         </Section>
       )}
 
+      {node.type === "event" && <EventProperties model={model} node={node} boundary={!!attachedHost} onChange={onChange} />}
+
       {node.type === "event" && (
         <Section title="Граничное событие" open={!!attachedHost}>
           <Field label="Прикреплено к задаче">
@@ -275,20 +286,19 @@ export default function NodeProperties({
             </div>
           )}
           <div className="bpe-actions" style={{ marginTop: 0 }}>
-            {BOUNDARY_SUBTYPES.map(([k, label]) => (
-              <button
-                key={k}
-                onClick={() => {
-                  const r = addBoundaryEvent(model, node.id, k);
-                  if (!r.error) {
-                    onChange(r.model);
-                    onSelect({ kind: "node", id: r.id! });
-                  }
-                }}
-              >
-                + {label}
+            {BOUNDARY_MAIN.map((k) => (
+              <button key={k} onClick={() => addBoundary(k)}>
+                + {TRIGGER_LABELS[k]}
               </button>
             ))}
+            <select value="" aria-label="Другой триггер" onChange={(e) => e.target.value && addBoundary(e.target.value as TriggerType)}>
+              <option value="">Другой триггер…</option>
+              {BOUNDARY_TRIGGERS.filter((t) => !BOUNDARY_MAIN.includes(t)).map((t) => (
+                <option key={t} value={t}>
+                  {TRIGGER_LABELS[t]}
+                </option>
+              ))}
+            </select>
           </div>
         </Section>
       )}

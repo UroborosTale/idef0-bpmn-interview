@@ -8,6 +8,7 @@
  */
 
 import { functionCodes, stepCodes } from "./codes.js";
+import { TRIGGER_TYPES, eventSpec, triggerProblem, triggerSummary, type EventTrigger, type TriggerType } from "./events.js";
 
 export type PatchCollection = "roles" | "systems" | "data" | "controls" | "nodes" | "flows" | "pools" | "messages";
 
@@ -200,6 +201,14 @@ export function integrityProblems(m: PatchModel): string[] {
       if (!host) out.push(`шаг ${label(n)} относится к операции «${n.bpmn_scope}», которой нет`);
       else if (host.bpmn_scope || (host.type !== "task" && host.type !== "subprocess")) out.push(`шаг ${label(n)}: «${n.bpmn_scope}» — не функция IDEF0, диаграмма BPMN бывает только у функции`);
     }
+    if (n.type === "event" && n.trigger) {
+      // триггер: известный тип и подходящий виду события (иначе предложение нарисует событие, не существующее в BPMN)
+      if (!(TRIGGER_TYPES as readonly string[]).includes(n.trigger.type)) out.push(`событие ${label(n)}: неизвестный триггер «${n.trigger.type}»`);
+      else {
+        const problem = triggerProblem(eventSpec({ type: "event", subtype: n.subtype, trigger: n.trigger }, !!n.attached_to && nodes.has(n.attached_to)));
+        if (problem) out.push(`событие ${label(n)}: ${problem}`);
+      }
+    }
     if (n.attached_to) {
       const host = nodes.get(n.attached_to);
       if (!host || (host.type !== "task" && host.type !== "subprocess")) out.push(`граничное событие ${label(n)} прикреплено не к задаче («${n.attached_to}»)`);
@@ -328,7 +337,11 @@ const FIELD_NAMES: Record<string, string> = {
   status: "статус",
 };
 
-const show = (v: unknown): string => (Array.isArray(v) ? v.join(", ") || "—" : v === null || v === undefined || v === "" ? "—" : String(v));
+/** Триггер события в описании правки: «Таймер: P3D», а не «[object Object]». */
+const showTrigger = (v: { type: string }): string => triggerSummary({ position: "intermediate", trigger: v.type as TriggerType, throwing: false, details: v as EventTrigger });
+const show = (v: unknown): string =>
+  Array.isArray(v) ? v.join(", ") || "—" : v === null || v === undefined || v === "" ? "—" : typeof v === "object" && typeof (v as { type?: unknown }).type === "string" ? showTrigger(v as { type: string }) : String(v);
+const fieldName = (collection: string, k: string) => (collection === "nodes" && k === "trigger" ? "триггер события" : FIELD_NAMES[k] ?? k);
 
 /** Предложение по-русски: по строке на операцию, функции и шаги — с кодами по Соглашению. */
 export function describePatch(model: PatchModel, patch: ModelPatch): string[] {
@@ -353,7 +366,7 @@ export function describePatch(model: PatchModel, patch: ModelPatch): string[] {
         return `Добавить ${COLLECTION_NOUN[op.collection][0]} ${detail}${where}`;
       }
       case "update":
-        return `Изменить ${COLLECTION_NOUN[op.collection][0]} ${nameOf(op.collection, op.id)}: ${Object.entries(op.patch).map(([k, v]) => `${FIELD_NAMES[k] ?? k} → ${show(v)}`).join("; ")}`;
+        return `Изменить ${COLLECTION_NOUN[op.collection][0]} ${nameOf(op.collection, op.id)}: ${Object.entries(op.patch).map(([k, v]) => `${fieldName(op.collection, k)} → ${show(v)}`).join("; ")}`;
       case "remove":
         return `Удалить ${COLLECTION_NOUN[op.collection][0]} ${nameOf(op.collection, op.id)}`;
     }

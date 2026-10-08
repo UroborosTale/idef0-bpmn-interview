@@ -25,7 +25,7 @@ describe("граничные события: операции над модел�
     const r = withBoundary(structuredModel());
     const host = structuredModel().nodes.find((n) => n.id === "b1")!;
     const node = r.model.nodes.find((n) => n.id === r.id)!;
-    expect(node).toMatchObject({ type: "event", subtype: "timer", name: "Срок истёк", attached_to: "b1", interrupting: true, role_id: host.role_id, bpmn_scope: "o1" });
+    expect(node).toMatchObject({ type: "event", subtype: "intermediate", trigger: { type: "timer" }, name: "Срок истёк", attached_to: "b1", interrupting: true, role_id: host.role_id, bpmn_scope: "o1" });
     expect(addBoundaryEvent(structuredModel(), "b0").error).toMatch(/задаче или подпроцессу/); // к событию не крепится
     expect(addBoundaryEvent(structuredModel(), "нет").error).toBeTruthy();
     const second = addBoundaryEvent(r.model, "b1", "message");
@@ -143,7 +143,7 @@ describe("панель «Свойства»: граничные события, 
     expect(screen.getByText("На границе задачи событий нет.")).toBeTruthy();
     fireEvent.click(screen.getByText("+ Ошибка"));
     const created = p.model().nodes.find((n) => n.attached_to === "b1")!;
-    expect(created).toMatchObject({ subtype: "error", bpmn_scope: "o1" });
+    expect(created).toMatchObject({ subtype: "intermediate", trigger: { type: "error" }, bpmn_scope: "o1" });
     expect(p.onSelect).toHaveBeenCalledWith(expect.objectContaining({ kind: "node", id: created.id }));
   });
 
@@ -263,7 +263,7 @@ describe("студия: новые элементы на диаграмме оп
     expect(document.querySelector(`[data-node-id="${bid}"] circle`)!.getAttribute("cx")).toBe(before);
     expect(document.querySelector(".props-head b")!.textContent).toBe("Свойства элемента");
     await act(async () => fireEvent.click(screen.getByTitle("Сохранить (Ctrl+S)")));
-    expect(onSave.mock.calls[0][0].nodes.find((n) => n.id === bid)).toMatchObject({ attached_to: "b1", subtype: "timer", bpmn_scope: "o1" });
+    expect(onSave.mock.calls[0][0].nodes.find((n) => n.id === bid)).toMatchObject({ attached_to: "b1", subtype: "intermediate", trigger: { type: "timer" }, bpmn_scope: "o1" });
   });
 
   it("значки документов и хранилищ, внешний пул и поток сообщений рисуются; клик по значку выбирает задачу", () => {

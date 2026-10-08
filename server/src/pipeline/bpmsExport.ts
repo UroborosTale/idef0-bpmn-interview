@@ -1,5 +1,8 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { parseDurationToMinutes } from "./timeUtils.js";
+import { createEventWriter } from "./bpmn.js";
+import { eventSpec } from "../shared/events.js";
+import { isBoundaryNode } from "../shared/bpmnArtifacts.js";
 
 /**
  * ФТ-М1.4: экспорт конфигурации в BPMS. Целевые системы — Camunda
@@ -71,6 +74,7 @@ export interface BpmsExportResult {
 export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
   const notes: string[] = [];
   const nodeIdOf = (mid: string) => `Node_${mid}`;
+  const events = createEventWriter();
   const roleById = new Map(model.roles.map((r) => [r.id, r] as const));
   const dataById = new Map(model.data.map((d) => [d.id, d] as const));
 
@@ -101,28 +105,17 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
       const tag = gatewayTag(n.subtype);
       flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}" />`);
     } else if (n.type === "event") {
-      if (n.subtype === "start") {
-        flowElementsXml.push(`<bpmn:startEvent id="${id}" name="${esc(n.name)}" />`);
-      } else if (n.subtype === "end") {
-        flowElementsXml.push(`<bpmn:endEvent id="${id}" name="${esc(n.name)}" />`);
-      } else if (n.subtype === "timer") {
+      const boundary = isBoundaryNode(n, model.nodes);
+      const spec = eventSpec(n, boundary);
+      // таймер без срока в самом триггере берёт срок из длительности шага — как было до введения триггеров
+      if (spec.trigger === "timer" && !spec.details.timer?.value?.trim()) {
         const minutes = parseDurationToMinutes(n.duration);
-        if (minutes) {
-          flowElementsXml.push(
-            `<bpmn:intermediateCatchEvent id="${id}" name="${esc(n.name)}"><bpmn:timerEventDefinition><bpmn:timeDuration xsi:type="bpmn:tFormalExpression">${minutesToIso8601(
-              minutes
-            )}</bpmn:timeDuration></bpmn:timerEventDefinition></bpmn:intermediateCatchEvent>`
-          );
-        } else {
-          notes.push(`Таймер «${n.name}»: не указан срок — таймер экспортирован без длительности, требуется задать вручную.`);
-          flowElementsXml.push(`<bpmn:intermediateCatchEvent id="${id}" name="${esc(n.name)}"><bpmn:timerEventDefinition /></bpmn:intermediateCatchEvent>`);
-        }
-      } else {
-        flowElementsXml.push(`<bpmn:intermediateThrowEvent id="${id}" name="${esc(n.name)}" />`);
+        if (minutes) spec.details.timer = { kind: "duration", value: minutesToIso8601(minutes) };
+        else notes.push(`Таймер «${n.name}»: не указан срок — таймер экспортирован без длительности, требуется задать вручную.`);
       }
+      flowElementsXml.push(events.eventXml(id, n.name, spec, boundary ? ` attachedToRef="${nodeIdOf(n.attached_to!)}" cancelActivity="${n.interrupting !== false}"` : ""));
     }
   }
-
   const outAdj = new Map<string, number>();
   for (const f of model.flows) outAdj.set(f.from, (outAdj.get(f.from) ?? 0) + 1);
   for (const f of model.flows) {
@@ -147,6 +140,7 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_${esc(model.process.id)}" targetNamespace="http://example.org/bpmn" exporter="IDEF0-BPMN Interview System" exporterVersion="1.0">
+  ${events.declarations().join("\n  ")}
   <bpmn:process id="Process_${esc(model.process.id)}" name="${esc(model.process.name)}" isExecutable="true">
     ${flowElementsXml.join("\n    ")}
   </bpmn:process>

@@ -106,6 +106,19 @@
           "id": { "type": "string" },
           "type": { "enum": ["task", "event", "gateway", "subprocess"] },
           "subtype": { "type": "string" },
+          "trigger": {
+            "type": ["object", "null"],
+            "description": "Триггер события: type (none, message, timer, conditional, signal, error, escalation, compensation, cancel, link, terminate, multiple, parallel_multiple), direction (catch/throw для промежуточного), name, timer {kind: date|duration|cycle, value}, condition, members",
+            "properties": {
+              "type": { "enum": ["none", "message", "timer", "conditional", "signal", "error", "escalation", "compensation", "cancel", "link", "terminate", "multiple", "parallel_multiple"] },
+              "direction": { "enum": ["catch", "throw"] },
+              "name": { "type": ["string", "null"] },
+              "timer": { "type": ["object", "null"], "properties": { "kind": { "enum": ["date", "duration", "cycle"] }, "value": { "type": "string" } }, "required": ["kind", "value"] },
+              "condition": { "type": ["string", "null"] },
+              "members": { "type": "array", "items": { "type": "string" } }
+            },
+            "required": ["type"]
+          },
           "name": { "type": "string" },
           "role_id": { "type": ["string", "null"] },
           "system_ids": { "type": "array", "items": { "type": "string" } },

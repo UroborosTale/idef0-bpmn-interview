@@ -1,35 +1,27 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
+import { eventSpec, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
 import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds } from "./geometry";
 
 const INK = "#1e293b";
 const ACCENT = "#4338ca";
 
-function EventGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: string }) {
-  switch (subtype) {
-    case "timer":
-      return (
-        <g stroke={INK} strokeWidth={1.2} fill="none">
-          <circle cx={cx} cy={cy} r={9} />
-          <path d={`M${cx} ${cy - 6} V${cy} L${cx + 4} ${cy + 3}`} />
-        </g>
-      );
-    case "message":
-      return (
-        <g stroke={INK} strokeWidth={1.2} fill="none">
-          <rect x={cx - 8} y={cy - 5.5} width={16} height={11} />
-          <path d={`M${cx - 8} ${cy - 5.5} L${cx} ${cy + 1} L${cx + 8} ${cy - 5.5}`} />
-        </g>
-      );
-    case "signal":
-      return <path d={`M${cx} ${cy - 8} L${cx + 8} ${cy + 6} H${cx - 8} Z`} stroke={INK} strokeWidth={1.2} fill="none" />;
-    case "error":
-      return <path d={`M${cx - 4} ${cy + 8} L${cx - 2} ${cy - 1} L${cx + 3} ${cy + 2} L${cx + 5} ${cy - 8} L${cx + 2} ${cy - 1} L${cx - 3} ${cy - 3} Z`} stroke={INK} strokeWidth={1.2} fill="none" />;
-    default:
-      return null;
-  }
+/** Значок триггера события; у выбрасывающих событий (throwing) он залит, у ждущих — только контур. */
+function EventGlyph({ cx, cy, trigger, throwing }: { cx: number; cy: number; trigger: TriggerType; throwing: boolean }) {
+  const glyphs = triggerGlyph(trigger, throwing);
+  if (glyphs.length === 0) return null;
+  return (
+    <g data-trigger={trigger} data-throwing={throwing || undefined} strokeLinejoin="round" pointerEvents="none">
+      {glyphs.map((g, i) => {
+        const fill = g.filled ? INK : "none";
+        const stroke = g.kind === "poly" && g.light ? "#fff" : INK;
+        if (g.kind === "circle") return <circle key={i} cx={cx} cy={cy} r={g.r} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+        const d = g.pts.map(([x, y], k) => `${k === 0 ? "M" : "L"}${cx + x} ${cy + y}`).join(" ") + (g.closed ? " Z" : "");
+        return <path key={i} d={d} fill={fill} stroke={stroke} strokeWidth={1.2} />;
+      })}
+    </g>
+  );
 }
-
 function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: string }) {
   const p = { stroke: INK, strokeWidth: 3, fill: "none", strokeLinecap: "round" as const };
   switch (subtype) {
@@ -73,13 +65,15 @@ export function NodeShape({ node, box, selected, hot, boundary = false }: { node
 
   let body: JSX.Element;
   if (node.type === "event") {
-    const isEnd = node.subtype === "end";
-    const isStart = node.subtype === "start";
+    const spec = eventSpec(node, boundary);
+    const isEnd = spec.position === "end";
+    const isStart = spec.position === "start";
     body = (
-      <g>
+      <g data-event-position={spec.position}>
+        <title>{`${spec.trigger === "none" ? "Событие" : triggerSummary(spec)}${spec.position === "intermediate" ? (spec.throwing ? " (выбрасывает)" : " (ждёт)") : ""}`}</title>
         <circle cx={cx} cy={cy} r={w / 2} fill={isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff"} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
         {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
-        <EventGlyph cx={cx} cy={cy} subtype={node.subtype} />
+        <EventGlyph cx={cx} cy={cy} trigger={spec.trigger} throwing={spec.throwing} />
         <Label cx={cx} y={y + h + 14} text={node.name} />
       </g>
     );

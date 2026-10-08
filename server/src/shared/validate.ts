@@ -2,6 +2,7 @@ import type { ProcessLogicModel, ValidationIssue } from "../types/model.js";
 import { idef0Codes, functionsOf as idef0Functions } from "./idef0Layout.js";
 import { bpmnHosts, functionDepth, isStructured, parseProcessCode } from "./codes.js";
 import { isBoundaryNode } from "./bpmnArtifacts.js";
+import { TRIGGER_LABELS, eventSpec, triggerGaps, triggerProblem, triggerSummary } from "./events.js";
 import { FUNCTION_CODE, blockKey, hasVerbalNoun, looksLikeFact, normalizeCode } from "./rules.js";
 
 /**
@@ -150,6 +151,40 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     if ((outAdj.get(b.id) ?? []).length === 0) add("BPMN", "warning", "bpmn_boundary_no_outgoing", `${where}У граничного события «${b.name}» нет продолжения: проведите стрелку к шагу, который выполняется при его наступлении.`, b.id);
   }
 
+  // --- триггеры событий ---
+  const linkThrow = new Map<string, string>();
+  const linkCatch = new Set<string>();
+  for (const n of bpmnNodes) {
+    if (n.type !== "event") continue;
+    const spec = eventSpec(n, boundaryIds.has(n.id));
+    const problem = triggerProblem(spec);
+    if (spec.position === "boundary" && spec.trigger === "none" && boundaryIds.has(n.id)) {
+      add("BPMN", "warning", "bpmn_boundary_no_trigger", `${where}У граничного события «${n.name}» не выбран триггер: укажите, что его запускает — таймер, сообщение, ошибка…`, n.id);
+    } else if (problem) {
+      add("BPMN", "error", "bpmn_event_trigger_invalid", `${where}Событие «${n.name}»: ${problem}.`, n.id);
+    } else if (n.trigger) {
+      // замечания о незаполненных параметрах — только у событий, где триггер задан явно (прежние записи без параметров не трогаем)
+      const gaps = triggerGaps(spec);
+      if (gaps.length > 0) add("BPMN", "warning", "bpmn_event_trigger_incomplete", `${where}Событие «${n.name}» (${TRIGGER_LABELS[spec.trigger].toLowerCase()}): ${gaps.join("; ")}.`, n.id);
+    }
+    if (spec.trigger === "link" && spec.details.name?.trim()) {
+      if (spec.throwing) linkThrow.set(n.id, spec.details.name.trim().toLowerCase());
+      else linkCatch.add(spec.details.name.trim().toLowerCase());
+    }
+  }
+  const throwNames = new Set(linkThrow.values());
+  for (const [id, name] of linkThrow) {
+    if (!linkCatch.has(name)) add("BPMN", "warning", "bpmn_link_unpaired", `${where}Событие «${nodeById.get(id)!.name}» переходит по ссылке «${name}», но на этой диаграмме нет события, которое эту ссылку принимает.`, id);
+  }
+  for (const n of bpmnNodes) {
+    if (n.type !== "event") continue;
+    const spec = eventSpec(n, boundaryIds.has(n.id));
+    const name = spec.details.name?.trim().toLowerCase();
+    if (spec.trigger === "link" && !spec.throwing && name && !throwNames.has(name)) {
+      add("BPMN", "warning", "bpmn_link_unpaired", `${where}Событие «${n.name}» принимает ссылку «${name}», но на этой диаграмме нет события, которое по ней переходит.`, n.id);
+    }
+  }
+
   // --- правила Соглашения о моделировании (только для модели со структурным кодом процесса) ---
   if (isStructured(model)) {
     const byId = new Map(bpmnNodes.map((n) => [n.id, n] as const));
@@ -177,7 +212,7 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       const isEnd = n.type === "event" && n.subtype === "end";
       if (!isEnd && insOf(n.id).length >= 2) add("BPMN", "warning", "bpmn_merge_without_gateway", `${where}В «${n.name}» потоки сходятся без шлюза — объедините их шлюзом.`, n.id);
       // событие — это свершившийся факт: «Получена заявка», а не «Заявка» или «Получить заявку»
-      if (n.type === "event" && n.subtype !== "timer" && n.name.trim() && !/^[\d\s\p{P}]+$/u.test(n.name) && !looksLikeFact(n.name)) {
+      if (n.type === "event" && eventSpec(n, false).trigger !== "timer" && n.name.trim() && !/^[\d\s\p{P}]+$/u.test(n.name) && !looksLikeFact(n.name)) {
         add("BPMN", "warning", "bpmn_event_not_fact", `${where}Событие «${n.name}» нужно сформулировать как факт, который произошёл (например: «Заявка получена»).`, n.id);
       }
     }
@@ -370,9 +405,11 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       const node = model.nodes.find((n) => n.id === (out ? msg.from : msg.to));
       const pool = poolName(out ? msg.to : msg.from);
       if (!node || pool === undefined) continue;
-      const bad = node.type === "gateway" || (node.type === "event" && (node.subtype === "timer" || node.subtype === "error"));
+      const trig = node.type === "event" ? eventSpec(node, !!node.attached_to).trigger : "none";
+      const bad = node.type === "gateway" || ["timer", "error", "conditional", "escalation", "compensation", "cancel", "link", "terminate"].includes(trig);
       if (bad) {
-        add("BPMN", "warning", "bpmn_message_endpoint", `${out ? "Сообщение в «" : "Сообщение из «"}${pool}» ${out ? "отправляет" : "получает"} «${node.name}», а ${node.type === "gateway" ? "шлюз" : "таймер и событие-ошибка"} сообщений не ${out ? "отправляют" : "получают"}: свяжите пул с задачей или событием-сообщением.`, node.id);
+        const who = node.type === "gateway" ? "шлюз" : trig === "timer" || trig === "error" ? "таймер и событие-ошибка" : `событие с триггером «${TRIGGER_LABELS[trig].toLowerCase()}»`;
+        add("BPMN", "warning", "bpmn_message_endpoint", `${out ? "Сообщение в «" : "Сообщение из «"}${pool}» ${out ? "отправляет" : "получает"} «${node.name}», а ${who} сообщений не ${out ? "отправляют" : "получают"}: свяжите пул с задачей или событием-сообщением.`, node.id);
       }
     }
     // источник и назначение продуктов: внутри модели они выводятся из связей функций, снаружи — задаются в карточке

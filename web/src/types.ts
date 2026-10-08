@@ -1,3 +1,4 @@
+import type { EventTrigger } from "@shared/events";
 export type Speaker = "interviewer" | "owner" | "participant" | "unknown";
 
 export interface Fragment {
@@ -60,6 +61,8 @@ export interface ProcessNode {
   id: string;
   type: "task" | "event" | "gateway" | "subprocess";
   subtype?: string;
+  /** Событие: триггер (сообщение, таймер, условие, сигнал, ошибка…); вид события — subtype. */
+  trigger?: EventTrigger | null;
   name: string;
   role_id?: string | null;
   system_ids: string[];
@@ -417,3 +420,4 @@ export interface HistoryEvent {
   event: "created" | "changed" | "removed";
   changes: HistoryChange[];
 }
+export type { EventTrigger };

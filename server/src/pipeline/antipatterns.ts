@@ -1,5 +1,6 @@
 import type { ProcessLogicModel, ProcessNode, SourceRef } from "../types/model.js";
 import { APPROVE_STEMS, CONSULT_STEMS } from "./raci.js";
+import { eventSpec } from "../shared/events.js";
 
 export type AntipatternRule = "double_entry" | "manual_handoff" | "excessive_approval" | "step_without_output" | "loop_without_exit" | "ping_pong";
 
@@ -126,7 +127,7 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
     const hasTimerOrCount = cycle.some((id) => {
       const n = nodeById.get(id);
       if (!n) return false;
-      if (n.type === "event" && n.subtype === "timer") return true;
+      if (n.type === "event" && eventSpec(n, !!n.attached_to).trigger === "timer") return true;
       const flowsOut = outAdj.get(id) ?? [];
       return flowsOut.some((f) => f.condition && TIMER_OR_COUNT_MARKERS.some((mk) => f.condition!.toLowerCase().includes(mk)));
     });

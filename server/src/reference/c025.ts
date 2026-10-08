@@ -1,5 +1,5 @@
 import { ProcessLogicModel } from "../types/model.js";
-import { END, IF, START, T, TIMER, XOR, buildDiagram, type Diagram, type Item } from "./builder.js";
+import { END, IF, MSG_CATCH, MSG_START, START, T, TIMER, XOR, buildDiagram, type Diagram, type Item } from "./builder.js";
 
 /**
  * Процесс C025 «Организация обучения и аттестации персонала ООО «РУ КМЗ»» — по документу «ДПО от 05.10»:
@@ -146,7 +146,7 @@ const o11: Diagram = {
 /** Три согласования подряд устроены одинаково: уведомление → карточка → решение (срок 1 день) → «Согласовано?». */
 const approval = (n: number, role: string, createName: string, msgName: string): Item[] => [
   T(`c${n}`, createName, svc),
-  { kind: "event", key: `msg${n}`, k: "message", name: msgName, r: role },
+  MSG_CATCH(`msg${n}`, msgName, "Уведомление о необходимости согласования заявки", role),
   T(`open${n}`, "Открыть карточку согласования заявки", at(role)),
   T(`dec${n}`, "Принять решение о согласовании", { ...at(role), dur: "1 день" }),
   XOR(`ok${n}`, "Согласовано?", "elma"),
@@ -241,16 +241,16 @@ const o21: Diagram = {
   items: [
     START("start", "Программа обучения и организации подтверждены", "elma"),
     T("calendar", "Создать событие в календаре за 1 день до начала обучения и направить уведомление сотруднику о начале обучения", { ...svc, ctl: ["ruleReminder"] }),
-    TIMER("begin", "Дата начала обучения", "elma"),
+    TIMER("begin", "Дата начала обучения", "elma", { kind: "date", value: "Дата начала обучения из заявки" }),
     T("auto", "Автоматическое подтверждение начала обучения и установка статуса “Обучение идёт”", svc),
     XOR("m2"),
-    TIMER("finish", "Дата окончания обучения"),
+    TIMER("finish", "Дата окончания обучения", undefined, { kind: "date", value: "Дата окончания обучения из заявки" }),
     T("ask", "Запросить у организации сведения о прохождении обучения"),
     T("check", "Проверить прохождение обучения"),
     XOR("done", "Сотрудник закончил обучение?"),
     END("endDone", "Сотрудник закончил обучение"),
     XOR("extended", "Обучение было продлено?"),
-    START("dismissalStart", "Уведомление об отчислении сотрудника от образовательной организации получено"),
+    MSG_START("dismissalStart", "Уведомление об отчислении сотрудника от образовательной организации получено", "Уведомление об отчислении"),
     XOR("m3", "Слияние потоков", "elma"),
     T("notify", "Направить уведомление об отчислении сотруднику", svc),
     T("close", "Внести запись “Обучение не завершено”, статус заявки ”Закрыта”", svc),
