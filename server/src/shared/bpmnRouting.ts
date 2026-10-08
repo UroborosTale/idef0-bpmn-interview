@@ -309,6 +309,51 @@ export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacle
   return new Map([...routeFlowsDetailed(nodes, flows, extraObstacles)].map(([id, r]) => [id, r.pts] as const));
 }
 
+/** Показатели прокладки: пересечения стрелок друг с другом, проходы сквозь фигуры и суммарная длина линий. */
+export interface RouteQuality {
+  crossings: number;
+  cuts: number;
+  length: number;
+}
+
+/**
+ * Оценка готовой прокладки — по ней сравнивают варианты раскладки фигур. Пересечением считается перекрёстье
+ * горизонтального и вертикального участков разных стрелок (касания и общие концы не в счёт); проходом сквозь фигуру —
+ * участок, входящий в чужую фигуру (свои концы стрелки не считаются).
+ */
+export function routeQuality(nodes: RouteNode[], flows: RouteFlow[], routes: Map<string, Pt[]>): RouteQuality {
+  type Seg = { id: string; a: Pt; b: Pt; h: boolean };
+  const segs: Seg[] = [];
+  let length = 0;
+  let cuts = 0;
+  for (const f of flows) {
+    const pts = routes.get(f.id);
+    if (!pts) continue;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [a, b] = [pts[i], pts[i + 1]];
+      length += Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+      segs.push({ id: f.id, a, b, h: Math.abs(a[1] - b[1]) < 1e-6 });
+      for (const n of nodes) {
+        if ((n.id === f.from && i === 0) || (n.id === f.to && i === pts.length - 2) || n.type === "pool") continue;
+        const r = n.box;
+        const [x1, x2, y1, y2] = [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+        if (x2 > r.x + 0.5 && x1 < r.x + r.w - 0.5 && y2 > r.y + 0.5 && y1 < r.y + r.h - 0.5) cuts++;
+      }
+    }
+  }
+  let crossings = 0;
+  const hs = segs.filter((s) => s.h);
+  const vs = segs.filter((s) => !s.h);
+  for (const h of hs) {
+    const [hx1, hx2] = [Math.min(h.a[0], h.b[0]), Math.max(h.a[0], h.b[0])];
+    for (const v of vs) {
+      if (v.id === h.id) continue;
+      const [vy1, vy2] = [Math.min(v.a[1], v.b[1]), Math.max(v.a[1], v.b[1])];
+      if (v.a[0] > hx1 + 1 && v.a[0] < hx2 - 1 && h.a[1] > vy1 + 1 && h.a[1] < vy2 - 1) crossings++;
+    }
+  }
+  return { crossings, cuts, length };
+}
 /** То же, что routeFlows, но с фактическими сторонами и подвижным участком каждой стрелки (для ручной правки в редакторе). */
 export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extraObstacles: Box[] = []): Map<string, RouteInfo> {
   const byId = new Map(nodes.map((n) => [n.id, n] as const));

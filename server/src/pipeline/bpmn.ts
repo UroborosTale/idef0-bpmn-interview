@@ -1,5 +1,5 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
-import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
+import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
 import { collapseTriggers } from "../shared/bpmnTriggers.js";
@@ -244,20 +244,33 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
         width: size.w,
         height: size.h,
         laneIndex: laneIndexOf.get(laneIdOf(roleOf(n))) ?? unassignedIndex,
+        type: n.type,
+        fixed: n.layout ?? null,
       };
     });
   for (const se of synthEvents) {
-    layoutNodes.push({ id: se.id, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h, laneIndex: unassignedIndex });
+    layoutNodes.push({ id: se.id, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h, laneIndex: unassignedIndex, type: "event" });
   }
   const layoutSource = (id: string) => {
     const n = nodes.find((x) => x.id === id);
     return n && isBoundary(n) ? hostOf(n).id : id;
   };
   const layoutEdges: LayoutEdgeIn[] = [
-    ...tview.flows.map((f) => ({ id: f.id, from: nodeIdOf(layoutSource(f.from)), to: nodeIdOf(f.to) })),
+    ...tview.flows.map((f) => ({ id: f.id, from: nodeIdOf(layoutSource(f.from)), to: nodeIdOf(f.to), ...(layoutSource(f.from) !== f.from ? { viaBoundary: nodeIdOf(f.from) } : {}) })),
     ...synthFlows.filter((f) => ![f.from, f.to].some((id) => tview.hidden.has(id.replace(/^Node_/, "")))).map((f) => ({ id: f.id, from: f.from, to: f.to })),
   ];
-  const layout = await layoutLayered(layoutNodes, layoutEdges, Math.max(laneCount, 1));
+  // значки документов над задачами зависят от положения задач — при подборе раскладки они учитываются так же, как при итоговой прокладке
+  const layoutExtras: LayoutExtras = (boxes) => {
+    const hb = new Map<string, { x: number; y: number; w: number; h: number }>();
+    for (const n of nodes) {
+      const b = boxes.get(nodeIdOf(n.id));
+      if (b) hb.set(n.id, { x: b.x, y: b.y, w: b.width, h: b.height });
+    }
+    const arts = artifactsOf(nodes, hb, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) });
+    const extraNodes: RouteNode[] = [...boundaryBoxes(nodes, hb)].map(([id, b]) => ({ id: nodeIdOf(id), type: "event", box: b, boundary: true }));
+    return { obstacles: arts.map((a) => a.box), withArtifacts: new Set(arts.map((a) => nodeIdOf(a.nodeId))), extraNodes };
+  };
+  const layout = await layoutLayered(layoutNodes, layoutEdges, Math.max(laneCount, 1), layoutExtras);
 
   // Позиции, заданные в редакторе (node.layout), приоритетнее авто-раскладки.
   for (const n of nodes) {
