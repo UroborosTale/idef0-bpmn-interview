@@ -166,6 +166,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
     assignments: [],
     pools: [],
     messages: [],
+    accepted_issues: [],
     respondents: [],
     discrepancies: [],
   };
@@ -368,6 +369,7 @@ export function buildModelFromParsedDrawio(parsed: ParsedDrawio, meta: SessionMe
     assignments: [],
     pools: [],
     messages: [],
+    accepted_issues: [],
     respondents: [],
     discrepancies: [],
   };

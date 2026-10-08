@@ -6,7 +6,7 @@ import { getSession, listSessions } from "../repo.js";
 import { functionCodes, processCodeOf, stepCodes } from "../shared/codes.js";
 import { applyPatch, describePatch, issueDelta, type ModelPatch } from "../shared/patch.js";
 import { sourceErrors } from "../agent/sources.js";
-import { validateModel } from "../shared/validate.js";
+import { splitAccepted, validateModel } from "../shared/validate.js";
 import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput } from "../types/patch.js";
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
@@ -50,6 +50,8 @@ agentRouter.get("/agent/sessions/:id/model", (req, res) => {
     return;
   }
   const model = session.model;
+  // принятые аналитиком замечания (с причиной) агенту не показываем как задачи: они в отдельном списке
+  const split = splitAccepted(model.accepted_issues, validateModel(model));
   res.json({
     sessionId: session.id,
     updatedAt: session.updatedAt,
@@ -57,7 +59,8 @@ agentRouter.get("/agent/sessions/:id/model", (req, res) => {
     model,
     // коды функций и шагов — агенту удобнее ссылаться на «B002.01.01», чем на внутренние id
     codes: Object.fromEntries([...functionCodes(model), ...stepCodes(model)]),
-    issues: validateModel(model),
+    issues: split.active,
+    accepted: split.accepted.map((i) => ({ rule: i.rule, element_id: i.element_id, message: i.message, reason: i.reason })),
   });
 });
 

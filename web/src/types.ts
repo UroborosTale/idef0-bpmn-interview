@@ -114,6 +114,15 @@ export interface MessageFlow {
   name?: string | null;
 }
 
+/** Принятое замечание проверки: отклонение признано осознанным, причина записана. */
+export interface AcceptedIssue {
+  rule: string;
+  element_id: string | null;
+  message: string | null;
+  reason: string;
+  at: string | null;
+}
+
 export type GapPriority = "critical" | "important" | "desirable";
 
 export interface Gap {
@@ -246,6 +255,7 @@ export interface ProcessLogicModel {
   assignments: RoleAssignment[];
   pools: ExternalPool[];
   messages: MessageFlow[];
+  accepted_issues: AcceptedIssue[];
   respondents: Respondent[];
   discrepancies: Discrepancy[];
 }

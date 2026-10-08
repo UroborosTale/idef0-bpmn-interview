@@ -256,6 +256,21 @@
         }
       }
     },
+    "accepted_issues": {
+      "type": "array",
+      "description": "Принятые замечания проверок: отклонение признано осознанным, причина записана",
+      "items": {
+        "type": "object",
+        "required": ["rule", "reason"],
+        "properties": {
+          "rule": { "type": "string" },
+          "element_id": { "type": ["string", "null"] },
+          "message": { "type": ["string", "null"] },
+          "reason": { "type": "string" },
+          "at": { "type": ["string", "null"] }
+        }
+      }
+    },
     "respondents": {
       "type": "array",
       "description": "Респонденты мультиинтервью (М4.1)",

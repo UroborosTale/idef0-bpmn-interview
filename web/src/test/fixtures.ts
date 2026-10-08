@@ -61,6 +61,7 @@ export function purchaseModel(): M {
     assignments: [],
     pools: [],
     messages: [],
+    accepted_issues: [],
     raci: [
       { node_id: "a", role_id: "r1", type: "R" },
       { node_id: "a", role_id: "r1", type: "A" },

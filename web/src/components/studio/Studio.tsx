@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { validateModel } from "@shared/validate";
+import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
 import { applyPatch } from "@shared/patch";
 import { api, type AgentTaskRow, type Proposal } from "../../api/client";
@@ -20,11 +20,13 @@ import ReportView from "./ReportView";
 import PropertiesPanel from "./PropertiesPanel";
 import type { Selection } from "./selection";
 import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
+import { acceptIssue, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
 
 type M = ProcessLogicModel;
 
 /** Начальное состояние черновика: роли и позиции фигур достроены (в черновиках, сохранённых раньше, полей новой версии модели нет). */
-const normalize = (m: M): M => (m.assignments && m.pools && m.messages ? m : { ...m, assignments: m.assignments ?? [], pools: m.pools ?? [], messages: m.messages ?? [] });
+const normalize = (m: M): M =>
+  m.assignments && m.pools && m.messages && m.accepted_issues ? m : { ...m, assignments: m.assignments ?? [], pools: m.pools ?? [], messages: m.messages ?? [], accepted_issues: m.accepted_issues ?? [] };
 const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(withScopeLayouts(withLayout(normalize(m), false, positionsFromBpmnXml(bpmnXml))));
 
 /**
@@ -103,6 +105,11 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     }
     await loadProposals();
   };
+  /** Исправление и принятие замечаний — шаги общей истории: их можно отменить Ctrl+Z. */
+  const fixIssue = (_issue: ValidationIssue, fix: QuickFix, optionId?: string) => h.commit(fix.apply(h.draftRef.current, optionId));
+  const acceptOne = (issue: ValidationIssue, reason: string) => h.commit(acceptIssue(h.draftRef.current, issue, reason));
+  const revokeOne = (issue: ValidationIssue) => h.commit(revokeAcceptance(h.draftRef.current, issue));
+
   const createTask = async (task: { text: string; scope: string | null; agent?: string }) => {
     try {
       await api.createTask(session.id, task);
@@ -137,7 +144,10 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
 
   const liveDocs = docs.filter((d) => !docIsStale(d, draft));
   const active = liveDocs.find((d) => d.key === activeKey) ?? liveDocs[0] ?? bpmnDoc();
-  const issues: ValidationIssue[] = useMemo(() => validateModel(draft), [draft]);
+  const allIssues: ValidationIssue[] = useMemo(() => validateModel(draft), [draft]);
+  // принятые аналитиком замечания (с причиной) в счётчики и списки действующих не входят
+  const split = useMemo(() => splitAccepted(draft.accepted_issues, allIssues), [draft.accepted_issues, allIssues]);
+  const issues = split.active;
   const errors = issues.filter((i) => i.severity === "error").length;
   const warnings = issues.length - errors;
 
@@ -435,7 +445,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
           <PropertiesPanel
@@ -472,6 +482,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         <span className="spacer" />
         <span className={errors ? "st-err" : "muted"}>ошибок: {errors}</span>
         <span className="muted">предупреждений: {warnings}</span>
+        {split.accepted.length > 0 && <span className="muted">принято: {split.accepted.length}</span>}
         <span className={h.dirty ? "st-dirty" : "st-ok"}>{h.dirty ? "● есть несохранённые изменения" : "✓ сохранено"}</span>
       </div>
     </div>

@@ -286,6 +286,7 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     assignments: [],
     pools: [],
     messages: [],
+    accepted_issues: [],
     respondents: [],
     discrepancies: [],
   };

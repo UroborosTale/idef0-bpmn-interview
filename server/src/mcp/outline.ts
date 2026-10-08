@@ -25,6 +25,8 @@ export interface ModelView {
   updatedAt: string;
   codes: Record<string, string>;
   issues: { severity: string; rule: string; message: string; element_id: string | null }[];
+  /** Замечания, которые аналитик принял с причиной: не исправлять и не предлагать «исправления». */
+  accepted?: { rule: string; message: string; element_id: string | null; reason: string }[];
   model: {
     process: { name: string; code?: string | null; owner?: string; goal?: string; trigger?: string; result?: string };
     roles: { id: string; name: string; qualification?: string | null }[];
@@ -129,5 +131,10 @@ export function outline(view: ModelView, scope?: string): string {
   lines.push("", `Замечания проверок: ${issues.length}`);
   for (const i of issues.slice(0, 60)) lines.push(`  [${i.severity}] ${i.rule}${i.element_id ? ` (${i.element_id})` : ""}: ${i.message}`);
   if (issues.length > 60) lines.push(`  … и ещё ${issues.length - 60}`);
+  const accepted = (view.accepted ?? []).filter((i) => !rootId || !i.element_id || visible(i.element_id));
+  if (accepted.length > 0) {
+    lines.push("", `Принято аналитиком (не исправлять): ${accepted.length}`);
+    for (const i of accepted.slice(0, 30)) lines.push(`  ${i.rule}${i.element_id ? ` (${i.element_id})` : ""}: ${i.message} — причина: ${i.reason}`);
+  }
   return lines.join("\n");
 }

@@ -297,6 +297,17 @@ export const Discrepancy = z.object({
 });
 export type Discrepancy = z.infer<typeof Discrepancy>;
 
+// Принятые замечания проверок: аналитик признал отклонение осознанным («так нарисовано в документе») и записал причину.
+// Замечание считается принятым, пока совпадают правило и элемент (у замечаний без элемента — ещё и текст).
+export const AcceptedIssue = z.object({
+  rule: z.string(),
+  element_id: z.string().nullable().default(null),
+  message: z.string().nullable().default(null),
+  reason: z.string(),
+  at: z.string().nullable().default(null),
+});
+export type AcceptedIssue = z.infer<typeof AcceptedIssue>;
+
 export const ProcessLogicModel = z.object({
   schema_version: z.string().default(SCHEMA_VERSION),
   process: ProcessMeta,
@@ -315,6 +326,7 @@ export const ProcessLogicModel = z.object({
   assignments: z.array(RoleAssignment).default([]),
   pools: z.array(ExternalPool).default([]),
   messages: z.array(MessageFlow).default([]),
+  accepted_issues: z.array(AcceptedIssue).default([]),
   respondents: z.array(Respondent).default([]),
   discrepancies: z.array(Discrepancy).default([]),
 });

@@ -429,3 +429,39 @@ function isAncestorOrSelf(model: Pick<ProcessLogicModel, "nodes">, ancestor: str
 export function hasBlockingErrors(issues: ValidationIssue[]): boolean {
   return issues.some((i) => i.severity === "error");
 }
+
+// --- принятые замечания ---
+
+export interface AcceptanceLike {
+  rule: string;
+  element_id?: string | null;
+  message?: string | null;
+  reason: string;
+  at?: string | null;
+}
+
+interface IssueLikeFull {
+  rule: string;
+  message: string;
+  element_id: string | null;
+  severity: string;
+}
+
+/** Ключ замечания: правило и элемент; у замечаний без элемента — ещё и текст (он меняется вместе с содержанием замечания). */
+export const issueKey = (i: { rule: string; element_id?: string | null; message?: string | null }): string => (i.element_id ? `${i.rule}|${i.element_id}` : `${i.rule}||${i.message ?? ""}`);
+
+/**
+ * Делит замечания на действующие и принятые аналитиком. Ошибки принять нельзя — они всегда действующие: модель с ошибкой
+ * некорректна, а не «нарисована как в документе».
+ */
+export function splitAccepted<I extends IssueLikeFull>(accepted: AcceptanceLike[] | undefined, issues: I[]): { active: I[]; accepted: (I & { reason: string; at: string | null })[] } {
+  const byKey = new Map((accepted ?? []).map((a) => [issueKey(a), a] as const));
+  const active: I[] = [];
+  const done: (I & { reason: string; at: string | null })[] = [];
+  for (const i of issues) {
+    const a = i.severity === "error" ? undefined : byKey.get(issueKey(i));
+    if (a) done.push({ ...i, reason: a.reason, at: a.at ?? null });
+    else active.push(i);
+  }
+  return { active, accepted: done };
+}

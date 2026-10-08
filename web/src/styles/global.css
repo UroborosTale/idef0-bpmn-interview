@@ -459,3 +459,12 @@ button.danger:hover { background: #fef2f2; }
 /* глубокое дерево: длинные названия не обрезаются, а прокручиваются по горизонтали */
 .nav-row { width: max-content; min-width: 100%; box-sizing: border-box; }
 .nav-row .nav-name { overflow: visible; flex: 0 0 auto; }
+/* Исправление и принятие замечаний */
+.problem-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
+.fix-btn { padding: 0 8px; font-size: 11.5px; line-height: 18px; }
+.fix-select { font-size: 11.5px; max-width: 230px; }
+.problem-accept { display: flex; gap: 6px; padding: 4px 10px 6px 34px; background: #fffbeb; border-bottom: 1px solid #f1f4f9; }
+.problem-accept input { flex: 1; min-width: 200px; }
+.problem-row.accepted { color: #64748b; background: #f8fafc; }
+.problem-reason { color: #475569; font-style: italic; }
+.problem-group { padding: 3px 10px; font-weight: 600; font-size: 12px; background: #eef2f9; color: var(--bs-blue); position: sticky; top: 0; }
