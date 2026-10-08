@@ -11,7 +11,7 @@ import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
-import { duplicateNode } from "../bpmn-editor/model-ops";
+import { deleteNode, duplicateNode } from "../bpmn-editor/model-ops";
 import { diagramSvg, download, svgToPng } from "./export-image";
 import Navigator from "./Navigator";
 import ProblemsPanel from "./ProblemsPanel";
@@ -20,7 +20,9 @@ import ReportView from "./ReportView";
 import PropertiesPanel from "./PropertiesPanel";
 import type { Selection } from "./selection";
 import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
-import { acceptIssue, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
+import { acceptIssue, addOperationSkeleton, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
+import { addChildFunction, deleteImpact, moveFunction, type MoveTarget } from "./structure-ops";
+import StructureWizard from "./StructureWizard";
 
 type M = ProcessLogicModel;
 
@@ -67,6 +69,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(true);
   const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks"; nonce: number } | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
   const nonce = useRef(0);
@@ -105,6 +108,38 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     }
     await loadProposals();
   };
+  /** Правка структуры из навигатора — шаги общей истории (Ctrl+Z); коды пересчитываются, ссылки на них в текстах обновляются. */
+  const moveFn = (id: string, target: MoveTarget) => {
+    h.commit(withIdef0Layout(moveFunction(h.draftRef.current, id, target)));
+    setSelection({ kind: "node", id });
+  };
+  const fnAction = (action: "add-child" | "skeleton" | "duplicate" | "delete", id: string) => {
+    const m = h.draftRef.current;
+    if (action === "add-child") {
+      const r = addChildFunction(m, id);
+      h.commit(r.model);
+      open(idef0Doc(id));
+      setSelection({ kind: "node", id: r.id });
+      goto(r.id);
+    } else if (action === "skeleton") {
+      h.commit(addOperationSkeleton(m, id));
+      open(bpmnDoc(id));
+    } else if (action === "duplicate") {
+      const r = duplicateNode(m, id);
+      if (r.error) return;
+      h.commit(r.model);
+      setSelection({ kind: "node", id: r.id! });
+    } else {
+      const node = m.nodes.find((n) => n.id === id);
+      if (!node) return;
+      const imp = deleteImpact(m, id);
+      const what = [imp.functions > 1 ? `функций: ${imp.functions}` : "", imp.steps ? `шагов диаграмм: ${imp.steps}` : "", imp.flows ? `стрелок: ${imp.flows}` : ""].filter(Boolean).join(", ");
+      if (!window.confirm(`Удалить «${node.name}»${what ? ` (вместе с вложенным: ${what})` : ""}? Отменить можно Ctrl+Z.`)) return;
+      h.commit(deleteNode(m, id));
+      setSelection(null);
+    }
+  };
+
   /** Исправление и принятие замечаний — шаги общей истории: их можно отменить Ctrl+Z. */
   const fixIssue = (_issue: ValidationIssue, fix: QuickFix, optionId?: string) => h.commit(fix.apply(h.draftRef.current, optionId));
   const acceptOne = (issue: ValidationIssue, reason: string) => h.commit(acceptIssue(h.draftRef.current, issue, reason));
@@ -332,6 +367,9 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             <button onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
               + Функция
             </button>
+            <button onClick={() => setWizardOpen(true)} title="Подпроцессы и операции списком: коды по Соглашению и заготовки диаграмм">
+              Мастер структуры…
+            </button>
             <button disabled={selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
               Дублировать
             </button>
@@ -391,7 +429,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
 
       <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "330px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
-          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} />
+          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={moveFn} onFunctionAction={fnAction} onWizard={() => setWizardOpen(true)} />
         )}
         <div className="studio-main">
           <div className="doc-tabs" role="tablist">
@@ -465,6 +503,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
         )}
       </div>
 
+      {wizardOpen && <StructureWizard model={draft} onApply={(next) => h.commit(seed(next, null))} onClose={() => setWizardOpen(false)} />}
       {exportError && (
         <div className="bpe-banner" role="alert">
           {exportError}

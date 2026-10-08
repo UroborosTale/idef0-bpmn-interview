@@ -120,8 +120,8 @@ function subtreeIds(m: M, id: string): Set<string> {
   for (let grew = true; grew; ) {
     grew = false;
     for (const n of m.nodes) {
-      // граничные события уходят вместе со своей задачей
-      if (((n.idef0_parent && ids.has(n.idef0_parent)) || (n.attached_to && ids.has(n.attached_to))) && !ids.has(n.id)) {
+      // граничные события уходят вместе со своей задачей, шаги диаграммы операции — вместе с операцией
+      if (((n.idef0_parent && ids.has(n.idef0_parent)) || (n.attached_to && ids.has(n.attached_to)) || (n.bpmn_scope && ids.has(n.bpmn_scope))) && !ids.has(n.id)) {
         ids.add(n.id);
         grew = true;
       }

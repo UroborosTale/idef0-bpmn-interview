@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { functionsOf, idef0Codes } from "../idef0-editor/geometry";
-import { blockNumbers, bpmnHosts, isStructured, processCodeOf } from "@shared/codes";
+import { blockNumbers, bpmnHosts, functionDepth, isStructured, processCodeOf } from "@shared/codes";
 import NavIcon from "./NavIcon";
 import { entriesOf } from "./dict-ops";
+import { moveProblem, previewMove, shiftFunction, type MoveTarget } from "./structure-ops";
 import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type StudioDoc, bpmnDoc, dictDoc, idef0Doc, reportDoc } from "./docs";
 
 /**
@@ -15,6 +16,9 @@ import { DICT_TITLES, REPORT_TITLES, type DictKind, type ReportKind, type Studio
  *
  * Клик по функции открывает её диаграмму и выделяет блок; двойной щелчок по функции с декомпозицией — её дочернюю диаграмму;
  * строка диаграммы BPMN открывает диаграмму операции; строка процесса в модели с кодом открывает IDEF0 процесса.
+ *
+ * Структуру можно править: функции перетаскиваются (между равными — порядок, на подпроцесс — перенос операции; новые коды видны
+ * при наведении), у строк есть контекстное меню (добавить операцию, заготовка диаграммы, вверх/вниз, дублировать, удалить).
  */
 export default function Navigator({
   model,
@@ -24,6 +28,9 @@ export default function Navigator({
   onSelectFn,
   onAddFunction,
   onOpenEntry,
+  onMoveFunction,
+  onFunctionAction,
+  onWizard,
 }: {
   model: ProcessLogicModel;
   activeKey: string;
@@ -33,6 +40,12 @@ export default function Navigator({
   onAddFunction: (parentId: string | null) => void;
   /** Открыть справочник с карточкой записи (из результатов поиска). */
   onOpenEntry?: (dict: DictKind, id: string) => void;
+  /** Перенести функцию (перетаскиванием или кнопками «вверх/вниз»); без обработчика перетаскивание отключено. */
+  onMoveFunction?: (id: string, target: MoveTarget) => void;
+  /** Действие из контекстного меню функции. */
+  onFunctionAction?: (action: "add-child" | "skeleton" | "duplicate" | "delete", id: string) => void;
+  /** Открыть мастер структуры. */
+  onWizard?: () => void;
 }) {
   const codes = idef0Codes(model);
   const nums = blockNumbers(model);
@@ -41,6 +54,21 @@ export default function Navigator({
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [closedSections, setClosedSections] = useState<Set<string>>(new Set());
+  // перетаскивание и контекстное меню
+  const dragId = useRef<string | null>(null);
+  const [drop, setDrop] = useState<{ id: string; kind: MoveTarget["kind"]; preview: string | null } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string | null } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("click", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menu]);
   const toggle = (id: string) =>
     setCollapsed((s) => {
       const n = new Set(s);
@@ -68,12 +96,58 @@ export default function Navigator({
     const nextSeen = new Set(seen).add(n.id);
     const num = nums.get(n.id) ?? "";
     const hasSteps = model.nodes.some((s) => s.bpmn_scope === n.id);
+    const dropHere = drop?.id === n.id ? drop : null;
     return (
       <div key={n.id}>
         <div
-          className={`nav-row ${selectedId === n.id ? "selected" : ""}`}
+          className={`nav-row ${selectedId === n.id ? "selected" : ""} ${dropHere ? `drop-${dropHere.kind}` : ""}`}
           style={{ paddingLeft: 8 + depth * 14 }}
           data-nav-fn={n.id}
+          data-drop-preview={dropHere?.preview ?? undefined}
+          draggable={!!onMoveFunction}
+          onDragStart={(e) => {
+            dragId.current = n.id;
+            try {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", n.id);
+            } catch {
+              /* окружение без dataTransfer */
+            }
+          }}
+          onDragEnd={() => {
+            dragId.current = null;
+            setDrop(null);
+          }}
+          onDragOver={(e) => {
+            const from = dragId.current;
+            if (!from || from === n.id) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const h = rect.height || 20;
+            const y = e.clientY - rect.top;
+            let kind: MoveTarget["kind"] = y < h * 0.3 ? "before" : y > h * 0.7 ? "after" : "into";
+            if (kind === "into" && moveProblem(model, from, { kind, id: n.id })) kind = y < h / 2 ? "before" : "after";
+            if (moveProblem(model, from, { kind, id: n.id })) {
+              if (drop) setDrop(null);
+              return;
+            }
+            e.preventDefault();
+            const preview = previewMove(model, from, { kind, id: n.id });
+            const text = preview && structured && preview.from !== preview.to ? `${preview.from} → ${preview.to}` : null;
+            if (drop?.id !== n.id || drop.kind !== kind || drop.preview !== text) setDrop({ id: n.id, kind, preview: text });
+          }}
+          onDrop={(e) => {
+            const from = dragId.current;
+            if (!from || !drop || drop.id !== n.id) return;
+            e.preventDefault();
+            const target: MoveTarget = { kind: drop.kind, id: n.id };
+            dragId.current = null;
+            setDrop(null);
+            onMoveFunction?.(from, target);
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenu({ x: e.clientX, y: e.clientY, id: n.id });
+          }}
           onClick={() => onSelectFn(n.id)}
           onDoubleClick={() => kids.length > 0 && onOpenDoc(idef0Doc(n.id))}
           title={kids.length > 0 ? "Двойной щелчок — открыть декомпозицию" : n.name}
@@ -142,6 +216,10 @@ export default function Navigator({
             className={`nav-row ${activeKey === (structured ? "idef0:root" : "report:passport") ? "active-doc" : ""}`}
             style={pad(base)}
             data-nav-process
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ x: e.clientX, y: e.clientY, id: null });
+            }}
             onClick={() => onOpenDoc(structured ? idef0Doc(null) : reportDoc("passport"))}
             title={structured ? "Диаграмма IDEF0 процесса" : "Паспорт процесса"}
           >
@@ -153,7 +231,19 @@ export default function Navigator({
           {!collapsed.has("~process") && structured && (
             <>
               {top.map((n) => renderFn(n, base + 1, new Set()))}
-              {top.length === 0 && <div className="muted nav-empty">Функций пока нет</div>}
+              {top.length === 0 && (
+                <div className="muted nav-empty">
+                  Функций пока нет
+                  {onWizard && (
+                    <>
+                      {" — "}
+                      <button className="link-button" onClick={onWizard}>
+                        Мастер структуры
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </>
           )}
           {!collapsed.has("~process") && !structured && (
@@ -171,7 +261,19 @@ export default function Navigator({
                 <span className="nav-name">{model.process.name}</span>
               </div>
               {!collapsed.has("~a0") && top.map((n) => renderFn(n, base + 2, new Set()))}
-              {top.length === 0 && <div className="muted nav-empty">Функций пока нет</div>}
+              {top.length === 0 && (
+                <div className="muted nav-empty">
+                  Функций пока нет
+                  {onWizard && (
+                    <>
+                      {" — "}
+                      <button className="link-button" onClick={onWizard}>
+                        Мастер структуры
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
               <div
                 className={`nav-row ${activeKey === "bpmn" ? "active-doc" : ""}`}
                 style={pad(base + 1)}
@@ -187,6 +289,43 @@ export default function Navigator({
           )}        </>
       )}
     </>
+  );
+  const menuFn = menu?.id ? model.nodes.find((x) => x.id === menu.id) : undefined;
+  const menuItem = (label: string, run: () => void, disabled = false) => (
+    <button key={label} role="menuitem" className="nav-menu-item" disabled={disabled} onClick={() => (setMenu(null), run())}>
+      {label}
+    </button>
+  );
+  const contextMenu = menu && (
+    <div className="nav-menu" role="menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.preventDefault()}>
+      {menuFn ? (
+        (() => {
+          const depth = functionDepth(model, menuFn.id);
+          const siblings = model.nodes.filter((x) => (x.type === "task" || x.type === "subprocess") && !x.bpmn_scope && (x.idef0_parent ?? null) === (menuFn.idef0_parent ?? null));
+          const at = siblings.findIndex((x) => x.id === menuFn.id);
+          const hasKids = functionsOf(model, menuFn.id).length > 0;
+          const host = hosts.has(menuFn.id);
+          const canAddChild = structured ? depth === 1 : true;
+          return (
+            <>
+              {hasKids && menuItem("Открыть декомпозицию", () => onOpenDoc(idef0Doc(menuFn.id)))}
+              {host && menuItem("Открыть диаграмму BPMN", () => onOpenDoc(bpmnDoc(menuFn.id)))}
+              {canAddChild && onFunctionAction && menuItem(structured ? "Добавить операцию" : "Добавить подфункцию", () => onFunctionAction("add-child", menuFn.id))}
+              {host && !model.nodes.some((x) => x.bpmn_scope === menuFn.id) && onFunctionAction && menuItem("Создать заготовку диаграммы BPMN", () => onFunctionAction("skeleton", menuFn.id))}
+              {onMoveFunction && menuItem("Переместить вверх", () => onMoveFunction(menuFn.id, { kind: "before", id: siblings[at - 1]?.id ?? menuFn.id }), at <= 0)}
+              {onMoveFunction && menuItem("Переместить вниз", () => onMoveFunction(menuFn.id, { kind: "after", id: siblings[at + 1]?.id ?? menuFn.id }), at < 0 || at >= siblings.length - 1)}
+              {onFunctionAction && menuItem("Дублировать", () => onFunctionAction("duplicate", menuFn.id))}
+              {onFunctionAction && menuItem("Удалить…", () => onFunctionAction("delete", menuFn.id))}
+            </>
+          );
+        })()
+      ) : (
+        <>
+          {menuItem(structured ? "Добавить подпроцесс" : "Добавить функцию", () => onAddFunction(null))}
+          {onWizard && menuItem("Мастер структуры…", onWizard)}
+        </>
+      )}
+    </div>
   );
   const section = (id: string, title: string, body: React.ReactNode, action?: React.ReactNode) => (
     <div className="nav-section">
@@ -221,6 +360,7 @@ export default function Navigator({
 
   return (
     <div className="nav">
+      {contextMenu}
       <div className="nav-search">
         <input type="search" placeholder="Найти функцию или запись…" aria-label="Поиск в навигаторе" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} />
       </div>
