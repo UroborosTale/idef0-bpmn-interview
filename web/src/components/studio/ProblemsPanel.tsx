@@ -34,6 +34,7 @@ export default function ProblemsPanel({
   reports = [],
   onReportStatus,
   onHandOffAnswers,
+  sessionId,
   nodeByCode,
   onSelectFn,
   onAssignFinding,
@@ -65,6 +66,8 @@ export default function ProblemsPanel({
   reports?: AgentReportRow[];
   onReportStatus?: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
   onHandOffAnswers?: () => void | Promise<void>;
+  /** Сессия студии — для выгрузок вопросов в Word. */
+  sessionId?: string;
   nodeByCode?: (code: string) => string | null;
   onSelectFn?: (nodeId: string) => void;
   onAssignFinding?: (report: AgentReportRow, finding: ReportFinding) => void | Promise<void>;
@@ -218,7 +221,7 @@ export default function ProblemsPanel({
         {tab === "tasks" && (
           <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
         )}
-        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} onHandOff={onHandOffAnswers} />}
+        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} onHandOff={onHandOffAnswers} sessionId={sessionId} />}
         {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} nodeByCode={nodeByCode} onSelectFn={onSelectFn} onAssign={onAssignFinding} />}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}
         {tab === "gaps" &&

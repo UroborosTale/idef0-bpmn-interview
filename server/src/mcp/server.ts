@@ -84,7 +84,7 @@ function describeFinding(f: any, i: number): string {
 }
 
 function describeReport(r: any, full = false): string {
-  const lines = [`${r.id} — «${r.title}» (${r.agent}, ${kindLabel[r.kind] ?? r.kind}), ${reportLabel[r.status] ?? r.status}${r.scopeNodeId ? `, функция ${r.scopeNodeId}` : ""}; выводов: ${r.findings?.length ?? 0}`];
+  const lines = [`${r.id} — «${r.title}» (${r.agent}, ${kindLabel[r.kind] ?? r.kind}), ${reportLabel[r.status] ?? r.status}${r.scopeNodeId ? `, функция ${r.scopeNodeId}` : ""}; выводов: ${r.findings?.length ?? 0}${r.stale ? ". МОДЕЛЬ С ТЕХ ПОР ИЗМЕНИЛАСЬ — сверьте выводы с текущей" : ""}`];
   if (r.summary) lines.push(`  ${r.summary}`);
   if (full) {
     (r.findings ?? []).forEach((f: any, i: number) => lines.push(`  ${describeFinding(f, i)}`));

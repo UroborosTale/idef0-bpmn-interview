@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AgentReportRow, ReportFinding } from "../../api/client";
+import { api, type AgentReportRow, type ReportFinding } from "../../api/client";
 
 const KIND: Record<AgentReportRow["kind"], string> = { analysis: "анализ", review: "проверка", methodology: "методология", other: "прочее" };
 const STATUS: Record<AgentReportRow["status"], string> = { new: "новый", read: "прочитан", archived: "в архиве" };
@@ -54,6 +54,11 @@ export default function ReportsPanel({
           <div className="proposal-head report-head" onClick={() => toggle(r)} role="button" aria-expanded={open === r.id}>
             <span className={`agent-badge ${r.status === "new" ? "task-badge-open" : ""}`}>{STATUS[r.status]}</span>
             <strong>{r.title}</strong>
+            {r.stale && (
+              <span className="agent-badge stale" title="Модель изменилась после отчёта: часть выводов могла устареть — сверьте с текущей моделью">
+                модель изменилась
+              </span>
+            )}
             <span className="spacer" />
             <span className="muted">
               {KIND[r.kind]} · {r.agent} · {new Date(r.createdAt).toLocaleString("ru-RU")}
@@ -111,6 +116,9 @@ export default function ReportsPanel({
           <div className="proposal-actions">
             {r.status === "archived" ? <button onClick={() => void onStatus(r, "read")}>Вернуть из архива</button> : <button onClick={() => void onStatus(r, "archived")}>В архив</button>}
             {r.status === "read" && <button onClick={() => void onStatus(r, "new")}>Отметить новым</button>}
+            <a className="btn-link" href={api.reportDocxUrl(r.id)} download>
+              Скачать Word
+            </a>
           </div>
         </div>
       ))}

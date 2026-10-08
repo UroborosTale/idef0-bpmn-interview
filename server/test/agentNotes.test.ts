@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp } from "./api.js";
+import JSZip from "jszip";
 import { normalizeQuestion } from "../src/agentQuestions.js";
 import { structuredModel } from "./fixtures.js";
 
@@ -142,6 +143,94 @@ describe("хранилище вопросов к интервью и отчёт�
     await app.call("POST", `/agent/tasks/${t.id}/complete`, { note: "готово" });
     expect((await app.call("POST", `/agent/sessions/${id}/questions`, { agent: "интервьюер", questions: [q("Ещё один вопрос после закрытия?")], task_id: t.id })).status).toBe(409);
     expect((await app.call("POST", `/agent/sessions/${id}/reports`, { agent: "аналитик", title: "Поздний отчёт", summary: "текст", task_id: t.id })).status).toBe(409);
+  });
+
+  /** Текст документа Word: содержимое document.xml без разметки. */
+  const docxText = async (res: { body: unknown }) => {
+    const zip = await JSZip.loadAsync(res.body as Buffer);
+    const xml = await zip.file("word/document.xml")!.async("string");
+    return xml.replace(/<\/w:p>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+  };
+
+  it("лист вопросов в Word: по функциям, ждущие и заданные, без отвеченных и снятых", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Экспорт вопросов" } })).body.id;
+    await app.call("PUT", `/sessions/${s}/model`, structuredModel());
+    const fnCode = (await app.call("GET", `/agent/sessions/${s}/model`)).body.codes.o2;
+    const post = async (text: string, extra: Record<string, unknown> = {}) => (await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions: [{ text, ...extra }] })).body.added[0].id as string;
+    await post("Кто подписывает акт приёмки?", { scope: fnCode, addressee: "Начальник склада", reason: "нет владельца", priority: "critical" });
+    await post("Какие системы использует отдел?");
+    const answered = await post("Вопрос с ответом про сроки?");
+    const dismissed = await post("Снятый вопрос про бюджет?");
+    await app.call("POST", `/agent-questions/${answered}/status`, { status: "answered", answer: "Три дня" });
+    await app.call("POST", `/agent-questions/${dismissed}/status`, { status: "dismissed" });
+    const res = await app.raw(`/sessions/${s}/agent-questions/export.docx`);
+    expect(res.status).toBe(200);
+    const text = await docxText(res);
+    expect(text).toContain("ЛИСТ ВОПРОСОВ К ИНТЕРВЬЮ");
+    expect(text).toContain("Экспорт вопросов");
+    expect(text).toContain("Кто подписывает акт приёмки?");
+    expect(text).toContain("Начальник склада");
+    expect(text).toContain(`${fnCode} «Проведение первичного интервью»`);
+    expect(text).toContain("Процесс в целом");
+    expect(text.indexOf("Процесс в целом")).toBeLessThan(text.indexOf(fnCode)); // процесс в целом — первым
+    expect(text).not.toContain("Вопрос с ответом");
+    expect(text).not.toContain("Снятый вопрос");
+    expect((await app.raw("/sessions/нет/agent-questions/export.docx")).status).toBe(404);
+  });
+
+  it("отчёт в Word: сводка, таблица выводов, полный текст с заголовками и списками", async () => {
+    const created = await app.call("POST", `/agent/sessions/${id}/reports`, {
+      agent: "аналитик",
+      title: "Отчёт для Word",
+      summary: "Главное: ожидание подписи",
+      scope: code,
+      findings: [{ what: "Ожидание подписи", where: code, basis: "time_waiting = 3 дня", impact: "high", confidence: "medium", recommendation: "Ввести срок" }],
+      body: "# Раздел\nПервый абзац\n- пункт списка\n## Подраздел",
+    });
+    const res = await app.raw(`/agent-reports/${created.body.id}/export.docx`);
+    expect(res.status).toBe(200);
+    const text = await docxText(res);
+    for (const part of ["Отчёт для Word", "Главное: ожидание подписи", "Выводы", "высокое", "Ожидание подписи", "time_waiting = 3 дня", "среднее", "Ввести срок", "Раздел", "Первый абзац", "пункт списка", "Подраздел"]) expect(text, part).toContain(part);
+    expect(text).not.toContain("# Раздел"); // разметка превращена в заголовки
+    expect((await app.raw("/agent-reports/rep_нет/export.docx")).status).toBe(404);
+  });
+
+  it("отчёт помечается устаревшим, когда изменилось содержание модели, но не раскладка диаграмм", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Устаревание отчёта" } })).body.id;
+    await app.call("PUT", `/sessions/${s}/model`, structuredModel());
+    const created = (await app.call("POST", `/agent/sessions/${s}/reports`, { agent: "аналитик", title: "Отчёт по версии", summary: "Состояние на сейчас" })).body;
+    const stale = async () => (await app.call("GET", `/agent/sessions/${s}/reports`)).body[0].stale as boolean;
+    expect(await stale()).toBe(false);
+    // раскладка и ручные маршруты — не содержание
+    const moved = structuredModel();
+    moved.nodes[0].layout = { x: 999, y: 111 };
+    expect((await app.call("PUT", `/sessions/${s}/model`, moved)).status).toBe(200);
+    expect(await stale()).toBe(false);
+    // название шага — содержание
+    const renamed = structuredModel();
+    renamed.nodes.find((n) => n.id === "b1")!.name = "Открыть реестр процессов";
+    expect((await app.call("PUT", `/sessions/${s}/model`, renamed)).status).toBe(200);
+    expect(await stale()).toBe(true);
+    expect((await app.call("GET", `/sessions/${s}/agent-reports`)).body[0].stale).toBe(true);
+    expect((await app.call("GET", `/agent/reports/${created.id}`)).body.stale).toBe(true);
+  });
+
+  it("аналитик получает уведомления о предложениях, вопросах и отчётах; повтор вопроса уведомления не создаёт", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Уведомления агентов" } })).body.id;
+    await app.call("PUT", `/sessions/${s}/model`, structuredModel());
+    const notes = async () => ((await app.call("GET", `/notifications?session_id=${s}`)).body as { message: string; recipient_kind: string; diff_link: string; is_read: number }[]).map((n) => n);
+    expect(await notes()).toEqual([]);
+    await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions: [{ text: "Кто утверждает реестр?" }, { text: "Как часто он обновляется?" }] });
+    await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions: [{ text: "кто утверждает реестр" }] }); // повтор
+    await app.call("POST", `/agent/sessions/${s}/reports`, { agent: "аналитик", title: "Узкие места", summary: "Текст" });
+    await app.call("POST", `/agent/sessions/${s}/proposals`, { agent: "моделист", title: "Цель процесса", ops: [{ op: "set_process", patch: { goal: "Цель" } }] });
+    const rows = await notes();
+    expect(rows).toHaveLength(3);
+    const texts = rows.map((r) => r.message).join("\n");
+    expect(texts).toContain("сохранил вопросов к интервью: 2");
+    expect(texts).toContain("прислал отчёт «Узкие места»");
+    expect(texts).toContain("предложил правки: Цель процесса");
+    expect(rows.every((r) => r.recipient_kind === "analyst" && r.is_read === 0 && r.diff_link === `/s/${s}?tab=studio`)).toBe(true);
   });
 
   it("удаление сессии убирает её вопросы и отчёты", async () => {

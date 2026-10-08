@@ -11,8 +11,10 @@ import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, Agent
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
 import { handOffAnswers } from "../answerHandoff.js";
+import { notifyAnalyst } from "../agentNotify.js";
+import { buildQuestionsDocx, buildReportDocx } from "../export/agentDocs.js";
 import { addQuestion, getQuestion, listQuestions, setQuestionStatus, QUESTION_STATUSES, type QuestionStatus } from "../agentQuestions.js";
-import { addReport, getReport, listReports, setReportStatus, REPORT_STATUSES, type ReportStatus } from "../agentReports.js";
+import { addReport, getReport, listReports, modelFingerprint, setReportStatus, withStale, REPORT_STATUSES, type ReportStatus } from "../agentReports.js";
 
 /**
  * Работа агентов с моделью. Агент (Cline и его субагенты через MCP-сервер, server/src/mcp) читает модель и проверки и
@@ -133,6 +135,7 @@ agentRouter.post("/agent/sessions/:id/proposals", (req, res) => {
     taskId: task_id ?? null,
   });
   logAudit(session.id, `agent:${agent}`, "proposal_created", { id: proposal.id, title, ops: ops.length });
+  notifyAnalyst(session.id, session.meta.processName, `Агент «${agent}» предложил правки: ${title}. Решение — во вкладке «Предложения агентов».`);
   res.status(201).json({
     id: proposal.id,
     status: proposal.status,
@@ -422,7 +425,11 @@ agentRouter.post("/agent/sessions/:id/questions", (req, res) => {
     if (!r.duplicate) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
     added.push(r);
   });
-  if (added.some((a) => !a.duplicate)) logAudit(session.id, `agent:${parsed.data.agent}`, "questions_added", { count: added.filter((a) => !a.duplicate).length });
+  const fresh = added.filter((a) => !a.duplicate).length;
+  if (fresh > 0) {
+    logAudit(session.id, `agent:${parsed.data.agent}`, "questions_added", { count: fresh });
+    notifyAnalyst(session.id, session.meta.processName, `Агент «${parsed.data.agent}» сохранил вопросов к интервью: ${fresh}. Они во вкладке «Вопросы».`);
+  }
   res.status(201).json({ added: added.filter((a) => !a.duplicate).map((a) => a.question), duplicates: added.filter((a) => a.duplicate).map((a) => ({ id: a.question.id, text: a.question.text, status: a.question.status })), skipped });
 });
 
@@ -438,7 +445,12 @@ agentRouter.get("/agent/sessions/:id/reports", (req, res) => {
     return;
   }
   // список — без полного текста: он может быть большим, читается отдельно (get_report)
-  res.json(listReports(session.id, status).map(({ body, ...r }) => ({ ...r, hasBody: !!body })));
+  res.json(
+    listReports(session.id, status).map((r) => {
+      const { body, ...rest } = withStale(r, session.model);
+      return { ...rest, hasBody: !!body };
+    })
+  );
 });
 
 agentRouter.get("/agent/reports/:rid", (req, res) => {
@@ -447,7 +459,7 @@ agentRouter.get("/agent/reports/:rid", (req, res) => {
     res.status(404).json({ error: "отчёт не найден" });
     return;
   }
-  res.json(report);
+  res.json(withStale(report, getSession(report.sessionId)?.model));
 });
 
 agentRouter.post("/agent/sessions/:id/reports", (req, res) => {
@@ -481,8 +493,9 @@ agentRouter.post("/agent/sessions/:id/reports", (req, res) => {
     res.status(429).json({ error: `уже ${fresh} непрочитанных отчётов — дождитесь, пока аналитик их просмотрит` });
     return;
   }
-  const report = addReport({ sessionId: session.id, agent, kind, title, summary, body, findings, scopeNodeId: scopeId, taskId: task_id ?? null });
+  const report = addReport({ sessionId: session.id, agent, kind, title, summary, body, findings, scopeNodeId: scopeId, taskId: task_id ?? null, modelHash: modelFingerprint(session.model) });
   logAudit(session.id, `agent:${agent}`, "report_added", { id: report.id, title, findings: findings.length });
+  notifyAnalyst(session.id, session.meta.processName, `Агент «${agent}» прислал отчёт «${title}» (выводов: ${findings.length}). Он во вкладке «Отчёты».`);
   res.status(201).json(report);
 });
 
@@ -495,6 +508,33 @@ agentRouter.get("/sessions/:id/agent-questions", (req, res) => {
     return;
   }
   res.json(listQuestions(session.id));
+});
+
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Лист вопросов к интервью в Word: ждущие и заданные вопросы по функциям, с пустой колонкой для ответа. */
+agentRouter.get("/sessions/:id/agent-questions/export.docx", async (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const buf = await buildQuestionsDocx(session, listQuestions(session.id));
+  res.setHeader("Content-Disposition", `attachment; filename="interview-questions.docx"`);
+  res.type(DOCX).send(buf);
+});
+
+/** Отчёт агента в Word. */
+agentRouter.get("/agent-reports/:rid/export.docx", async (req, res) => {
+  const report = getReport(req.params.rid);
+  const session = report ? getSession(report.sessionId) : null;
+  if (!report || !session) {
+    res.status(404).json({ error: "отчёт не найден" });
+    return;
+  }
+  const buf = await buildReportDocx(session, report);
+  res.setHeader("Content-Disposition", `attachment; filename="report-${report.id}.docx"`);
+  res.type(DOCX).send(buf);
 });
 
 /** Передать моделисту ответы, полученные на интервью, одним заданием «внеси ответы». */
@@ -541,7 +581,7 @@ agentRouter.get("/sessions/:id/agent-reports", (req, res) => {
     res.status(404).json({ error: "сессия не найдена" });
     return;
   }
-  res.json(listReports(session.id));
+  res.json(listReports(session.id).map((r) => withStale(r, session.model)));
 });
 
 agentRouter.post("/agent-reports/:rid/status", (req, res) => {

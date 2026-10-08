@@ -524,3 +524,5 @@ button.danger:hover { background: #fef2f2; }
 .report-archived { opacity: 0.7; }.chat-msg.by-interviewer { border: 1px solid var(--accent, #2563eb); }
 .chat-author { font-size: 11px; color: #475569; margin-bottom: 2px; }
 .chat-input-row button.active { background: var(--accent-soft); border-color: var(--accent, #2563eb); }
+.btn-link { display: inline-block; padding: 3px 10px; border: 1px solid #c3cfe2; border-radius: 4px; background: #fff; color: inherit; text-decoration: none; font-size: 12.5px; }
+.btn-link:hover { background: #f1f5fb; }

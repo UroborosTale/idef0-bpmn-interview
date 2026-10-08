@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AgentQuestionRow } from "../../api/client";
+import { api, type AgentQuestionRow } from "../../api/client";
 
 const PRIORITY: Record<AgentQuestionRow["priority"], string> = { critical: "критично", important: "важно", desirable: "желательно" };
 const STATUS: Record<AgentQuestionRow["status"], string> = { open: "ждёт интервью", asked: "задан", answered: "получен ответ", dismissed: "снят" };
@@ -39,6 +39,7 @@ export default function QuestionsPanel({
   processName,
   onStatus,
   onHandOff,
+  sessionId,
 }: {
   questions: AgentQuestionRow[];
   labelOf: (nodeId: string) => string;
@@ -46,6 +47,8 @@ export default function QuestionsPanel({
   onStatus: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
   /** Поручить моделисту внести в модель полученные ответы (одним заданием). */
   onHandOff?: () => void | Promise<void>;
+  /** Сессия — для выгрузки листа вопросов в Word. */
+  sessionId?: string;
 }) {
   const [showClosed, setShowClosed] = useState(false);
   const [answering, setAnswering] = useState<string | null>(null);
@@ -89,6 +92,11 @@ export default function QuestionsPanel({
           >
             Передать ответы моделисту ({toHandOff.length})
           </button>
+        )}
+        {sessionId && live.length > 0 && (
+          <a className="btn-link" href={api.questionsDocxUrl(sessionId)} download title="Лист вопросов по функциям, с колонкой для записи ответа">
+            Скачать Word
+          </a>
         )}
         <button disabled={live.length === 0} onClick={() => void copy()} title="Список для интервью: по функциям, с адресатами">
           {copied ? "Скопировано" : "Копировать для интервью"}

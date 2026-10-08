@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { customAlphabet } from "nanoid";
 import { db } from "./db.js";
 
@@ -24,6 +25,15 @@ db.exec(`CREATE TABLE IF NOT EXISTS agent_reports (
   updated_at TEXT NOT NULL
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_reports_session ON agent_reports(session_id, status)`);
+// отпечаток модели на момент отчёта: по нему видно, что модель с тех пор изменилась; столбец добавлен позже
+if (!(db.prepare(`PRAGMA table_info(agent_reports)`).all() as { name: string }[]).some((c) => c.name === "model_hash")) db.exec(`ALTER TABLE agent_reports ADD COLUMN model_hash TEXT`);
+
+/** Отпечаток содержания модели: раскладка диаграмм, ручные маршруты стрелок и номер версии (растёт при каждом сохранении) в него не входят — смысла процесса они не меняют. */
+export function modelFingerprint(model: unknown): string | null {
+  if (!model) return null;
+  const skip = new Set(["layout", "idef0_layout", "route", "version"]);
+  return createHash("sha1").update(JSON.stringify(model, (k, v) => (skip.has(k) ? undefined : v))).digest("hex").slice(0, 16);
+}
 
 export type ReportKind = "analysis" | "review" | "methodology" | "other";
 export type ReportStatus = "new" | "read" | "archived";
@@ -53,6 +63,8 @@ export interface AgentReport {
   scopeNodeId: string | null;
   taskId: string | null;
   status: ReportStatus;
+  /** Отпечаток модели на момент отчёта (modelFingerprint); null — модели тогда не было. */
+  modelHash: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -69,6 +81,7 @@ interface Row {
   scope_node_id: string | null;
   task_id: string | null;
   status: string;
+  model_hash: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,6 +107,7 @@ const fromRow = (r: Row): AgentReport => ({
   scopeNodeId: r.scope_node_id,
   taskId: r.task_id,
   status: r.status as ReportStatus,
+  modelHash: r.model_hash,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -108,12 +122,13 @@ export function addReport(input: {
   findings: Finding[];
   scopeNodeId?: string | null;
   taskId?: string | null;
+  modelHash?: string | null;
 }): AgentReport {
   const id = `rep_${shortId()}`;
   const now = new Date().toISOString();
   db.prepare(
-    `INSERT INTO agent_reports (id, session_id, agent, kind, title, summary, body, findings, scope_node_id, task_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)`
-  ).run(id, input.sessionId, input.agent, input.kind, input.title, input.summary || null, input.body || null, JSON.stringify(input.findings), input.scopeNodeId ?? null, input.taskId ?? null, now, now);
+    `INSERT INTO agent_reports (id, session_id, agent, kind, title, summary, body, findings, scope_node_id, task_id, status, model_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)`
+  ).run(id, input.sessionId, input.agent, input.kind, input.title, input.summary || null, input.body || null, JSON.stringify(input.findings), input.scopeNodeId ?? null, input.taskId ?? null, input.modelHash ?? null, now, now);
   return getReport(id)!;
 }
 
@@ -135,3 +150,9 @@ export function setReportStatus(id: string, status: ReportStatus): AgentReport |
   const res = db.prepare(`UPDATE agent_reports SET status = ?, updated_at = ? WHERE id = ?`).run(status, new Date().toISOString(), id);
   return res.changes > 0 ? getReport(id) : null;
 }
+
+/** Отчёт с признаком «модель с тех пор изменилась» (stale) — для выдачи студии и агентам. */
+export const withStale = <T extends AgentReport>(report: T, model: unknown): T & { stale: boolean } => ({
+  ...report,
+  stale: !!report.modelHash && report.modelHash !== modelFingerprint(model),
+});

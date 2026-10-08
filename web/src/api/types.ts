@@ -578,5 +578,7 @@ export interface AgentReportRow {
   scopeNodeId: string | null;
   taskId: string | null;
   status: "new" | "read" | "archived";
+  /** Модель изменилась после того, как отчёт был составлен. */
+  stale?: boolean;
   createdAt: string;
 }

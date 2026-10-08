@@ -83,6 +83,14 @@ describe("вопросы к интервью: вкладка", () => {
     expect(screen.queryByPlaceholderText(/Ответ респондента/)).toBeNull();
   });
 
+  it("Word: ссылка на лист вопросов только когда есть ждущие вопросы и известна сессия", () => {
+    const { unmount } = render(<QuestionsPanel questions={[question()]} labelOf={labelOf} processName="П" onStatus={vi.fn()} sessionId="s1" />);
+    expect((screen.getByText("Скачать Word") as HTMLAnchorElement).getAttribute("href")).toBe("/api/sessions/s1/agent-questions/export.docx");
+    unmount();
+    render(<QuestionsPanel questions={[question({ status: "dismissed" })]} labelOf={labelOf} processName="П" onStatus={vi.fn()} sessionId="s1" />);
+    expect(screen.queryByText("Скачать Word")).toBeNull();
+  });
+
   it("вопрос, заданный интервьюером в ходе интервью, подписан его логином", () => {
     panel([question({ agent: "user:ivanov", status: "answered", answer: "Секретарь", fragmentId: "f4" })]);
     fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));
@@ -181,6 +189,17 @@ describe("отчёты агентов: вкладка", () => {
     expect(onSelectFn).toHaveBeenCalledWith("o1");
     fireEvent.click(screen.getByText("Поручить моделисту"));
     expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ id: "rep_1" }), expect.objectContaining({ what: "Ожидание подписи" }));
+  });
+
+  it("отчёт, составленный по прежней модели, помечен; свежий — нет", () => {
+    render(<ReportsPanel reports={[report({ stale: true }), report({ id: "rep_2", title: "Свежий", stale: false })]} labelOf={labelOf} onStatus={vi.fn()} />);
+    expect(document.querySelectorAll(".agent-badge.stale")).toHaveLength(1);
+    expect(screen.getByText("модель изменилась").getAttribute("title")).toMatch(/могла устареть/);
+  });
+
+  it("Word: у каждого отчёта своя ссылка на выгрузку", () => {
+    render(<ReportsPanel reports={[report(), report({ id: "rep_2", title: "Второй" })]} labelOf={labelOf} onStatus={vi.fn()} />);
+    expect([...document.querySelectorAll("a.btn-link")].map((a) => a.getAttribute("href"))).toEqual(["/api/agent-reports/rep_1/export.docx", "/api/agent-reports/rep_2/export.docx"]);
   });
 
   it("код, которого нет в модели, остаётся обычным текстом", () => {
