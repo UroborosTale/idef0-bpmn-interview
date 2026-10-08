@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
-import { layoutLayered } from "../src/pipeline/layout.js";
+import { MIN_EVALUATIONS, evaluationsFor, layoutLayered } from "../src/pipeline/layout.js";
 import { b002Model } from "../src/reference/b002.js";
 import { c025Model } from "../src/reference/c025.js";
 import { demoModel } from "../src/reference/demo.js";
@@ -39,6 +39,27 @@ describe("подбор раскладки: меньше пересечений �
     expect(before).toBe(43);
     expect(after).toBeLessThanOrEqual(31); // замер: 29
   }, 120_000);
+
+  it("LAYOUT_SEARCH=0 возвращает прежнюю раскладку: ровно 43 пересечения на тех же диаграммах", async () => {
+    process.env.LAYOUT_SEARCH = "0";
+    try {
+      let total = 0;
+      for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) for (const h of bpmnHosts(m)) total += await crossingsOf(m, h.id);
+      expect(total).toBe(43);
+    } finally {
+      delete process.env.LAYOUT_SEARCH;
+    }
+  }, 120_000);
+
+  it("число проверяемых вариантов зависит только от размера диаграммы: на малых — полный перебор, на больших меньше, на огромных подбора нет", () => {
+    expect(evaluationsFor(10)).toBe(200);
+    expect(evaluationsFor(26)).toBe(200);
+    const sizes = [26, 40, 60, 80, 100, 120, 150, 300].map(evaluationsFor);
+    expect([...sizes].sort((a, b) => b - a)).toEqual(sizes); // с ростом диаграммы не растёт
+    expect(evaluationsFor(100)).toBeGreaterThanOrEqual(MIN_EVALUATIONS); // типичная крупная диаграмма ещё подбирается
+    expect(evaluationsFor(150)).toBeLessThan(MIN_EVALUATIONS); // от ~120 стрелок — как есть
+    expect(evaluationsFor(150)).toBe(evaluationsFor(150)); // не зависит от запуска
+  });
 
   it("результат не зависит от запуска: одинаковые координаты и маршруты", async () => {
     const m = c025Model();

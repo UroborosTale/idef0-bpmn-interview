@@ -102,8 +102,17 @@ function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<
 
 const defaultType = (n: LayoutNodeIn) => n.type ?? (n.width <= 40 ? "event" : n.width <= 50 ? "gateway" : "task");
 
-/** Сколько вариантов раскладки перебирается: число фиксировано, поэтому результат не зависит от скорости машины. */
+/**
+ * Сколько вариантов раскладки перебирается. Число считается по размеру диаграммы, а не по часам, поэтому результат не зависит
+ * от скорости машины. Прокладка одного варианта растёт гораздо быстрее, чем число стрелок (замер: 100 стрелок — около 85 мс,
+ * 150 — около 185 мс, то есть примерно в степени 3,5), поэтому на больших диаграммах вариантов меньше: бюджет делится на число
+ * стрелок в этой степени (~0,5 с на диаграмму до 100 стрелок), а диаграммы от ~120 стрелок остаются как есть — подбор там не
+ * окупается.
+ */
 const MAX_EVALUATIONS = 200;
+const WORK_BUDGET = 70_000_000;
+export const MIN_EVALUATIONS = 4;
+export const evaluationsFor = (flows: number) => Math.min(MAX_EVALUATIONS, Math.floor(WORK_BUDGET / Math.pow(Math.max(flows, 1), 3.5)));
 
 /**
  * Подбор раскладки с меньшим числом пересечений стрелок при тех же дорожках. Дорожка вмещает ровно один ряд фигур, поэтому
@@ -114,7 +123,9 @@ const MAX_EVALUATIONS = 200;
  */
 function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: Placement, extras?: LayoutExtras): Placement {
   const free = nodes.filter((n) => !n.fixed);
-  if (nodes.length < 4 || edges.length < 3 || free.length < 2) return start;
+  const maxEvals = evaluationsFor(edges.length);
+  // LAYOUT_SEARCH=0 выключает подбор (для сравнения и на случай жалоб на скорость)
+  if (process.env.LAYOUT_SEARCH === "0" || nodes.length < 4 || edges.length < 3 || free.length < 2 || maxEvals < MIN_EVALUATIONS) return start;
 
   const flows: RouteFlow[] = edges.map((e) => ({ id: e.id, from: e.viaBoundary ?? e.from, to: e.to }));
   const score = (p: Placement): number => {
@@ -137,7 +148,7 @@ function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: P
   let curScore = score(cur);
   let evals = 1;
   const tryMove = (next: Placement): boolean => {
-    if (evals >= MAX_EVALUATIONS) return false;
+    if (evals >= maxEvals) return false;
     evals++;
     const s = score(next);
     if (s < curScore - 1e-9) {
@@ -148,7 +159,7 @@ function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: P
     return false;
   };
 
-  for (let pass = 0; pass < 3 && evals < MAX_EVALUATIONS && curScore > 0.5; pass++) {
+  for (let pass = 0; pass < 3 && evals < maxEvals && curScore > 0.5; pass++) {
     let improved = false;
     // 1. порядок фигур одного слоя в одной дорожке
     const groups = new Map<string, string[]>();
