@@ -357,7 +357,9 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     const to = layout.boxes.get(nodeIdOf(f.to));
     if (!from || !to) continue;
     const others = [...layout.boxes.entries()].filter(([id]) => id !== nodeIdOf(f.from) && id !== nodeIdOf(f.to)).map(([, b]) => b);
-    const points = orthogonalWaypoints(from, to, others);
+    const fromNode = nodes.find((n) => n.id === f.from);
+    const toNode = nodes.find((n) => n.id === f.to);
+    const points = orthogonalWaypoints(from, to, others, { fromType: fromNode?.type, toType: toNode?.type, fromBoundary: !!fromNode && isBoundary(fromNode) });
     diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
     const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
     edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${f.id}_di" bpmnElement="Flow_${f.id}">${waypointsXml}</bpmndi:BPMNEdge>`);

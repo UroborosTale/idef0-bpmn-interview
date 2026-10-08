@@ -1,5 +1,5 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { MIN_X, boxMap, boxOf, isBoundary, snap, visibleNodes, type Box } from "./geometry";
+import { MIN_X, boxMap, boxOf, isBoundary, snap, snapTop, visibleNodes, type Box } from "./geometry";
 import { deleteNode, dropNodeIntoLane, nextId } from "./model-ops";
 
 /**
@@ -43,7 +43,7 @@ export function moveGroup(base: M, ids: string[], dx: number, dy: number): M {
     nodes: base.nodes.map((n) => {
       if (!set.has(n.id)) return n;
       const b = boxOf(n);
-      return { ...n, layout: { x: snap(b.x + sx), y: snap(b.y + dy) } };
+      return { ...n, layout: { x: snap(b.x + sx), y: snapTop(b.y + dy, b.h) } };
     }),
   };
 }
@@ -75,7 +75,7 @@ export function alignMiddle(m: M, ids: string[]): M {
     for (const n of group) cy.set(n.id, boxOf(top).y + boxOf(top).h / 2);
   }
   if (cy.size === 0) return m;
-  return { ...m, nodes: m.nodes.map((n) => (cy.has(n.id) ? { ...n, layout: { x: boxOf(n).x, y: snap(cy.get(n.id)! - boxOf(n).h / 2) } } : n)) };
+  return { ...m, nodes: m.nodes.map((n) => (cy.has(n.id) ? { ...n, layout: { x: boxOf(n).x, y: cy.get(n.id)! - boxOf(n).h / 2 } } : n)) };
 }
 
 /** Равные промежутки между фигурами по горизонтали (крайние остаются на месте). */
@@ -135,7 +135,7 @@ export function pasteFragment(m: M, frag: Fragment, dx: number, dy: number, rese
       id: map.get(n.id)!,
       attached_to: attached,
       role_id: n.role_id && roles.has(n.role_id) ? n.role_id : null,
-      layout: { x: Math.max(MIN_X, snap(b.x + dx)), y: snap(b.y + dy) },
+      layout: { x: Math.max(MIN_X, snap(b.x + dx)), y: snapTop(b.y + dy, b.h) },
       source: [],
       confirmed_by: [],
       requirement_ids: [],

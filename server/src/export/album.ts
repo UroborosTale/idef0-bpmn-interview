@@ -70,7 +70,7 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
       const from = layout.boxes.get(f.from);
       const to = layout.boxes.get(f.to);
       if (!from || !to) return "";
-      const points = orthogonalWaypoints(from, to);
+      const points = orthogonalWaypoints(from, to, [], { fromType: model.nodes.find((n) => n.id === f.from)?.type, toType: model.nodes.find((n) => n.id === f.to)?.type });
       const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
       return `<path d="${d}" fill="none" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arrow2)" />`;
     })

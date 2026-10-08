@@ -6,8 +6,8 @@ import { POOL_H, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolB
 
 // Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
 // (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
-export { SIZE, LANE_H, START_Y, LANE_X, LABEL_W, MIN_X, sizeOf, waypoints } from "@shared/bpmnGeometry";
-export type { Box } from "@shared/bpmnGeometry";
+export { SIZE, LANE_H, START_Y, LANE_X, LABEL_W, MIN_X, sizeOf, waypoints, flowLabelPoint } from "@shared/bpmnGeometry";
+export type { Box, EndKinds } from "@shared/bpmnGeometry";
 export type { Pt };
 
 export const GRID = 10;
@@ -17,6 +17,12 @@ const COL_W = 170;
 export const visibleNodes = (m: ProcessLogicModel) => m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope);
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
+
+/**
+ * Верх фигуры высотой h так, чтобы её центр лёг на сетку в 5 px. Привязка по центру, а не по верху: задача (80), шлюз (50)
+ * и событие (36) в одном ряду получают общую линию центров, и стрелки между ними идут прямо, без «ступенек».
+ */
+export const snapTop = (y: number, h: number) => Math.round((y + h / 2) / 5) * 5 - h / 2;
 
 export function boxOf(n: ProcessNode): Box {
   const s = sizeOf(n);
@@ -153,7 +159,7 @@ export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: nu
   for (const n of shown) {
     const s = sizeOf(n);
     const cx = MIN_X + 60 + (rank.get(n.id) ?? 0) * COL_W;
-    result.set(n.id, { x: snap(cx - s.w / 2), y: snap(laneTop(laneOf.get(n.id)!) + (LANE_H - s.h) / 2) });
+    result.set(n.id, { x: snap(cx - s.w / 2), y: laneTop(laneOf.get(n.id)!) + (LANE_H - s.h) / 2 }); // центры — на одной линии
   }
   return result;
 }

@@ -3,7 +3,7 @@ import * as ElkNS from "elkjs";
 // elkjs публикует CJS-модуль с default-совместимой формой; в NodeNext-режиме
 // TS не всегда разрешает интероп автоматически, поэтому берём конструктор
 // явно (как это делает сам bpmn-generator-подобный тулинг).
-import { LANE_H, MIN_X, START_Y, waypoints } from "../shared/bpmnGeometry.js";
+import { LANE_H, MIN_X, START_Y, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
 
 const ElkCtor: new () => import("elkjs").ELK = (ElkNS as any).default ?? (ElkNS as any);
 
@@ -119,7 +119,7 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
  * Ортогональные точки перегиба стрелки между двумя прямоугольниками — общая функция
  * shared/bpmnGeometry.ts (её же использует редактор в браузере).
  */
-export function orthogonalWaypoints(from: LayoutBox, to: LayoutBox, obstacles: LayoutBox[] = []): [number, number][] {
+export function orthogonalWaypoints(from: LayoutBox, to: LayoutBox, obstacles: LayoutBox[] = [], kinds: EndKinds = {}): [number, number][] {
   const box = (b: LayoutBox) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
-  return waypoints(box(from), box(to), obstacles.map(box));
+  return waypoints(box(from), box(to), obstacles.map(box), kinds);
 }

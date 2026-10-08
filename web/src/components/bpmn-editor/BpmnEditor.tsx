@@ -4,7 +4,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, visibleNodes, withLayout } from "./geometry";
+import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
@@ -215,7 +215,7 @@ export default function BpmnEditor({
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      setDraft((m) => moveNode(m, d.id, Math.max(MIN_X, snap(wx - d.offX)), snap(wy - d.offY)));
+      setDraft((m) => moveNode(m, d.id, Math.max(MIN_X, snap(wx - d.offX)), snapTop(wy - d.offY, boxOf(m.nodes.find((x) => x.id === d.id)!).h)));
       setHotLane(laneIndexAtY(viewRef.current, wy));
     } else if (d.kind === "marquee") {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -514,7 +514,9 @@ export default function BpmnEditor({
                 const b = boxes.get(f.to);
                 if (!a || !b) return null;
                 const others = shown.filter((n) => n.id !== f.from && n.id !== f.to).map((n) => boxes.get(n.id)!);
-                return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} selected={curSel?.kind === "flow" && curSel.id === f.id} />;
+                const fn = shown.find((n) => n.id === f.from);
+                const tn = shown.find((n) => n.id === f.to);
+                return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} kinds={{ fromType: fn?.type, toType: tn?.type, fromBoundary: !!fn && isBoundary(fn, shown) }} selected={curSel?.kind === "flow" && curSel.id === f.id} />;
               })}
 
               {extras.messages.map(({ message, points }) => (

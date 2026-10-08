@@ -1,6 +1,6 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
-import { LANE_H, LANE_X, LABEL_W, labelPoint, laneCount, laneTop, waypoints, wrapText, type Box } from "./geometry";
+import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds } from "./geometry";
 
 const INK = "#1e293b";
 const ACCENT = "#4338ca";
@@ -128,11 +128,11 @@ export function NodeShape({ node, box, selected, hot, boundary = false }: { node
   );
 }
 
-export function FlowShape({ flow, from, to, obstacles, selected }: { flow: ProcessFlow; from: Box; to: Box; obstacles: Box[]; selected: boolean }) {
-  const pts = waypoints(from, to, obstacles);
+export function FlowShape({ flow, from, to, obstacles, selected, kinds }: { flow: ProcessFlow; from: Box; to: Box; obstacles: Box[]; selected: boolean; kinds?: EndKinds }) {
+  const pts = waypoints(from, to, obstacles, kinds);
   const d = pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const color = selected ? ACCENT : INK;
-  const [lx, ly] = labelPoint(pts);
+  const label = flowLabelPoint(pts);
   const cond = flow.condition?.trim();
   return (
     <g data-flow-id={flow.id} style={{ cursor: "pointer" }}>
@@ -140,8 +140,8 @@ export function FlowShape({ flow, from, to, obstacles, selected }: { flow: Proce
       <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.5 : 1.5} markerEnd={selected ? "url(#bpe-arrow-sel)" : "url(#bpe-arrow)"} />
       {cond && (
         <g pointerEvents="none">
-          <rect x={lx - cond.length * 3 - 4} y={ly - 17} width={cond.length * 6 + 8} height={15} rx={3} fill="#fff" opacity={0.92} />
-          <text x={lx} y={ly - 6} textAnchor="middle" fontSize={10.5} fill={color}>
+          <rect x={label.anchor === "middle" ? label.x - cond.length * 3 - 4 : label.x - 3} y={label.y - 11} width={cond.length * 6 + 8} height={15} rx={3} fill="#fff" opacity={0.92} />
+          <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize={10.5} fill={color}>
             {cond.length > 28 ? cond.slice(0, 27) + "…" : cond}
           </text>
         </g>

@@ -3,6 +3,7 @@ import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { isStructured } from "../shared/codes.js";
+import { flowLabelPoint } from "../shared/bpmnGeometry.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -561,8 +562,8 @@ function bpmnPage(d: BpmnDiagramData, name: string): Page {
   for (const edge of d.edges) {
     let textAt: Pt | undefined;
     if (edge.label) {
-      const i = Math.floor((edge.points.length - 1) / 2);
-      textAt = [(edge.points[i][0] + edge.points[i + 1][0]) / 2, (edge.points[i][1] + edge.points[i + 1][1]) / 2 - 10];
+      const l = flowLabelPoint(edge.points);
+      textAt = [l.x + (l.anchor === "start" ? 24 : 0), l.y - 4];
     }
     page.connector({
       points: edge.points,

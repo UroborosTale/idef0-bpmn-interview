@@ -1,5 +1,5 @@
 import type { ExternalPool, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, boxOf } from "./geometry";
+import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, boxOf } from "./geometry";
 
 type M = ProcessLogicModel;
 export interface OpResult {
@@ -49,7 +49,7 @@ const mapNode = (m: M, id: string, fn: (n: ProcessNode) => ProcessNode): M => ({
 export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpResult {
   const size = sizeOf(spec);
   const lane = laneIndexAtY(m, cy);
-  const [x, y] = clampIntoLane(m, spec, snap(cx - size.w / 2), snap(cy - size.h / 2), lane);
+  const [x, y] = clampIntoLane(m, spec, snap(cx - size.w / 2), snapTop(cy - size.h / 2, size.h), lane);
   const node: ProcessNode = {
     id: nextId("n", m.nodes.map((n) => n.id)),
     type: spec.type,
@@ -79,7 +79,7 @@ export function dropNodeIntoLane(m: M, id: string): M {
   if (!n) return m;
   const b = boxOf(n);
   const lane = laneIndexAtY(m, b.y + b.h / 2);
-  const [x, y] = clampIntoLane(m, n, snap(b.x), snap(b.y), lane);
+  const [x, y] = clampIntoLane(m, n, snap(b.x), snapTop(b.y, b.h), lane);
   return syncBoundaryRole(mapNode(m, id, (nn) => ({ ...nn, role_id: roleIdOfLane(m, lane), layout: { x, y } })), id);
 }
 
@@ -108,7 +108,7 @@ export function setNodeType(m: M, id: string, type: ProcessNode["type"]): M {
     ...nn,
     type,
     subtype,
-    layout: { x: snap(old.x + (old.w - size.w) / 2), y: snap(old.y + (old.h - size.h) / 2) },
+    layout: { x: snap(old.x + (old.w - size.w) / 2), y: old.y + (old.h - size.h) / 2 }, // центр остаётся на месте
   }));
 }
 
