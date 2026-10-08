@@ -521,4 +521,4 @@ button.danger:hover { background: #fef2f2; }
 .report-findings th { background: #f4f7fc; font-weight: 600; }
 .finding-high td:first-child { color: #991b1b; font-weight: 600; }
 .report-text { white-space: pre-wrap; font: inherit; background: #f8fafc; border: 1px solid #e5ebf5; border-radius: 4px; padding: 8px; margin: 6px 0; max-height: 320px; overflow: auto; }
-.report-archived { opacity: 0.7; }
+.report-archived { opacity: 0.7; }.question-form { padding: 8px 12px; border-bottom: 1px solid #e5ebf5; }

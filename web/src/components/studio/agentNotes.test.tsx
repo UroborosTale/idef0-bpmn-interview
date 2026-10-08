@@ -82,6 +82,26 @@ describe("вопросы к интервью: вкладка", () => {
     expect(screen.queryByPlaceholderText(/Ответ респондента/)).toBeNull();
   });
 
+  it("свой вопрос: форма с адресатом, важностью и привязкой к выделенной функции; короткий текст не отправляется", async () => {
+    const onAdd = vi.fn();
+    render(<QuestionsPanel questions={[question({ agent: "user:ivanov" })]} labelOf={labelOf} processName="П" onStatus={vi.fn()} selected={{ id: "o2", label: "B002.01.02 «Интервью»" }} onAdd={onAdd} />);
+    expect(screen.getByText(/добавлен вручную \(ivanov\)/)).toBeTruthy();
+    const send = screen.getByText("Добавить вопрос") as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    fireEvent.change(screen.getByPlaceholderText(/Свой вопрос к интервью/), { target: { value: "  Кто заменяет директора?  " } });
+    fireEvent.change(screen.getByLabelText("Кого спросить"), { target: { value: "Секретарь" } });
+    fireEvent.change(screen.getByLabelText("Важность"), { target: { value: "critical" } });
+    fireEvent.click(send);
+    expect(onAdd).toHaveBeenCalledWith({ text: "Кто заменяет директора?", addressee: "Секретарь", scope: "o2", priority: "critical" });
+    await act(async () => {}); // после отправки поле очищается
+    expect((screen.getByPlaceholderText(/Свой вопрос к интервью/) as HTMLTextAreaElement).value).toBe("");
+    // без галочки — к процессу в целом
+    fireEvent.change(screen.getByPlaceholderText(/Свой вопрос к интервью/), { target: { value: "Общий вопрос о процессе?" } });
+    fireEvent.click(screen.getByLabelText(/к функции B002/));
+    fireEvent.click(screen.getByText("Добавить вопрос"));
+    expect(onAdd).toHaveBeenLastCalledWith({ text: "Общий вопрос о процессе?", addressee: "Секретарь", scope: null, priority: "critical" });
+  });
+
   it("возврат: снятый вопрос возвращается в список ожидающих", () => {
     const onStatus = panel([question({ status: "dismissed" })]);
     fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));
