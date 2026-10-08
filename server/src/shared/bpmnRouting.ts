@@ -354,6 +354,18 @@ export function routeQuality(nodes: RouteNode[], flows: RouteFlow[], routes: Map
   }
   return { crossings, cuts, length };
 }
+/**
+ * Сколько вариантов раскладки перебирается. Число считается по размеру диаграммы, а не по часам, поэтому результат не зависит
+ * от скорости машины. Прокладка одного варианта растёт гораздо быстрее, чем число стрелок (замер: 100 стрелок — около 85 мс,
+ * 150 — около 185 мс, то есть примерно в степени 3,5), поэтому на больших диаграммах вариантов меньше: бюджет делится на число
+ * стрелок в этой степени (~0,5 с на диаграмму до 100 стрелок), а диаграммы от ~120 стрелок остаются как есть — подбор там не
+ * окупается.
+ */
+export const MAX_EVALUATIONS = 200;
+const WORK_BUDGET = 70_000_000;
+export const MIN_EVALUATIONS = 4;
+export const evaluationsFor = (flows: number) => Math.min(MAX_EVALUATIONS, Math.floor(WORK_BUDGET / Math.pow(Math.max(flows, 1), 3.5)));
+
 /** То же, что routeFlows, но с фактическими сторонами и подвижным участком каждой стрелки (для ручной правки в редакторе). */
 export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extraObstacles: Box[] = []): Map<string, RouteInfo> {
   const byId = new Map(nodes.map((n) => [n.id, n] as const));

@@ -4,7 +4,11 @@ import * as ElkNS from "elkjs";
 // TS не всегда разрешает интероп автоматически, поэтому берём конструктор
 // явно (как это делает сам bpmn-generator-подобный тулинг).
 import { LANE_H, MIN_X, START_Y, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
-import { routeFlows, routeQuality, type RouteFlow, type RouteNode } from "../shared/bpmnRouting.js";
+import { rankColumns } from "../shared/bpmnRank.js";
+import { MIN_EVALUATIONS, evaluationsFor, routeFlows, routeQuality, type RouteFlow, type RouteNode } from "../shared/bpmnRouting.js";
+
+// бюджет перебора общий с редактором в браузере (shared/bpmnRouting.ts); здесь он нужен и тестам
+export { MIN_EVALUATIONS, evaluationsFor };
 
 const ElkCtor: new () => import("elkjs").ELK = (ElkNS as any).default ?? (ElkNS as any);
 
@@ -104,17 +108,6 @@ function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<
 
 const defaultType = (n: LayoutNodeIn) => n.type ?? (n.width <= 40 ? "event" : n.width <= 50 ? "gateway" : "task");
 
-/**
- * Сколько вариантов раскладки перебирается. Число считается по размеру диаграммы, а не по часам, поэтому результат не зависит
- * от скорости машины. Прокладка одного варианта растёт гораздо быстрее, чем число стрелок (замер: 100 стрелок — около 85 мс,
- * 150 — около 185 мс, то есть примерно в степени 3,5), поэтому на больших диаграммах вариантов меньше: бюджет делится на число
- * стрелок в этой степени (~0,5 с на диаграмму до 100 стрелок), а диаграммы от ~120 стрелок остаются как есть — подбор там не
- * окупается.
- */
-const MAX_EVALUATIONS = 200;
-const WORK_BUDGET = 70_000_000;
-export const MIN_EVALUATIONS = 4;
-export const evaluationsFor = (flows: number) => Math.min(MAX_EVALUATIONS, Math.floor(WORK_BUDGET / Math.pow(Math.max(flows, 1), 3.5)));
 
 /**
  * Подбор раскладки с меньшим числом пересечений стрелок при тех же дорожках. Дорожка вмещает ровно один ряд фигур, поэтому
@@ -123,11 +116,26 @@ export const evaluationsFor = (flows: number) => Math.min(MAX_EVALUATIONS, Math.
  * запас, на слой позже. Ход принимается, если прокладка стрелок стала лучше (пересечения, проходы сквозь фигуры, длина).
  * Исходный вариант всегда остаётся запасным — хуже прежнего результат не бывает.
  */
-async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: Placement, extras?: LayoutExtras): Promise<Placement> {
+/** Ширина столбца раскладки по столбцам (как у кнопки «Расставить» в редакторе) и отступ первого столбца от левого края. */
+const COLUMN_W = 170;
+const COLUMN_X0 = 60 - 25;
+
+/**
+ * Раскладка по столбцам (shared/bpmnRank.ts): столбец — длиннейший путь от начала, строка — дорожка, в ячейке одна фигура. Ветки
+ * шлюза в одной дорожке получают разные столбцы, а ELK ставит их в один слой и фигуры потом растаскиваются вправо — стрелки к
+ * дальней ветке идут над ближней. Это второй исходный вариант подбора наряду с раскладкой ELK.
+ */
+function columnPlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]): Placement {
+  const lane = new Map(nodes.map((n) => [n.id, n.laneIndex] as const));
+  const { rank } = rankColumns({ ids: nodes.map((n) => n.id), lane, edges: edges.map((e) => ({ from: e.from, to: e.to })) });
+  return { rawX: new Map(nodes.map((n) => [n.id, COLUMN_X0 + (rank.get(n.id) ?? 0) * COLUMN_W] as const)), rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
+}
+
+async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], elkStart: Placement, extras?: LayoutExtras): Promise<Placement> {
   const free = nodes.filter((n) => !n.fixed);
   const maxEvals = evaluationsFor(edges.length);
   // LAYOUT_SEARCH=0 выключает подбор (для сравнения и на случай жалоб на скорость)
-  if (process.env.LAYOUT_SEARCH === "0" || nodes.length < 4 || edges.length < 3 || free.length < 2 || maxEvals < MIN_EVALUATIONS) return start;
+  if (process.env.LAYOUT_SEARCH === "0" || nodes.length < 4 || edges.length < 3 || free.length < 2 || maxEvals < MIN_EVALUATIONS) return elkStart;
 
   const flows: RouteFlow[] = edges.map((e) => ({ id: e.id, from: e.viaBoundary ?? e.from, to: e.to }));
   const score = (p: Placement): number => {
@@ -142,13 +150,19 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], st
     return q.crossings * 10 + q.cuts * 40 + q.length / 400;
   };
 
+  // два исходных варианта — раскладка ELK и раскладка по столбцам; дальше улучшается лучший из них
+  const columns = columnPlacement(nodes, edges);
+  const elkScore = score(elkStart);
+  const columnScore = score(columns);
+  const start = columnScore < elkScore - 1e-9 ? columns : elkStart;
+
   const succ = new Map<string, string[]>();
   for (const e of edges) succ.set(e.from, [...(succ.get(e.from) ?? []), e.to]);
   const layers = [...new Set(start.rawX.values())].sort((a, b) => a - b);
 
   let cur = start;
-  let curScore = score(cur);
-  let evals = 1;
+  let curScore = Math.min(elkScore, columnScore);
+  let evals = 2;
   // подбор синхронный и считает десятки прокладок: между вариантами отдаём управление, чтобы сервер отвечал другим запросам
   const yieldToLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
   const tryMove = async (next: Placement): Promise<boolean> => {

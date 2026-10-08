@@ -517,7 +517,7 @@ export default function BpmnEditor({
         compact={embedded}
         extra={
           <>
-            <button onClick={() => commit(withLayout(draft, true))} title="Расставить все фигуры заново (можно отменить)">
+            <button onClick={() => commit(withLayout(draft, true, undefined, true))} title="Расставить все фигуры заново, подобрав порядок так, чтобы стрелки пересекались меньше (можно отменить)">
               Авто-раскладка
             </button>
             <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">

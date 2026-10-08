@@ -1,5 +1,6 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { fixedRoute, routeFlowsDetailed } from "@shared/bpmnRouting";
+import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, routeFlowsDetailed, routeQuality } from "@shared/bpmnRouting";
+import { rankColumns } from "@shared/bpmnRank";
 import { collapseTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
@@ -119,66 +120,28 @@ export function labelPoint(pts: Pt[]): Pt {
   return [(pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2];
 }
 
-/**
- * Авто-раскладка слева направо: столбец = длиннейший путь от начала (петли
- * игнорируются), строка = дорожка роли. Две фигуры в одной ячейке не допускаются.
- */
-export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: number }> {
+/** Разложение диаграммы по столбцам (rank) и дорожкам: основа и авто-раскладки, и её подбора. */
+interface Ranked {
+  shown: ProcessNode[];
+  /** Столбец фигуры: длиннейший путь от начала (петли игнорируются), две фигуры в одной ячейке «столбец × дорожка» не допускаются. */
+  rank: Map<string, number>;
+  laneOf: Map<string, number>;
+  /** Прямые (без петель) связи между показанными фигурами. */
+  fwd: Map<string, string[]>;
+  preds: Map<string, string[]>;
+}
+
+function rankLayout(m: ProcessLogicModel): Ranked {
   const all = visibleNodes(m);
   // граничное событие в раскладке — продолжение своей задачи: его стрелки идут «от задачи», а места оно не занимает
   const hostOf = new Map(all.filter((n) => isBoundary(n, all)).map((n) => [n.id, n.attached_to!] as const));
   const shown = all.filter((n) => !hostOf.has(n.id));
-  const ids = shown.map((n) => n.id);
-  const order = new Map(ids.map((id, i) => [id, i] as const));
-  const out = new Map<string, string[]>();
-  const hasIn = new Set<string>();
-  for (const f of visibleFlows(m)) {
-    const from = hostOf.get(f.from) ?? f.from;
-    if (from === f.to || !order.has(from) || !order.has(f.to)) continue;
-    out.set(from, [...(out.get(from) ?? []), f.to]);
-    hasIn.add(f.to);
-  }
-
-  // убираем обратные рёбра (петли), чтобы получить DAG
-  const fwd = new Map<string, string[]>();
-  const state = new Map<string, 1 | 2>();
-  const dfs = (u: string) => {
-    state.set(u, 1);
-    for (const v of out.get(u) ?? []) {
-      if (state.get(v) === 1) continue;
-      fwd.set(u, [...(fwd.get(u) ?? []), v]);
-      if (!state.has(v)) dfs(v);
-    }
-    state.set(u, 2);
-  };
-  for (const id of [...ids.filter((i) => !hasIn.has(i)), ...ids]) if (!state.has(id)) dfs(id);
-
-  const preds = new Map<string, string[]>();
-  const indeg = new Map<string, number>(ids.map((id) => [id, 0]));
-  for (const [u, vs] of fwd) {
-    for (const v of vs) {
-      preds.set(v, [...(preds.get(v) ?? []), u]);
-      indeg.set(v, (indeg.get(v) ?? 0) + 1);
-    }
-  }
-
   const laneOf = new Map(shown.map((n) => [n.id, laneIndexOfRole(m, n.role_id)] as const));
-  const rank = new Map<string, number>();
-  const taken = new Set<string>();
-  const queue = ids.filter((id) => indeg.get(id) === 0);
-  while (queue.length > 0) {
-    queue.sort((a, b) => order.get(a)! - order.get(b)!);
-    const u = queue.shift()!;
-    let r = Math.max(-1, ...(preds.get(u) ?? []).map((p) => rank.get(p) ?? -1)) + 1;
-    while (taken.has(`${r}:${laneOf.get(u)}`)) r++;
-    taken.add(`${r}:${laneOf.get(u)}`);
-    rank.set(u, r);
-    for (const v of fwd.get(u) ?? []) {
-      indeg.set(v, indeg.get(v)! - 1);
-      if (indeg.get(v) === 0) queue.push(v);
-    }
-  }
-
+  const edges = visibleFlows(m).map((f) => ({ from: hostOf.get(f.from) ?? f.from, to: f.to }));
+  const { rank, fwd, preds } = rankColumns({ ids: shown.map((n) => n.id), lane: laneOf, edges });
+  return { shown, rank, laneOf, fwd, preds };
+}
+function placeRanks({ shown, laneOf }: Ranked, rank: Map<string, number>): Map<string, { x: number; y: number }> {
   const result = new Map<string, { x: number; y: number }>();
   for (const n of shown) {
     const s = sizeOf(n);
@@ -188,6 +151,89 @@ export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: nu
   return result;
 }
 
+/**
+ * Авто-раскладка слева направо: столбец = длиннейший путь от начала (петли
+ * игнорируются), строка = дорожка роли. Две фигуры в одной ячейке не допускаются.
+ */
+export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: number }> {
+  const ranked = rankLayout(m);
+  return placeRanks(ranked, ranked.rank);
+}
+
+/**
+ * Та же раскладка, но с подбором: фигуре с запасом по времени разрешается встать столбцом позже, две фигуры одной дорожки
+ * могут поменяться местами. Вариант принимается, если стрелки пересекаются меньше (и реже идут сквозь фигуры) — оценка по
+ * настоящей прокладке редактора (diagramLayout), так что учитываются документы над задачами, граничные события и значки.
+ * Число проверяемых вариантов зависит только от размера диаграммы (shared/bpmnRouting.ts: evaluationsFor), поэтому результат
+ * воспроизводим, а кнопка не подвисает на больших схемах. Исходная раскладка — запасной вариант: хуже неё результат не бывает.
+ */
+export function optimizedLayout(m: ProcessLogicModel): Map<string, { x: number; y: number }> {
+  const ranked = rankLayout(m);
+  const start = placeRanks(ranked, ranked.rank);
+  const flowCount = visibleFlows(m).length;
+  const maxEvals = evaluationsFor(flowCount);
+  if (ranked.shown.length < 4 || flowCount < 3 || maxEvals < MIN_EVALUATIONS) return start;
+
+  const score = (rank: Map<string, number>): number => {
+    const pos = placeRanks(ranked, rank);
+    const candidate: ProcessLogicModel = { ...m, nodes: m.nodes.map((n) => (pos.has(n.id) ? { ...n, layout: pos.get(n.id)! } : n)) };
+    const d = diagramLayout(candidate);
+    const nodes = d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)! }));
+    const q = routeQuality(nodes, d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes);
+    return q.crossings * 10 + q.cuts * 40 + q.length / 400;
+  };
+
+  let rank = ranked.rank;
+  let best = score(rank);
+  let evals = 1;
+  const cell = (r: Map<string, number>, id: string) => `${r.get(id)}:${ranked.laneOf.get(id)}`;
+  const tryRank = (next: Map<string, number>): boolean => {
+    if (evals >= maxEvals) return false;
+    evals++;
+    const s = score(next);
+    if (s < best - 1e-9) {
+      rank = next;
+      best = s;
+      return true;
+    }
+    return false;
+  };
+
+  for (let pass = 0; pass < 3 && evals < maxEvals && best > 0.5; pass++) {
+    let improved = false;
+    // 1. фигура с запасом сдвигается на столбец позже (не дальше столбца своих преемников), если ячейка свободна
+    const occupied = new Set(ranked.shown.map((n) => cell(rank, n.id)));
+    for (const n of ranked.shown) {
+      const r = rank.get(n.id) ?? 0;
+      const succ = ranked.fwd.get(n.id) ?? [];
+      if (succ.length === 0 || !succ.every((s) => (rank.get(s) ?? 0) > r + 1)) continue;
+      const key = `${r + 1}:${ranked.laneOf.get(n.id)}`;
+      if (occupied.has(key)) continue;
+      const next = new Map(rank).set(n.id, r + 1);
+      if (tryRank(next)) {
+        improved = true;
+        occupied.delete(cell(rank, n.id));
+        occupied.add(key);
+      }
+    }
+    // 2. две фигуры одной дорожки меняются столбцами, если порядок «до/после» относительно связей не нарушается
+    const byLane = new Map<number, string[]>();
+    for (const n of ranked.shown) byLane.set(ranked.laneOf.get(n.id)!, [...(byLane.get(ranked.laneOf.get(n.id)!) ?? []), n.id]);
+    for (const ids of byLane.values()) {
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const [a, b] = [ids[i], ids[j]];
+          const [ra, rb] = [rank.get(a) ?? 0, rank.get(b) ?? 0];
+          const swapped = new Map(rank).set(a, rb).set(b, ra);
+          const fits = (id: string) => (ranked.preds.get(id) ?? []).every((p) => (swapped.get(p) ?? 0) < (swapped.get(id) ?? 0)) && (ranked.fwd.get(id) ?? []).every((s) => (swapped.get(s) ?? 0) > (swapped.get(id) ?? 0));
+          if (ra !== rb && fits(a) && fits(b) && tryRank(swapped)) improved = true;
+        }
+      }
+    }
+    if (!improved) break;
+  }
+  return placeRanks(ranked, rank);
+}
 /**
  * Позиции фигур из BPMN, сгенерированного сервером (раскладка ELK): id узла → левый верхний угол.
  * Редактор начинает с них, поэтому без ручных правок показывает ту же диаграмму, что и экспорт.
@@ -203,12 +249,12 @@ export function positionsFromBpmnXml(xml: string | null | undefined): Map<string
 
 /**
  * Достраивает layout узлам, у которых его нет: из раскладки сервера (seed), иначе — своей авто-раскладкой.
- * force — расставить все фигуры заново авто-раскладкой.
+ * force — расставить все фигуры заново авто-раскладкой; optimize — с подбором по числу пересечений стрелок (optimizedLayout).
  */
-export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>): ProcessLogicModel {
+export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>, optimize = false): ProcessLogicModel {
   const all = visibleNodes(m);
   if (!force && all.every((n) => n.layout || isBoundary(n, all))) return m;
-  const auto = autoLayout(m);
+  const auto = optimize && force ? optimizedLayout(m) : autoLayout(m);
   const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
   return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
 }

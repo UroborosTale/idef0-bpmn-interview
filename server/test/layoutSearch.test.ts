@@ -7,6 +7,7 @@ import { demoModel } from "../src/reference/demo.js";
 import { routeQuality, type RouteNode } from "../src/shared/bpmnRouting.js";
 import { bpmnHosts } from "../src/shared/codes.js";
 import type { Pt } from "../src/shared/bpmnGeometry.js";
+import { rankColumns } from "../src/shared/bpmnRank.js";
 
 /** Пересечения стрелок на диаграмме операции — по готовой прокладке (то же, что видит пользователь). */
 async function crossingsOf(m: ReturnType<typeof b002Model>, host: string): Promise<number> {
@@ -37,8 +38,44 @@ describe("подбор раскладки: меньше пересечений �
       }
     }
     expect(before).toBe(43);
-    expect(after).toBeLessThanOrEqual(31); // замер: 29
+    expect(after).toBeLessThanOrEqual(16); // замер: 14
   }, 120_000);
+
+  it("на всех диаграммах эталонов фигуры не налезают друг на друга и не выходят за левый край дорожек", async () => {
+    for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) {
+      for (const h of bpmnHosts(m)) {
+        const { diagram } = await generateBpmn(m, h.id);
+        const s = diagram.shapes.filter((x) => x.kind !== "pool");
+        for (let i = 0; i < s.length; i++) {
+          expect(s[i].x, `${name} ${h.id} ${s[i].id}`).toBeGreaterThanOrEqual(110);
+          for (let j = i + 1; j < s.length; j++) {
+            const [p, q] = [s[i], s[j]];
+            const overlap = p.x < q.x + q.w && p.x + p.w > q.x && p.y < q.y + q.h && p.y + p.h > q.y;
+            // граничное событие стоит на границе своей задачи — касается её по построению
+            if (overlap && p.kind !== "event" && q.kind !== "event") expect(overlap, `${name} ${h.id}: ${p.id} и ${q.id} налезают`).toBe(false);
+          }
+        }
+      }
+    }
+  }, 120_000);
+
+  it("столбцы (rankColumns): длиннейший путь, одна фигура в ячейке дорожки, петли не мешают", () => {
+    // a → b → c в дорожке 0; ветки b → d и b → e в той же дорожке получают разные столбцы; петля c → a отбрасывается
+    const r = rankColumns({
+      ids: ["a", "b", "c", "d", "e"],
+      lane: new Map([["a", 0], ["b", 0], ["c", 0], ["d", 0], ["e", 1]]),
+      edges: [["a", "b"], ["b", "c"], ["b", "d"], ["b", "e"], ["c", "a"]].map(([from, to]) => ({ from, to })),
+    });
+    expect(r.rank.get("a")).toBe(0);
+    expect(r.rank.get("b")).toBe(1);
+    expect(r.rank.get("c")).toBe(2);
+    expect(r.rank.get("d")).toBe(3); // ячейка «столбец 2 × дорожка 0» занята задачей c
+    expect(r.rank.get("e")).toBe(2); // другая дорожка — ячейка свободна
+    expect(r.fwd.get("c") ?? []).toEqual([]); // петля c → a обратная
+    expect(r.preds.get("b")).toEqual(["a"]);
+    // неизвестные концы и стрелка на себя игнорируются
+    expect(rankColumns({ ids: ["x"], lane: new Map([["x", 0]]), edges: [{ from: "x", to: "x" }, { from: "x", to: "нет" }] }).rank.get("x")).toBe(0);
+  });
 
   it("LAYOUT_SEARCH=0 возвращает прежнюю раскладку: ровно 43 пересечения на тех же диаграммах", async () => {
     process.env.LAYOUT_SEARCH = "0";
