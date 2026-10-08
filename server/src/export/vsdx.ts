@@ -686,19 +686,34 @@ export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string
   const codes = idef0Codes(model);
   // диаграммы BPMN операций — по странице на каждую, после общей схемы
   const scopes = [...new Set(model.nodes.map((n) => n.bpmn_scope).filter((s): s is string => !!s))];
-  const scoped = await Promise.all(scopes.map(async (s) => ({ code: codes.get(s) ?? s, d: (await generateBpmn(model, s)).diagram })));
+  const scoped = await Promise.all(scopes.map(async (s) => ({ scope: s, code: codes.get(s) ?? s, d: (await generateBpmn(model, s)).diagram })));
   const rootName = isStructured(model) ? `IDEF0 ${idef0.root.code}` : "IDEF0 A0";
 
+  const contextPage = idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0");
+  const rootPage = idef0Page(idef0.root, rootName);
+  const childPages = idef0.children.map((c) => ({ parentNodeId: c.parentNodeId, page: idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId) }));
+  const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`) }));
+  const schemePage = bpmnPage(bpmn.diagram, "BPMN");
+
   // имена страниц Visio уникальны и без запрещённых символов
-  return packVsdx(
-    [
-      bpmnPage(bpmn.diagram, "BPMN"),
-      ...scoped.map((s) => bpmnPage(s.d, `BPMN ${s.code}`)),
-      idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0"),
-      idef0Page(idef0.root, rootName),
-      ...idef0.children.map((c) => idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId)),
-    ],
-    docMeta,
-    stencilMasters()
-  );
+  if (isStructured(model)) {
+    // порядок атласа процесса, как в документах организации: контекст A-0 → A0 → для каждого подпроцесса его диаграмма IDEF0 и
+    // BPMN его операций → операции, не вошедшие в декомпозицию → общая схема процесса
+    const used = new Set<string>();
+    const ordered = [contextPage, rootPage];
+    for (const child of childPages) {
+      ordered.push(child.page);
+      for (const op of model.nodes.filter((n) => n.idef0_parent === child.parentNodeId)) {
+        const found = bpmnPages.find((b) => b.scope === op.id);
+        if (found && !used.has(op.id)) {
+          used.add(op.id);
+          ordered.push(found.page);
+        }
+      }
+    }
+    for (const b of bpmnPages) if (!used.has(b.scope)) ordered.push(b.page);
+    ordered.push(schemePage);
+    return packVsdx(ordered, docMeta, stencilMasters());
+  }
+  return packVsdx([schemePage, ...bpmnPages.map((b) => b.page), contextPage, rootPage, ...childPages.map((c) => c.page)], docMeta, stencilMasters());
 }

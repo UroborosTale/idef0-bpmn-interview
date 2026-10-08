@@ -161,6 +161,8 @@ describe("студия в браузере", () => {
     const id = await seedSession();
     const { ctx, page } = await openContext(browser);
     await openStudio(page, id);
+    // страница при открытии дважды запрашивает сессию; ждём, пока оба ответа придут, иначе поздний ответ подхватит и «чужую» правку
+    await page.waitForLoadState("networkidle");
     // другая вкладка сохранила модель
     const s = await api("GET", `/sessions/${id}`);
     const m = s.body.model;

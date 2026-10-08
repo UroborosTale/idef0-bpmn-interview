@@ -16,6 +16,8 @@ export interface StepOpts {
   /** Системы (хранилища данных) и регламенты (аннотации). */
   sys?: string[];
   ctl?: string[];
+  /** Срок выполнения шага («1 день», «2 рабочих дня»). */
+  dur?: string;
 }
 
 export type Item =
@@ -51,7 +53,7 @@ export interface Diagram {
   items: Item[];
   flows: (string[] | CondFlow)[];
   /** Потоки сообщений: ключ шага ↔ id внешнего пула, направление задаёт порядок. */
-  messages?: { from: string; to: string; name: string }[];
+  messages?: { from: string; to: string; name?: string }[];
 }
 
 export interface Dict {
@@ -77,7 +79,7 @@ export function buildDiagram(d: Diagram, dict: Dict): { nodes: Record<string, un
   for (const it of d.items) {
     const id = stepId(d.op, it.key);
     if (it.kind === "task") {
-      nodes.push({ ...base(it.r), id, type: "task", subtype: it.k ?? "user", name: it.name, inputs: (it.in ?? []).map(dict.data), outputs: (it.out ?? []).map(dict.data), system_ids: (it.sys ?? []).map(dict.system), controls: (it.ctl ?? []).map(dict.control) });
+      nodes.push({ ...base(it.r), id, type: "task", subtype: it.k ?? "user", name: it.name, inputs: (it.in ?? []).map(dict.data), outputs: (it.out ?? []).map(dict.data), system_ids: (it.sys ?? []).map(dict.system), controls: (it.ctl ?? []).map(dict.control), duration: it.dur ?? null });
     } else if (it.kind === "sub") {
       nodes.push({ ...base(it.r), id, type: "subprocess", name: it.name });
     } else if (it.kind === "event") {
@@ -99,7 +101,7 @@ export function buildDiagram(d: Diagram, dict: Dict): { nodes: Record<string, un
 
   const messages = (d.messages ?? []).map((m, i) => {
     const isStep = (k: string) => d.items.some((it) => it.key === k);
-    return { id: `${d.op}_m${i + 1}`, from: isStep(m.from) ? stepId(d.op, m.from) : m.from, to: isStep(m.to) ? stepId(d.op, m.to) : m.to, name: m.name };
+    return { id: `${d.op}_m${i + 1}`, from: isStep(m.from) ? stepId(d.op, m.from) : m.from, to: isStep(m.to) ? stepId(d.op, m.to) : m.to, name: m.name ?? null };
   });
   return { nodes, flows, messages };
 }

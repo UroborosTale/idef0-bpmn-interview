@@ -255,6 +255,7 @@ describe("выгрузки по операциям", () => {
     const buf = await buildVsdx(structuredModel());
     const pages = await (await JSZip.loadAsync(buf)).file("visio/pages/pages.xml")!.async("string");
     const names = [...pages.matchAll(/<Page ID="\d+" NameU="([^"]+)"/g)].map((m) => m[1]);
-    expect(names).toEqual(["BPMN", "BPMN B002.01.01", "IDEF0 B002.00.00 контекст", "IDEF0 B002.00.00", "IDEF0 B002.01.00", "IDEF0 B002.02.00"]);
+    // порядок атласа, как в документах: контекст → A0 → диаграмма подпроцесса и BPMN его операций → … → общая схема
+    expect(names).toEqual(["IDEF0 B002.00.00 контекст", "IDEF0 B002.00.00", "IDEF0 B002.01.00", "BPMN B002.01.01", "IDEF0 B002.02.00", "BPMN"]);
   });
 });

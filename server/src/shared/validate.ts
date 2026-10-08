@@ -363,19 +363,18 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       if (back.length > 0) add("IDEF0", "warning", "idef0_self_loop", `У функции ${label(n)} выход «${dataName(back[0])}» возвращается на её же вход или управление — петли в IDEF0 не допускаются.`, n.id);
     }
 
-    // потоки сообщений: отправляет задача «Отправка» или событие-сообщение, получает задача «Получение» или событие-сообщение
+    // потоки сообщений идут от задач, подпроцессов и событий-сообщений; шлюз и таймер сообщения не отправляют и не получают
     const poolName = (id: string) => (model.pools ?? []).find((q) => q.id === id)?.name;
     for (const msg of model.messages ?? []) {
       const out = !!model.nodes.find((n) => n.id === msg.from);
       const node = model.nodes.find((n) => n.id === (out ? msg.from : msg.to));
       const pool = poolName(out ? msg.to : msg.from);
       if (!node || pool === undefined) continue;
-      const fits = node.type === "event" ? node.subtype === "message" || node.subtype === "signal" : node.type === "task" && node.subtype === (out ? "send" : "receive");
-      if (!fits) {
-        add("BPMN", "warning", "bpmn_message_endpoint", `${out ? "Сообщение в «" : "Сообщение из «"}${pool}» ${out ? "отправляет" : "получает"} «${node.name}», а это не ${out ? "задача «Отправка»" : "задача «Получение»"} и не событие-сообщение.`, node.id);
+      const bad = node.type === "gateway" || (node.type === "event" && (node.subtype === "timer" || node.subtype === "error"));
+      if (bad) {
+        add("BPMN", "warning", "bpmn_message_endpoint", `${out ? "Сообщение в «" : "Сообщение из «"}${pool}» ${out ? "отправляет" : "получает"} «${node.name}», а ${node.type === "gateway" ? "шлюз" : "таймер и событие-ошибка"} сообщений не ${out ? "отправляют" : "получают"}: свяжите пул с задачей или событием-сообщением.`, node.id);
       }
     }
-
     // источник и назначение продуктов: внутри модели они выводятся из связей функций, снаружи — задаются в карточке
     const producersOf = (id: string) => fnsAll.filter((n) => n.outputs.includes(id));
     const consumersOf = (id: string) => fnsAll.filter((n) => n.inputs.includes(id) || (n.control_data_ids ?? []).includes(id));

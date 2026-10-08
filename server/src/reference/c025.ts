@@ -1,53 +1,79 @@
 import { ProcessLogicModel } from "../types/model.js";
-import { AND, BOUNDARY, END, IF, START, SUB, T, TIMER, XOR, buildDiagram, type Diagram } from "./builder.js";
+import { END, IF, START, T, TIMER, XOR, buildDiagram, type Diagram, type Item } from "./builder.js";
 
 /**
- * Демонстрационный процесс C025 «Организация обучения и аттестации персонала ООО «РУ КМЗ»» — один процесс, в котором
- * использованы все возможности редактора по Соглашению о моделировании:
- *  • структура по кодам: процесс C025.00.00 → подпроцессы C025.01.00… → операции C025.01.01…, группа процессов (папка);
- *  • отдельная диаграмма BPMN у каждой операции, несколько дорожек (должностей), события — факты, развилки после задач;
- *  • задача «Бизнес-правила», отправка и получение сообщений, таймеры, шлюзы XOR и AND, подпроцесс-согласование;
- *  • граничные события: прерывающее (срок утверждения) и непрерывающее (срок заполнения заявки);
- *  • документы на ассоциациях, хранилища данных (ELMA365, Outlook, Excel, 1С), регламенты-аннотации;
- *  • внешний пул «Учебный центр» и потоки сообщений к нему и от него;
- *  • ролевая модель: владелец, исполнитель, соисполнитель, контролёр, наблюдатель; квалификация должности;
- *  • карточки продуктов: внешний поставщик и потребитель, ценность, стандарт качества; схема перехода статусов.
+ * Процесс C025 «Организация обучения и аттестации персонала ООО «РУ КМЗ»» — по документу «ДПО от 05.10»:
+ * контекстная диаграмма A-0, A0 (два подпроцесса), A4 — декомпозиция C025.01.00, BPMN пяти операций
+ * (C025.01.01, C025.01.02, C025.01.03, C025.02.01, C025.02.02). Диаграммы A3 (декомпозиция C025.02.00) в документе нет:
+ * входы, выходы и управление операций C025.02.01 и C025.02.02 выведены из A0 и их BPMN.
  *
- * ВАЖНО: структура (подпроцессы и операции первых двух подпроцессов, их коды) взята из дерева процессов в Business Studio;
- * шаги, роли, продукты и сроки — черновик для демонстрации и сверки с владельцем процесса, поэтому элементы помечены как
- * гипотезы (пунктирная рамка) и процесс имеет статус «черновик».
+ * Отступления от документа (чтобы модель записывалась по Соглашению о моделировании):
+ *  • события-существительные названы фактами: «Необходимость в повышении квалификации выявлена», «Поручение руководства
+ *    получено», «Уведомление о необходимости согласования заявки получено», «Согласованная заявка» → «Заявка на обучение
+ *    согласована»; конечное событие-письмо — «Сотруднику направлено уведомление о его отчислении»;
+ *  • начальное событие-сообщение операции C025.02.01 — обычное начальное событие (тип сообщения в модели у начальных
+ *    событий не хранится);
+ *  • задача «Заявка отправлена на дополнительную проработку» названа действием: «Отправить заявку на дополнительную проработку»;
+ *  • сроки согласования («1 день») и загрузки документа («2 рабочих дня») записаны в срок шага, а не граничным таймером без
+ *    продолжения; шлюзы с одним входом и выходом (после начала в C025.02.01) опущены;
+ *  • ELMA365 — дорожка автоматических действий (роль) и одновременно информационная система-механизм функций; два
+ *    одноимённых свёрнутых пула «Поиск программы и внесение в список» в C025.01.03 объединены в один;
+ *  • «Директор дирекции по операционной эффективности» (BPMN) и «Директор дирекции операционной эффективности» (IDEF0) —
+ *    одна должность; примечания на диаграммах — правила-регламенты, привязанные к шагам.
+ *
+ * Чего в документе нет и что поэтому не заполнено (проверки Соглашения об этом сообщают): владелец процесса и подпроцессов,
+ * внешние поставщики входов и потребители выходов, выход «Уведомление о невозможности исполнения заявки» на A0.
  */
 
-const ROLES: Record<string, { name: string; qualification?: string }> = {
-  emp: { name: "Сотрудник (инициатор обучения)" },
-  mgr: { name: "Непосредственный руководитель сотрудника" },
-  hr: { name: "Специалист по обучению персонала", qualification: "Опыт организации обучения персонала от 1 года, знание Положения об обучении и аттестации" },
-  hrhead: { name: "Начальник отдела обучения и развития персонала" },
-  dir: { name: "Директор по персоналу и операционной эффективности" },
+const ROLES: Record<string, { name: string; description?: string }> = {
+  elma: { name: "ELMA365", description: "Информационная система: автоматические действия и уведомления" },
+  initiator: { name: "Инициатор заявки на обучение" },
+  mgr: { name: "Руководитель инициатора заявки на обучение" },
+  dird: { name: "Директор дирекции операционной эффективности" },
+  dirhr: { name: "Директор по персоналу и операционной эффективности" },
+  emp: { name: "Сотрудник прошедший обучение" },
+  spec: { name: "Специалист отдела обучения и развития персонала" },
 };
 
-const SYSTEMS: Record<string, string> = { elma: "ELMA365", outlook: "Outlook", excel: "Excel", zup: "1С:ЗУП" };
+const SYSTEMS: Record<string, string> = { elma: "ELMA365" };
 
-const CONTROLS: Record<string, string> = {
-  policy: "Положение об обучении и аттестации персонала",
-  plan: "План обучения персонала на год",
+const CONTROLS: Record<string, { name: string; kind: "regulation" | "norm" | "rule"; description?: string }> = {
+  law273: { name: "Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в Российской Федерации»", kind: "regulation" },
+  order266: { name: "Приказ Минобрнауки России от 24.03.2025 № 266", kind: "regulation" },
+  tk187: { name: "Трудовой кодекс РФ ст.187", kind: "regulation" },
+  tk196: { name: "Трудовой кодекс РФ ст.196", kind: "regulation" },
+  list: { name: "Список направлений обучения", kind: "norm" },
+  // примечания на диаграммах BPMN
+  ruleList: { name: "Список формируется исходя из нынешних компетенций сотрудника и должности", kind: "rule" },
+  ruleFields: {
+    name: "Список необходимых полей для заполнения",
+    kind: "rule",
+    description: "1. Заголовок (обязательное, строка). 2. Краткое описание обучения (обязательное, строка). 3. Необходимость обучения (обязательное, список выбора – задача, проблема, проект). 4. Тема обучения (обязательное, строка). 5. Результат обучения (обязательное, строка). 6. Комментарий (обязательное, строка).",
+  },
+  ruleApproval: {
+    name: "Согласование не требуется при выполнении обоих условий",
+    kind: "rule",
+    description: "1. Программа обучения первая за год у сотрудника. 2. Стоимость программы обучения менее 15000 рублей.",
+  },
+  ruleReminder: { name: "Напоминание об обучении приходит за 1 день до и в день занятия", kind: "rule" },
 };
 
-type Ext = { supplier?: string; consumer?: string; value?: string; quality_standard?: string };
-const DATA: Record<string, [name: string, ext?: Ext]> = {
-  need: ["Потребность в обучении", { supplier: "Руководители подразделений", value: "Основание для планирования расходов на обучение", quality_standard: "Указаны сотрудник, тема обучения и желаемый срок" }],
-  note: ["Служебная записка о потребности в обучении"],
-  program: ["Программа обучения"],
-  application: ["Заявка на обучение", { value: "Основание для согласования расходов на обучение", quality_standard: "Заполнены все обязательные поля, приложена программа обучения" }],
-  approved: ["Согласованная заявка на обучение", { value: "Разрешение на расходы", quality_standard: "Есть решение руководителя и утверждение расходов" }],
-  confirmed: ["Подтверждённая программа обучения", { value: "Гарантия, что учебный центр проведёт обучение", quality_standard: "Тема, сроки и стоимость программы совпадают с заявкой" }],
-  card: ["Карточка обучения"],
-  attendance: ["Журнал посещаемости"],
-  completion: ["Сведения о завершении обучения"],
-  cert: ["Документ об обучении", { supplier: "Учебный центр" }],
-  result: ["Результат обучения сотрудника", { value: "Подтверждает прохождение обучения", quality_standard: "Документ проверен, результат внесён в личное дело" }],
-  attestation: ["Результат аттестации сотрудника", { consumer: "Отдел кадров (личное дело сотрудника)", value: "Основание для решения о квалификации сотрудника", quality_standard: "Оценка выставлена по критериям Положения" }],
+const DATA: Record<string, string> = {
+  need: "Сотрудник нуждающийся в обучении",
+  mandate: "Поручение руководства",
+  dismissal: "Уведомление об отчислении сотрудника от образовательной организации",
+  formed: "Сформированная заявка на обучение",
+  returned: "Заявка возвращена на доработку",
+  approved: "Согласованная заявка на обучение",
+  unapproved: "Несогласованная заявка на обучение",
+  confirmed: "Подтверждённая заявка на обучение",
+  impossible: "Уведомление о невозможности исполнения заявки",
+  trained: "Обученный сотрудник",
+  eduSection: "Актуализированный раздел об образовании в карточке сотрудника",
+  dismissed: "Уведомление сотруднику о его отчислении",
 };
+
+type Kind = "owner" | "executor" | "coexecutor" | "controller" | "observer";
 
 interface Fn {
   id: string;
@@ -56,140 +82,220 @@ interface Fn {
   in: string[];
   controls: string[];
   out: string[];
-  /** Роли функции: ключ роли → вид назначения. */
-  roles: Record<string, "owner" | "executor" | "coexecutor" | "controller" | "observer">[];
-  functions?: Record<string, string[]>;
+  /** Исполнитель операции (дорожка по умолчанию) и роли-механизмы. */
+  role?: string;
+  roles: [role: string, kind: Kind][];
 }
 
+// Порядок как в документе: A0 → A4 (C025.01.00 и её операции) → операции C025.02.00
 const FUNCTIONS: Fn[] = [
-  { id: "s1", name: "Оформление заявки на обучение сотрудника", in: ["need"], controls: ["policy", "plan"], out: ["confirmed"], roles: [{ hrhead: "owner" }] },
-  { id: "o11", parent: "s1", name: "Формирование заявки на обучение", in: ["need"], controls: ["policy", "plan"], out: ["application"], roles: [{ hr: "executor" }, { emp: "coexecutor" }], functions: { hr: ["Проверяет потребность на соответствие плану", "Заполняет заявку и прикладывает программу"], emp: ["Подаёт служебную записку о потребности"] } },
-  { id: "o12", parent: "s1", name: "Согласование заявки на обучение", in: ["application"], controls: ["policy"], out: ["approved"], roles: [{ hr: "executor" }, { mgr: "coexecutor" }, { dir: "controller" }], functions: { mgr: ["Принимает решение по заявке"], dir: ["Утверждает расходы на обучение"] } },
-  { id: "o13", parent: "s1", name: "Подтверждение программы обучения", in: ["approved"], controls: ["policy"], out: ["confirmed"], roles: [{ hr: "executor" }, { mgr: "observer" }] },
-  { id: "s2", name: "Проведение обучения", in: ["confirmed"], controls: ["policy"], out: ["result"], roles: [{ hrhead: "owner" }] },
-  { id: "o21", parent: "s2", name: "Сопровождение обучения сотрудника", in: ["confirmed"], controls: ["policy"], out: ["completion"], roles: [{ hr: "executor" }, { emp: "coexecutor" }] },
-  { id: "o22", parent: "s2", name: "Учет результата обучения", in: ["completion"], controls: ["policy"], out: ["result"], roles: [{ hr: "executor" }, { hrhead: "controller" }] },
-  { id: "s3", name: "Аттестация сотрудника по итогам обучения", in: ["result"], controls: ["policy"], out: ["attestation"], roles: [{ hrhead: "owner" }] },
-  { id: "o31", parent: "s3", name: "Проведение аттестации сотрудника", in: ["result"], controls: ["policy"], out: ["attestation"], roles: [{ hr: "executor" }, { dir: "controller" }, { emp: "observer" }] },
+  { id: "s1", name: "Оформление заявки на обучение сотрудника", in: ["need", "mandate"], controls: ["order266", "tk196", "list"], out: ["unapproved", "confirmed"], roles: [["initiator", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]] },
+  { id: "o11", parent: "s1", name: "Формирование заявки на обучение", in: ["need", "mandate", "returned"], controls: ["order266", "list"], out: ["formed"], role: "initiator", roles: [["initiator", "executor"], ["elma", "coexecutor"]] },
+  { id: "o12", parent: "s1", name: "Согласование заявки на обучение", in: ["formed"], controls: ["tk196"], out: ["returned", "unapproved", "approved"], role: "mgr", roles: [["mgr", "executor"], ["dird", "coexecutor"], ["dirhr", "coexecutor"], ["elma", "coexecutor"]] },
+  { id: "o13", parent: "s1", name: "Подтверждение программы обучения", in: ["approved"], controls: [], out: ["impossible", "confirmed"], role: "spec", roles: [["spec", "executor"], ["elma", "coexecutor"]] },
+  { id: "s2", name: "Проведение обучения", in: ["confirmed", "dismissal"], controls: ["law273", "tk187", "order266"], out: ["trained", "eduSection", "dismissed"], roles: [["emp", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]] },
+  { id: "o21", parent: "s2", name: "Сопровождение обучения сотрудника", in: ["confirmed", "dismissal"], controls: ["law273", "tk187", "order266"], out: ["trained", "dismissed"], role: "spec", roles: [["spec", "executor"], ["elma", "coexecutor"]] },
+  { id: "o22", parent: "s2", name: "Учет результата обучения", in: ["trained"], controls: ["tk187"], out: ["eduSection"], role: "spec", roles: [["spec", "executor"], ["emp", "coexecutor"], ["elma", "coexecutor"]] },
 ];
 
-const DIAGRAMS: Diagram[] = [
-  {
-    op: "o11",
-    role: "hr",
-    items: [
-      START("start", "Потребность в обучении выявлена", "emp"),
-      T("note", "Подать служебную записку о потребности в обучении", { r: "emp", sys: ["outlook"], out: ["note"] }),
-      T("receive", "Получить служебную записку", { sys: ["outlook"], in: ["note"] }),
-      T("check", "Проверить потребность на соответствие плану обучения", { k: "business_rule", ctl: ["plan"], in: ["note"] }),
-      XOR("fit", "Потребность соответствует плану обучения?"),
-      T("back", "Вернуть служебную записку инициатору на доработку", { sys: ["outlook"] }),
-      END("end_back", "Служебная записка возвращена инициатору"),
-      T("fill", "Заполнить заявку на обучение", { sys: ["elma"], out: ["application"] }),
-      BOUNDARY("late", "fill", "timer", "Срок заполнения заявки истёк", false),
-      T("remind", "Напомнить исполнителю о сроке заполнения", { k: "service", sys: ["elma"] }),
-      END("end_remind", "Исполнитель уведомлён о сроке"),
-      T("attach", "Прикрепить программу обучения к заявке", { sys: ["elma"], in: ["program"] }),
-      END("end", "Заявка на обучение сформирована"),
-    ],
-    flows: [["start", "note", "receive", "check", "fit"], IF("fit", "back", "Нет"), ["back", "end_back"], IF("fit", "fill", "Да"), ["fill", "attach", "end"], ["late", "remind", "end_remind"]],
-  },
-  {
-    op: "o12",
-    role: "hr",
-    items: [
-      START("start", "Заявка на обучение сформирована"),
-      T("send", "Направить заявку на согласование руководителю", { sys: ["elma"], in: ["application"] }),
-      T("review", "Рассмотреть заявку на обучение", { r: "mgr", sys: ["elma"], in: ["application"] }),
-      XOR("ok", "Руководитель согласовал заявку?", "mgr"),
-      T("reason", "Зафиксировать причину отказа", { sys: ["elma"] }),
-      END("end_no", "Заявка на обучение отклонена"),
-      T("budget", "Утвердить расходы на обучение", { r: "dir", sys: ["elma"], out: ["approved"] }),
-      BOUNDARY("late", "budget", "timer", "Срок утверждения расходов истёк", true),
-      T("escalate", "Эскалировать согласование директору по персоналу", { k: "service", r: "dir", sys: ["elma"] }),
-      END("end_esc", "Согласование эскалировано", "dir"),
-      END("end", "Заявка на обучение согласована", "dir"),
-    ],
-    flows: [["start", "send", "review", "ok"], IF("ok", "reason", "Нет"), ["reason", "end_no"], IF("ok", "budget", "Да"), ["budget", "end"], ["late", "escalate", "end_esc"]],
-  },
-  {
-    op: "o13",
-    role: "hr",
-    items: [
-      START("start", "Заявка на обучение согласована"),
-      XOR("m"),
-      T("send", "Отправить заявку в учебный центр", { k: "send", sys: ["outlook"], in: ["approved"] }),
-      T("recv", "Получить подтверждение программы обучения", { k: "receive", sys: ["outlook"], out: ["confirmed"] }),
-      XOR("ok", "Программа обучения подтверждена?"),
-      T("clarify", "Уточнить условия обучения с учебным центром", { sys: ["outlook"] }),
-      T("card", "Внести данные о программе в карточку обучения", { sys: ["elma"], in: ["confirmed"], out: ["card"] }),
-      END("end", "Программа обучения подтверждена"),
-    ],
-    flows: [["start", "m", "send", "recv", "ok"], IF("ok", "clarify", "Нет"), ["clarify", "m"], IF("ok", "card", "Да"), ["card", "end"]],
-    messages: [
-      { from: "send", to: "p_center", name: "Заявка на обучение" },
-      { from: "p_center", to: "recv", name: "Подтверждение программы" },
-    ],
-  },
-  {
-    op: "o21",
-    role: "hr",
-    items: [
-      START("start", "Программа обучения подтверждена"),
-      T("notify", "Уведомить сотрудника о сроках и месте обучения", { sys: ["outlook"], in: ["confirmed"] }),
-      TIMER("begin", "Начало обучения"),
-      T("attend", "Пройти обучение", { k: "manual", r: "emp" }),
-      T("control", "Контролировать посещаемость", { sys: ["excel"], out: ["attendance"] }),
-      XOR("done", "Сотрудник завершил обучение?"),
-      T("reason", "Выяснить причину прерывания обучения", { sys: ["outlook"] }),
-      END("end_no", "Обучение прервано"),
-      T("complete", "Подготовить сведения о завершении обучения", { sys: ["elma"], in: ["attendance"], out: ["completion"] }),
-      END("end", "Обучение завершено"),
-    ],
-    flows: [["start", "notify", "begin", "attend", "control", "done"], IF("done", "reason", "Нет"), ["reason", "end_no"], IF("done", "complete", "Да"), ["complete", "end"]],
-  },
-  {
-    op: "o22",
-    role: "hr",
-    items: [
-      START("start", "Обучение завершено"),
-      XOR("m"),
-      T("recv", "Получить документ о результатах обучения", { k: "receive", sys: ["outlook"], out: ["cert"] }),
-      T("check", "Проверить полноту документа об обучении", { k: "business_rule", ctl: ["policy"], in: ["cert"] }),
-      XOR("ok", "Документ оформлен верно?"),
-      T("ask", "Запросить исправление документа", { k: "send", sys: ["outlook"] }),
-      AND("split", "Параллельные действия"),
-      T("file", "Внести результат в личное дело", { sys: ["zup"], in: ["cert"], out: ["result"] }),
-      T("registry", "Обновить реестр результатов обучения", { sys: ["excel"] }),
-      AND("join"),
-      END("end", "Результат обучения учтён"),
-    ],
-    flows: [["start", "m", "recv", "check", "ok"], IF("ok", "ask", "Нет"), ["ask", "m"], IF("ok", "split", "Да"), ["split", "file", "join"], ["split", "registry", "join"], ["join", "end"]],
-    messages: [
-      { from: "p_center", to: "recv", name: "Документ об обучении" },
-      { from: "ask", to: "p_center", name: "Запрос исправления документа" },
-    ],
-  },
-  {
-    op: "o31",
-    role: "hr",
-    items: [
-      START("start", "Результат обучения учтён"),
-      T("date", "Назначить дату аттестации", { sys: ["outlook"] }),
-      T("questions", "Подготовить аттестационные вопросы", { ctl: ["policy"], in: ["result"] }),
-      TIMER("day", "Наступление даты аттестации"),
-      T("run", "Провести аттестацию сотрудника"),
-      T("score", "Оценить результаты аттестации по критериям Положения", { k: "business_rule", ctl: ["policy"] }),
-      XOR("passed", "Аттестация пройдена?"),
-      T("again", "Назначить повторную аттестацию", { sys: ["outlook"] }),
-      END("end_again", "Повторная аттестация назначена"),
-      T("file", "Внести результат аттестации в личное дело", { sys: ["zup"], out: ["attestation"] }),
-      SUB("approve", "Согласовать результат аттестации с директором по персоналу", "dir"),
-      END("end", "Аттестация сотрудника завершена", "dir"),
-    ],
-    flows: [["start", "date", "questions", "day", "run", "score", "passed"], IF("passed", "again", "Нет"), ["again", "end_again"], IF("passed", "file", "Да"), ["file", "approve", "end"]],
-  },
+const svc = { k: "service" as const, r: "elma" };
+const at = (r: string) => ({ r });
+
+const o11: Diagram = {
+  op: "o11",
+  role: "initiator",
+  items: [
+    START("start1", "Необходимость в повышении квалификации выявлена"),
+    START("start2", "Поручение руководства получено"),
+    XOR("m1"),
+    T("enter", "Зайти в раздел “Заявки на обучение”"),
+    T("create", "Нажать кнопку “Создать заявку”"),
+    XOR("many", "Направленных сотрудников на обучение >1?"),
+    T("all", "Указать всех сотрудников направленных на обучение"),
+    XOR("m2"),
+    T("list", "Выдать список подходящих направлений", { ...svc, ctl: ["ruleList"] }),
+    XOR("chosen", "Программа обучения выбрана?"),
+    T("continue", "Нажать “Продолжить создание заявки”"),
+    T("write", "Написать в поле “Напишите вашу желаемую программу обучения”"),
+    T("fill", "Заполнить обязательные поля", { ctl: ["ruleFields"] }),
+    XOR("m3"),
+    T("approver", "Заполнить первое согласующее лицо – руководителя инициатора заявки", svc),
+    T("send", "Нажать кнопку “Отправить на согласование”"),
+    XOR("fromList", "Программа выбрана из списка?"),
+    END("end1", "Программа выбрана из списка"),
+    END("end2", "Программа предложена сотрудником"),
+  ],
+  flows: [
+    ["start1", "m1"],
+    ["start2", "m1"],
+    ["m1", "enter", "create", "many"],
+    IF("many", "all", "Да"),
+    ["all", "m2"],
+    IF("many", "m2", "Нет"),
+    ["m2", "list", "chosen"],
+    IF("chosen", "continue", "Да"),
+    ["continue", "m3"],
+    IF("chosen", "write", "Нет"),
+    ["write", "fill", "m3"],
+    ["m3", "approver", "send", "fromList"],
+    IF("fromList", "end1", "Да"),
+    IF("fromList", "end2", "Нет"),
+  ],
+};
+
+/** Три согласования подряд устроены одинаково: уведомление → карточка → решение (срок 1 день) → «Согласовано?». */
+const approval = (n: number, role: string, createName: string, msgName: string): Item[] => [
+  T(`c${n}`, createName, svc),
+  { kind: "event", key: `msg${n}`, k: "message", name: msgName, r: role },
+  T(`open${n}`, "Открыть карточку согласования заявки", at(role)),
+  T(`dec${n}`, "Принять решение о согласовании", { ...at(role), dur: "1 день" }),
+  XOR(`ok${n}`, "Согласовано?", "elma"),
+  T(`rew${n}`, "Создать заявку на доработку заявки", svc),
+  END(`endRew${n}`, "Заявка отправлена на доработку", "elma"),
 ];
+
+const o12: Diagram = {
+  op: "o12",
+  role: "elma",
+  items: [
+    START("start1", "Программа обучения и организация подобраны из списка"),
+    START("start2", "Инициатор предложил свой вариант программы"),
+    XOR("m1"),
+    T("need", "Определить необходимость согласования", { ...svc, ctl: ["ruleApproval"] }),
+    XOR("req", "Требуется согласование?"),
+    END("skip", "Заявка согласована"),
+    ...approval(1, "mgr", "Создать задачу на согласование руководителю инициатора заявки", "Уведомление о необходимости согласования заявки получено"),
+    ...approval(2, "dird", "Создать задачу на согласование директору дирекции по операционной эффективности", "Уведомление о необходимости согласования заявки получено"),
+    ...approval(3, "dirhr", "Создать задачу на согласование директору по персоналу и операционной эффективности", "Копия уведомления о необходимости согласования заявки получена"),
+    END("end", "Заявка согласована"),
+  ],
+  flows: [
+    ["start1", "m1"],
+    ["start2", "m1"],
+    ["m1", "need", "req"],
+    IF("req", "skip", "Нет"),
+    IF("req", "c1", "Да"),
+    ["c1", "msg1", "open1", "dec1", "ok1"],
+    IF("ok1", "rew1", "Нет"),
+    ["rew1", "endRew1"],
+    IF("ok1", "c2", "Да"),
+    ["c2", "msg2", "open2", "dec2", "ok2"],
+    IF("ok2", "rew2", "Нет"),
+    ["rew2", "endRew2"],
+    IF("ok2", "c3", "Да"),
+    ["c3", "msg3", "open3", "dec3", "ok3"],
+    IF("ok3", "rew3", "Нет"),
+    ["rew3", "endRew3"],
+    IF("ok3", "end", "Да"),
+  ],
+};
+
+const o13: Diagram = {
+  op: "o13",
+  role: "elma",
+  items: [
+    START("start", "Заявка на обучение согласована"),
+    T("task", "Создать задачу специалисту на проверку направления", svc),
+    T("assign", "Назначить специалиста на задачу", svc),
+    XOR("m1", "Слияние потоков", "spec"),
+    T("open", "Открыть задачу и изучить контекст заявки", at("spec")),
+    T("pick", "Выбрать программу обучения из списка под целевой результат", at("spec")),
+    XOR("found", "Удалось подобрать программу обучения?", "spec"),
+    XOR("contract", "Договор с учебной организацией заключен?", "spec"),
+    T("confirm", "Подтвердить программу обучения и организацию", at("spec")),
+    T("notify", "Отправить уведомление сотруднику о подтверждении заявки", svc),
+    END("endOk", "Заявка на обучение подтверждена"),
+    T("search", "Поиск программы во внешнем контуре", at("spec")),
+    XOR("tender", "Возможно провести тендерную процедуру?", "spec"),
+    T("docs", "Подготовка документов для проведения тендерной закупки", at("spec")),
+    T("buy", "Проведение тендерной закупки", at("spec")),
+    END("endBuy", "Необходимая программа обучения куплена, заявка подтверждена", "spec"),
+    T("fail", "Нажать кнопку “Не удалось подобрать направление”", at("spec")),
+    T("again", "Отправить заявку на дополнительную проработку", svc),
+  ],
+  flows: [
+    ["start", "task", "assign", "m1", "open", "pick", "found"],
+    IF("found", "contract", "Да"),
+    IF("found", "search", "Нет"),
+    ["search", "tender"],
+    IF("contract", "confirm", "Да"),
+    IF("contract", "tender", "Нет"),
+    ["confirm", "notify", "endOk"],
+    IF("tender", "docs", "Да"),
+    ["docs", "buy", "endBuy"],
+    IF("tender", "fail", "Нет"),
+    ["fail", "again", "m1"],
+  ],
+  // свёрнутый пул «Поиск программы и внесение в список»: обмен с ним у поиска и у тендерной закупки
+  messages: [
+    { from: "search", to: "p_search" },
+    { from: "p_search", to: "search" },
+    { from: "buy", to: "p_search" },
+    { from: "p_search", to: "buy" },
+  ],
+};
+
+const o21: Diagram = {
+  op: "o21",
+  role: "spec",
+  items: [
+    START("start", "Программа обучения и организации подтверждены", "elma"),
+    T("calendar", "Создать событие в календаре за 1 день до начала обучения и направить уведомление сотруднику о начале обучения", { ...svc, ctl: ["ruleReminder"] }),
+    TIMER("begin", "Дата начала обучения", "elma"),
+    T("auto", "Автоматическое подтверждение начала обучения и установка статуса “Обучение идёт”", svc),
+    XOR("m2"),
+    TIMER("finish", "Дата окончания обучения"),
+    T("ask", "Запросить у организации сведения о прохождении обучения"),
+    T("check", "Проверить прохождение обучения"),
+    XOR("done", "Сотрудник закончил обучение?"),
+    END("endDone", "Сотрудник закончил обучение"),
+    XOR("extended", "Обучение было продлено?"),
+    START("dismissalStart", "Уведомление об отчислении сотрудника от образовательной организации получено"),
+    XOR("m3", "Слияние потоков", "elma"),
+    T("notify", "Направить уведомление об отчислении сотруднику", svc),
+    T("close", "Внести запись “Обучение не завершено”, статус заявки ”Закрыта”", svc),
+    END("endDismissed", "Сотруднику направлено уведомление о его отчислении", "elma"),
+  ],
+  flows: [
+    ["start", "calendar", "begin", "auto", "m2", "finish", "ask", "check", "done"],
+    IF("done", "endDone", "Да"),
+    IF("done", "extended", "Нет"),
+    IF("extended", "m2", "Да"),
+    IF("extended", "m3", "Нет"),
+    ["dismissalStart", "m3"],
+    ["m3", "notify", "close", "endDismissed"],
+  ],
+};
+
+const o22: Diagram = {
+  op: "o22",
+  role: "elma",
+  items: [
+    START("start", "Обучение завершено"),
+    XOR("m1"),
+    T("remind", "Автоматическое ежедневное напоминание о прикреплении корректного документа", svc),
+    T("create", "Создать задачу сотруднику на загрузку документа в КЭДО", svc),
+    T("open", "Открыть задачу", at("emp")),
+    T("attach", "Прикрепить документ об окончании обучения и заполнить реквизиты документа об окончании", { ...at("emp"), dur: "2 рабочих дня" }),
+    XOR("inTime", "Документ загружен в срок?", "emp"),
+    T("taskSpec", "Создать задачу специалисту на проверку документа", svc),
+    T("verify", "Открыть задачу, проверить документ и реквизиты", at("spec")),
+    XOR("correct", "Документ корректный?"),
+    T("update", "Актуализировать раздел об обучении сотрудника", svc),
+    END("end", "Раздел об образовании актуализирован"),
+  ],
+  flows: [
+    ["start", "m1", "remind", "create", "open", "attach", "inTime"],
+    IF("inTime", "m1", "Нет"),
+    IF("inTime", "taskSpec", "Да"),
+    ["taskSpec", "verify", "correct"],
+    IF("correct", "m1", "Нет"),
+    IF("correct", "update", "Да"),
+    ["update", "end"],
+  ],
+};
+
+const DIAGRAMS: Diagram[] = [o11, o12, o13, o21, o22];
 
 export function c025Model(): ProcessLogicModel {
   const id = {
@@ -197,7 +303,7 @@ export function c025Model(): ProcessLogicModel {
     data: (k: string) => `d_${k}`,
     system: (k: string) => `s_${k}`,
     control: (k: string) => `c_${k}`,
-    status: "hypothesis" as const,
+    status: "confirmed" as const,
   };
 
   const nodes: Record<string, unknown>[] = [];
@@ -210,12 +316,13 @@ export function c025Model(): ProcessLogicModel {
       type: "task",
       name: f.name,
       idef0_parent: f.parent ?? null,
-      role_id: f.parent ? id.role("hr") : null,
+      role_id: f.role ? id.role(f.role) : null,
       inputs: f.in.map(id.data),
       outputs: f.out.map(id.data),
       controls: f.controls.map(id.control),
-      status: "hypothesis",
-      confidence: 0.5,
+      system_ids: [id.system("elma")], // ELMA365 — механизм на всех диаграммах IDEF0
+      status: "confirmed",
+      confidence: 1,
     });
   }
   for (const d of DIAGRAMS) {
@@ -225,12 +332,8 @@ export function c025Model(): ProcessLogicModel {
     messages.push(...built.messages);
   }
 
-  const assignments: Record<string, unknown>[] = [{ node_id: null, role_id: id.role("hrhead"), kind: "owner", functions: ["Отвечает за результат и актуальность процесса обучения и аттестации персонала"] }];
-  for (const f of FUNCTIONS) {
-    for (const entry of f.roles) {
-      for (const [role, kind] of Object.entries(entry)) assignments.push({ node_id: f.id, role_id: id.role(role), kind, functions: f.functions?.[role] ?? [] });
-    }
-  }
+  const assignments: Record<string, unknown>[] = [];
+  for (const f of FUNCTIONS) for (const [role, kind] of f.roles) assignments.push({ node_id: f.id, role_id: id.role(role), kind, functions: [] });
 
   return ProcessLogicModel.parse({
     process: {
@@ -238,20 +341,16 @@ export function c025Model(): ProcessLogicModel {
       name: "Организация обучения и аттестации персонала ООО «РУ КМЗ»",
       code: "C025.00.00",
       group: "Организация дополнительного профессионального обучения персонала ООО «РУ КМЗ»",
-      owner: ROLES.hrhead.name,
-      author: ROLES.hr.name,
-      department: "Отдел обучения и развития персонала",
       type: "AS-IS",
       status: "draft",
-      goal: "ЧЕРНОВИК. Структура взята из дерева процессов в Business Studio; шаги, роли, продукты и сроки — предположения для демонстрации возможностей редактора и сверки с владельцем процесса.",
     },
-    roles: Object.entries(ROLES).map(([k, r]) => ({ id: id.role(k), name: r.name, qualification: r.qualification ?? null })),
+    roles: Object.entries(ROLES).map(([k, r]) => ({ id: id.role(k), name: r.name, description: r.description ?? null })),
     systems: Object.entries(SYSTEMS).map(([k, name]) => ({ id: id.system(k), name })),
-    controls: Object.entries(CONTROLS).map(([k, name]) => ({ id: id.control(k), name, kind: "regulation" })),
-    data: Object.entries(DATA).map(([k, [name, ext]]) => ({ id: id.data(k), name, kind: "document", ...ext })),
+    controls: Object.entries(CONTROLS).map(([k, c]) => ({ id: id.control(k), name: c.name, kind: c.kind, description: c.description ?? null })),
+    data: Object.entries(DATA).map(([k, name]) => ({ id: id.data(k), name, kind: "data" })),
     nodes,
     flows,
-    pools: [{ id: "p_center", name: "Учебный центр", code: null }],
+    pools: [{ id: "p_search", name: "Поиск программы и внесение в список", code: null }],
     messages,
     assignments,
   });

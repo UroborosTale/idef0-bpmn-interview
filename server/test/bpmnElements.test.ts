@@ -311,22 +311,30 @@ describe("проверки BPMN по Соглашению", () => {
 });
 
 describe("потоки сообщений: проверка концов", () => {
-  it("отправляет задача «Отправка» или событие-сообщение, получает «Получение» — остальное предупреждает", () => {
+  it("сообщения идут от задач, подпроцессов и событий-сообщений; шлюз и таймер сообщений не отправляют и не получают", () => {
     const m = structuredModel();
     m.pools.push({ id: "x1", name: "Другой процесс" });
+    // обычные пользовательские задачи — допустимые концы (так нарисованы документы организации)
     m.messages.push({ id: "m1", from: "b2", to: "x1" }, { id: "m2", from: "x1", to: "b1" });
-    expect(rules(m, "bpmn_message_endpoint").map((i) => i.element_id)).toEqual(["b2", "b1"]);
+    expect(rules(m, "bpmn_message_endpoint")).toEqual([]);
     m.nodes.find((n) => n.id === "b2")!.subtype = "send";
     m.nodes.find((n) => n.id === "b1")!.subtype = "receive";
     expect(rules(m, "bpmn_message_endpoint")).toEqual([]);
-    m.nodes.find((n) => n.id === "b1")!.subtype = "send"; // получать «отправкой» нельзя
-    expect(rules(m, "bpmn_message_endpoint")).toHaveLength(1);
+    // событие-сообщение и подпроцесс тоже подходят
     m.nodes.find((n) => n.id === "b1")!.type = "event";
     m.nodes.find((n) => n.id === "b1")!.subtype = "message";
+    m.nodes.find((n) => n.id === "b2")!.type = "subprocess";
     expect(rules(m, "bpmn_message_endpoint")).toEqual([]);
+    // шлюз и таймер — нет
+    m.nodes.find((n) => n.id === "b2")!.type = "gateway";
+    m.nodes.find((n) => n.id === "b2")!.subtype = "exclusive";
+    m.nodes.find((n) => n.id === "b1")!.subtype = "timer";
+    const issues = rules(m, "bpmn_message_endpoint");
+    expect(issues.map((i) => i.element_id).sort()).toEqual(["b1", "b2"]);
+    expect(issues.find((i) => i.element_id === "b2")!.message).toMatch(/шлюз сообщений не отправляют/);
+    expect(issues.find((i) => i.element_id === "b1")!.message).toMatch(/таймер и событие-ошибка сообщений не получают/);
   });
 });
-
 describe("проверки блоков и продуктов по Соглашению", () => {
   it("одинаковые названия блоков и петли", () => {
     const m = structuredModel();
