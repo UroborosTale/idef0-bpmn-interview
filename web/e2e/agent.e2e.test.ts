@@ -155,6 +155,16 @@ describe("вопросы и отчёты агентов в студии", () => 
     expect(stored.map((q) => q.status).sort()).toEqual(["answered", "asked"]);
     expect(stored.find((q) => q.status === "asked").scopeNodeId).toBe(fnId);
 
+    // ответ уходит моделисту заданием: оно появляется на вкладке заданий, вопрос помечен переданным
+    await page.getByRole("button", { name: "Передать ответы моделисту (1)" }).click();
+    const handoff = page.locator(".task", { hasText: "Внеси в модель ответы владельца" });
+    await handoff.waitFor();
+    expect(await handoff.innerText()).toContain("«Три дня»");
+    expect(await handoff.innerText()).toContain("адресовано: моделист");
+    await qTab.click();
+    await page.getByLabel(/с отвеченными и снятыми/).check();
+    await page.getByText(/Передано моделисту: задание task_/).waitFor();
+
     // отчёт: открытие отмечает прочитанным, архив убирает из списка
     const rTab = page.locator(".problems-head button", { hasText: "Отчёты" });
     await rTab.locator(".pill-count", { hasText: "1" }).waitFor();

@@ -10,6 +10,7 @@ import { splitAccepted, validateModel } from "../shared/validate.js";
 import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput, QuestionsInput, ReportInput, QuestionStatusInput, ReportStatusInput } from "../types/patch.js";
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
+import { handOffAnswers } from "../answerHandoff.js";
 import { addQuestion, getQuestion, listQuestions, setQuestionStatus, QUESTION_STATUSES, type QuestionStatus } from "../agentQuestions.js";
 import { addReport, getReport, listReports, setReportStatus, REPORT_STATUSES, type ReportStatus } from "../agentReports.js";
 
@@ -494,6 +495,23 @@ agentRouter.get("/sessions/:id/agent-questions", (req, res) => {
     return;
   }
   res.json(listQuestions(session.id));
+});
+
+/** Передать моделисту ответы, полученные на интервью, одним заданием «внеси ответы». */
+agentRouter.post("/sessions/:id/agent-questions/handoff", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  const by = req.user?.login ?? "analyst";
+  const r = handOffAnswers(session, by);
+  if (!r) {
+    res.status(409).json({ error: "нет полученных ответов, которые ещё не переданы моделисту" });
+    return;
+  }
+  logAudit(session.id, "analyst", "answers_handed_off", { task: r.task.id, count: r.count });
+  res.status(201).json({ task: taskWithProposals(r.task), count: r.count });
 });
 
 agentRouter.post("/agent-questions/:qid/status", (req, res) => {

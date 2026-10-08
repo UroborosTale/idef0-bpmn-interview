@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AgentQuestionRow, AgentReportRow, AgentTaskRow, Proposal } from "../../api/client";
+import type { AgentQuestionRow, AgentReportRow, AgentTaskRow, Proposal, ReportFinding } from "../../api/client";
 import type { ProcessLogicModel, ValidationIssue } from "../../types";
 import ProposalsList from "./ProposalsList";
 import TasksPanel from "./TasksPanel";
@@ -33,6 +33,10 @@ export default function ProblemsPanel({
   onQuestionStatus,
   reports = [],
   onReportStatus,
+  onHandOffAnswers,
+  nodeByCode,
+  onSelectFn,
+  onAssignFinding,
   acceptedIssues = [],
   fixFor,
   onFix,
@@ -60,6 +64,10 @@ export default function ProblemsPanel({
   onQuestionStatus?: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
   reports?: AgentReportRow[];
   onReportStatus?: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
+  onHandOffAnswers?: () => void | Promise<void>;
+  nodeByCode?: (code: string) => string | null;
+  onSelectFn?: (nodeId: string) => void;
+  onAssignFinding?: (report: AgentReportRow, finding: ReportFinding) => void | Promise<void>;
   /** Принятые аналитиком замечания с причиной: в счётчики не входят, показываются по флажку. */
   acceptedIssues?: AcceptedRow[];
   /** Однозначное исправление замечания, если оно есть. */
@@ -210,8 +218,8 @@ export default function ProblemsPanel({
         {tab === "tasks" && (
           <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
         )}
-        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} />}
-        {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} />}
+        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} onHandOff={onHandOffAnswers} />}
+        {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} nodeByCode={nodeByCode} onSelectFn={onSelectFn} onAssign={onAssignFinding} />}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}
         {tab === "gaps" &&
           gaps.map((g) => (

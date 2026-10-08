@@ -25,6 +25,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS agent_questions (
   updated_at TEXT NOT NULL
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_agent_questions_session ON agent_questions(session_id, status)`);
+// задание моделисту «внести ответы», в которое вошёл вопрос; столбец добавлен позже — дополняем уже созданные базы
+if (!(db.prepare(`PRAGMA table_info(agent_questions)`).all() as { name: string }[]).some((c) => c.name === "handoff_task_id")) db.exec(`ALTER TABLE agent_questions ADD COLUMN handoff_task_id TEXT`);
 
 export type QuestionStatus = "open" | "asked" | "answered" | "dismissed";
 export type QuestionPriority = "critical" | "important" | "desirable";
@@ -47,6 +49,8 @@ export interface AgentQuestion {
   fragmentId: string | null;
   agent: string;
   taskId: string | null;
+  /** Задание моделисту «внести ответ в модель», в которое вошёл этот вопрос (после получения ответа). */
+  handoffTaskId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +68,7 @@ interface Row {
   fragment_id: string | null;
   agent: string;
   task_id: string | null;
+  handoff_task_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +86,7 @@ const fromRow = (r: Row): AgentQuestion => ({
   fragmentId: r.fragment_id,
   agent: r.agent,
   taskId: r.task_id,
+  handoffTaskId: r.handoff_task_id,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -139,5 +145,16 @@ export function setQuestionStatus(id: string, status: QuestionStatus, extra: { a
   const res = db
     .prepare(`UPDATE agent_questions SET status = ?, answer = ?, fragment_id = ?, updated_at = ? WHERE id = ?`)
     .run(status, answered ? extra.answer?.trim() || null : null, answered ? extra.fragmentId ?? null : null, new Date().toISOString(), id);
+  if (!answered) db.prepare(`UPDATE agent_questions SET handoff_task_id = NULL WHERE id = ?`).run(id);
   return res.changes > 0 ? getQuestion(id) : null;
+}
+
+/** Вопросы с полученным ответом, которые ещё не переданы моделисту. */
+export function unhandedAnswers(sessionId: string): AgentQuestion[] {
+  return listQuestions(sessionId, "answered").filter((q) => !q.handoffTaskId);
+}
+
+export function markHandedOff(ids: string[], taskId: string): void {
+  const stmt = db.prepare(`UPDATE agent_questions SET handoff_task_id = ? WHERE id = ?`);
+  for (const id of ids) stmt.run(taskId, id);
 }

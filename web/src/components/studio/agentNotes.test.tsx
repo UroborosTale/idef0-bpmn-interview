@@ -19,6 +19,7 @@ const question = (extra: Partial<AgentQuestionRow> = {}): AgentQuestionRow => ({
   fragmentId: null,
   agent: "интервьюер",
   taskId: null,
+  handoffTaskId: null,
   createdAt: "2026-10-08T10:00:00.000Z",
   ...extra,
 });
@@ -89,6 +90,28 @@ describe("вопросы к интервью: вкладка", () => {
     expect(screen.getByText("Ответ (фрагмент f4): Секретарь")).toBeTruthy();
   });
 
+  it("передача ответов моделисту: кнопка со счётчиком, переданные не считаются, в карточке видно задание", () => {
+    const onHandOff = vi.fn();
+    render(
+      <QuestionsPanel
+        questions={[question({ id: "q_a", status: "answered", answer: "Директор" }), question({ id: "q_b", status: "answered", handoffTaskId: "task_x1" }), question({ id: "q_c" })]}
+        labelOf={labelOf}
+        processName="П"
+        onStatus={vi.fn()}
+        onHandOff={onHandOff}
+      />
+    );
+    fireEvent.click(screen.getByText("Передать ответы моделисту (1)"));
+    expect(onHandOff).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));
+    expect(screen.getByText("Передано моделисту: задание task_x1")).toBeTruthy();
+  });
+
+  it("передавать нечего — кнопка неактивна", () => {
+    render(<QuestionsPanel questions={[question()]} labelOf={labelOf} processName="П" onStatus={vi.fn()} onHandOff={vi.fn()} />);
+    expect((screen.getByText("Передать ответы моделисту (0)") as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("возврат: снятый вопрос возвращается в список ожидающих", () => {
     const onStatus = panel([question({ status: "dismissed" })]);
     fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));
@@ -149,6 +172,24 @@ describe("отчёты агентов: вкладка", () => {
     expect(screen.queryByText("Подробный текст отчёта")).toBeNull();
   });
 
+  it("вывод отчёта: код функции — ссылка на неё в студии; «Поручить моделисту» передаёт вывод", () => {
+    const onSelectFn = vi.fn();
+    const onAssign = vi.fn();
+    render(<ReportsPanel reports={[report()]} labelOf={labelOf} onStatus={vi.fn()} nodeByCode={(c) => (c === "B002.01.01" ? "o1" : null)} onSelectFn={onSelectFn} onAssign={onAssign} />);
+    fireEvent.click(screen.getByText("Узкие места реестра"));
+    fireEvent.click(screen.getByTitle("Показать в студии"));
+    expect(onSelectFn).toHaveBeenCalledWith("o1");
+    fireEvent.click(screen.getByText("Поручить моделисту"));
+    expect(onAssign).toHaveBeenCalledWith(expect.objectContaining({ id: "rep_1" }), expect.objectContaining({ what: "Ожидание подписи" }));
+  });
+
+  it("код, которого нет в модели, остаётся обычным текстом", () => {
+    render(<ReportsPanel reports={[report()]} labelOf={labelOf} onStatus={vi.fn()} nodeByCode={() => null} onSelectFn={vi.fn()} />);
+    fireEvent.click(screen.getByText("Узкие места реестра"));
+    expect(screen.queryByTitle("Показать в студии")).toBeNull();
+    expect(screen.getByText("B002.01.01")).toBeTruthy();
+  });
+
   it("прочитанный отчёт при открытии не меняет статус; в архив и обратно", () => {
     const onStatus = panel([report({ status: "read" }), report({ id: "rep_2", title: "Старый отчёт", status: "archived" })]);
     fireEvent.click(screen.getByText("Узкие места реестра"));
@@ -192,6 +233,32 @@ describe("студия: вопросы и отчёты", () => {
     fireEvent.click(tab("Отчёты"));
     fireEvent.click(await screen.findByText("Узкие места реестра"));
     await waitFor(() => expect(setR).toHaveBeenCalledWith("rep_1", "read"));
+  });
+
+  it("студия: передача ответов и поручение по выводу создают задания моделисту и открывают вкладку заданий", async () => {
+    vi.spyOn(api, "listProposals").mockResolvedValue([]);
+    vi.spyOn(api, "listTasks").mockResolvedValue([]);
+    vi.spyOn(api, "listQuestions").mockResolvedValue([question({ status: "answered", answer: "Директор", fragmentId: "f3" })]);
+    vi.spyOn(api, "listReports").mockResolvedValue([report({ findings: [{ what: "Ожидание подписи", where: "B002.01.01", basis: "time_waiting = 3 дня", impact: "high", confidence: "medium", recommendation: "Ввести срок" }] })]);
+    const hand = vi.spyOn(api, "handOffAnswers").mockResolvedValue({ task: {} as never, count: 1 });
+    const create = vi.spyOn(api, "createTask").mockResolvedValue({} as never);
+    render(<Studio session={session(structuredModel())} busy={false} onSave={vi.fn(async () => true)} />);
+    await act(async () => {});
+    const tab = (name: string) => [...document.querySelectorAll(".problems-head button")].find((b) => b.textContent?.startsWith(name)) as HTMLElement;
+    fireEvent.click(tab("Вопросы"));
+    fireEvent.click(await screen.findByText("Передать ответы моделисту (1)"));
+    await waitFor(() => expect(hand).toHaveBeenCalledWith("sess_test"));
+    await waitFor(() => expect(tab("Задания агенту").className).toContain("active"));
+    fireEvent.click(tab("Отчёты"));
+    fireEvent.click(await screen.findByText("Узкие места реестра"));
+    fireEvent.click(await screen.findByText("Поручить моделисту"));
+    await waitFor(() => expect(create).toHaveBeenCalled());
+    const [sid, body] = create.mock.calls[0];
+    expect(sid).toBe("sess_test");
+    expect(body.agent).toBe("моделист");
+    expect(body.text).toContain("Ожидание подписи");
+    expect(body.text).toContain("Ввести срок");
+    expect(body.text).toContain("rep_1");
   });
 
   it("сбой связи не мешает работе: вкладки пустые, студия открыта", async () => {

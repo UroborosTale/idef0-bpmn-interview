@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
 import { applyPatch } from "@shared/patch";
-import { api, type AgentQuestionRow, type AgentReportRow, type AgentTaskRow, type Proposal } from "../../api/client";
+import { api, type AgentQuestionRow, type AgentReportRow, type AgentTaskRow, type Proposal, type ReportFinding } from "../../api/client";
 import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
@@ -183,6 +183,33 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
       await api.setReportStatus(r.id, status);
     } catch {
       /* отчёт останется в прежнем состоянии */
+    }
+    await loadProposals();
+  };
+  /** Функция или шаг по коду Соглашения (B002.01.02) — для ссылок из выводов отчётов. */
+  const nodeByCode = (code: string): string | null => {
+    for (const map of [functionCodes(draft), stepCodes(draft)]) for (const [id, c] of map) if (c === code) return id;
+    return null;
+  };
+  const showTasks = () => setProblemsTab({ tab: "tasks", nonce: ++nonce.current });
+  const handOffAnswers = async () => {
+    try {
+      await api.handOffAnswers(session.id);
+      showTasks();
+    } catch (e) {
+      setExportError(`Не удалось передать ответы моделисту: ${(e as Error).message}`);
+    }
+    await loadProposals();
+  };
+  /** Вывод отчёта → задание моделисту: в тексте вывод целиком, ссылка на отчёт и рекомендация. */
+  const assignFinding = async (report: AgentReportRow, f: ReportFinding) => {
+    const parts = [`По отчёту «${report.title}» (${report.id}) доработай модель: ${f.what}.`, f.where ? `Где: ${f.where}.` : "", f.basis ? `Основание: ${f.basis}.` : "", f.recommendation ? `Рекомендация аналитика: ${f.recommendation}.` : "", "Правки — предложениями; чего нет в тексте интервью, не выдумывай."];
+    const scope = (f.where ? nodeByCode(f.where) : null) ?? report.scopeNodeId;
+    try {
+      await api.createTask(session.id, { text: parts.filter(Boolean).join(" ").slice(0, 2000), scope, agent: "моделист" });
+      showTasks();
+    } catch (e) {
+      setExportError(`Не удалось поставить задание: ${(e as Error).message}`);
     }
     await loadProposals();
   };
@@ -508,7 +535,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} onHandOffAnswers={handOffAnswers} nodeByCode={nodeByCode} onSelectFn={selectFn} onAssignFinding={assignFinding} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

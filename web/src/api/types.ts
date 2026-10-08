@@ -548,6 +548,8 @@ export interface AgentQuestionRow {
   fragmentId: string | null;
   agent: string;
   taskId: string | null;
+  /** Задание моделисту «внести ответ», в которое вошёл вопрос. */
+  handoffTaskId: string | null;
   createdAt: string;
 }
 

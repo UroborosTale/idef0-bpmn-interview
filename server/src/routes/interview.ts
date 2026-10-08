@@ -8,6 +8,7 @@ import { logAudit } from "../db.js";
 import { addVersion } from "../repo.js";
 import { addQuestion, getQuestion, setQuestionStatus } from "../agentQuestions.js";
 import { AskInput } from "../types/patch.js";
+import { handOffAnswers } from "../answerHandoff.js";
 import type { ChatMessage, Fragment } from "../types/model.js";
 
 export const interviewRouter = Router();
@@ -176,5 +177,8 @@ interviewRouter.post("/sessions/:id/interview/finish", (req, res) => {
   const chat = [...session.chat, chatMsg("assistant", "Интервью завершено. Спасибо! Протокол и черновик моделей доступны аналитику.")];
   const updated = updateSession(req.params.id, { chat, status: "completed" });
   logAudit(req.params.id, "owner", "interview_finished");
+  // ответы, полученные в ходе интервью, уходят моделисту заданием: цепочка интервьюер → моделист не требует ручных шагов
+  const handoff = handOffAnswers(updated ?? session, "system");
+  if (handoff) logAudit(req.params.id, "system", "answers_handed_off", { task: handoff.task.id, count: handoff.count });
   res.json(updated);
 });

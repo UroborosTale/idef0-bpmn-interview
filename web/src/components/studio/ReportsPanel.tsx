@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AgentReportRow } from "../../api/client";
+import type { AgentReportRow, ReportFinding } from "../../api/client";
 
 const KIND: Record<AgentReportRow["kind"], string> = { analysis: "анализ", review: "проверка", methodology: "методология", other: "прочее" };
 const STATUS: Record<AgentReportRow["status"], string> = { new: "новый", read: "прочитан", archived: "в архиве" };
@@ -14,10 +14,18 @@ export default function ReportsPanel({
   reports,
   labelOf,
   onStatus,
+  nodeByCode,
+  onSelectFn,
+  onAssign,
 }: {
   reports: AgentReportRow[];
   labelOf: (nodeId: string) => string;
   onStatus: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
+  /** Функция модели по коду из вывода (B002.01.02) — для перехода к ней; null, если такой нет. */
+  nodeByCode?: (code: string) => string | null;
+  onSelectFn?: (nodeId: string) => void;
+  /** Поручить моделисту доработку по выводу отчёта. */
+  onAssign?: (report: AgentReportRow, finding: ReportFinding) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -65,6 +73,7 @@ export default function ReportsPanel({
                       <th>Основание</th>
                       <th>Уверенность</th>
                       <th>Рекомендация</th>
+                      {onAssign && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -72,10 +81,25 @@ export default function ReportsPanel({
                       <tr key={i} className={`finding-${f.impact}`}>
                         <td>{LEVEL[f.impact]}</td>
                         <td>{f.what}</td>
-                        <td>{f.where ?? ""}</td>
+                        <td>
+                          {f.where && nodeByCode?.(f.where) ? (
+                            <button className="link-button" title="Показать в студии" onClick={() => onSelectFn?.(nodeByCode(f.where!)!)}>
+                              {f.where}
+                            </button>
+                          ) : (
+                            f.where ?? ""
+                          )}
+                        </td>
                         <td>{f.basis ?? ""}</td>
                         <td>{LEVEL[f.confidence]}</td>
                         <td>{f.recommendation ?? ""}</td>
+                        {onAssign && (
+                          <td>
+                            <button title="Задание моделисту с этим выводом" onClick={() => void onAssign(r, f)}>
+                              Поручить моделисту
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

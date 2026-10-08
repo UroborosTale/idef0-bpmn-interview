@@ -38,17 +38,21 @@ export default function QuestionsPanel({
   labelOf,
   processName,
   onStatus,
+  onHandOff,
 }: {
   questions: AgentQuestionRow[];
   labelOf: (nodeId: string) => string;
   processName: string;
   onStatus: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
+  /** Поручить моделисту внести в модель полученные ответы (одним заданием). */
+  onHandOff?: () => void | Promise<void>;
 }) {
   const [showClosed, setShowClosed] = useState(false);
   const [answering, setAnswering] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
   const [copied, setCopied] = useState(false);
   const live = questions.filter(isLiveQuestion);
+  const toHandOff = questions.filter((q) => q.status === "answered" && !q.handoffTaskId);
   const shown = showClosed ? questions : live;
 
   const copy = async () => {
@@ -76,6 +80,16 @@ export default function QuestionsPanel({
         <label className="problems-filter">
           <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} /> с отвеченными и снятыми ({questions.length - live.length})
         </label>
+        {onHandOff && (
+          <button
+            className={toHandOff.length ? "primary" : ""}
+            disabled={toHandOff.length === 0}
+            onClick={() => void onHandOff()}
+            title="Задание моделисту: внести ответы владельца в модель. При завершении интервью в чате это делается само"
+          >
+            Передать ответы моделисту ({toHandOff.length})
+          </button>
+        )}
         <button disabled={live.length === 0} onClick={() => void copy()} title="Список для интервью: по функциям, с адресатами">
           {copied ? "Скопировано" : "Копировать для интервью"}
         </button>
@@ -95,6 +109,7 @@ export default function QuestionsPanel({
             {q.addressee ? `спросить: ${q.addressee} · ` : ""}{authorOf(q.agent)} · {new Date(q.createdAt).toLocaleString("ru-RU")}
           </div>
           {q.reason && <p className="proposal-why">Зачем: {q.reason}</p>}
+          {q.handoffTaskId && <p className="muted task-meta">Передано моделисту: задание {q.handoffTaskId}</p>}
           {q.status === "answered" && <p className="proposal-why">Ответ{q.fragmentId ? ` (фрагмент ${q.fragmentId})` : ""}: {q.answer ?? "дан на интервью"}</p>}
           {answering === q.id ? (
             <div className="proposal-actions">

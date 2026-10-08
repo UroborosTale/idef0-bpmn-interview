@@ -69,6 +69,7 @@ const kindLabel = { analysis: "анализ", review: "проверка", method
 function describeQuestion(q: any): string {
   const lines = [`${q.id} — [${priorityLabel[q.priority] ?? q.priority}] «${q.text}»${q.scopeNodeId ? ` (функция ${q.scopeNodeId})` : ""}${q.addressee ? `, адресат: ${q.addressee}` : ""} — ${questionLabel[q.status] ?? q.status}`];
   if (q.reason) lines.push(`  Зачем: ${q.reason}`);
+  if (q.handoffTaskId) lines.push(`  Передано моделисту: ${q.handoffTaskId}`);
   if (q.status === "answered") lines.push(`  Ответ${q.fragmentId ? ` [${q.fragmentId}]` : ""}: ${q.answer ?? "дан на интервью"}`);
   return lines.join("\n");
 }
