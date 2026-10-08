@@ -415,5 +415,9 @@ export const ChatMessage = z.object({
   text: z.string(),
   ts: z.number(),
   gap_id: z.string().nullable().optional(),
+  /** Кто задал вопрос, если не система: интервьюер (логин). Такой вопрос сохранён и в списке вопросов к интервью. */
+  author: z.string().optional(),
+  /** Вопрос из списка вопросов к интервью (agent_questions): ответ владельца отметит его полученным. */
+  question_id: z.string().optional(),
 });
 export type ChatMessage = z.infer<typeof ChatMessage>;

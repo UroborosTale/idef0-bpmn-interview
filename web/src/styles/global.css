@@ -521,4 +521,6 @@ button.danger:hover { background: #fef2f2; }
 .report-findings th { background: #f4f7fc; font-weight: 600; }
 .finding-high td:first-child { color: #991b1b; font-weight: 600; }
 .report-text { white-space: pre-wrap; font: inherit; background: #f8fafc; border: 1px solid #e5ebf5; border-radius: 4px; padding: 8px; margin: 6px 0; max-height: 320px; overflow: auto; }
-.report-archived { opacity: 0.7; }
+.report-archived { opacity: 0.7; }.chat-msg.by-interviewer { border: 1px solid var(--accent, #2563eb); }
+.chat-author { font-size: 11px; color: #475569; margin-bottom: 2px; }
+.chat-input-row button.active { background: var(--accent-soft); border-color: var(--accent, #2563eb); }

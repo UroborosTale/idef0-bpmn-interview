@@ -102,3 +102,8 @@ export const QuestionStatusInput = z.object({
   fragment_id: z.string().min(1).optional(),
 });
 export const ReportStatusInput = z.object({ status: z.enum(["new", "read", "archived"]) });
+/** Свой вопрос интервьюера в ходе интервью. */
+export const AskInput = z.object({
+  text: z.string().trim().min(5).max(600),
+  addressee: z.string().trim().min(1).max(120).optional(),
+});

@@ -290,6 +290,7 @@ export default function WorkspacePage({
                 finished={session.status === "completed"}
                 onSend={(text) => withBusy(async () => setSession(await api.interviewTurn(sessionId, text)))}
                 onFinish={() => withBusy(async () => setSession(await api.interviewFinish(sessionId)))}
+                onAsk={async (text) => void (await withBusy(async () => setSession(await api.interviewAsk(sessionId, text))))}
               />
             )}
           </div>

@@ -286,6 +286,9 @@ export interface ChatMessage {
   text: string;
   ts: number;
   gap_id?: string | null;
+  /** Интервьюер (логин), если вопрос задал он, а не система. */
+  author?: string;
+  question_id?: string;
 }
 
 export interface Idef0Block {

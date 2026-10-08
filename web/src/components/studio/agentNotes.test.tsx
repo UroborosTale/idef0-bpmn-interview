@@ -82,6 +82,13 @@ describe("вопросы к интервью: вкладка", () => {
     expect(screen.queryByPlaceholderText(/Ответ респондента/)).toBeNull();
   });
 
+  it("вопрос, заданный интервьюером в ходе интервью, подписан его логином", () => {
+    panel([question({ agent: "user:ivanov", status: "answered", answer: "Секретарь", fragmentId: "f4" })]);
+    fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));
+    expect(screen.getByText(/задан интервьюером \(ivanov\)/)).toBeTruthy();
+    expect(screen.getByText("Ответ (фрагмент f4): Секретарь")).toBeTruthy();
+  });
+
   it("возврат: снятый вопрос возвращается в список ожидающих", () => {
     const onStatus = panel([question({ status: "dismissed" })]);
     fireEvent.click(screen.getByLabelText(/с отвеченными и снятыми/));

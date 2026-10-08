@@ -25,6 +25,9 @@ export function interviewSheet(questions: AgentQuestionRow[], labelOf: (nodeId: 
   return lines.join("\n").trimEnd();
 }
 
+/** Автор вопроса: роль агента или интервьюер (подпись «user:логин» ставит сервер для вопросов, заданных в ходе интервью). */
+const authorOf = (agent: string) => (agent.startsWith("user:") ? `задан интервьюером${agent !== "user:local" ? ` (${agent.slice(5)})` : ""}` : `от агента ${agent}`);
+
 /**
  * Вопросы к интервью. Их готовит агент-интервьюер (MCP add_questions); здесь аналитик видит список с адресатами и
  * приоритетами, переносит его на интервью и отмечает, что задано и что отвечено. Ответ на вопрос в модель вносит моделист
@@ -89,7 +92,7 @@ export default function QuestionsPanel({
           </div>
           <div className="muted task-meta">
             {q.scopeNodeId ? `${labelOf(q.scopeNodeId)} · ` : "процесс в целом · "}
-            {q.addressee ? `спросить: ${q.addressee} · ` : ""}от агента {q.agent} · {new Date(q.createdAt).toLocaleString("ru-RU")}
+            {q.addressee ? `спросить: ${q.addressee} · ` : ""}{authorOf(q.agent)} · {new Date(q.createdAt).toLocaleString("ru-RU")}
           </div>
           {q.reason && <p className="proposal-why">Зачем: {q.reason}</p>}
           {q.status === "answered" && <p className="proposal-why">Ответ{q.fragmentId ? ` (фрагмент ${q.fragmentId})` : ""}: {q.answer ?? "дан на интервью"}</p>}

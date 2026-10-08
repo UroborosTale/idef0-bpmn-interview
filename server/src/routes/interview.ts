@@ -6,6 +6,8 @@ import { resolveProvider } from "../llm/provider.js";
 import { INTERVIEW_OPENING_QUESTION, isInterviewComplete, mergeManualGaps, selectNextQuestion } from "../pipeline/interviewEngine.js";
 import { logAudit } from "../db.js";
 import { addVersion } from "../repo.js";
+import { addQuestion, getQuestion, setQuestionStatus } from "../agentQuestions.js";
+import { AskInput } from "../types/patch.js";
 import type { ChatMessage, Fragment } from "../types/model.js";
 
 export const interviewRouter = Router();
@@ -50,6 +52,9 @@ interviewRouter.post("/sessions/:id/interview/turn", async (req, res) => {
   const lastAssistant = [...session.chat].reverse().find((m) => m.role === "assistant");
   const offset = session.fragments.length;
   const newFragment: Fragment = { id: `f${offset + 1}`, index: offset + 1, speaker: "owner", text };
+  // ответ на вопрос интервьюера: в списке вопросов он становится «получен ответ» с привязкой к фрагменту
+  const asked = lastAssistant?.question_id ? getQuestion(lastAssistant.question_id) : null;
+  if (asked && (asked.status === "open" || asked.status === "asked")) setQuestionStatus(asked.id, "answered", { answer: text.slice(0, 4000), fragmentId: newFragment.id });
   const fragments = [...session.fragments, newFragment];
   const chatAfterOwner = [...session.chat, chatMsg("owner", text, lastAssistant?.gap_id ?? null)];
 
@@ -90,6 +95,45 @@ interviewRouter.post("/sessions/:id/interview/turn", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
+});
+
+/**
+ * Интервьюер задаёт свой вопрос по ходу интервью — вместо следующего вопроса системы или сверх него. Вопрос появляется в
+ * чате от имени интервьюера и сохраняется в списке вопросов к интервью («задан»); ответ владельца отметит его полученным.
+ */
+interviewRouter.post("/sessions/:id/interview/ask", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const parsed = AskInput.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "text — вопрос (от 5 до 600 знаков)" });
+    return;
+  }
+  if (session.chat.length === 0) {
+    res.status(409).json({ error: "интервью ещё не начато" });
+    return;
+  }
+  if (session.status === "completed") {
+    res.status(409).json({ error: "интервью завершено" });
+    return;
+  }
+  const block = editBlockReason(session);
+  if (block) {
+    res.status(409).json({ error: block });
+    return;
+  }
+  const by = req.user?.login ?? "analyst";
+  // тот же вопрос мог уже лежать в списке (например, подготовил агент): тогда он просто становится заданным
+  const stored = addQuestion({ sessionId: session.id, text: parsed.data.text, addressee: parsed.data.addressee, priority: "important", agent: `user:${by}` });
+  const q = stored.question;
+  if (q.status === "open") setQuestionStatus(q.id, "asked");
+  const message: ChatMessage = { ...chatMsg("assistant", parsed.data.text), author: by, question_id: q.id };
+  const updated = updateSession(session.id, { chat: [...session.chat, message] });
+  logAudit(session.id, "interviewer", "interviewer_question", { id: q.id });
+  res.json(updated);
 });
 
 /** Владелец отмечает элемент превью как неверный (ФТ-2.5). */

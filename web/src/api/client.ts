@@ -52,6 +52,7 @@ export const api = {
   waitJob: (job: Job, id: string, onProgress?: (p: JobProgress) => void) => waitJob(job, id, onProgress),
 
   interviewStart: (id: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/start`),
+  interviewAsk: (id: string, text: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/ask`, { text }),
   interviewTurn: (id: string, text: string) => req<SessionRecord>("POST", `/sessions/${id}/interview/turn`, { text }),
   interviewFlag: (id: string, element_id: string, note?: string) =>
     req<SessionRecord>("POST", `/sessions/${id}/interview/flag-element`, { element_id, note }),
