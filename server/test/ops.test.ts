@@ -1,9 +1,15 @@
+import Database from "better-sqlite3";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { recordUsage, usageForSession, withLlmContext } from "../src/llm/usage.js";
 import { isPrivateAddress, safeWebhookFetch, validateWebhookUrl } from "../src/util/webhook.js";
-import { backupNow } from "../src/util/backup.js";
+import { backupNow, backupRepo, verifyBackup } from "../src/util/backup.js";
 
 describe("учёт расхода LLM", () => {
   it("токены записываются на сессию из контекста и суммируются, стоимость — по ценам из окружения", async () => {
@@ -38,4 +44,86 @@ describe("резервные копии", () => {
     expect(path.dirname(file)).toBe(path.join(process.env.DATA_DIR!, "backups"));
     expect(fs.statSync(file).size).toBeGreaterThan(0);
   });
+
+  const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "pm-backup-"));
+  const makeDb = (file: string, sessions: number) => {
+    const d = new Database(file);
+    d.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY)`);
+    for (let i = 0; i < sessions; i++) d.prepare(`INSERT INTO sessions VALUES (?)`).run(`s${i}`);
+    d.close();
+  };
+
+  it("копия проверяется; битый файл не принимается", () => {
+    const dir = tmp();
+    makeDb(path.join(dir, "ok.sqlite"), 3);
+    expect(verifyBackup(path.join(dir, "ok.sqlite"))).toEqual({ ok: true, detail: "целостность в порядке, сессий: 3" });
+    fs.writeFileSync(path.join(dir, "bad.sqlite"), "это не база данных");
+    expect(verifyBackup(path.join(dir, "bad.sqlite")).ok).toBe(false);
+    expect(verifyBackup(path.join(dir, "нет.sqlite")).ok).toBe(false);
+  });
+
+  it("BACKUP_COPY_DIR получает такую же копию и сам чистит старые; недоступная папка не отменяет локальную копию", async () => {
+    const outside = tmp();
+    for (let i = 1; i <= 8; i++) fs.writeFileSync(path.join(outside, `app-2020010${i}-000000.sqlite`), "старая");
+    process.env.BACKUP_COPY_DIR = outside;
+    try {
+      const file = await backupNow();
+      const copies = fs.readdirSync(outside).filter((f) => f.startsWith("app-")).sort();
+      expect(copies).toContain(path.basename(file));
+      expect(copies).toHaveLength(7); // хранится не больше BACKUP_KEEP
+      expect(copies).not.toContain("app-20200101-000000.sqlite");
+      expect(fs.statSync(path.join(outside, path.basename(file))).size).toBe(fs.statSync(file).size);
+      // вместо папки — файл: создать каталог нельзя
+      const blocker = path.join(tmp(), "файл");
+      fs.writeFileSync(blocker, "x");
+      process.env.BACKUP_COPY_DIR = path.join(blocker, "вложенная");
+      const local = await backupNow();
+      expect(fs.existsSync(local)).toBe(true);
+    } finally {
+      delete process.env.BACKUP_COPY_DIR;
+    }
+  });
+
+  it("репозиторий сохраняется одним файлом bundle, из которого можно клонировать", () => {
+    const outside = tmp();
+    process.env.BACKUP_COPY_DIR = outside;
+    try {
+      const file = backupRepo();
+      expect(path.dirname(file)).toBe(outside);
+      expect(file).toMatch(/repo-\d{8}-\d{6}\.bundle$/);
+      const clone = path.join(tmp(), "клон");
+      execFileSync("git", ["clone", "--quiet", file, clone], { stdio: "pipe" });
+      expect(fs.existsSync(path.join(clone, "package.json"))).toBe(true);
+    } finally {
+      delete process.env.BACKUP_COPY_DIR;
+    }
+  }, 60_000);
+
+  it("восстановление: нужна отметка --yes, битая копия отклоняется, прежняя база сохраняется рядом", () => {
+    const data = tmp();
+    makeDb(path.join(data, "app.sqlite"), 1);
+    const copy = path.join(tmp(), "app-20260101-000000.sqlite");
+    makeDb(copy, 5);
+    const run = (...args: string[]) =>
+      spawnSync(process.execPath, ["--import", "tsx", "src/scripts/restore.ts", ...args], { cwd: path.resolve(__dirname, ".."), env: { ...process.env, DATA_DIR: data }, encoding: "utf8" });
+    expect(run(copy).status).toBe(1); // без подтверждения ничего не меняется
+    expect(new Database(path.join(data, "app.sqlite"), { readonly: true }).prepare(`SELECT COUNT(*) AS n FROM sessions`).get()).toEqual({ n: 1 });
+
+    const bad = path.join(tmp(), "bad.sqlite");
+    fs.writeFileSync(bad, "мусор");
+    const refused = run(bad, "--yes");
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toContain("не годится");
+
+    const done = run(copy, "--yes");
+    expect(done.status, done.stderr).toBe(0);
+    const live = new Database(path.join(data, "app.sqlite"), { readonly: true });
+    expect(live.prepare(`SELECT COUNT(*) AS n FROM sessions`).get()).toEqual({ n: 5 });
+    live.close();
+    const saved = fs.readdirSync(path.join(data, "backups")).filter((f) => f.startsWith("app-before-restore-"));
+    expect(saved).toHaveLength(1);
+    const before = new Database(path.join(data, "backups", saved[0]), { readonly: true });
+    expect(before.prepare(`SELECT COUNT(*) AS n FROM sessions`).get()).toEqual({ n: 1 });
+    before.close();
+  }, 60_000);
 });

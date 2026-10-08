@@ -129,7 +129,10 @@ CI (`.github/workflows/ci.yml`): typecheck, тесты сервера и кли�
 | `LLM_TIMEOUT_MS`, `LLM_RETRIES` | таймаут одного вызова LLM (120 000) и число повторов (3) |
 | `AGENT_MAX_ITERATIONS` | повторные проходы оркестратора (для платных LLM по умолчанию 1) |
 | `LLM_PRICE_INPUT_PER_M`, `LLM_PRICE_OUTPUT_PER_M` | цены за 1 млн токенов — для оценки стоимости в «Журнале агентов» |
-| `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP` | резервные копии SQLite в `data/backups` (24 ч, 7 копий; 0 — выключить) |
+| `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP` | резервные копии SQLite в `data/backups` (24 ч, 7 копий; 0 — выключить); каждая копия проверяется `integrity_check` |
+| `BACKUP_COPY_DIR` | вторая копия вне диска данных (сетевая папка, облачный каталог); без неё копии лежат только рядом с базой |
+
+**Копии вручную и восстановление.** `npm run backup -w server` — копия базы сейчас (с проверкой); `-- --repo` — ещё и весь git-репозиторий одним файлом `repo-….bundle` (код приложения; у репозитория нет удалённого, и bundle — копия на случай потери машины; в `BACKUP_COPY_DIR`, а если она не задана, в `data/backups`). Код из bundle: `git clone repo-….bundle <папка>`. База из копии: остановить сервер, `npm run restore -w server -- data/backups/app-….sqlite --yes` — копия проверяется, прежняя база сохраняется рядом (`app-before-restore-…`), так что восстановление можно отменить.
 
 Расход токенов по сессии: `GET /api/sessions/:id/llm-usage` и вкладка «Документы и выгрузка → Журнал агентов».
 

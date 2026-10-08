@@ -12,6 +12,8 @@
     "hash-password": "tsx src/scripts/hash-password.ts",
     "mcp": "tsx src/mcp/index.ts",
     "agent:check": "tsx src/scripts/agent-check.ts",
+    "backup": "tsx src/scripts/backup.ts",
+    "restore": "tsx src/scripts/restore.ts",
     "agent:demo": "tsx src/scripts/agent-demo.ts",
     "agent:prompt": "tsx src/scripts/agent-prompt.ts",
     "eval:b002": "tsx src/scripts/eval-model.ts",
