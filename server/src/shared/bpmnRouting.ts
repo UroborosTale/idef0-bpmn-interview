@@ -34,6 +34,38 @@ export interface RouteFlow {
   to: string;
   /** Поток сообщений между шагом и свёрнутым пулом: идёт строго вертикально (низ шага — верх пула). */
   message?: boolean;
+  /**
+   * Ручной маршрут (его задал пользователь): стороны выхода и входа и положение среднего участка. Такие стрелки
+   * прокладываются первыми, остальные их обходят; если заданное не подходит по взаимному положению фигур, стрелка
+   * прокладывается автоматически.
+   */
+  fixed?: { e?: Side; n?: Side; channel?: number } | null;
+}
+
+/** Ручной маршрут модели (стороны и канал) в виде настройки прокладки; null — маршрут автоматический. */
+export const fixedRoute = (r: { from_side?: Side; to_side?: Side; channel?: number } | null | undefined): RouteFlow["fixed"] => (r && (r.from_side || r.to_side || r.channel !== undefined) ? { e: r.from_side, n: r.to_side, channel: r.channel } : undefined);
+
+/** Подвижный средний участок стрелки: по нему редактор рисует ручку и им же пользователь меняет маршрут. */
+export interface RouteChannel {
+  /** x — вертикальный участок (сдвигается по x), y — горизонтальный (по y). */
+  axis: "x" | "y";
+  /** Текущее положение (x или y). */
+  at: number;
+  /** Пределы перемещения (бесконечные у петли: наружу можно сколько угодно). */
+  lo: number;
+  hi: number;
+  /** Середина участка — место ручки. */
+  handle: Pt;
+}
+
+export interface RouteInfo {
+  pts: Pt[];
+  /** Какими сторонами стрелка выходит и входит (фактические, а не заданные). */
+  from: Side;
+  to: Side;
+  channel?: RouteChannel;
+  /** Маршрут взят из ручных настроек (иначе подобран автоматически). */
+  manual: boolean;
 }
 
 const NORMAL: Record<Side, Pt> = { R: [1, 0], L: [-1, 0], T: [0, -1], B: [0, 1] };
@@ -226,10 +258,13 @@ function sidePref(n: RouteNode, side: Side, end: "out" | "in"): number {
   return base + (n.artifacts && side === "T" ? 60 : 0);
 }
 
-/** Сколько стрелок уже занимает сторону фигуры и какова цена ещё одной: у ромба и круга порт одноразовый. */
+/**
+ * Сколько стрелок уже занимает сторону фигуры и какова цена ещё одной. В один вход входит одна стрелка, из одного выхода
+ * выходит одна — у любой фигуры; на одной стороне стрелки делят точки только когда свободных сторон не осталось.
+ * Пул принимает сколько угодно потоков сообщений.
+ */
 function occupancyCost(n: RouteNode, count: number): number {
-  if (count === 0 || n.type === "pool") return 0;
-  return (n.type === "gateway" || n.type === "event" ? 600 : 35) * count;
+  return count === 0 || n.type === "pool" ? 0 : 600 * count;
 }
 
 // --- сборка ---
@@ -246,20 +281,22 @@ const seg = (a: Pt, b: Pt): Seg => (isH(a, b) ? { axis: "y", at: a[1], from: Mat
 /** Два отрезка лежат на одной прямой и перекрываются. */
 const clash = (s: Seg, t: Seg) => s.axis === t.axis && Math.abs(s.at - t.at) < 5 && Math.min(s.to, t.to) - Math.max(s.from, t.from) > 2;
 /**
- * Две Z-образные стрелки «крест-накрест» между теми же двумя уровнями (одна идёт с верхнего на нижний, другая — с нижнего
- * на верхний): как ни разводи каналы, их горизонтальные отрезки лягут друг на друга, поэтому одной нужна другая форма.
+ * Две Z-образные стрелки «крест-накрест» (их концы лежат на одних и тех же двух линиях): как ни разводи каналы, их отрезки
+ * на этих линиях лягут друг на друга, поэтому одной нужна другая форма. Бывает в двух видах: стрелки идут в одну сторону, а
+ * линии начала и конца у них поменялись местами, или идут навстречу друг другу по одним и тем же линиям.
  */
 function crossedZ(a: Pt[], b: Pt[]): boolean {
   if (a.length !== 4 || b.length !== 4) return false;
   const horizontal = isH(a[0], a[1]);
   if (isH(b[0], b[1]) !== horizontal) return false;
-  const i = horizontal ? 1 : 0; // координата «уровня»
+  const i = horizontal ? 1 : 0; // координата линии, на которой стоят концы
   const j = horizontal ? 0 : 1; // координата вдоль движения
   const near = (u: number, v: number) => Math.abs(u - v) < 3;
   const overlap = Math.min(Math.max(a[0][j], a[3][j]), Math.max(b[0][j], b[3][j])) - Math.max(Math.min(a[0][j], a[3][j]), Math.min(b[0][j], b[3][j]));
-  return near(a[0][i], b[3][i]) && near(a[3][i], b[0][i]) && !near(a[0][i], a[3][i]) && overlap > 40;
+  if (near(a[0][i], a[3][i]) || overlap <= 40) return false;
+  const sameWay = Math.sign(a[3][j] - a[0][j]) === Math.sign(b[3][j] - b[0][j]);
+  return sameWay ? near(a[0][i], b[3][i]) && near(a[3][i], b[0][i]) : near(a[0][i], b[0][i]) && near(a[3][i], b[3][i]);
 }
-
 /** Неподвижные отрезки ломаной (без среднего канала, положение которого потом подбирается). */
 const fixedSegs = (pts: Pt[], channel?: Channel): Seg[] => pts.slice(0, -1).flatMap((p, i) => (channel && i === channel.i ? [] : [seg(p, pts[i + 1])]));
 
@@ -269,26 +306,35 @@ const fixedSegs = (pts: Pt[], channel?: Channel): Seg[] => pts.slice(0, -1).flat
  * порта, не входят в один и не накладываются друг на друга.
  */
 export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacles: Box[] = []): Map<string, Pt[]> {
+  return new Map([...routeFlowsDetailed(nodes, flows, extraObstacles)].map(([id, r]) => [id, r.pts] as const));
+}
+
+/** То же, что routeFlows, но с фактическими сторонами и подвижным участком каждой стрелки (для ручной правки в редакторе). */
+export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extraObstacles: Box[] = []): Map<string, RouteInfo> {
   const byId = new Map(nodes.map((n) => [n.id, n] as const));
   const list = flows.filter((f) => f.from !== f.to && byId.has(f.from) && byId.has(f.to));
   // препятствия: все фигуры и значки документов над задачами (у них нет id: они никогда не бывают концом стрелки)
   const obstacles = [...nodes.map((n) => ({ id: n.id, box: n.box })), ...extraObstacles.map((box, i) => ({ id: `\u0002obstacle${i}`, box }))];
   const ctxOf = (f: RouteFlow): Ctx => ({ obstacles, from: f.from, to: f.to });
 
-  const exits = (f: RouteFlow): Side[] => {
+  // ignoreFixed — повторная попытка, когда заданные пользователем стороны не подходят по взаимному положению фигур
+  const exits = (f: RouteFlow, ignoreFixed = false): Side[] => {
     const from = byId.get(f.from)!;
     if (f.message) return [from.type === "pool" ? "T" : "B"];
     if (from.boundary) return ["B"];
+    if (f.fixed?.e && !ignoreFixed) return [f.fixed.e];
     return ["R", "B", "T", "L"];
   };
-  const entries = (f: RouteFlow): Side[] => {
+  const entries = (f: RouteFlow, ignoreFixed = false): Side[] => {
     const to = byId.get(f.to)!;
     if (f.message) return [to.type === "pool" ? "T" : "B"];
+    if (f.fixed?.n && !ignoreFixed) return [f.fixed.n];
     return ["L", "B", "T", "R"];
   };
 
   // сначала стрелки с жёсткими сторонами, затем остальные в порядке модели
-  const order = [...list].sort((a, b) => Number(!!b.message || !!byId.get(b.from)!.boundary) - Number(!!a.message || !!byId.get(a.from)!.boundary));
+  const hard = (f: RouteFlow) => (f.message || byId.get(f.from)!.boundary ? 1 : 0) + (f.fixed ? 2 : 0);
+  const order = [...list].sort((a, b) => hard(b) - hard(a));
   const chosen = new Map<string, Choice>();
   /** Положение порта вдоль стороны у выбранных стрелок: `${flowId}:out|in` → доля стороны (0,5 — середина). */
   let portFrac = new Map<string, number>();
@@ -327,12 +373,12 @@ export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacle
     return fracAt(node, items.length, items.findIndex((s) => s.self));
   };
 
-  const choose = (f: RouteFlow): Choice | null => {
+  const choose = (f: RouteFlow, ignoreFixed = false): Choice | null => {
     const from = byId.get(f.from)!;
     const to = byId.get(f.to)!;
     let best: { cost: number; choice: Choice } | null = null;
-    for (const e of exits(f)) {
-      for (const n of entries(f)) {
+    for (const e of exits(f, ignoreFixed)) {
+      for (const n of entries(f, ignoreFixed)) {
         // маршрут оценивается с той точкой порта, которую стрелка реально получит на этой стороне рядом с соседями
         const p = portPoint(from.box, from.type, e, fracIfAdded(from, e, f, "out", to));
         const q = portPoint(to.box, to.type, n, fracIfAdded(to, n, f, "in", from));
@@ -346,7 +392,8 @@ export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacle
         const mine = fixedSegs(built.pts, built.channel);
         for (const [fid, c] of chosen) {
           if (fid === f.id) continue;
-          cost += 6 * crossingCount(built.pts, c.pts) + (crossedZ(built.pts, c.pts) ? 300 : 0);
+          // пути стрелок не должны пересекаться: пересечение дороже любого обхода, кроме прохода сквозь фигуру
+          cost += 150 * crossingCount(built.pts, c.pts) + (crossedZ(built.pts, c.pts) ? 1200 : 0);
           // наложение на неподвижный участок чужой стрелки: средние каналы разводятся потом, а такие участки сдвинуть нельзя
           const theirs = fixedSegs(c.pts, c.channel);
           for (const s of mine) for (const t of theirs) if (clash(s, t)) cost += 120;
@@ -354,6 +401,8 @@ export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacle
         if (!best || cost < best.cost - 1e-9) best = { cost, choice: { e, n, pts: built.pts, channel: built.channel } };
       }
     }
+    // заданные пользователем стороны не подошли — стрелка прокладывается автоматически
+    if (!best && !ignoreFixed && (f.fixed?.e || f.fixed?.n)) return choose(f, true);
     return best?.choice ?? null;
   };
 
@@ -412,36 +461,49 @@ export function routeFlows(nodes: RouteNode[], flows: RouteFlow[], extraObstacle
   }
 
   // каналы: средний отрезок Z- и П-образных стрелок подбирается так, чтобы вся ломаная (а не только канал: вместе с ним
-  // меняются длины соседних отрезков) не ложилась на уже проложенные линии
+  // меняются длины соседних отрезков) не ложилась на уже проложенные линии. Ручной канал ставится как задан и первым.
   const allSegs = (pts: Pt[]) => pts.slice(0, -1).map((p, i) => seg(p, pts[i + 1]));
   const placed: Seg[] = [];
+  const manualChannel = new Set<string>();
   for (const [, r] of routes) if (!r.channel) placed.push(...allSegs(r.pts));
-  for (const f of list) {
-    const r = routes.get(f.id);
-    if (!r?.channel) continue;
-    const ch = r.channel;
+  const withChannel = list.filter((f) => routes.get(f.id)?.channel).sort((a, b) => Number(b.fixed?.channel !== undefined) - Number(a.fixed?.channel !== undefined));
+  for (const f of withChannel) {
+    const r = routes.get(f.id)!;
+    const ch = r.channel!;
     const base = ch.axis === "x" ? r.pts[1][0] : r.pts[1][1];
-    const candidates = ch.outward ? Array.from({ length: 14 }, (_, k) => base + k * STEP * ch.outward!) : around(base, ch.lo, ch.hi, 30);
+    const wanted = f.fixed?.channel;
     const withAt = (c: number): Pt[] => r.pts.map((p, i) => (i === 1 || i === 2 ? (ch.axis === "x" ? [c, p[1]] : [p[0], c]) : p) as Pt);
     let pick = base;
-    for (const c of candidates) {
-      const pts = withAt(c);
-      if (allSegs(pts).some((s) => placed.some((o) => clash(s, o)))) continue;
-      if (hitsOf(pts, ctxOf(f)) > r.hits) continue;
-      pick = c;
-      break;
+    // заданное пользователем положение подходит, если оно в пределах (у петли — снаружи фигур) и не задевает фигуры
+    if (wanted !== undefined && (ch.outward ? (wanted - base) * ch.outward >= 0 : wanted >= ch.lo - MIN && wanted <= ch.hi + MIN) && hitsOf(withAt(wanted), ctxOf(f)) <= r.hits) {
+      pick = wanted;
+      manualChannel.add(f.id);
+    } else {
+      const candidates = ch.outward ? Array.from({ length: 14 }, (_, k) => base + k * STEP * ch.outward!) : around(base, ch.lo, ch.hi, 30);
+      for (const c of candidates) {
+        const pts = withAt(c);
+        if (allSegs(pts).some((s) => placed.some((o) => clash(s, o)))) continue;
+        if (hitsOf(pts, ctxOf(f)) > r.hits) continue;
+        pick = c;
+        break;
+      }
     }
     r.pts = withAt(pick);
     placed.push(...allSegs(r.pts));
   }
-  const out = new Map<string, Pt[]>();
+
+  const out = new Map<string, RouteInfo>();
   for (const f of list) {
     const r = routes.get(f.id);
-    if (r) out.set(f.id, simplify(r.pts));
+    const c = chosen.get(f.id);
+    if (!r || !c) continue;
+    const channel: RouteChannel | undefined = r.channel
+      ? { axis: r.channel.axis, at: r.channel.axis === "x" ? r.pts[1][0] : r.pts[1][1], lo: r.channel.lo, hi: r.channel.hi, handle: [(r.pts[1][0] + r.pts[2][0]) / 2, (r.pts[1][1] + r.pts[2][1]) / 2] }
+      : undefined;
+    out.set(f.id, { pts: simplify(r.pts), from: c.e, to: c.n, channel, manual: !!f.fixed && (f.fixed.e === c.e || f.fixed.n === c.n || manualChannel.has(f.id)) });
   }
   return out;
 }
-
 /** Убирает повторяющиеся точки и промежуточные точки на прямых участках. */
 function simplify(pts: Pt[]): Pt[] {
   const dedup = pts.filter((p, i) => i === 0 || Math.abs(p[0] - pts[i - 1][0]) > 1e-6 || Math.abs(p[1] - pts[i - 1][1]) > 1e-6);

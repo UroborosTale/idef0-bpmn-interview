@@ -1,14 +1,15 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
-import { eventSpec, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
+import { eventSpec, scaleGlyphs, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
+import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
 import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
 const INK = "#1e293b";
 const ACCENT = "#4338ca";
 
 /** Значок триггера события; у выбрасывающих событий (throwing) он залит, у ждущих — только контур. */
-function EventGlyph({ cx, cy, trigger, throwing }: { cx: number; cy: number; trigger: TriggerType; throwing: boolean }) {
-  const glyphs = triggerGlyph(trigger, throwing);
+function EventGlyph({ cx, cy, trigger, throwing, k = 1 }: { cx: number; cy: number; trigger: TriggerType; throwing: boolean; k?: number }) {
+  const glyphs = k === 1 ? triggerGlyph(trigger, throwing) : scaleGlyphs(triggerGlyph(trigger, throwing), k);
   if (glyphs.length === 0) return null;
   return (
     <g data-trigger={trigger} data-throwing={throwing || undefined} strokeLinejoin="round" pointerEvents="none">
@@ -56,7 +57,7 @@ function Label({ cx, y, text, left = false }: { cx: number; y: number; text: str
   );
 }
 
-export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean }) {
+export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false, hasMarkers = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean; hasMarkers?: boolean }) {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -100,7 +101,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
           </g>
         )}
         {node.type === "task" && node.subtype && (
-          <text x={x + 8} y={y + 14} fontSize={9} fill="#64748b" pointerEvents="none">
+          <text x={x + (hasMarkers ? 20 : 8)} y={y + 14} fontSize={9} fill="#64748b" pointerEvents="none">
             {{ user: "Польз.", service: "Сервис", manual: "Ручн.", send: "Отпр.", receive: "Получ.", script: "Скрипт", business_rule: "Правила" }[node.subtype] ?? ""}
           </text>
         )}
@@ -124,6 +125,31 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
   );
 }
 
+/**
+ * Триггеры блока действия: ожидающие события (сообщение, таймер, условие, сигнал), прикреплённые к блоку значками на его границе.
+ * Отдельной фигуры и стрелки «событие → блок» нет; щелчок по значку выбирает событие (его свойства — в панели).
+ */
+export function TriggerMarkers({ box, markers, selectedId }: { box: Box; markers: TriggerMarker[]; selectedId?: string | null }) {
+  const centers = markerCenters(box, markers.length);
+  return (
+    <g>
+      {markers.map((mk, i) => {
+        const [cx, cy] = centers[i];
+        const selected = selectedId === mk.eventId;
+        const stroke = selected ? ACCENT : INK;
+        return (
+          <g key={mk.eventId} data-marker={mk.eventId} style={{ cursor: "pointer" }}>
+            <title>{`${mk.name} — ${triggerSummary(mk.spec)}${mk.start ? " (запускает блок)" : " (блок ждёт)"}`}</title>
+            <circle cx={cx} cy={cy} r={MARKER_R + 3} fill="transparent" />
+            <circle cx={cx} cy={cy} r={MARKER_R} fill={mk.start ? "#f0fdf4" : "#fff"} stroke={stroke} strokeWidth={selected ? 2.2 : 1.3} />
+            {!mk.start && <circle cx={cx} cy={cy} r={MARKER_R - 2.5} fill="none" stroke={stroke} strokeWidth={1} />}
+            <EventGlyph cx={cx} cy={cy} trigger={mk.spec.trigger} throwing={false} k={0.55} />
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 /** Стрелка последовательности; points — готовый маршрут всей диаграммы (routeFlows), иначе маршрут между двумя фигурами. */
 export function FlowShape({ flow, points, from, to, obstacles = [], selected, kinds }: { flow: ProcessFlow; points?: Pt[]; from?: Box; to?: Box; obstacles?: Box[]; selected: boolean; kinds?: EndKinds }) {
   const pts = points ?? waypoints(from!, to!, obstacles, kinds);

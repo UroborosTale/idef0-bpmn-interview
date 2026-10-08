@@ -1,5 +1,5 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { MIN_X, boxMap, boxOf, isBoundary, snap, snapTop, visibleNodes, type Box } from "./geometry";
+import { MIN_X, boxMap, boxOf, isBoundary, snap, snapTop, triggerView, visibleNodes, type Box } from "./geometry";
 import { deleteNode, dropNodeIntoLane, nextId } from "./model-ops";
 
 /**
@@ -108,6 +108,8 @@ export interface Fragment {
 export function copyFragment(m: M, ids: string[]): Fragment | null {
   const picked = new Set(ids);
   for (const n of m.nodes) if (n.attached_to && picked.has(n.attached_to)) picked.add(n.id);
+  // значки-триггеры выбранных блоков копируются вместе с ними
+  for (const id of ids) for (const mk of triggerView(m).markers.get(id) ?? []) picked.add(mk.eventId);
   const nodes = m.nodes.filter((n) => picked.has(n.id)).map((n) => structuredClone(n));
   if (nodes.length === 0) return null;
   return { nodes, flows: m.flows.filter((f) => picked.has(f.from) && picked.has(f.to)).map((f) => structuredClone(f)) };
@@ -152,7 +154,8 @@ export function pasteFragment(m: M, frag: Fragment, dx: number, dy: number, rese
   let model: M = { ...m, nodes: [...m.nodes, ...nodes], flows: [...m.flows, ...flows] };
   const ids = nodes.map((n) => n.id);
   for (const n of nodes) if (!n.attached_to) model = dropNodeIntoLane(model, n.id);
-  return { model, ids: ids.filter((id) => !nodes.find((n) => n.id === id)!.attached_to) };
+  const hidden = triggerView(model).hidden; // свёрнутые в значки события выбираемыми фигурами не считаются
+  return { model, ids: ids.filter((id) => !nodes.find((n) => n.id === id)!.attached_to && !hidden.has(id)) };
 }
 
 // Буфер обмена редактора: общий для всех диаграмм, чтобы фрагмент можно было вставить в другую диаграмму.

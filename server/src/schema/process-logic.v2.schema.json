@@ -153,6 +153,15 @@
           "from": { "type": "string" },
           "to": { "type": "string" },
           "condition": { "type": ["string", "null"] },
+          "route": {
+            "type": ["object", "null"],
+            "description": "Ручной маршрут стрелки: стороны выхода и входа (L, R, T, B) и положение среднего участка; чего нет — выбирает автоматическая прокладка",
+            "properties": {
+              "from_side": { "enum": ["L", "R", "T", "B"] },
+              "to_side": { "enum": ["L", "R", "T", "B"] },
+              "channel": { "type": "number" }
+            }
+          },
           "source": { "$ref": "#/definitions/sourceList" }
         }
       }

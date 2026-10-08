@@ -48,7 +48,7 @@ describe("демонстрационный процесс C090 в студии",
       await page.locator(`[data-nav-bpmn="${op}"]`).click();
       await page.locator(".bpe-svg").waitFor();
       await page.locator(`.studio g[data-node-id^="${op}_"]`).first().waitFor();
-      for (const t of await page.locator(".studio g[data-node-id] [data-trigger]").evaluateAll((els) => els.map((e) => `${e.getAttribute("data-trigger")}${e.getAttribute("data-throwing") ? ":throw" : ""}`))) seen.add(t);
+      for (const t of await page.locator(".studio [data-trigger]").evaluateAll((els) => els.map((e) => `${e.getAttribute("data-trigger")}${e.getAttribute("data-throwing") ? ":throw" : ""}`))) seen.add(t);
       if (shot) {
         await page.getByRole("button", { name: "100%" }).first().click().catch(() => {});
         await page.locator(".bpe-canvas").first().screenshot({ path: `${shot}/demo-${op}.png` });

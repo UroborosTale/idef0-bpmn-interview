@@ -98,8 +98,16 @@ export interface ProcessFlow {
   from: string;
   to: string;
   condition?: string | null;
+  /** Ручной маршрут: стороны выхода и входа и положение среднего участка; без него маршрут выбирается автоматически. */
+  route?: FlowRoute | null;
   source: SourceRef[];
   confirmed_by: string[];
+}
+
+export interface FlowRoute {
+  from_side?: "L" | "R" | "T" | "B";
+  to_side?: "L" | "R" | "T" | "B";
+  channel?: number;
 }
 
 /** Внешний пул: другой процесс (по коду) или внешний участник; на диаграмме — свёрнутый пул. */

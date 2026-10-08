@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Fragment, ProcessLogicModel, ProcessMeta, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
-import { deleteFlow, updateFlow } from "../bpmn-editor/model-ops";
+import { SIDE_LABELS, deleteFlow, setFlowRoute, updateFlow, type FlowSide } from "../bpmn-editor/model-ops";
 import { parseProcessCode } from "@shared/codes";
 import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
@@ -144,7 +144,25 @@ export default function PropertiesPanel({
           <Field label={from?.type === "gateway" ? "Условие ветки" : "Условие (необязательно)"}>
             <CommitInput value={flow.condition ?? ""} placeholder="например, если сумма > 100 000" onCommit={(v) => onChange(updateFlow(model, flow.id, { condition: v.trim() || null }))} />
           </Field>
-          <button onClick={() => onChange(updateFlow(model, flow.id, { from: flow.to, to: flow.from }))}>Развернуть стрелку</button>
+          <button onClick={() => onChange(updateFlow(model, flow.id, { from: flow.to, to: flow.from, route: flow.route ? { ...(flow.route.to_side ? { from_side: flow.route.to_side } : {}), ...(flow.route.from_side ? { to_side: flow.route.from_side } : {}) } : null }))}>Развернуть стрелку</button>
+        </Section>
+        <Section title="Маршрут" open={!!flow.route}>
+          <p className="muted prop-note">{flow.route ? "Маршрут задан вручную: остальные стрелки его обходят." : "Маршрут подбирается автоматически: из разных портов, без наложений. Его можно изменить здесь или на диаграмме (ручки на выбранной стрелке)."}</p>
+          {(["from_side", "to_side"] as const).map((key) => (
+            <Field key={key} label={key === "from_side" ? "Выходит из стороны" : "Входит в сторону"}>
+              <select value={flow.route?.[key] ?? ""} onChange={(e) => onChange(setFlowRoute(model, flow.id, { [key]: (e.target.value || undefined) as FlowSide | undefined, channel: undefined }))}>
+                <option value="">Автоматически</option>
+                {(Object.keys(SIDE_LABELS) as FlowSide[]).map((s) => (
+                  <option key={s} value={s}>
+                    {SIDE_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ))}
+          <button disabled={!flow.route} onClick={() => onChange(setFlowRoute(model, flow.id, null))}>
+            Сбросить маршрут
+          </button>
         </Section>
         <Section title="Источник в интервью" count={flow.source.length} open={flow.source.length > 0}>
           <SourceList source={flow.source} fragments={session.fragments} />

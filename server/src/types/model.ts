@@ -158,11 +158,20 @@ export const MessageFlow = z.object({
 });
 export type MessageFlow = z.infer<typeof MessageFlow>;
 
+// Ручной маршрут стрелки: стороны выхода и входа и положение среднего участка (x или y в координатах диаграммы).
+// Всё необязательно; чего нет — выбирает автоматическая прокладка (shared/bpmnRouting.ts).
+export const FlowRoute = z.object({
+  from_side: z.enum(["L", "R", "T", "B"]).optional(),
+  to_side: z.enum(["L", "R", "T", "B"]).optional(),
+  channel: z.number().optional(),
+});
+
 export const ProcessFlow = z.object({
   id: z.string(),
   from: z.string(),
   to: z.string(),
   condition: z.string().nullable().optional(),
+  route: FlowRoute.nullable().optional(),
   source: z.array(SourceRef).default([]),
   confirmed_by: z.array(z.string()).default([]), // ФТ-М4.1.2
 });

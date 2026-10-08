@@ -4,12 +4,11 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, withLayout } from "./geometry";
+import { MIN_X, boxMap, boxOf, diagramLayout, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
-import { routeFlows } from "@shared/bpmnRouting";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { EVENT_PALETTE, PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
-import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, UNASSIGNED_LANE } from "./shapes";
+import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
@@ -19,6 +18,8 @@ type Drag =
   | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
   | { kind: "connect"; from: string }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
+  | { kind: "flowChannel"; id: string; axis: "x" | "y"; lo: number; hi: number; startModel: M; moved: boolean; x0: number; y0: number }
+  | { kind: "flowEnd"; id: string; end: "from" | "to" }
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean };
 
 export default function BpmnEditor({
@@ -66,6 +67,8 @@ export default function BpmnEditor({
   const [multi, setMulti] = useState<string[]>([]);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showMap, setShowMap] = useState(true);
+  /** Конец стрелки в руках пользователя: куда он сейчас указывает (точка, фигура под ней, ближайшая сторона). */
+  const [flowGhost, setFlowGhost] = useState<{ id: string; end: "from" | "to"; pt: Pt; target: string | null; side: FlowSide | null } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
@@ -139,7 +142,23 @@ export default function BpmnEditor({
     const flowEl = t.closest("[data-flow-id]");
     const laneEl = t.closest("[data-lane-id]");
     const artifactEl = t.closest("[data-artifact]");
-    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl && !artifactEl;
+    const markerEl = t.closest("[data-marker]");
+    const handleEl = t.closest("[data-flow-handle]");
+    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl && !artifactEl && !markerEl && !handleEl;
+
+    if (handleEl && e.button === 0 && curSel?.kind === "flow") {
+      // ручки выбранной стрелки: концы переносят на другую сторону или фигуру, средний участок сдвигают
+      const kind = handleEl.getAttribute("data-flow-handle")!;
+      const channel = layoutInfo.get(curSel.id)?.channel;
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (kind === "channel" && channel) dragRef.current = { kind: "flowChannel", id: curSel.id, axis: channel.axis, lo: channel.lo, hi: channel.hi, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
+      else if (kind === "from" || kind === "to") {
+        dragRef.current = { kind: "flowEnd", id: curSel.id, end: kind };
+        setFlowGhost({ id: curSel.id, end: kind, pt: [wx, wy], target: null, side: null });
+      }
+      svgRef.current!.setPointerCapture(e.pointerId);
+      return;
+    }
 
     if (e.button === 0 && e.shiftKey && onEmpty) {
       // Shift + рамка: выделить несколько фигур (с Ctrl — добавить к уже выделенным)
@@ -194,6 +213,10 @@ export default function BpmnEditor({
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
+    } else if (markerEl) {
+      // значок триггера: выбирает событие (его свойства — в панели), перетаскивать нельзя — он стоит на блоке
+      setMulti([]);
+      pick({ kind: "node", id: markerEl.getAttribute("data-marker")! });
     } else if (artifactEl) {
       setMulti([]);
       pick({ kind: "node", id: artifactEl.getAttribute("data-artifact")! });
@@ -218,6 +241,22 @@ export default function BpmnEditor({
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setDraft((m) => moveNode(m, d.id, Math.max(MIN_X, snap(wx - d.offX)), snapTop(wy - d.offY, boxOf(m.nodes.find((x) => x.id === d.id)!).h)));
       setHotLane(laneIndexAtY(viewRef.current, wy));
+    } else if (d.kind === "flowChannel") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
+      d.moved = true;
+      const raw = Math.round((d.axis === "x" ? wx : wy) / 5) * 5;
+      const value = Number.isFinite(d.lo) && Number.isFinite(d.hi) ? Math.min(Math.max(raw, d.lo), d.hi) : raw;
+      setDraft((m) => setFlowRoute(m, d.id, { channel: value }));
+    } else if (d.kind === "flowEnd") {
+      // куда указывает конец: фигура под курсором и ближайшая к курсору её сторона
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      const hit = shown.find((n) => {
+        const b = boxes.get(n.id)!;
+        return wx > b.x - 10 && wx < b.x + b.w + 10 && wy > b.y - 10 && wy < b.y + b.h + 10;
+      });
+      setFlowGhost({ id: d.id, end: d.end, pt: [wx, wy], target: hit?.id ?? null, side: hit ? nearestSide(boxes.get(hit.id)!, [wx, wy]) : null });
+      setConnectHot(hit?.id ?? null);
     } else if (d.kind === "marquee") {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setMarquee({ x: Math.min(d.x0, wx), y: Math.min(d.y0, wy), w: Math.abs(wx - d.x0), h: Math.abs(wy - d.y0) });
@@ -242,6 +281,18 @@ export default function BpmnEditor({
       h.recordPast(d.startModel);
       setDraft((m) => dropNodeIntoLane(m, d.id));
       setHotLane(null);
+    } else if (d.kind === "flowChannel") {
+      if (d.moved) h.recordPast(d.startModel);
+    } else if (d.kind === "flowEnd") {
+      const ghost = flowGhost;
+      setFlowGhost(null);
+      setConnectHot(null);
+      if (ghost?.target) {
+        const flow = vflows.find((f) => f.id === d.id);
+        const r = reconnectFlow(viewRef.current, d.id, d.end, ghost.target, ghost.side ?? undefined, flow?.viaEvent);
+        if (r.error) showHint(r.error);
+        else commit(r.model);
+      }
     } else if (d.kind === "group") {
       if (d.moved) {
         h.recordPast(d.startModel);
@@ -282,6 +333,13 @@ export default function BpmnEditor({
     const m = viewRef.current;
     let cx: number, cy: number;
     const from = curSel?.kind === "node" ? m.nodes.find((n) => n.id === curSel.id) : undefined;
+    // ожидающий триггер при выбранном блоке прикрепляется к блоку значком, а не рисуется отдельной фигурой со стрелкой
+    if (!at && spec.type === "event" && spec.trigger && spec.subtype !== "end" && spec.trigger.direction !== "throw" && BLOCK_TRIGGERS.includes(spec.trigger.type) && from && (from.type === "task" || from.type === "subprocess")) {
+      const r = attachTrigger(m, from.id, spec.trigger.type, spec.name);
+      if (r.error) showHint(r.error);
+      else commit(r.model, { kind: "node", id: r.id! });
+      return;
+    }
     if (at) {
       [cx, cy] = at;
     } else if (from) {
@@ -412,7 +470,7 @@ export default function BpmnEditor({
       deleteSelected();
     } else if ((e.key === "Delete" || e.key === "Backspace") && curSel) {
       e.preventDefault();
-      if (curSel.kind === "node") commit(deleteNode(draft, curSel.id), null);
+      if (curSel.kind === "node") commit(triggerView(draft).hidden.has(curSel.id) ? deleteTriggerEvent(draft, curSel.id) : deleteNode(draft, curSel.id), null);
       else if (curSel.kind === "flow") commit(deleteFlow(draft, curSel.id), null);
     } else if (e.key === "Escape") {
       setMulti([]);
@@ -425,31 +483,9 @@ export default function BpmnEditor({
 
   const { w: worldW, h: worldH } = modelExtents(draft);
   const W = Math.max(worldW, 1400);
-  // фигуры, документы, пулы и ВСЕ стрелки считаются вместе (shared/bpmnRouting.ts): без общих портов и наложений линий
-  const { shown, boxes, extras, routes, bottomUsed } = useMemo(() => {
-    const shown = visibleNodes(draft);
-    const boxes = boxMap(shown);
-    const extras = diagramExtras(draft, shown, boxes);
-    const withArtifacts = new Set(extras.artifacts.map((a) => a.nodeId));
-    const poolIds = new Set(extras.pools.map((p) => p.pool.id));
-    const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
-    const routes = routeFlows(
-      [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id) })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
-      [...draft.flows.filter((f) => boxes.has(f.from) && boxes.has(f.to)).map((f) => ({ id: f.id, from: f.from, to: f.to })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true }))],
-      extras.artifacts.map((a) => a.box)
-    );
-    // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
-    const bottomUsed = new Set<string>();
-    for (const f of draft.flows) {
-      const pts = routes.get(f.id);
-      const a = boxes.get(f.from);
-      const b = boxes.get(f.to);
-      if (!pts || !a || !b) continue;
-      if (Math.abs(pts[0][1] - (a.y + a.h)) < 0.5) bottomUsed.add(f.from);
-      if (Math.abs(pts[pts.length - 1][1] - (b.y + b.h)) < 0.5) bottomUsed.add(f.to);
-    }
-    return { shown, boxes, extras, routes, bottomUsed };
-  }, [draft]);  const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
+  // фигуры, значки триггеров, документы, пулы и ВСЕ стрелки считаются вместе (geometry.diagramLayout)
+  const { shown, boxes, extras, flows: vflows, markers, routes, info: layoutInfo, bottomUsed } = useMemo(() => diagramLayout(draft), [draft]);
+  const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
 
   return (
@@ -544,7 +580,7 @@ export default function BpmnEditor({
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
               <LanesLayer model={draft} width={W} hotLane={hotLane} selectedLaneId={curSel?.kind === "lane" ? curSel.id : null} />
 
-              {draft.flows.map((f) => {
+              {vflows.map((f) => {
                 const points = routes.get(f.id);
                 return points ? <FlowShape key={f.id} flow={f} points={points} selected={curSel?.kind === "flow" && curSel.id === f.id} /> : null;
               })}
@@ -560,7 +596,7 @@ export default function BpmnEditor({
               ))}
 
               {shown.map((n) => (
-                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} />
+                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
               ))}
 
               {inGroup && (() => {
@@ -569,7 +605,48 @@ export default function BpmnEditor({
               })()}
               {marquee && <rect data-marquee x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(67,56,202,0.08)" stroke="#4338ca" strokeDasharray="4 3" pointerEvents="none" />}
 
-              {!inGroup && selectedNode && !(selectedNode.type === "event" && selectedNode.subtype === "end") && !editing && (
+              {[...markers].map(([blockId, list]) => (boxes.has(blockId) ? <TriggerMarkers key={blockId} box={boxes.get(blockId)!} markers={list} selectedId={curSel?.kind === "node" ? curSel.id : null} /> : null))}
+
+              {curSel?.kind === "flow" &&
+                (() => {
+                  // ручки выбранной стрелки: концы (перенести на другую сторону или фигуру) и средний участок (сдвинуть)
+                  const pts = routes.get(curSel.id);
+                  const inf = layoutInfo.get(curSel.id);
+                  if (!pts || !inf) return null;
+                  const ch = inf.channel;
+                  const stroke = "#4338ca";
+                  return (
+                    <g>
+                      {ch && (
+                        <rect data-flow-handle="channel" x={ch.handle[0] - (ch.axis === "x" ? 4 : 9)} y={ch.handle[1] - (ch.axis === "x" ? 9 : 4)} width={ch.axis === "x" ? 8 : 18} height={ch.axis === "x" ? 18 : 8} rx={3} fill="#fff" stroke={stroke} strokeWidth={1.8} style={{ cursor: ch.axis === "x" ? "ew-resize" : "ns-resize" }}>
+                          <title>Потяните, чтобы сдвинуть средний участок стрелки</title>
+                        </rect>
+                      )}
+                      <circle data-flow-handle="from" cx={pts[0][0]} cy={pts[0][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
+                        <title>Потяните конец на другую сторону фигуры или на другую фигуру</title>
+                      </circle>
+                      <circle data-flow-handle="to" cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
+                        <title>Потяните конец на другую сторону фигуры или на другую фигуру</title>
+                      </circle>
+                    </g>
+                  );
+                })()}
+              {flowGhost &&
+                (() => {
+                  const pts = routes.get(flowGhost.id);
+                  if (!pts) return null;
+                  const anchor = flowGhost.end === "to" ? pts[0] : pts[pts.length - 1];
+                  const tb = flowGhost.target ? boxes.get(flowGhost.target) : undefined;
+                  const mid = tb && flowGhost.side ? { L: [tb.x, tb.y + tb.h / 2], R: [tb.x + tb.w, tb.y + tb.h / 2], T: [tb.x + tb.w / 2, tb.y], B: [tb.x + tb.w / 2, tb.y + tb.h] }[flowGhost.side] : null;
+                  return (
+                    <g pointerEvents="none" data-flow-ghost>
+                      <path d={`M${anchor[0]} ${anchor[1]} L${(mid ?? flowGhost.pt)[0]} ${(mid ?? flowGhost.pt)[1]}`} stroke="#4338ca" strokeWidth={2} strokeDasharray="6 4" fill="none" />
+                      {mid && <circle data-flow-ghost-side={flowGhost.side} cx={mid[0]} cy={mid[1]} r={6} fill="#16a34a" stroke="#fff" strokeWidth={1.5} />}
+                    </g>
+                  );
+                })()}
+
+              {!inGroup && selectedNode && boxes.has(selectedNode.id) && !(selectedNode.type === "event" && selectedNode.subtype === "end") && !editing && (
                 <g data-connect={selectedNode.id} style={{ cursor: "crosshair" }}>
                   <circle cx={boxes.get(selectedNode.id)!.x + boxes.get(selectedNode.id)!.w + 16} cy={boxes.get(selectedNode.id)!.y + boxes.get(selectedNode.id)!.h / 2} r={9} fill="#4338ca" />
                   <path
@@ -609,7 +686,24 @@ export default function BpmnEditor({
               </span>
             </div>
           )}
-          {(pickedIds.length > 0 || hasClipboard()) && (
+          {curSel?.kind === "flow" &&
+            (() => {
+              const flow = draft.flows.find((f) => f.id === curSel.id);
+              if (!flow) return null;
+              return (
+                <div className="bpe-selbar" role="toolbar" aria-label="Действия со стрелкой">
+                  <span className="muted">{flow.route ? "Маршрут задан вручную" : "Маршрут автоматический"}</span>
+                  <button disabled={!flow.route} onClick={() => commit(setFlowRoute(draft, flow.id, null))} title="Вернуть автоматическую прокладку этой стрелки">
+                    Сбросить маршрут
+                  </button>
+                  <button onClick={() => commit(deleteFlow(draft, flow.id), null)} title="Удалить стрелку (Delete)">
+                    Удалить
+                  </button>
+                  <span className="muted">● — перенести конец, ▮ — сдвинуть участок</span>
+                </div>
+              );
+            })()}
+          {curSel?.kind !== "flow" && (pickedIds.length > 0 || hasClipboard()) && (
             <div className="bpe-selbar" role="toolbar" aria-label="Действия с выделением">
               {pickedIds.length > 0 && <span className="muted">Выделено: {pickedIds.length}</span>}
               <button disabled={pickedIds.length === 0} onClick={copySelected} title="Копировать (Ctrl+C)">
@@ -649,7 +743,7 @@ export default function BpmnEditor({
             />
           )}
           <div className="bpe-corner muted">
-            {shown.length} элем. · {draft.flows.length} связей · {Math.round(worldH)}px
+            {shown.length} элем. · {vflows.length} связей · {Math.round(worldH)}px
           </div>
         </div>
       </div>

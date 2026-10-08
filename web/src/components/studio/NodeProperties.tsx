@@ -1,7 +1,10 @@
 import { useState } from "react";
 import type { Fragment, ProcessLogicModel, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
-import { BOUNDARY_MAIN, BOUNDARY_TRIGGERS, SUBTYPES, TYPE_LABELS, addBoundaryEvent, deleteNode, setNodeType, updateNode } from "../bpmn-editor/model-ops";
+import { BLOCK_TRIGGERS, BOUNDARY_MAIN, BOUNDARY_TRIGGERS, SUBTYPES, TYPE_LABELS, addBoundaryEvent, attachTrigger, deleteNode, deleteTriggerEvent, setNodeType, updateNode } from "../bpmn-editor/model-ops";
+import { triggerView } from "../bpmn-editor/geometry";
+import { scopeView } from "@shared/scope";
+import { triggerSummary } from "@shared/events";
 import { descendantsOf } from "../idef0-editor/geometry";
 import { SLOT_ENTITY, attach, createEntity, detach, setFunctionRole, type EntityKind, type Slot } from "../idef0-editor/ops";
 import { bpmnHosts, functionDepth, processCodeOf, stepCodes } from "@shared/codes";
@@ -165,6 +168,17 @@ export default function NodeProperties({
       onSelect({ kind: "node", id: r.id! });
     }
   };
+  // триггеры блока: ожидающие события, свёрнутые в значки на блоке; событие-значок удаляется так, чтобы вход блока сохранился
+  const tview = triggerView(scopeView(model, node.bpmn_scope ?? null));
+  const blockTriggers = tview.markers.get(node.id) ?? [];
+  const isMarker = tview.hidden.has(node.id);
+  const addBlockTrigger = (trigger: TriggerType) => {
+    const r = attachTrigger(model, node.id, trigger);
+    if (!r.error) {
+      onChange(r.model);
+      onSelect({ kind: "node", id: r.id! });
+    }
+  };
   const messageCount = (model.messages ?? []).filter((m) => m.from === node.id || m.to === node.id).length;
 
   return (
@@ -269,6 +283,34 @@ export default function NodeProperties({
       )}
 
       {(node.type === "task" || node.type === "subprocess") && onDiagram && (
+        <Section title="Триггеры блока" count={blockTriggers.length} open={blockTriggers.length > 0}>
+          {blockTriggers.length === 0 && <p className="muted prop-note">Блок ничего не ждёт: его запускает стрелка. Добавьте триггер, если блок запускает сообщение, срок, условие или сигнал.</p>}
+          {blockTriggers.length > 0 && (
+            <div className="bpe-chips" style={{ marginBottom: 4 }}>
+              {blockTriggers.map((mk) => (
+                <span key={mk.eventId} className="bpe-chip">
+                  <button className="bpe-chip-name" title="Открыть свойства триггера" onClick={() => onSelect({ kind: "node", id: mk.eventId })}>
+                    {triggerSummary(mk.spec)}
+                  </button>
+                  <button className="bpe-chip-x" title="Убрать триггер" onClick={() => onChange(deleteTriggerEvent(model, mk.eventId))}>
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="bpe-actions" style={{ marginTop: 0 }}>
+            {BLOCK_TRIGGERS.map((k) => (
+              <button key={k} onClick={() => addBlockTrigger(k)}>
+                + {TRIGGER_LABELS[k]}
+              </button>
+            ))}
+          </div>
+          <p className="muted prop-note">Триггер — значок на блоке, отдельной фигуры и стрелки к блоку нет. В файле BPMN он остаётся событием перед блоком.</p>
+        </Section>
+      )}
+
+      {(node.type === "task" || node.type === "subprocess") && onDiagram && (
         <Section title="Граничные события" count={boundaries.length} open={boundaries.length > 0}>
           {boundaries.length === 0 && <p className="muted prop-note">На границе задачи событий нет.</p>}
           {boundaries.length > 0 && (
@@ -369,7 +411,7 @@ export default function NodeProperties({
       <HistoryList sessionId={sessionId} kind="node" id={node.id} stamp={stamp} />
 
       <div className="bpe-actions">
-        <button className="danger" onClick={() => onChange(deleteNode(model, node.id))} title={isFn ? "Удаляет элемент и из BPMN, и из IDEF0" : undefined}>
+        <button className="danger" onClick={() => onChange(isMarker ? deleteTriggerEvent(model, node.id) : deleteNode(model, node.id))} title={isFn ? "Удаляет элемент и из BPMN, и из IDEF0" : undefined}>
           Удалить{isFn ? " функцию" : " элемент"}
           {subtree > 0 ? ` и ${subtree} вложенных` : ""}
         </button>

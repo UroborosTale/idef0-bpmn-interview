@@ -1,6 +1,6 @@
 import { allowedTriggers, eventSpec, withTrigger, type EventPosition, type EventTrigger, type TriggerType } from "@shared/events";
-import type { ExternalPool, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, boxOf } from "./geometry";
+import type { ExternalPool, FlowRoute, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
+import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, boxOf, triggerView, type Pt } from "./geometry";
 
 type M = ProcessLogicModel;
 export interface OpResult {
@@ -158,6 +158,8 @@ function subtreeIds(m: M, id: string): Set<string> {
 
 export function deleteNode(m: M, id: string): M {
   const gone = subtreeIds(m, id);
+  // значки-триггеры блока (свёрнутые события) уходят вместе с блоком, иначе они появились бы на диаграмме отдельными фигурами
+  for (const mk of triggerView(m).markers.get(id) ?? []) gone.add(mk.eventId);
   return {
     ...m,
     nodes: m.nodes.filter((n) => !gone.has(n.id)),
@@ -212,6 +214,51 @@ export const updateFlow = (m: M, id: string, patch: Partial<ProcessFlow>): M => 
   flows: m.flows.map((f) => (f.id === id ? { ...f, ...patch } : f)),
 });
 export const deleteFlow = (m: M, id: string): M => ({ ...m, flows: m.flows.filter((f) => f.id !== id) });
+
+// --- ручной маршрут стрелки ---
+
+export type FlowSide = "L" | "R" | "T" | "B";
+export const SIDE_LABELS: Record<FlowSide, string> = { L: "Слева", R: "Справа", T: "Сверху", B: "Снизу" };
+
+const cleanRoute = (r: FlowRoute): FlowRoute | null => {
+  const out: FlowRoute = {};
+  if (r.from_side) out.from_side = r.from_side;
+  if (r.to_side) out.to_side = r.to_side;
+  if (r.channel !== undefined && Number.isFinite(r.channel)) out.channel = r.channel;
+  return Object.keys(out).length > 0 ? out : null;
+};
+
+/** Ручной маршрут стрелки: заданные поля меняются, undefined — снимается (сторона или канал снова подбираются автоматически); null — весь маршрут автоматический. */
+export function setFlowRoute(m: M, id: string, patch: { [K in keyof FlowRoute]?: FlowRoute[K] | undefined } | null): M {
+  return { ...m, flows: m.flows.map((f) => (f.id === id ? { ...f, route: patch === null ? null : cleanRoute({ ...(f.route ?? {}), ...patch }) } : f)) };
+}
+
+/** Сторона фигуры, ближайшая к точке (по серединам сторон). */
+export function nearestSide(box: { x: number; y: number; w: number; h: number }, pt: Pt): FlowSide {
+  const mids: [FlowSide, number, number][] = [["L", box.x, box.y + box.h / 2], ["R", box.x + box.w, box.y + box.h / 2], ["T", box.x + box.w / 2, box.y], ["B", box.x + box.w / 2, box.y + box.h]];
+  return mids.reduce((best, c) => (Math.hypot(c[1] - pt[0], c[2] - pt[1]) < Math.hypot(best[1] - pt[0], best[2] - pt[1]) ? c : best))[0];
+}
+
+/**
+ * Конец стрелки перенесён на другую сторону той же фигуры (сторона запоминается) или на другую фигуру (с теми же проверками,
+ * что при создании связи). Положение среднего участка при смене конца сбрасывается. viaEvent — стрелка идёт «X → блок»
+ * через свёрнутый триггер блока (в модели её конец — событие): блок — конец-вход, на другую фигуру его переносить нельзя
+ * (триггер блока переносят отдельно), меняется только сторона.
+ */
+export function reconnectFlow(m: M, id: string, end: "from" | "to", nodeId: string, side?: FlowSide, viaEvent?: string): OpResult {
+  const f = m.flows.find((x) => x.id === id);
+  if (!f) return { model: m, error: "Стрелка не найдена" };
+  const key = end === "from" ? "from_side" : "to_side";
+  const locked = end === "to" && !!viaEvent;
+  const current = locked ? m.flows.find((x) => x.from === viaEvent)?.to ?? f.to : f[end];
+  if (nodeId === current) return { model: setFlowRoute(m, id, { [key]: side, channel: undefined }) };
+  if (locked) return { model: m, error: "К блоку с триггером стрелку можно только переставить на другую сторону: триггер блока переносят отдельно (удалите значок и добавьте его другому блоку)" };
+  const without = { ...m, flows: m.flows.filter((x) => x.id !== id) };
+  const check = end === "from" ? addFlow(without, nodeId, f.to) : addFlow(without, f.from, nodeId);
+  if (check.error) return { model: m, error: check.error };
+  const route = cleanRoute({ ...(f.route ?? {}), channel: undefined, [key]: side, ...(end === "from" ? { from_side: side } : { to_side: side }) });
+  return { model: { ...m, flows: m.flows.map((x) => (x.id === id ? { ...x, [end]: nodeId, route } : x)) } };
+}
 
 /** Дорожки — это роли; вставка/удаление роли сдвигает фигуры нижних дорожек. */
 function shiftForLanes(oldM: M, newM: M): M {
@@ -295,6 +342,63 @@ export function addBoundaryEvent(m: M, hostId: string, trigger: TriggerType = "t
   return { model: { ...m, nodes: [...m.nodes, node] }, id: node.id };
 }
 
+// --- триггеры блока действия ---
+
+const TRIGGER_EVENT_NAMES: Partial<Record<TriggerType, string>> = { message: "Сообщение получено", timer: "Наступил срок", conditional: "Условие выполнено", signal: "Сигнал получен" };
+/** Триггеры, которые рисуются значком на блоке (ожидающие события): сообщение, таймер, условие, сигнал. */
+export const BLOCK_TRIGGERS: TriggerType[] = ["message", "timer", "conditional", "signal"];
+
+/**
+ * Добавляет блоку триггер: ожидающее событие, которое запускает блок или которого блок ждёт. На диаграмме оно рисуется
+ * значком на блоке (shared/bpmnTriggers.ts). Если в блок ведёт ровно одна стрелка, событие встаёт на её пути («X → событие
+ * → блок»: блок ждёт после X); если стрелок нет — это начало («событие → блок»).
+ */
+export function attachTrigger(m: M, blockId: string, trigger: TriggerType = "timer", name?: string): OpResult {
+  const block = m.nodes.find((n) => n.id === blockId);
+  if (!block || (block.type !== "task" && block.type !== "subprocess")) return { model: m, error: "Триггер прикрепляется к задаче или подпроцессу" };
+  if (!BLOCK_TRIGGERS.includes(trigger)) return { model: m, error: "Значком на блоке бывают сообщение, таймер, условие и сигнал" };
+  const nodeById = new Map(m.nodes.map((n) => [n.id, n] as const));
+  const entering = m.flows.filter((f) => f.to === blockId && nodeById.get(f.from)?.type !== "event");
+  const hasEvents = m.flows.some((f) => f.to === blockId && nodeById.get(f.from)?.type === "event");
+  const insert = entering.length === 1 && !hasEvents;
+  const node: ProcessNode = {
+    id: nextId("n", m.nodes.map((n) => n.id)),
+    type: "event",
+    subtype: insert ? "intermediate" : "start",
+    trigger: insert ? { type: trigger, direction: "catch" } : { type: trigger },
+    name: name?.trim() || TRIGGER_EVENT_NAMES[trigger] || "Событие",
+    role_id: block.role_id ?? null,
+    bpmn_scope: block.bpmn_scope ?? null,
+    system_ids: [],
+    inputs: [],
+    outputs: [],
+    controls: [],
+    status: "confirmed",
+    confidence: 1,
+    source: [],
+    requirement_ids: [],
+    tags: [],
+    confirmed_by: [],
+  };
+  const link: ProcessFlow = { id: nextId("flow", m.flows.map((f) => f.id)), from: node.id, to: blockId, condition: null, source: [], confirmed_by: [] };
+  const flows = insert ? m.flows.map((f) => (f.id === entering[0].id ? { ...f, to: node.id } : f)) : m.flows;
+  return { model: { ...m, nodes: [...m.nodes, node], flows: [...flows, link] }, id: node.id };
+}
+
+/**
+ * Удаляет событие-триггер блока. Если оно стояло на пути «X → событие → блок», стрелка X → блок сохраняется
+ * (иначе блок остался бы без входа); начало просто исчезает вместе со стрелкой в блок.
+ */
+export function deleteTriggerEvent(m: M, eventId: string): M {
+  const incoming = m.flows.filter((f) => f.to === eventId);
+  const outgoing = m.flows.filter((f) => f.from === eventId);
+  if (incoming.length === 1 && outgoing.length === 1) {
+    const [inn, out] = [incoming[0], outgoing[0]];
+    const next = deleteNode(m, eventId);
+    return { ...next, flows: [...next.flows, { ...inn, to: out.to }] };
+  }
+  return deleteNode(m, eventId);
+}
 // --- вид и триггер события ---
 
 const isBoundaryOf = (m: M, n: ProcessNode) => !!n.attached_to && m.nodes.some((x) => x.id === n.attached_to);

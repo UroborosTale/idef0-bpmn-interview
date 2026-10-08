@@ -4,7 +4,8 @@ import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { isStructured } from "../shared/codes.js";
 import { flowLabelPoint } from "../shared/bpmnGeometry.js";
-import { triggerGlyph, type Glyph } from "../shared/events.js";
+import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
+import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -598,8 +599,24 @@ function drawBpmnShape(page: Page, s: Shape) {
   } else if (s.kind === "gateway") {
     page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id }, gatewayGlyph(s.subtype, w, h));
   } else {
+    drawBlock(page, s, x, y, w, h, tag);
+  }
+}
+
+/** Задача или подпроцесс; триггеры блока (ожидающие события) — значки на его границе, без отдельных фигур и стрелок. */
+function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: number, tag: Record<string, string>) {
+  {
     page.rect(x, y, w, h, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id }, s.kind === "subprocess" ? [{ kind: "path", pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]], closed: true }, { kind: "path", pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] }, { kind: "path", pts: [[w / 2, h - 14], [w / 2, h - 6]] }] : []);
   }
+  // триггеры блока: значок с кольцом (двойным у промежуточного события) на границе блока
+  const markers = s.markers ?? [];
+  markerCenters({ x, y, w, h }, markers.length).forEach(([cx, cy], i) => {
+    const mk = markers[i];
+    const d = MARKER_R * 2;
+    const glyphs = scaleGlyphs(triggerGlyph(mk.trigger, false), 0.55);
+    const ring: GeomPart[] = mk.start ? [] : [{ kind: "ellipse", cx: MARKER_R, cy: MARKER_R, rx: MARKER_R - 2.5, ry: MARKER_R - 2.5 }];
+    page.ellipse(cx - MARKER_R, cy - MARKER_R, d, d, { fill: mk.start ? "#f0fdf4" : "#ffffff", weightPt: 1.1, tag: { pm_k: "trigger", pm_n: mk.name } }, [...ring, ...eventGlyph(glyphs, d, d)]);
+  });
 }
 
 // --- пакет ---

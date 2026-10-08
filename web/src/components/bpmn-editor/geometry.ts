@@ -1,4 +1,6 @@
-import type { ProcessLogicModel, ProcessNode } from "../../types";
+import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
+import { fixedRoute, routeFlowsDetailed } from "@shared/bpmnRouting";
+import { collapseTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
 import { mergeScope, scopeView } from "@shared/scope";
@@ -13,8 +15,30 @@ export type { Pt };
 export const GRID = 10;
 const COL_W = 170;
 
-/** Узлы диаграммы процесса: вложенные функции IDEF0 (idef0_parent) в BPMN не показываются. */
-export const visibleNodes = (m: ProcessLogicModel) => m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope);
+/**
+ * Свёртка триггеров диаграммы (shared/bpmnTriggers.ts): ожидающие события, ведущие прямо в блок действия, рисуются значками
+ * на блоке, без фигуры и стрелки «событие → блок». Модель неизменна, поэтому результат кэшируется по ней.
+ */
+const triggerCache = new WeakMap<ProcessLogicModel, TriggerView<ProcessFlow>>();
+export function triggerView(m: ProcessLogicModel): TriggerView<ProcessFlow> {
+  let v = triggerCache.get(m);
+  if (!v) {
+    const base = m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope);
+    const ids = new Set(base.map((n) => n.id));
+    v = collapseTriggers(base, m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)));
+    triggerCache.set(m, v);
+  }
+  return v;
+}
+
+/** Узлы диаграммы процесса: вложенные функции IDEF0 (idef0_parent) в BPMN не показываются, как и свёрнутые в значки триггеры. */
+export const visibleNodes = (m: ProcessLogicModel) => {
+  const hidden = triggerView(m).hidden;
+  return m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope && !hidden.has(n.id));
+};
+
+/** Стрелки диаграммы: без «событие → блок»; «X → событие» ведёт в блок (та же стрелка модели). */
+export const visibleFlows = (m: ProcessLogicModel) => triggerView(m).flows;
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 
@@ -108,7 +132,7 @@ export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: nu
   const order = new Map(ids.map((id, i) => [id, i] as const));
   const out = new Map<string, string[]>();
   const hasIn = new Set<string>();
-  for (const f of m.flows) {
+  for (const f of visibleFlows(m)) {
     const from = hostOf.get(f.from) ?? f.from;
     if (from === f.to || !order.has(from) || !order.has(f.to)) continue;
     out.set(from, [...(out.get(from) ?? []), f.to]);
@@ -226,4 +250,36 @@ export function wrapText(text: string, maxChars: number, maxLines: number): stri
     return cut;
   }
   return lines;
+}
+
+/**
+ * Всё, что нужно нарисовать: фигуры, добавочные элементы (документы, пулы, сообщения), значки триггеров и маршруты ВСЕХ стрелок,
+ * рассчитанные вместе (shared/bpmnRouting.ts): без общих портов и наложений. Общая функция редактора и просмотра.
+ */
+export function diagramLayout(m: ProcessLogicModel) {
+  const shown = visibleNodes(m);
+  const boxes = boxMap(shown);
+  const extras = diagramExtras(m, shown, boxes);
+  const tv = triggerView(m);
+  const flows = tv.flows.filter((f) => boxes.has(f.from) && boxes.has(f.to));
+  const withArtifacts = new Set(extras.artifacts.map((a) => a.nodeId));
+  const poolIds = new Set(extras.pools.map((p) => p.pool.id));
+  const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
+  const info = routeFlowsDetailed(
+    [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id) })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
+    [...flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true }))],
+    extras.artifacts.map((a) => a.box)
+  );
+  const routes = new Map([...info].map(([id, r]) => [id, r.pts] as const));
+  // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
+  const bottomUsed = new Set<string>();
+  for (const f of flows) {
+    const pts = routes.get(f.id);
+    const a = boxes.get(f.from)!;
+    const b = boxes.get(f.to)!;
+    if (!pts) continue;
+    if (Math.abs(pts[0][1] - (a.y + a.h)) < 0.5) bottomUsed.add(f.from);
+    if (Math.abs(pts[pts.length - 1][1] - (b.y + b.h)) < 0.5) bottomUsed.add(f.to);
+  }
+  return { shown, boxes, extras, flows, markers: tv.markers, routes, info, bottomUsed };
 }

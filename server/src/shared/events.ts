@@ -205,3 +205,8 @@ export function triggerGlyph(trigger: TriggerType, throwing: boolean): Glyph[] {
       return [];
   }
 }
+
+/** Значок, уменьшенный в k раз (для значка-триггера на блоке действия). */
+export function scaleGlyphs(glyphs: Glyph[], k: number): Glyph[] {
+  return glyphs.map((g) => (g.kind === "circle" ? { ...g, r: g.r * k } : { ...g, pts: g.pts.map(([x, y]) => [x * k, y * k] as GlyphPt) }));
+}

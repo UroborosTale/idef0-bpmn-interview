@@ -1,7 +1,8 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
-import { routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
+import { fixedRoute, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
+import { collapseTriggers } from "../shared/bpmnTriggers.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
@@ -17,7 +18,7 @@ export interface BpmnDiagramData {
   /** roleId — id роли дорожки; null у дорожки «Без исполнителя». */
   lanes: { roleId: string | null; name: string; x: number; y: number; w: number; h: number }[];
   /** nodeId — id узла модели; у служебных начала/конца (их нет в модели) его нет. */
-  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; /** Событие: вид, триггер и направление (залитый значок у выбрасывающих) */ event?: { position: EventPosition; trigger: TriggerType; throwing: boolean }; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean }[];
+  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; /** Событие: вид, триггер и направление (залитый значок у выбрасывающих) */ event?: { position: EventPosition; trigger: TriggerType; throwing: boolean }; /** Триггеры блока: события, свёрнутые в значки на блоке (на диаграмме отдельной фигуры и стрелки у них нет) */ markers?: { name: string; trigger: TriggerType; start: boolean }[]; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean }[];
   /** flowId — id потока модели (у служебных стрелок отсутствует); from/to — id фигур. */
   edges: { id: string; flowId?: string; from: string; to: string; points: [number, number][]; label?: string }[];
   /** data — документ, store — хранилище данных (информационная система), annotation — регламент; link — ассоциация с задачей. */
@@ -182,6 +183,9 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const nodes = view.nodes.filter((n) => !n.idef0_parent);
   const visibleIds = new Set(nodes.map((n) => n.id));
   const flows = view.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to));
+  // ожидающие события, ведущие прямо в блок действия, на диаграмме — значки на блоке (shared/bpmnTriggers.ts); в XML они остаются событиями
+  const tview = collapseTriggers(nodes, flows);
+  const isHidden = (nodeId: string) => tview.hidden.has(nodeId.replace(/^Node_/, ""));
 
   // синтетические старт/конец, если явных событий нет в модели (только для рендера)
   const hasExplicitStart = nodes.some((n) => n.type === "event" && n.subtype === "start");
@@ -232,7 +236,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // --- layout ---
   // граничные события в раскладке не участвуют: они стоят на границе своей задачи, а их стрелки идут «от задачи»
   const layoutNodes: LayoutNodeIn[] = nodes
-    .filter((n) => !isBoundary(n))
+    .filter((n) => !isBoundary(n) && !tview.hidden.has(n.id))
     .map((n) => {
       const size = NODE_SIZE[n.type] ?? NODE_SIZE.task;
       return {
@@ -250,8 +254,8 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     return n && isBoundary(n) ? hostOf(n).id : id;
   };
   const layoutEdges: LayoutEdgeIn[] = [
-    ...flows.map((f) => ({ id: f.id, from: nodeIdOf(layoutSource(f.from)), to: nodeIdOf(f.to) })),
-    ...synthFlows.map((f) => ({ id: f.id, from: f.from, to: f.to })),
+    ...tview.flows.map((f) => ({ id: f.id, from: nodeIdOf(layoutSource(f.from)), to: nodeIdOf(f.to) })),
+    ...synthFlows.filter((f) => ![f.from, f.to].some((id) => tview.hidden.has(id.replace(/^Node_/, "")))).map((f) => ({ id: f.id, from: f.from, to: f.to })),
   ];
   const layout = await layoutLayered(layoutNodes, layoutEdges, Math.max(laneCount, 1));
 
@@ -268,6 +272,11 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     if (b) hostBoxes.set(n.id, { x: b.x, y: b.y, w: b.width, h: b.height });
   }
   for (const [id, b] of boundaryBoxes(nodes, hostBoxes)) layout.boxes.set(nodeIdOf(id), { x: b.x, y: b.y, width: b.w, height: b.h });
+  // свёрнутое событие для XML стоит слева от своего блока (на диаграмме Visio его нет)
+  for (const id of tview.hidden) {
+    const target = hostBoxes.get(tview.links.get(id)!.outgoing.to);
+    if (target) layout.boxes.set(nodeIdOf(id), { x: target.x - 56, y: target.y + target.h / 2 - 18, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h });
+  }
   for (const b of layout.boxes.values()) layout.totalWidth = Math.max(layout.totalWidth, b.x + b.width + 80);
 
   // --- XML: flow elements ---
@@ -403,12 +412,15 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   for (const id of allNodeIds) {
     const box = layout.boxes.get(id);
     if (!box) continue;
-    diagramShapes.push({ id, ...shapeMeta.get(id)!, x: box.x, y: box.y, w: box.width, h: box.height });
+    // в XML у каждого элемента есть фигура, в том числе у свёрнутого события; на диаграмме Visio такое событие — значок на блоке
     shapesXml.push(
       `<bpmndi:BPMNShape id="${id}_di" bpmnElement="${id}"><dc:Bounds x="${Math.round(box.x)}" y="${Math.round(
         box.y
       )}" width="${box.width}" height="${box.height}" /></bpmndi:BPMNShape>`
     );
+    if (isHidden(id)) continue;
+    const markers = (tview.markers.get(nodes.find((n) => nodeIdOf(n.id) === id)?.id ?? "") ?? []).map((mk) => ({ name: mk.name, trigger: mk.spec.trigger, start: mk.start }));
+    diagramShapes.push({ id, ...shapeMeta.get(id)!, ...(markers.length > 0 ? { markers } : {}), x: box.x, y: box.y, w: box.width, h: box.height });
   }
 
   const laneSetXml = laneCount > 0 ? `<bpmn:laneSet id="LaneSet_1">${lanesXml.join("")}</bpmn:laneSet>` : "";
@@ -430,7 +442,9 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const poolLabel = (q: { name: string; code?: string | null }) => `${q.code ? `${q.code} ` : ""}${q.name}`;
   const poolEndId = (id: string) => (knownPools.has(id) ? `Pool_${id}` : nodeIdOf(id));
 
-  // стрелки и потоки сообщений прокладываются все вместе (shared/bpmnRouting.ts): без общих портов и наложений
+  // стрелки и потоки сообщений прокладываются все вместе (shared/bpmnRouting.ts): без общих портов и наложений.
+  // Два расчёта: для XML — со всеми событиями (свёрнутые стоят слева от блока), для диаграммы Visio — со свёрнутыми
+  // триггерами: без их фигур и стрелок «событие → блок».
   const withArtifacts = new Set(artifacts.map((a) => a.nodeId));
   const toBox = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
   const routeNodes: RouteNode[] = [
@@ -444,28 +458,35 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     }),
     ...[...poolRects].map(([id, r]) => ({ id: `Pool_${id}`, box: r, type: "pool" })),
   ];
-  const routed = routeFlows(routeNodes, [
-    ...flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to) })),
-    ...synthFlows.map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })),
-    ...messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true })),
-  ], artifacts.map((a) => a.box));
+  const messageFlows = messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true }));
+  const routed = routeFlows(
+    routeNodes,
+    // ручной маршрут стрелки учитывается и в XML — кроме стрелок к свёрнутым событиям: их стороны заданы для диаграммы без события
+    [...flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: tview.hidden.has(f.to) || tview.hidden.has(f.from) ? undefined : fixedRoute(f.route) })), ...synthFlows.map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
+    artifacts.map((a) => a.box)
+  );
+  const routedView = routeFlows(
+    routeNodes.filter((n) => !isHidden(n.id)),
+    [...tview.flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: fixedRoute(f.route) })), ...synthFlows.filter((sf) => !isHidden(sf.from) && !isHidden(sf.to)).map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
+    artifacts.map((a) => a.box)
+  );
 
   const edgesXml: string[] = [];
+  const waypointsOf = (points: [number, number][]) => points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
   for (const f of flows) {
     const points = routed.get(`flow:${f.id}`);
-    if (!points) continue;
-    diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
-    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
-    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${f.id}_di" bpmnElement="Flow_${f.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
+    if (points) edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${f.id}_di" bpmnElement="Flow_${f.id}">${waypointsOf(points)}</bpmndi:BPMNEdge>`);
+  }
+  for (const f of tview.flows) {
+    const points = routedView.get(`flow:${f.id}`);
+    if (points) diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
   }
   for (const sf of synthFlows) {
-    const points = routed.get(`flow:${sf.id}`);
-    if (!points) continue;
-    diagramEdges.push({ id: `Flow_${sf.id}`, from: sf.from, to: sf.to, points });
-    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
-    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${sf.id}_di" bpmnElement="Flow_${sf.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
+    const xmlPoints = routed.get(`flow:${sf.id}`);
+    if (xmlPoints) edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${sf.id}_di" bpmnElement="Flow_${sf.id}">${waypointsOf(xmlPoints)}</bpmndi:BPMNEdge>`);
+    const viewPoints = routedView.get(`flow:${sf.id}`);
+    if (viewPoints) diagramEdges.push({ id: `Flow_${sf.id}`, from: sf.from, to: sf.to, points: viewPoints });
   }
-
   const diagramPools: BpmnDiagramData["pools"] = [];
   const diagramMessages: BpmnDiagramData["messages"] = [];
   const participantsXml: string[] = [];
@@ -481,7 +502,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     const points = routed.get(`msg:${m.id}`) ?? fallback;
     participantsXml.push(`<bpmn:messageFlow id="Msg_${m.id}" name="${esc(m.name)}" sourceRef="${poolEndId(m.from)}" targetRef="${poolEndId(m.to)}" />`);
     poolShapesXml.push(`<bpmndi:BPMNEdge id="Msg_${m.id}_di" bpmnElement="Msg_${m.id}">${wp(points)}</bpmndi:BPMNEdge>`);
-    diagramMessages.push({ id: `Msg_${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), points, label: m.name ?? undefined });
+    diagramMessages.push({ id: `Msg_${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), points: routedView.get(`msg:${m.id}`) ?? points, label: m.name ?? undefined });
   }  const diagramLanes: BpmnDiagramData["lanes"] = [];
   const laneShapesXml = [...laneRoles.map((r) => r.id), ...(hasUnassigned ? ["__unassigned__"] : [])].map((rid, i) => {
     const bounds = layout.laneBounds[i] ?? { y: 60, height: 150 };

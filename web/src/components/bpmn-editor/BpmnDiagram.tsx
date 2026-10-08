@@ -1,8 +1,8 @@
 import { useMemo, useRef } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { useViewport } from "../editor-core/hooks";
-import { boxMap, diagramExtras, isBoundary, modelExtents, positionsFromBpmnXml, visibleNodes, withLayout } from "./geometry";
-import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape } from "./shapes";
+import { diagramLayout, isBoundary, modelExtents, positionsFromBpmnXml, withLayout } from "./geometry";
+import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers } from "./shapes";
 
 /**
  * Просмотр BPMN только для чтения: те же фигуры, что в редакторе, без сторонних библиотек.
@@ -33,9 +33,7 @@ export default function BpmnDiagram({
 
   if (!laid) return <p className="muted">Диаграмма BPMN ещё не сгенерирована.</p>;
 
-  const shown = visibleNodes(laid);
-  const boxes = boxMap(shown);
-  const extras = diagramExtras(laid, shown, boxes);
+  const { shown, boxes, extras, flows, markers, routes, bottomUsed } = diagramLayout(laid);
   const W = Math.max(modelExtents(laid).w, 1400);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -65,15 +63,12 @@ export default function BpmnDiagram({
         <ArrowDefs />
         <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
           <LanesLayer model={laid} width={W} />
-          {laid.flows.map((f) => {
-            const a = boxes.get(f.from);
-            const b = boxes.get(f.to);
-            if (!a || !b) return null;
-            const others = shown.filter((n) => n.id !== f.from && n.id !== f.to).map((n) => boxes.get(n.id)!);
-            return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} selected={false} />;
+          {flows.map((f) => {
+            const points = routes.get(f.id);
+            return points ? <FlowShape key={f.id} flow={f} points={points} selected={false} /> : null;
           })}
           {extras.messages.map(({ message, points }) => (
-            <MessageShape key={message.id} points={points} label={message.name} />
+            <MessageShape key={message.id} points={routes.get(`msg:${message.id}`) ?? points} label={message.name} />
           ))}
           {extras.pools.map(({ pool, box }) => (
             <PoolShape key={pool.id} pool={pool} box={box} />
@@ -82,8 +77,9 @@ export default function BpmnDiagram({
             <ArtifactShape key={a.key} artifact={a} />
           ))}
           {shown.map((n) => (
-            <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} boundary={isBoundary(n, shown)} />
+            <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
           ))}
+          {[...markers].map(([blockId, list]) => (boxes.has(blockId) ? <TriggerMarkers key={blockId} box={boxes.get(blockId)!} markers={list} selectedId={selectedId} /> : null))}
         </g>
       </svg>
       <div className="bpe-zoom">

@@ -1,7 +1,7 @@
 import type { SessionRecord } from "../repo.js";
 import type { ProcessLogicModel } from "../types/model.js";
 import { layoutLayered, type LayoutNodeIn, type LayoutEdgeIn } from "../pipeline/layout.js";
-import { routeFlows } from "../shared/bpmnRouting.js";
+import { fixedRoute, routeFlows } from "../shared/bpmnRouting.js";
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
@@ -26,7 +26,7 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
       laneIndex: n.role_id ? roleIndex.get(n.role_id) ?? model.roles.length : model.roles.length,
     };
   });
-  const layoutEdges: LayoutEdgeIn[] = model.flows.map((f) => ({ id: f.id, from: f.from, to: f.to }));
+  const layoutEdges: LayoutEdgeIn[] = model.flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) }));
   const laneCount = model.roles.length + 1;
   const layout = await layoutLayered(layoutNodes, layoutEdges, laneCount);
 
