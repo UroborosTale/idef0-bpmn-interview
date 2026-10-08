@@ -98,7 +98,11 @@ sessionsRouter.patch("/sessions/:id", (req, res) => {
     return;
   }
   const body = req.body as { title?: string; meta?: SessionMeta };
-  const updated = updateSession(req.params.id, { title: body.title, meta: body.meta });
+  // мета правится слиянием: устаревший клиент не затирает чужие изменения; доступ агентов — отдельное решение аналитика для конфиденциальной
+  // сессии, поэтому он сбрасывается, когда конфиденциальность включают заново, и не хранится у обычных сессий
+  let meta = body.meta ? { ...session.meta, ...body.meta } : undefined;
+  if (meta && (!meta.confidential || (!session.meta.confidential && body.meta?.agentAccess === undefined))) meta = { ...meta, agentAccess: false };
+  const updated = updateSession(req.params.id, { title: body.title, meta });
   logAudit(req.params.id, "analyst", "session_meta_updated", body);
   res.json(updated);
 });

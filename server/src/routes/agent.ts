@@ -451,14 +451,22 @@ agentRouter.post("/agent/sessions/:id/questions", (req, res) => {
   for (const q of live) perScope.set(q.scopeNodeId, (perScope.get(q.scopeNodeId) ?? 0) + 1);
   const added: { question: ReturnType<typeof addQuestion>["question"]; duplicate: boolean }[] = [];
   const skipped: { text: string; reason: string }[] = [];
+  let liveCount = live.length;
   parsed.data.questions.forEach((q, i) => {
     const scope = scopes[i] ?? null;
+    if (liveCount >= MAX_LIVE_QUESTIONS) {
+      skipped.push({ text: q.text, reason: `в списке уже ${MAX_LIVE_QUESTIONS} ждущих вопросов — дождитесь, пока аналитик их разберёт` });
+      return;
+    }
     if ((perScope.get(scope) ?? 0) >= MAX_QUESTIONS_PER_SCOPE) {
       skipped.push({ text: q.text, reason: `по этой теме уже ${MAX_QUESTIONS_PER_SCOPE} вопросов — отложите на следующий раз` });
       return;
     }
     const r = addQuestion({ sessionId: session.id, text: q.text, addressee: q.addressee, scopeNodeId: scope, reason: q.reason, priority: q.priority, agent: parsed.data.agent, taskId: parsed.data.task_id });
-    if (!r.duplicate) perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
+    if (!r.duplicate) {
+      perScope.set(scope, (perScope.get(scope) ?? 0) + 1);
+      liveCount++;
+    }
     added.push(r);
   });
   const fresh = added.filter((a) => !a.duplicate).length;

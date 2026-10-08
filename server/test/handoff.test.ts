@@ -67,7 +67,29 @@ describe("передача ответов интервью моделисту", 
     expect(second.body.task.id).not.toBe(first.body.task.id);
   });
 
-  it("длинный список не выходит за лимит текста задания и отсылает к list_questions", async () => {
+  it("отменённое задание передачей не считается: ответы можно передать снова; исправленный ответ тоже", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Повторная передача" } })).body.id;
+    await app.call("PUT", `/sessions/${s}/model`, structuredModel());
+    const q = (await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions: [{ text: "Кто подписывает акт приёмки?" }] })).body.added[0].id;
+    await app.call("POST", `/agent-questions/${q}/status`, { status: "answered", answer: "Начальник склада" });
+    const first = await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {});
+    expect(first.status).toBe(201);
+    expect((await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {})).status).toBe(409);
+    // аналитик отменил задание — ответы снова ждут передачи
+    await app.call("POST", `/tasks/${first.body.task.id}/cancel`);
+    const second = await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {});
+    expect(second.status).toBe(201);
+    expect(second.body.task.id).not.toBe(first.body.task.id);
+    // тот же ответ повторно отмечен — это не новое сведение; исправленный текст — новое
+    await app.call("POST", `/agent-questions/${q}/status`, { status: "answered", answer: "Начальник склада" });
+    expect((await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {})).status).toBe(409);
+    await app.call("POST", `/agent-questions/${q}/status`, { status: "answered", answer: "Заместитель начальника склада" });
+    const third = await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {});
+    expect(third.status).toBe(201);
+    expect(third.body.task.text).toContain("Заместитель начальника склада");
+  });
+
+  it("длинный список не выходит за лимит текста задания; не поместившееся остаётся непереданным и уходит следующим заданием", async () => {
     const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Длинный" } })).body.id;
     await app.call("PUT", `/sessions/${s}/model`, structuredModel());
     for (let i = 0; i < 20; i++) {
@@ -75,8 +97,18 @@ describe("передача ответов интервью моделисту", 
       await app.call("POST", `/agent-questions/${qid}/status`, { status: "answered", answer: "ответ ".repeat(40) });
     }
     const r = await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {});
-    expect(r.body.count).toBe(20);
+    expect(r.body.count).toBeLessThan(20);
+    expect(r.body.count).toBeGreaterThan(0);
     expect(r.body.task.text.length).toBeLessThanOrEqual(2000);
-    expect(r.body.task.text).toMatch(/и ещё \d+ — list_questions/);
+    expect(r.body.task.text).toMatch(new RegExp(`ещё ${20 - r.body.count} ответов не вошло`));
+    // остаток не потерян: следующее задание забирает оставшиеся
+    let handed = r.body.count;
+    for (let i = 0; i < 10 && handed < 20; i++) {
+      const next = await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {});
+      expect(next.status).toBe(201);
+      handed += next.body.count;
+    }
+    expect(handed).toBe(20);
+    expect((await app.call("POST", `/sessions/${s}/agent-questions/handoff`, {})).status).toBe(409);
   });
 });

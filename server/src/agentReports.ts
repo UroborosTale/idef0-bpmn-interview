@@ -31,8 +31,13 @@ if (!(db.prepare(`PRAGMA table_info(agent_reports)`).all() as { name: string }[]
 /** Отпечаток содержания модели: раскладка диаграмм, ручные маршруты стрелок и номер версии (растёт при каждом сохранении) в него не входят — смысла процесса они не меняют. */
 export function modelFingerprint(model: unknown): string | null {
   if (!model) return null;
-  const skip = new Set(["layout", "idef0_layout", "route", "version"]);
-  return createHash("sha1").update(JSON.stringify(model, (k, v) => (skip.has(k) ? undefined : v))).digest("hex").slice(0, 16);
+  const skip = new Set(["layout", "idef0_layout", "route"]);
+  const process = (model as { process?: unknown }).process;
+  // номер версии процесса растёт при каждом сохранении; одноимённые поля других записей — содержание и в отпечаток входят
+  return createHash("sha1")
+    .update(JSON.stringify(model, function (this: unknown, k, v) { return skip.has(k) || (k === "version" && this === process) ? undefined : v; }))
+    .digest("hex")
+    .slice(0, 16);
 }
 
 export type ReportKind = "analysis" | "review" | "methodology" | "other";

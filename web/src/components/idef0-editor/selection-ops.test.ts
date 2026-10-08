@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ProcessLogicModel } from "../../types";
 import { structuredModel } from "../../test/fixtures";
-import { alignLeft, alignTop, blockBoxes, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, moveGroup, pasteFragment, selectableIds } from "./selection-ops";
+import { alignLeft, alignTop, blockBoxes, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasDecomposition, moveGroup, pasteFragment, selectableIds } from "./selection-ops";
 import { MIN_POS, withIdef0Layout } from "./geometry";
 
 type M = ProcessLogicModel;
@@ -91,6 +91,25 @@ describe("блоки IDEF0: копирование и вставка", () => {
     const names = again.model.nodes.map((n) => n.name);
     expect(new Set(names).size).toBe(names.length);
     expect(again.model.nodes.filter((n) => again.ids.includes(n.id)).every((n) => /\(копия 2\)$/.test(n.name))).toBe(true);
+  });
+
+  it("блоки, которые не двигали (позиции в модели нет), при вставке сохраняют взаимное положение, а не слипаются", () => {
+    const base = structuredModel();
+    const m: M = { ...base, nodes: base.nodes.map((n) => ({ ...n, idef0_layout: undefined })) };
+    const boxes = blockBoxes(m, null);
+    expect(new Set([...boxes.values()].map((b) => `${b.x}:${b.y}`)).size).toBe(boxes.size); // на диаграмме они стоят порознь
+    const frag = copyFragment(m, null, ["s1", "s2"])!;
+    const r = pasteFragment(m, null, frag, 40, 40);
+    const [a, b] = r.ids.map((id) => pos(r.model, id));
+    expect(a).not.toEqual(b);
+    expect({ dx: b.x - a.x, dy: b.y - a.y }).toEqual({ dx: boxes.get("s2")!.x - boxes.get("s1")!.x, dy: boxes.get("s2")!.y - boxes.get("s1")!.y });
+  });
+
+  it("hasDecomposition: у блока с вложенными функциями — да, у листа — нет (вырезать такой блок нельзя)", () => {
+    const m = model();
+    expect(hasDecomposition(m, ["s1"])).toBe(true);
+    expect(hasDecomposition(m, ["o1", "o2"])).toBe(false);
+    expect(hasDecomposition(m, [])).toBe(false);
   });
 
   it("копировать нечего — null; блоки другой диаграммы не копируются", () => {

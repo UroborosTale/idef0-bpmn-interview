@@ -39,7 +39,24 @@ export function restoreBackup(file: string): { restored: string; previous: strin
   const live = path.join(dataDir, "app.sqlite");
   const previous = path.join(dir, `app-before-restore-${stampNow()}.sqlite`);
   fs.mkdirSync(dir, { recursive: true });
-  if (fs.existsSync(live)) fs.copyFileSync(live, previous);
+  if (fs.existsSync(live)) {
+    // после аварийной остановки свежие записи могут лежать только в журнале (-wal): сначала переносим их в основной файл,
+    // иначе «прежняя» копия окажется без них, а журнал мы удаляем
+    if (fs.existsSync(`${live}-wal`) && fs.statSync(`${live}-wal`).size > 0) {
+      try {
+        const open = new Database(live, { fileMustExist: true });
+        try {
+          open.pragma("wal_checkpoint(TRUNCATE)");
+        } finally {
+          open.close();
+        }
+      } catch {
+        // не получилось слить журнал — сохраняем его рядом, чтобы ничего не потерять
+        for (const ext of ["-wal", "-shm"]) if (fs.existsSync(`${live}${ext}`)) fs.copyFileSync(`${live}${ext}`, `${previous}${ext}`);
+      }
+    }
+    fs.copyFileSync(live, previous);
+  }
   for (const ext of ["-wal", "-shm"]) fs.rmSync(`${live}${ext}`, { force: true });
   fs.copyFileSync(file, live);
   return { restored: live, previous };

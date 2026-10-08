@@ -83,20 +83,22 @@ function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<
     boxes.set(n.id, { x, y, width: n.width, height: n.height });
   }
 
+  // Фигуры, заданные в редакторе, стоят на своих местах — остальные обходят их.
+  for (const n of nodes) if (n.fixed) boxes.set(n.id, { x: n.fixed.x, y: n.fixed.y, width: n.width, height: n.height });
+
   // Фигуры одной дорожки не должны налезать друг на друга (две ветки шлюза попадают в один слой ELK):
-  // идём слева направо и сдвигаем перекрывающуюся фигуру правее предыдущей.
+  // идём слева направо и сдвигаем перекрывающуюся фигуру правее предыдущей; закреплённую фигуру не двигаем.
   const byLane = new Map<number, string[]>();
-  for (const n of nodes) if (!pinned.has(n.id)) byLane.set(n.laneIndex, [...(byLane.get(n.laneIndex) ?? []), n.id]);
+  for (const n of nodes) byLane.set(n.laneIndex, [...(byLane.get(n.laneIndex) ?? []), n.id]);
   for (const ids of byLane.values()) {
     ids.sort((a, b) => boxes.get(a)!.x - boxes.get(b)!.x);
     let right = -Infinity;
     for (const id of ids) {
       const b = boxes.get(id)!;
-      if (b.x < right + 30) b.x = right + 30;
-      right = b.x + b.width;
+      if (!pinned.has(id) && b.x < right + 30) b.x = right + 30;
+      right = Math.max(right, b.x + b.width);
     }
   }
-  for (const n of nodes) if (n.fixed) boxes.set(n.id, { x: n.fixed.x, y: n.fixed.y, width: n.width, height: n.height });
   return boxes;
 }
 
@@ -121,7 +123,7 @@ export const evaluationsFor = (flows: number) => Math.min(MAX_EVALUATIONS, Math.
  * запас, на слой позже. Ход принимается, если прокладка стрелок стала лучше (пересечения, проходы сквозь фигуры, длина).
  * Исходный вариант всегда остаётся запасным — хуже прежнего результат не бывает.
  */
-function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: Placement, extras?: LayoutExtras): Placement {
+async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: Placement, extras?: LayoutExtras): Promise<Placement> {
   const free = nodes.filter((n) => !n.fixed);
   const maxEvals = evaluationsFor(edges.length);
   // LAYOUT_SEARCH=0 выключает подбор (для сравнения и на случай жалоб на скорость)
@@ -147,9 +149,12 @@ function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: P
   let cur = start;
   let curScore = score(cur);
   let evals = 1;
-  const tryMove = (next: Placement): boolean => {
+  // подбор синхронный и считает десятки прокладок: между вариантами отдаём управление, чтобы сервер отвечал другим запросам
+  const yieldToLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
+  const tryMove = async (next: Placement): Promise<boolean> => {
     if (evals >= maxEvals) return false;
     evals++;
+    if (evals % 3 === 0) await yieldToLoop();
     const s = score(next);
     if (s < curScore - 1e-9) {
       cur = next;
@@ -173,7 +178,7 @@ function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: P
           const rank = new Map(cur.rank);
           rank.set(ids[i], cur.rank.get(ids[j])!);
           rank.set(ids[j], cur.rank.get(ids[i])!);
-          if (tryMove({ rawX: cur.rawX, rank })) improved = true;
+          if (await tryMove({ rawX: cur.rawX, rank })) improved = true;
         }
       }
     }
@@ -185,7 +190,7 @@ function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], start: P
       if (next === undefined || after.length === 0 || !after.every((sx) => sx > next + 1)) continue;
       const rawX = new Map(cur.rawX);
       rawX.set(n.id, next);
-      if (tryMove({ rawX, rank: cur.rank })) improved = true;
+      if (await tryMove({ rawX, rank: cur.rank })) improved = true;
     }
     if (!improved) break;
   }
@@ -223,7 +228,7 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
 
   const edgeList = edges.filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
   const start: Placement = { rawX: elkX, rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
-  const best = improvePlacement(nodes, edgeList, start, extras);
+  const best = await improvePlacement(nodes, edgeList, start, extras);
   const boxes = placeBoxes(nodes, best.rawX, best.rank);
 
   let maxRight = 0;

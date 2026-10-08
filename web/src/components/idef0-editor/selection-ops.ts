@@ -48,6 +48,9 @@ export function moveGroup(base: M, parentId: string | null, ids: string[], dx: n
   return place(base, new Map(ids.filter((id) => boxes.has(id)).map((id) => [id, { x: snap(boxes.get(id)!.x + sx), y: snap(boxes.get(id)!.y + sy) }] as const)));
 }
 
+/** Есть ли у выбранных блоков вложенные функции (декомпозиция): копия их не переносит, а удаление уничтожает. */
+export const hasDecomposition = (m: M, ids: string[]): boolean => m.nodes.some((n) => n.idef0_parent !== null && n.idef0_parent !== undefined && ids.includes(n.idef0_parent));
+
 export const deleteGroup = (m: M, ids: string[]): M => ids.reduce((acc, id) => deleteNode(acc, id), m);
 
 /** Выровнять левые края по самому левому блоку. */
@@ -109,8 +112,9 @@ export interface Fragment {
 
 /** Фрагмент для буфера; null — копировать нечего. Источники в интервью и подтверждения не копируются. */
 export function copyFragment(m: M, parentId: string | null, ids: string[]): Fragment | null {
-  const known = new Set(selectableIds(m, parentId));
-  const nodes = m.nodes.filter((n) => ids.includes(n.id) && known.has(n.id)).map((n) => structuredClone(n));
+  const boxes = blockBoxes(m, parentId);
+  // положение берём с диаграммы, а не из модели: у блоков, которые не двигали, своей позиции в модели ещё нет
+  const nodes = m.nodes.filter((n) => ids.includes(n.id) && boxes.has(n.id)).map((n) => ({ ...structuredClone(n), idef0_layout: { x: boxes.get(n.id)!.x, y: boxes.get(n.id)!.y } }));
   return nodes.length > 0 ? { nodes } : null;
 }
 

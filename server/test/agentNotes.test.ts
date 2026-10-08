@@ -76,6 +76,22 @@ describe("хранилище вопросов к интервью и отчёт�
     expect(r.body.skipped[0].reason).toMatch(/отложите/);
   });
 
+  it("вопросы: общий лимит ждущих (60) учитывает и сам пакет — его нельзя превысить одним вызовом", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Общий лимит" } })).body.id;
+    await app.call("PUT", `/sessions/${s}/model`, structuredModel());
+    const fill = async (scope: string, n: number) => {
+      const questions = Array.from({ length: n }, (_, i) => ({ text: `Вопрос ${scope} номер ${i + 1} про сроки?`, scope }));
+      expect((await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions })).body.added).toHaveLength(n);
+    };
+    for (const scope of ["o1", "o2", "o3", "s1", "s2"]) await fill(scope, 10);
+    await fill("b0", 9); // 59 ждущих
+    const batch = await app.call("POST", `/agent/sessions/${s}/questions`, { agent: "интервьюер", questions: ["b1", "b2", "b9"].map((scope) => ({ text: `Ещё вопрос ${scope} про сроки?`, scope })) });
+    expect(batch.body.added).toHaveLength(1); // только до 60
+    expect(batch.body.skipped).toHaveLength(2);
+    expect(batch.body.skipped[0].reason).toMatch(/60 ждущих вопросов/);
+    expect(((await app.call("GET", `/sessions/${s}/agent-questions`)).body as any[]).filter((q) => q.status === "open")).toHaveLength(60);
+  });
+
   it("вопросы: аналитик отмечает заданный, отвеченный (с фрагментом) и снятый; ответ сохраняется только у отвеченного", async () => {
     const qid = (await app.call("GET", `/sessions/${id}/agent-questions`)).body.find((x: any) => x.text.startsWith("Что происходит"))!.id;
     expect((await app.call("POST", `/agent-questions/${qid}/status`, { status: "asked" })).body.status).toBe("asked");
@@ -241,5 +257,18 @@ describe("хранилище вопросов к интервью и отчёт�
     const { db } = await import("../src/db.js");
     expect(db.prepare(`SELECT COUNT(*) AS n FROM agent_questions WHERE session_id = ?`).get(s)).toEqual({ n: 0 });
     expect(db.prepare(`SELECT COUNT(*) AS n FROM agent_reports WHERE session_id = ?`).get(s)).toEqual({ n: 0 });
+  });
+});
+
+
+describe("отпечаток модели для пометки устаревшего отчёта", () => {
+  it("номер версии процесса, раскладка и маршруты в отпечаток не входят, а поле version у других записей — входит", async () => {
+    const { modelFingerprint } = await import("../src/agentReports.js");
+    const base = { process: { name: "П", version: "0.1" }, nodes: [{ id: "n1", name: "Шаг", layout: { x: 1, y: 2 }, version: "a" }], flows: [{ id: "f", route: { channel: 5 } }] };
+    const same = { process: { name: "П", version: "0.9" }, nodes: [{ id: "n1", name: "Шаг", layout: { x: 500, y: 600 }, version: "a" }], flows: [{ id: "f", route: { channel: 99 } }] };
+    expect(modelFingerprint(same)).toBe(modelFingerprint(base));
+    const changed = { ...same, nodes: [{ id: "n1", name: "Шаг", layout: { x: 1, y: 2 }, version: "b" }] };
+    expect(modelFingerprint(changed)).not.toBe(modelFingerprint(base));
+    expect(modelFingerprint(null)).toBeNull();
   });
 });

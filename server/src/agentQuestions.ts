@@ -1,5 +1,6 @@
 import { customAlphabet } from "nanoid";
 import { db } from "./db.js";
+import { getTask } from "./agentTasks.js";
 
 const shortId = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 8);
 
@@ -142,16 +143,18 @@ export function addQuestion(input: {
 /** Решение аналитика: задан на интервью, получен ответ, снят. Ответ и фрагмент имеют смысл только для «answered». */
 export function setQuestionStatus(id: string, status: QuestionStatus, extra: { answer?: string | null; fragmentId?: string | null } = {}): AgentQuestion | null {
   const answered = status === "answered";
+  // исправленный ответ — новые сведения для моделиста: прежняя передача к нему не относится
+  const before = getQuestion(id);
   const res = db
     .prepare(`UPDATE agent_questions SET status = ?, answer = ?, fragment_id = ?, updated_at = ? WHERE id = ?`)
     .run(status, answered ? extra.answer?.trim() || null : null, answered ? extra.fragmentId ?? null : null, new Date().toISOString(), id);
-  if (!answered) db.prepare(`UPDATE agent_questions SET handoff_task_id = NULL WHERE id = ?`).run(id);
+  if (!answered || (before && before.answer !== (extra.answer?.trim() || null))) db.prepare(`UPDATE agent_questions SET handoff_task_id = NULL WHERE id = ?`).run(id);
   return res.changes > 0 ? getQuestion(id) : null;
 }
 
-/** Вопросы с полученным ответом, которые ещё не переданы моделисту. */
+/** Вопросы с полученным ответом, которые ещё не переданы моделисту. Отменённое задание передачей не считается. */
 export function unhandedAnswers(sessionId: string): AgentQuestion[] {
-  return listQuestions(sessionId, "answered").filter((q) => !q.handoffTaskId);
+  return listQuestions(sessionId, "answered").filter((q) => !q.handoffTaskId || getTask(q.handoffTaskId)?.status === "cancelled");
 }
 
 export function markHandedOff(ids: string[], taskId: string): void {

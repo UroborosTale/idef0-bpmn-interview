@@ -20,21 +20,22 @@ export function handOffAnswers(session: SessionRecord, createdBy: string): { tas
   const codes = session.model ? new Map([...functionCodes(session.model), ...stepCodes(session.model)]) : new Map<string, string>();
   const head = `Внеси в модель ответы владельца процесса, полученные на интервью (${answered.length}). Тексты — get_fragments; факты добавляй с цитатой, чего в ответе нет — не выдумывай.`;
   const lines: string[] = [];
+  const included: typeof answered = [];
   let used = head.length;
   for (const [i, q] of answered.entries()) {
     const where = q.scopeNodeId ? codes.get(q.scopeNodeId) ?? q.scopeNodeId : "процесс в целом";
     const line = `${i + 1}. [${where}] ${clip(q.text, 160)} — ${q.answer ? `«${clip(q.answer, 220)}»` : "ответ дан устно"}${q.fragmentId ? ` [${q.fragmentId}]` : ""}`;
-    if (used + line.length + 1 > MAX_TEXT) {
-      lines.push(`… и ещё ${answered.length - i} — list_questions со статусом answered.`);
-      break;
-    }
+    if (used + line.length + 90 > MAX_TEXT) break; // запас под строку о непереданных
     lines.push(line);
+    included.push(q);
     used += line.length + 1;
   }
+  // что не поместилось, остаётся непереданным: его заберёт следующее задание (кнопка «Передать» остаётся доступной)
+  if (included.length < answered.length) lines.push(`… ещё ${answered.length - included.length} ответов не вошло — они в следующем задании (list_questions со статусом answered).`);
   // все ответы про одну функцию — задание привязывается к ней, иначе к процессу в целом
-  const scopes = new Set(answered.map((q) => q.scopeNodeId));
+  const scopes = new Set(included.map((q) => q.scopeNodeId));
   const scope = scopes.size === 1 ? [...scopes][0] : null;
   const task = createTask({ sessionId: session.id, text: [head, ...lines].join("\n"), scopeNodeId: scope, agent: HANDOFF_AGENT, createdBy });
-  markHandedOff(answered.map((q) => q.id), task.id);
-  return { task, count: answered.length };
+  markHandedOff(included.map((q) => q.id), task.id);
+  return { task, count: included.length };
 }

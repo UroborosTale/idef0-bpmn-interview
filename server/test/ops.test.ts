@@ -99,6 +99,33 @@ describe("резервные копии", () => {
     }
   }, 60_000);
 
+  it("восстановление после аварийной остановки: записи, оставшиеся только в журнале WAL, попадают в сохранённую прежнюю базу", () => {
+    // «живая» база с несброшенным журналом: автоматический сброс выключен, файлы копируются при открытом соединении
+    const src = tmp();
+    const open = new Database(path.join(src, "app.sqlite"));
+    open.pragma("journal_mode = WAL");
+    open.pragma("wal_autocheckpoint = 0");
+    open.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY)`);
+    open.checkpoint?.();
+    for (let i = 0; i < 4; i++) open.prepare(`INSERT INTO sessions VALUES (?)`).run(`w${i}`);
+    const data = tmp();
+    fs.copyFileSync(path.join(src, "app.sqlite"), path.join(data, "app.sqlite"));
+    fs.copyFileSync(path.join(src, "app.sqlite-wal"), path.join(data, "app.sqlite-wal"));
+    open.close();
+    expect(fs.statSync(path.join(data, "app.sqlite-wal")).size).toBeGreaterThan(0);
+    const copy = path.join(tmp(), "app-20260101-000000.sqlite");
+    makeDb(copy, 7);
+    const r = spawnSync(process.execPath, ["--import", "tsx", "src/scripts/restore.ts", copy, "--yes"], { cwd: path.resolve(__dirname, ".."), env: { ...process.env, DATA_DIR: data }, encoding: "utf8" });
+    expect(r.status, r.stderr).toBe(0);
+    const saved = fs.readdirSync(path.join(data, "backups")).find((f) => /^app-before-restore-.*\.sqlite$/.test(f))!;
+    const before = new Database(path.join(data, "backups", saved), { readonly: true });
+    expect(before.prepare(`SELECT COUNT(*) AS n FROM sessions`).get()).toEqual({ n: 4 }); // записи из журнала не потеряны
+    before.close();
+    const live = new Database(path.join(data, "app.sqlite"), { readonly: true });
+    expect(live.prepare(`SELECT COUNT(*) AS n FROM sessions`).get()).toEqual({ n: 7 });
+    live.close();
+  }, 60_000);
+
   it("восстановление: нужна отметка --yes, битая копия отклоняется, прежняя база сохраняется рядом", () => {
     const data = tmp();
     makeDb(path.join(data, "app.sqlite"), 1);

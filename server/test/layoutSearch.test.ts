@@ -79,6 +79,18 @@ describe("подбор раскладки: меньше пересечений �
     expect([s.x, s.y]).toEqual([777, 123]);
   });
 
+  it("закреплённая в редакторе фигура остаётся на месте, остальные в дорожке её обходят и не налезают", async () => {
+    const nodes = ["a", "b", "c", "d", "e"].map((id) => ({ id, width: 100, height: 80, laneIndex: 0, type: "task", fixed: id === "c" ? { x: 330, y: 70 } : null }));
+    const edges = [["a", "b"], ["b", "c"], ["c", "d"], ["d", "e"]].map(([from, to], i) => ({ id: `e${i}`, from, to }));
+    const r = await layoutLayered(nodes, edges, 1);
+    expect(r.boxes.get("c")).toMatchObject({ x: 330, y: 70 });
+    const boxes = [...r.boxes.entries()];
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+      const [[ia, p], [ib, q]] = [boxes[i], boxes[j]];
+      expect(p.x < q.x + q.width && p.x + p.width > q.x && p.y < q.y + q.height && p.y + p.height > q.y, `${ia} и ${ib} налезают`).toBe(false);
+    }
+  });
+
   it("layoutLayered: ветки шлюза в одной дорожке — порядок выбирается так, чтобы стрелки не пересекались; ничего не теряется", async () => {
     // g → a → m, g → b → m, g → c → m; одна дорожка; возврат m → g не нужен. Любой порядок допустим, но пересечений быть не должно.
     const nodes = ["g", "a", "b", "c", "m", "end"].map((id) => ({ id, width: id === "g" || id === "m" ? 50 : 100, height: id === "g" || id === "m" ? 50 : 80, laneIndex: 0, type: id === "g" || id === "m" ? "gateway" : id === "end" ? "event" : "task" }));

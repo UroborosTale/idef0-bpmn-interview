@@ -8,7 +8,7 @@ import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops"
 import MiniMap from "../bpmn-editor/MiniMap";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
 import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
-import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
+import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { ArrowShape, BlockShape, Idef0Defs } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -363,6 +363,8 @@ export default function Idef0Editor({
     }
     if (mod && key("x")) {
       e.preventDefault();
+      // вырезание = копия + удаление, а копия не берёт вложенные функции: блок с декомпозицией так потерял бы её
+      if (hasDecomposition(draftRef.current, pickedIds)) return showHint("Вырезать нельзя: у блока есть вложенные функции. Скопируйте или перенесите блок");
       copySelected();
       deleteSelected();
       return;
