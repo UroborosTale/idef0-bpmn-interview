@@ -13,6 +13,7 @@
     "mcp": "tsx src/mcp/index.ts",
     "agent:check": "tsx src/scripts/agent-check.ts",
     "agent:demo": "tsx src/scripts/agent-demo.ts",
+    "agent:prompt": "tsx src/scripts/agent-prompt.ts",
     "eval:b002": "tsx src/scripts/eval-model.ts",
     "seed:process": "tsx src/scripts/seed-process.ts",
     "seed:b002": "tsx src/scripts/seed-process.ts b002",
