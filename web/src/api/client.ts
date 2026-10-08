@@ -67,7 +67,6 @@ export const api = {
   createTask: (id: string, task: { text: string; scope?: string | null; agent?: string }) => req<AgentTaskRow>("POST", `/sessions/${id}/tasks`, task),
   cancelTask: (taskId: string) => req<AgentTaskRow>("POST", `/tasks/${taskId}/cancel`, {}),
   listQuestions: (id: string) => req<AgentQuestionRow[]>("GET", `/sessions/${id}/agent-questions`),
-  addQuestion: (id: string, q: { text: string; addressee?: string; scope?: string; priority?: AgentQuestionRow["priority"] }) => req<AgentQuestionRow>("POST", `/sessions/${id}/agent-questions`, q),
   setQuestionStatus: (qid: string, body: { status: AgentQuestionRow["status"]; answer?: string }) => req<AgentQuestionRow>("POST", `/agent-questions/${qid}/status`, body),
   listReports: (id: string) => req<AgentReportRow[]>("GET", `/sessions/${id}/agent-reports`),
   setReportStatus: (rid: string, status: AgentReportRow["status"]) => req<AgentReportRow>("POST", `/agent-reports/${rid}/status`, { status }),

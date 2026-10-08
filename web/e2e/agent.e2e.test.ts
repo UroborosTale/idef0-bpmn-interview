@@ -155,16 +155,6 @@ describe("вопросы и отчёты агентов в студии", () => 
     expect(stored.map((q) => q.status).sort()).toEqual(["answered", "asked"]);
     expect(stored.find((q) => q.status === "asked").scopeNodeId).toBe(fnId);
 
-    // свой вопрос аналитика: форма, привязка к выделенной функции не нужна — вопрос к процессу в целом
-    await page.getByPlaceholder(/Свой вопрос к интервью/).fill("Кто заменяет директора в отпуске?");
-    await page.getByLabel("Кого спросить").fill("Секретарь");
-    await page.getByRole("button", { name: "Добавить вопрос" }).click();
-    const own = page.locator(".question", { hasText: "Кто заменяет директора" });
-    await own.waitFor();
-    expect(await own.innerText()).toContain("добавлен вручную");
-    expect(await own.innerText()).toContain("спросить: Секретарь");
-    expect((await api<any[]>("GET", `/agent/sessions/${id}/questions`)).body).toHaveLength(3);
-
     // отчёт: открытие отмечает прочитанным, архив убирает из списка
     const rTab = page.locator(".problems-head button", { hasText: "Отчёты" });
     await rTab.locator(".pill-count", { hasText: "1" }).waitFor();

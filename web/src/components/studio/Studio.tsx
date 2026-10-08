@@ -170,14 +170,6 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
     }
     await loadProposals();
   };
-  const addQuestion = async (q: { text: string; addressee?: string; scope: string | null; priority: AgentQuestionRow["priority"] }) => {
-    try {
-      await api.addQuestion(session.id, { text: q.text, priority: q.priority, ...(q.addressee ? { addressee: q.addressee } : {}), ...(q.scope ? { scope: q.scope } : {}) });
-    } catch (e) {
-      setExportError(`Не удалось добавить вопрос: ${(e as Error).message}`);
-    }
-    await loadProposals();
-  };
   const setQuestionStatus = async (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => {
     try {
       await api.setQuestionStatus(q.id, { status, ...(answer ? { answer } : {}) });
@@ -516,7 +508,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} onAddQuestion={addQuestion} reports={reports} onReportStatus={setReportStatus} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

@@ -52,24 +52,6 @@ describe("хранилище вопросов к интервью и отчёт�
     expect((await app.call("GET", `/agent/sessions/${id}/questions?status=что`)).status).toBe(400);
   });
 
-  it("свой вопрос аналитика: попадает в общий список с пометкой автора; повтор и неизвестная функция отклоняются", async () => {
-    const r = await app.call("POST", `/sessions/${id}/agent-questions`, { text: "Кто заменяет директора в отпуск?", addressee: "Секретарь", scope: code, priority: "critical" });
-    expect(r.status).toBe(201);
-    expect(r.body).toMatchObject({ scopeNodeId: "o2", priority: "critical", status: "open", addressee: "Секретарь" });
-    expect(r.body.agent).toMatch(/^user:/);
-    // агент видит вопрос аналитика и не повторяет его
-    expect((await app.call("GET", `/agent/sessions/${id}/questions`)).body.some((x: any) => x.id === r.body.id)).toBe(true);
-    const again = await app.call("POST", `/agent/sessions/${id}/questions`, { agent: "интервьюер", questions: [q("кто заменяет директора в отпуск")] });
-    expect(again.body.added).toEqual([]);
-    expect(again.body.duplicates[0].id).toBe(r.body.id);
-    const dup = await app.call("POST", `/sessions/${id}/agent-questions`, { text: "Кто заменяет директора в отпуск?" });
-    expect(dup.status).toBe(409);
-    expect(dup.body.question.id).toBe(r.body.id);
-    expect((await app.call("POST", `/sessions/${id}/agent-questions`, { text: "Вопрос про нет-такой", scope: "B999.99.99" })).status).toBe(400);
-    expect((await app.call("POST", `/sessions/${id}/agent-questions`, { text: "к" })).status).toBe(400);
-    expect((await app.call("POST", "/sessions/нет/agent-questions", { text: "Вопрос номер один?" })).status).toBe(404);
-  });
-
   it("вопросы: пакет принимается целиком или не принимается; чужое и несуществующее отклоняется", async () => {
     const before = (await app.call("GET", `/sessions/${id}/agent-questions`)).body.length;
     const bad = await app.call("POST", `/agent/sessions/${id}/questions`, { agent: "интервьюер", questions: [q("Нормальный вопрос про сроки?"), q("Вопрос про нет-такой", { scope: "B999.99.99" })] });

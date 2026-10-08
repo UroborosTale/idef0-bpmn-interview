@@ -7,7 +7,7 @@ import { functionCodes, processCodeOf, stepCodes } from "../shared/codes.js";
 import { applyPatch, describePatch, issueDelta, type ModelPatch } from "../shared/patch.js";
 import { sourceErrors } from "../agent/sources.js";
 import { splitAccepted, validateModel } from "../shared/validate.js";
-import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput, QuestionsInput, QuestionItem, ReportInput, QuestionStatusInput, ReportStatusInput } from "../types/patch.js";
+import { ProposalInput, ResolveInput, TakeInput, CompleteInput, TaskInput, AgentTaskInput, QuestionsInput, ReportInput, QuestionStatusInput, ReportStatusInput } from "../types/patch.js";
 import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, type AgentTask, type TaskStatus } from "../agentTasks.js";
 import { ProcessLogicModel } from "../types/model.js";
 import { addQuestion, getQuestion, listQuestions, setQuestionStatus, QUESTION_STATUSES, type QuestionStatus } from "../agentQuestions.js";
@@ -494,33 +494,6 @@ agentRouter.get("/sessions/:id/agent-questions", (req, res) => {
     return;
   }
   res.json(listQuestions(session.id));
-});
-
-/** Свой вопрос аналитика (того, кто проводит интервью): попадает в тот же список, помечен автором-человеком. */
-agentRouter.post("/sessions/:id/agent-questions", (req, res) => {
-  const session = getSession(req.params.id);
-  if (!session) {
-    res.status(404).json({ error: "сессия не найдена" });
-    return;
-  }
-  const parsed = QuestionItem.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "text — вопрос (от 5 до 600 знаков)", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
-    return;
-  }
-  const scope = resolveScope(session.model, parsed.data.scope);
-  if (scope === undefined) {
-    res.status(400).json({ error: `функции «${parsed.data.scope}» нет в модели` });
-    return;
-  }
-  const by = req.user?.login ?? "analyst";
-  const r = addQuestion({ sessionId: session.id, text: parsed.data.text, addressee: parsed.data.addressee, scopeNodeId: scope, reason: parsed.data.reason, priority: parsed.data.priority, agent: `user:${by}` });
-  if (r.duplicate) {
-    res.status(409).json({ error: "такой вопрос уже есть в списке", question: r.question });
-    return;
-  }
-  logAudit(session.id, "analyst", "question_added", { id: r.question.id });
-  res.status(201).json(r.question);
 });
 
 agentRouter.post("/agent-questions/:qid/status", (req, res) => {

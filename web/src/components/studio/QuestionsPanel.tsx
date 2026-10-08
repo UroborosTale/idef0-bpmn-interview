@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AgentQuestionRow } from "../../api/client";
 
 const PRIORITY: Record<AgentQuestionRow["priority"], string> = { critical: "критично", important: "важно", desirable: "желательно" };
@@ -30,42 +30,17 @@ export function interviewSheet(questions: AgentQuestionRow[], labelOf: (nodeId: 
  * приоритетами, переносит его на интервью и отмечает, что задано и что отвечено. Ответ на вопрос в модель вносит моделист
  * по новым фрагментам интервью — отметка здесь только помогает агентам не повторяться.
  */
-/** Автор вопроса: роль агента или человек (подпись «user:логин» ставит сервер для вопросов, добавленных вручную). */
-const authorOf = (agent: string) => (agent.startsWith("user:") ? `добавлен вручную (${agent.slice(5)})` : `от агента ${agent}`);
-
 export default function QuestionsPanel({
   questions,
   labelOf,
   processName,
   onStatus,
-  selected = null,
-  onAdd,
 }: {
   questions: AgentQuestionRow[];
   labelOf: (nodeId: string) => string;
   processName: string;
   onStatus: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
-  /** Выделенная в студии функция — к ней можно привязать свой вопрос. */
-  selected?: { id: string; label: string } | null;
-  /** Добавить свой вопрос (когда в ходе интервью возник вопрос, которого агент не предложил). */
-  onAdd?: (q: { text: string; addressee?: string; scope: string | null; priority: AgentQuestionRow["priority"] }) => void | Promise<void>;
 }) {
-  const [text, setText] = useState("");
-  const [addressee, setAddressee] = useState("");
-  const [priority, setPriority] = useState<AgentQuestionRow["priority"]>("important");
-  const [withScope, setWithScope] = useState(true);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => setWithScope(true), [selected?.id]);
-  const add = async () => {
-    if (text.trim().length < 5 || !onAdd) return;
-    setBusy(true);
-    try {
-      await onAdd({ text: text.trim(), ...(addressee.trim() ? { addressee: addressee.trim() } : {}), scope: withScope && selected ? selected.id : null, priority });
-      setText("");
-    } finally {
-      setBusy(false);
-    }
-  };
   const [showClosed, setShowClosed] = useState(false);
   const [answering, setAnswering] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
@@ -102,39 +77,6 @@ export default function QuestionsPanel({
           {copied ? "Скопировано" : "Копировать для интервью"}
         </button>
       </div>
-      {onAdd && (
-        <div className="task-form question-form">
-          <textarea
-            rows={2}
-            value={text}
-            placeholder="Свой вопрос к интервью — например, появившийся по ходу разговора"
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) void add();
-            }}
-          />
-          <div className="task-form-row">
-            {selected ? (
-              <label className="problems-filter">
-                <input type="checkbox" checked={withScope} onChange={(e) => setWithScope(e.target.checked)} /> к функции {selected.label}
-              </label>
-            ) : (
-              <span className="muted">ко всему процессу (выделите функцию — вопрос привяжется к ней)</span>
-            )}
-            <span className="spacer" />
-            <input value={addressee} placeholder="Кого спросить" aria-label="Кого спросить" onChange={(e) => setAddressee(e.target.value)} />
-            <select value={priority} aria-label="Важность" onChange={(e) => setPriority(e.target.value as AgentQuestionRow["priority"])}>
-              <option value="critical">критично</option>
-              <option value="important">важно</option>
-              <option value="desirable">желательно</option>
-            </select>
-            <button className="primary" disabled={busy || text.trim().length < 5} onClick={() => void add()} title="Ctrl+Enter">
-              Добавить вопрос
-            </button>
-          </div>
-        </div>
-      )}
       {questions.length === 0 && <div className="muted problems-empty">Вопросов нет. Их готовит агент-интервьюер (инструмент add_questions) — например, по заданию «подготовь вопросы к следующему интервью».</div>}
       {questions.length > 0 && shown.length === 0 && <div className="muted problems-empty">Все вопросы закрыты.</div>}
       {shown.map((q) => (
@@ -147,7 +89,7 @@ export default function QuestionsPanel({
           </div>
           <div className="muted task-meta">
             {q.scopeNodeId ? `${labelOf(q.scopeNodeId)} · ` : "процесс в целом · "}
-            {q.addressee ? `спросить: ${q.addressee} · ` : ""}{authorOf(q.agent)} · {new Date(q.createdAt).toLocaleString("ru-RU")}
+            {q.addressee ? `спросить: ${q.addressee} · ` : ""}от агента {q.agent} · {new Date(q.createdAt).toLocaleString("ru-RU")}
           </div>
           {q.reason && <p className="proposal-why">Зачем: {q.reason}</p>}
           {q.status === "answered" && <p className="proposal-why">Ответ{q.fragmentId ? ` (фрагмент ${q.fragmentId})` : ""}: {q.answer ?? "дан на интервью"}</p>}

@@ -31,7 +31,6 @@ export default function ProblemsPanel({
   onCancelTask,
   questions = [],
   onQuestionStatus,
-  onAddQuestion,
   reports = [],
   onReportStatus,
   acceptedIssues = [],
@@ -58,7 +57,6 @@ export default function ProblemsPanel({
   onCancelTask?: (task: AgentTaskRow) => void | Promise<void>;
   /** Вопросы к интервью (готовит интервьюер) и отчёты агентов; решения аналитика. */
   questions?: AgentQuestionRow[];
-  onAddQuestion?: (q: { text: string; addressee?: string; scope: string | null; priority: AgentQuestionRow["priority"] }) => void | Promise<void>;
   onQuestionStatus?: (q: AgentQuestionRow, status: AgentQuestionRow["status"], answer?: string) => void | Promise<void>;
   reports?: AgentReportRow[];
   onReportStatus?: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
@@ -212,7 +210,7 @@ export default function ProblemsPanel({
         {tab === "tasks" && (
           <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
         )}
-        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} selected={selectedFn} onAdd={onAddQuestion ? (q) => onAddQuestion(q) : undefined} />}
+        {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} />}
         {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} />}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}
         {tab === "gaps" &&
