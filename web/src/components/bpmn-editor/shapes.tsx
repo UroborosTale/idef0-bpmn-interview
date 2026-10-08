@@ -1,7 +1,7 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
 import { eventSpec, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
-import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds } from "./geometry";
+import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
 const INK = "#1e293b";
 const ACCENT = "#4338ca";
@@ -124,8 +124,9 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
   );
 }
 
-export function FlowShape({ flow, from, to, obstacles, selected, kinds }: { flow: ProcessFlow; from: Box; to: Box; obstacles: Box[]; selected: boolean; kinds?: EndKinds }) {
-  const pts = waypoints(from, to, obstacles, kinds);
+/** Стрелка последовательности; points — готовый маршрут всей диаграммы (routeFlows), иначе маршрут между двумя фигурами. */
+export function FlowShape({ flow, points, from, to, obstacles = [], selected, kinds }: { flow: ProcessFlow; points?: Pt[]; from?: Box; to?: Box; obstacles?: Box[]; selected: boolean; kinds?: EndKinds }) {
+  const pts = points ?? waypoints(from!, to!, obstacles, kinds);
   const d = pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const color = selected ? ACCENT : INK;
   const label = flowLabelPoint(pts);

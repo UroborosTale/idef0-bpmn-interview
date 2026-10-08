@@ -12,6 +12,10 @@ afterAll(async () => {
   await browser?.close();
 });
 
+type Pt = [number, number];
+/** Линии стрелок, нарисованные в редакторе: начало, конец и отрезки — из атрибута d. */
+const parsePath = (d: string): Pt[] => d.split(/[ML]/).filter(Boolean).map((p) => p.trim().split(" ").map(Number) as Pt);
+
 describe("демонстрационный процесс C090 в студии", () => {
   it("дерево по кодам, нулевые замечания и одно принятое, диаграммы со всеми видами событий, шлюзов и задач", async () => {
     const created = await api<{ id: string; updatedAt: string }>("POST", "/sessions/blank", { meta: { processName: "C090" } });
@@ -50,7 +54,35 @@ describe("демонстрационный процесс C090 в студии",
         await page.locator(".bpe-canvas").first().screenshot({ path: `${shot}/demo-${op}.png` });
       }
     };
-    for (const op of ["o11", "o12", "o21", "o22", "o31", "o32"]) await open(op);
+    // нарисованные стрелки каждой диаграммы: никто не выходит из одной точки, не входит в одну и не лежит на другой линии
+    const drawn = async () => (await page.locator(".studio g[data-flow-id] path[marker-end]").evaluateAll((els) => els.map((e) => e.getAttribute("d") ?? ""))).map(parsePath);
+    const problems = (paths: Pt[][]) => {
+      const out: string[] = [];
+      const near = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 5;
+      for (let i = 0; i < paths.length; i++) {
+        for (let j = i + 1; j < paths.length; j++) {
+          if (near(paths[i][0], paths[j][0])) out.push(`общий выход ${i}/${j}`);
+          if (near(paths[i].at(-1)!, paths[j].at(-1)!)) out.push(`общий вход ${i}/${j}`);
+          for (let a = 0; a + 1 < paths[i].length; a++) {
+            for (let b = 0; b + 1 < paths[j].length; b++) {
+              const [p, q, r, u] = [paths[i][a], paths[i][a + 1], paths[j][b], paths[j][b + 1]];
+              const horizontal = p[1] === q[1];
+              if (horizontal !== (r[1] === u[1])) continue;
+              const k = horizontal ? 1 : 0;
+              const m = 1 - k;
+              if (Math.abs(p[k] - r[k]) < 3 && Math.min(Math.max(p[m], q[m]), Math.max(r[m], u[m])) - Math.max(Math.min(p[m], q[m]), Math.min(r[m], u[m])) > 2) out.push(`наложение ${i}/${j}`);
+            }
+          }
+        }
+      }
+      return out;
+    };
+    for (const op of ["o11", "o12", "o21", "o22", "o31", "o32"]) {
+      await open(op);
+      const paths = await drawn();
+      expect(paths.length, op).toBeGreaterThan(5);
+      expect(problems(paths), op).toEqual([]);
+    }
 
     // все значки триггеров, кроме отмены; залитые (выбрасывающие) — у отправки, конца, эскалации, компенсации, ссылки
     const base = new Set([...seen].map((t) => t.replace(":throw", "")));

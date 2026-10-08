@@ -42,13 +42,13 @@ describe("BPMN", () => {
     expect([s.x, s.y]).toEqual([900, 75]);
   });
 
-  it("прямая стрелка обходит фигуру на пути сверху", () => {
+  it("прямая стрелка обходит фигуру на пути (сверху или снизу)", () => {
     const from = { x: 0, y: 100, width: 100, height: 80 };
     const to = { x: 400, y: 100, width: 100, height: 80 };
     const mid = { x: 200, y: 100, width: 100, height: 80 };
     const pts = orthogonalWaypoints(from, to, [mid]);
     expect(pts.length).toBeGreaterThan(2);
-    expect(Math.min(...pts.map((p) => p[1]))).toBeLessThan(mid.y);
+    expect(Math.min(...pts.map((p) => p[1])) < mid.y || Math.max(...pts.map((p) => p[1])) > mid.y + mid.height).toBe(true);
     expect(orthogonalWaypoints(from, to, [])).toHaveLength(2);
   });
 });

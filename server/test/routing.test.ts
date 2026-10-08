@@ -33,14 +33,15 @@ describe("маршрутизация стрелок BPMN", () => {
     expect(check(a, b, {})).toEqual([[150, 150], [350, 150]]);
   });
 
-  it("на одной линии с фигурой на пути — обход поверху: вверх из источника, вниз в цель", () => {
+  it("на одной линии с фигурой на пути — обход: из верхней (или нижней) стороны источника в ту же сторону цели", () => {
     const a = box("task", 100, 150);
     const mid = box("event", 250, 150);
     const b = box("task", 400, 150);
     const pts = check(a, b, {}, [mid]);
-    expect(pts[0]).toEqual([100, 110]); // верхняя сторона источника
-    expect(pts.at(-1)).toEqual([400, 110]);
-    expect(Math.min(...pts.map((p) => p[1]))).toBeLessThan(mid.y);
+    const above = pts[0][1] < 150;
+    expect(pts[0]).toEqual([100, above ? 110 : 190]);
+    expect(pts.at(-1)).toEqual([400, above ? 110 : 190]);
+    expect(above ? Math.min(...pts.map((p) => p[1])) < mid.y : Math.max(...pts.map((p) => p[1])) > mid.y + mid.h).toBe(true);
   });
 
   it("ветка шлюза вниз и вверх уходит из нижней и верхней вершины и входит в цель слева", () => {

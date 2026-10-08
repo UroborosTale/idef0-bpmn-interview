@@ -4,8 +4,9 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, waypoints, withLayout } from "./geometry";
+import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
+import { routeFlows } from "@shared/bpmnRouting";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { EVENT_PALETTE, PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, UNASSIGNED_LANE } from "./shapes";
@@ -424,24 +425,31 @@ export default function BpmnEditor({
 
   const { w: worldW, h: worldH } = modelExtents(draft);
   const W = Math.max(worldW, 1400);
-  const shown = visibleNodes(draft);
-  const boxes = boxMap(shown);
-  const extras = diagramExtras(draft, shown, boxes);
-  // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
-  const bottomUsed = new Set<string>();
-  for (const f of draft.flows) {
-    const a = boxes.get(f.from);
-    const b = boxes.get(f.to);
-    const fn = shown.find((n) => n.id === f.from);
-    const tn = shown.find((n) => n.id === f.to);
-    if (!a || !b || !fn || !tn) continue;
-    const pts = waypoints(a, b, [], { fromType: fn.type, toType: tn.type, fromBoundary: isBoundary(fn, shown) });
-    const first = pts[0];
-    const last = pts[pts.length - 1];
-    if (Math.abs(first[0] - (a.x + a.w / 2)) < 0.5 && Math.abs(first[1] - (a.y + a.h)) < 0.5) bottomUsed.add(f.from);
-    if (Math.abs(last[0] - (b.x + b.w / 2)) < 0.5 && Math.abs(last[1] - (b.y + b.h)) < 0.5) bottomUsed.add(f.to);
-  }
-  const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
+  // фигуры, документы, пулы и ВСЕ стрелки считаются вместе (shared/bpmnRouting.ts): без общих портов и наложений линий
+  const { shown, boxes, extras, routes, bottomUsed } = useMemo(() => {
+    const shown = visibleNodes(draft);
+    const boxes = boxMap(shown);
+    const extras = diagramExtras(draft, shown, boxes);
+    const withArtifacts = new Set(extras.artifacts.map((a) => a.nodeId));
+    const poolIds = new Set(extras.pools.map((p) => p.pool.id));
+    const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
+    const routes = routeFlows(
+      [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id) })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
+      [...draft.flows.filter((f) => boxes.has(f.from) && boxes.has(f.to)).map((f) => ({ id: f.id, from: f.from, to: f.to })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true }))],
+      extras.artifacts.map((a) => a.box)
+    );
+    // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
+    const bottomUsed = new Set<string>();
+    for (const f of draft.flows) {
+      const pts = routes.get(f.id);
+      const a = boxes.get(f.from);
+      const b = boxes.get(f.to);
+      if (!pts || !a || !b) continue;
+      if (Math.abs(pts[0][1] - (a.y + a.h)) < 0.5) bottomUsed.add(f.from);
+      if (Math.abs(pts[pts.length - 1][1] - (b.y + b.h)) < 0.5) bottomUsed.add(f.to);
+    }
+    return { shown, boxes, extras, routes, bottomUsed };
+  }, [draft]);  const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
 
   return (
@@ -537,17 +545,12 @@ export default function BpmnEditor({
               <LanesLayer model={draft} width={W} hotLane={hotLane} selectedLaneId={curSel?.kind === "lane" ? curSel.id : null} />
 
               {draft.flows.map((f) => {
-                const a = boxes.get(f.from);
-                const b = boxes.get(f.to);
-                if (!a || !b) return null;
-                const others = shown.filter((n) => n.id !== f.from && n.id !== f.to).map((n) => boxes.get(n.id)!);
-                const fn = shown.find((n) => n.id === f.from);
-                const tn = shown.find((n) => n.id === f.to);
-                return <FlowShape key={f.id} flow={f} from={a} to={b} obstacles={others} kinds={{ fromType: fn?.type, toType: tn?.type, fromBoundary: !!fn && isBoundary(fn, shown) }} selected={curSel?.kind === "flow" && curSel.id === f.id} />;
+                const points = routes.get(f.id);
+                return points ? <FlowShape key={f.id} flow={f} points={points} selected={curSel?.kind === "flow" && curSel.id === f.id} /> : null;
               })}
 
               {extras.messages.map(({ message, points }) => (
-                <MessageShape key={message.id} points={points} label={message.name} />
+                <MessageShape key={message.id} points={routes.get(`msg:${message.id}`) ?? points} label={message.name} />
               ))}
               {extras.pools.map(({ pool, box }) => (
                 <PoolShape key={pool.id} pool={pool} box={box} />

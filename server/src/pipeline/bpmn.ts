@@ -1,6 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
+import { routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
@@ -410,30 +411,6 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     );
   }
 
-  // edges — ортогональная маршрутизация (см. пояснение в layout.ts)
-  const edgesXml: string[] = [];
-  for (const f of flows) {
-    const from = layout.boxes.get(nodeIdOf(f.from));
-    const to = layout.boxes.get(nodeIdOf(f.to));
-    if (!from || !to) continue;
-    const others = [...layout.boxes.entries()].filter(([id]) => id !== nodeIdOf(f.from) && id !== nodeIdOf(f.to)).map(([, b]) => b);
-    const fromNode = nodes.find((n) => n.id === f.from);
-    const toNode = nodes.find((n) => n.id === f.to);
-    const points = orthogonalWaypoints(from, to, others, { fromType: fromNode?.type, toType: toNode?.type, fromBoundary: !!fromNode && isBoundary(fromNode) });
-    diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
-    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
-    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${f.id}_di" bpmnElement="Flow_${f.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
-  }
-  for (const sf of synthFlows) {
-    const from = layout.boxes.get(sf.from);
-    const to = layout.boxes.get(sf.to);
-    if (!from || !to) continue;
-    const points = orthogonalWaypoints(from, to);
-    diagramEdges.push({ id: `Flow_${sf.id}`, from: sf.from, to: sf.to, points });
-    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
-    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${sf.id}_di" bpmnElement="Flow_${sf.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
-  }
-
   const laneSetXml = laneCount > 0 ? `<bpmn:laneSet id="LaneSet_1">${lanesXml.join("")}</bpmn:laneSet>` : "";
 
   const poolWidth = layout.totalWidth + 20;
@@ -452,6 +429,43 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const poolRects = poolBoxes(view.pools ?? [], messages, allBoxes, poolsTop);
   const poolLabel = (q: { name: string; code?: string | null }) => `${q.code ? `${q.code} ` : ""}${q.name}`;
   const poolEndId = (id: string) => (knownPools.has(id) ? `Pool_${id}` : nodeIdOf(id));
+
+  // стрелки и потоки сообщений прокладываются все вместе (shared/bpmnRouting.ts): без общих портов и наложений
+  const withArtifacts = new Set(artifacts.map((a) => a.nodeId));
+  const toBox = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
+  const routeNodes: RouteNode[] = [
+    ...nodes.flatMap((n) => {
+      const b = layout.boxes.get(nodeIdOf(n.id));
+      return b ? [{ id: nodeIdOf(n.id), box: toBox(b), type: n.type, boundary: isBoundary(n), artifacts: withArtifacts.has(n.id) }] : [];
+    }),
+    ...synthEvents.flatMap((se) => {
+      const b = layout.boxes.get(se.id);
+      return b ? [{ id: se.id, box: toBox(b), type: "event" }] : [];
+    }),
+    ...[...poolRects].map(([id, r]) => ({ id: `Pool_${id}`, box: r, type: "pool" })),
+  ];
+  const routed = routeFlows(routeNodes, [
+    ...flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to) })),
+    ...synthFlows.map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })),
+    ...messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true })),
+  ], artifacts.map((a) => a.box));
+
+  const edgesXml: string[] = [];
+  for (const f of flows) {
+    const points = routed.get(`flow:${f.id}`);
+    if (!points) continue;
+    diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
+    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
+    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${f.id}_di" bpmnElement="Flow_${f.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
+  }
+  for (const sf of synthFlows) {
+    const points = routed.get(`flow:${sf.id}`);
+    if (!points) continue;
+    diagramEdges.push({ id: `Flow_${sf.id}`, from: sf.from, to: sf.to, points });
+    const waypointsXml = points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");
+    edgesXml.push(`<bpmndi:BPMNEdge id="Flow_${sf.id}_di" bpmnElement="Flow_${sf.id}">${waypointsXml}</bpmndi:BPMNEdge>`);
+  }
+
   const diagramPools: BpmnDiagramData["pools"] = [];
   const diagramMessages: BpmnDiagramData["messages"] = [];
   const participantsXml: string[] = [];
@@ -463,12 +477,12 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     poolShapesXml.push(`<bpmndi:BPMNShape id="Pool_${q.id}_di" bpmnElement="Pool_${q.id}" isHorizontal="true"><dc:Bounds x="${Math.round(r.x)}" y="${Math.round(r.y)}" width="${r.w}" height="${r.h}" /></bpmndi:BPMNShape>`);
     diagramPools.push({ id: `Pool_${q.id}`, name: poolLabel(q), x: r.x, y: r.y, w: r.w, h: r.h });
   }
-  for (const { message: m, points } of messageEdges(messages, allBoxes, poolRects)) {
+  for (const { message: m, points: fallback } of messageEdges(messages, allBoxes, poolRects)) {
+    const points = routed.get(`msg:${m.id}`) ?? fallback;
     participantsXml.push(`<bpmn:messageFlow id="Msg_${m.id}" name="${esc(m.name)}" sourceRef="${poolEndId(m.from)}" targetRef="${poolEndId(m.to)}" />`);
     poolShapesXml.push(`<bpmndi:BPMNEdge id="Msg_${m.id}_di" bpmnElement="Msg_${m.id}">${wp(points)}</bpmndi:BPMNEdge>`);
     diagramMessages.push({ id: `Msg_${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), points, label: m.name ?? undefined });
-  }
-  const diagramLanes: BpmnDiagramData["lanes"] = [];
+  }  const diagramLanes: BpmnDiagramData["lanes"] = [];
   const laneShapesXml = [...laneRoles.map((r) => r.id), ...(hasUnassigned ? ["__unassigned__"] : [])].map((rid, i) => {
     const bounds = layout.laneBounds[i] ?? { y: 60, height: 150 };
     diagramLanes.push({ roleId: rid === "__unassigned__" ? null : rid, name: rid === "__unassigned__" ? "Без исполнителя" : laneRoles[i].name, x: LANE_X, y: bounds.y, w: poolWidth - LANE_X, h: bounds.height });

@@ -1,6 +1,7 @@
 import type { SessionRecord } from "../repo.js";
 import type { ProcessLogicModel } from "../types/model.js";
-import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeIn } from "../pipeline/layout.js";
+import { layoutLayered, type LayoutNodeIn, type LayoutEdgeIn } from "../pipeline/layout.js";
+import { routeFlows } from "../shared/bpmnRouting.js";
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
@@ -65,12 +66,18 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
     })
     .join("\n");
 
+  // все стрелки прокладываются вместе: без общих портов и наложений
+  const routed = routeFlows(
+    model.nodes.flatMap((n) => {
+      const b = layout.boxes.get(n.id);
+      return b ? [{ id: n.id, box: { x: b.x, y: b.y, w: b.width, h: b.height }, type: n.type }] : [];
+    }),
+    model.flows.map((f) => ({ id: f.id, from: f.from, to: f.to }))
+  );
   const edges = model.flows
     .map((f) => {
-      const from = layout.boxes.get(f.from);
-      const to = layout.boxes.get(f.to);
-      if (!from || !to) return "";
-      const points = orthogonalWaypoints(from, to, [], { fromType: model.nodes.find((n) => n.id === f.from)?.type, toType: model.nodes.find((n) => n.id === f.to)?.type });
+      const points = routed.get(f.id);
+      if (!points) return "";
       const d = points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
       return `<path d="${d}" fill="none" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arrow2)" />`;
     })
