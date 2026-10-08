@@ -5,8 +5,10 @@ import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
 import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
+import MiniMap from "../bpmn-editor/MiniMap";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
 import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
+import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { ArrowShape, BlockShape, Idef0Defs } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -16,6 +18,8 @@ type Zone = "input" | "control";
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "fn"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
+  | { kind: "marquee"; x0: number; y0: number; add: boolean }
+  | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
   | { kind: "connect"; from: string };
 
 /** Верхняя треть блока-цели при протягивании связи — управление, остальное — вход. */
@@ -61,6 +65,10 @@ export default function Idef0Editor({
     onParentChange?.(id);
   };
   const [sel, setSel] = useState<Sel>(null);
+  /** Несколько выделенных блоков (от двух); один выделенный блок — это обычный sel. */
+  const [multi, setMulti] = useState<string[]>([]);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [showMap, setShowMap] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
   const [connectHot, setConnectHot] = useState<{ id: string; zone: Zone } | null>(null);
@@ -83,6 +91,11 @@ export default function Idef0Editor({
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
   const curSel: Sel =
     sel && ((sel.kind === "fn" && blocks.has(sel.id)) || (sel.kind === "arrow" && layout.arrows.some((a) => a.key === sel.id))) ? sel : null;
+
+  const groupIds = multi.filter((id) => blocks.has(id));
+  const inGroup = groupIds.length >= 2;
+  /** Что сейчас выделено: группа блоков, один блок или ничего. */
+  const pickedIds = inGroup ? groupIds : curSel?.kind === "fn" ? [curSel.id] : [];
 
   const toSelection = (s: Sel): Selection => {
     if (!s) return null;
@@ -111,6 +124,7 @@ export default function Idef0Editor({
 
   const openDiagram = (id: string | null) => {
     setParentId(id);
+    setMulti([]);
     setSel(null);
     setEditing(null);
   };
@@ -164,9 +178,20 @@ export default function Idef0Editor({
     const arrowEl = t.closest("[data-arrow-key]");
     const onEmpty = !connectEl && !fnEl && !arrowEl;
 
+    if (e.button === 0 && e.shiftKey && onEmpty) {
+      // Shift + рамка: выделить несколько блоков (с Ctrl — добавить к уже выделенным)
+      e.preventDefault();
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      dragRef.current = { kind: "marquee", x0: wx, y0: wy, add: e.ctrlKey || e.metaKey };
+      svgRef.current!.setPointerCapture(e.pointerId);
+      return;
+    }
     if (e.button === 1 || (e.button === 0 && onEmpty)) {
       e.preventDefault();
-      if (e.button === 0) pick(null);
+      if (e.button === 0) {
+        pick(null);
+        setMulti([]);
+      }
       dragRef.current = { kind: "pan", sx: e.clientX, sy: e.clientY, tx: view.tx, ty: view.ty };
       svgRef.current!.setPointerCapture(e.pointerId);
       return;
@@ -182,10 +207,23 @@ export default function Idef0Editor({
       const f = blocks.get(id);
       if (!f) return;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (e.shiftKey) {
+        // Shift + щелчок: добавить блок в выделение или убрать из него
+        selectIds(pickedIds.includes(id) ? pickedIds.filter((x) => x !== id) : [...pickedIds, id]);
+        return;
+      }
+      if (inGroup && groupIds.includes(id)) {
+        // потянули блок из выделенной группы — едет вся группа
+        dragRef.current = { kind: "group", id, ids: groupIds, base: draftRef.current, startModel: draftRef.current, x0: wx, y0: wy, moved: false };
+        svgRef.current!.setPointerCapture(e.pointerId);
+        return;
+      }
+      setMulti([]);
       pick({ kind: "fn", id });
       dragRef.current = { kind: "fn", id, offX: wx - f.box.x, offY: wy - f.box.y, startModel: draft, moved: false, sx: e.clientX, sy: e.clientY };
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (arrowEl) {
+      setMulti([]);
       pick({ kind: "arrow", id: arrowEl.getAttribute("data-arrow-key")! });
     }
   };
@@ -200,6 +238,14 @@ export default function Idef0Editor({
       d.moved = true;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setDraft((m) => moveFunction(m, d.id, Math.max(MIN_POS, snap(wx - d.offX)), Math.max(MIN_POS, snap(wy - d.offY))));
+    } else if (d.kind === "marquee") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      setMarquee({ x: Math.min(d.x0, wx), y: Math.min(d.y0, wy), w: Math.abs(wx - d.x0), h: Math.abs(wy - d.y0) });
+    } else if (d.kind === "group") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
+      d.moved = true;
+      setDraft(() => moveGroup(d.base, cur, d.ids, wx - d.x0, wy - d.y0));
     } else {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setConnectTo([wx, wy]);
@@ -215,6 +261,19 @@ export default function Idef0Editor({
     if (!d) return;
     if (d.kind === "fn" && d.moved) {
       h.recordPast(d.startModel);
+    } else if (d.kind === "group") {
+      if (d.moved) h.recordPast(d.startModel);
+      else {
+        // щелчок без движения по члену группы — оставляем только этот блок
+        setMulti([]);
+        pick({ kind: "fn", id: d.id });
+      }
+    } else if (d.kind === "marquee") {
+      const rect = marquee;
+      setMarquee(null);
+      if (!rect || (rect.w < 3 && rect.h < 3)) return;
+      const hit = blocksInRect(draftRef.current, cur, rect);
+      selectIds(d.add ? [...new Set([...pickedIds, ...hit])] : hit);
     } else if (d.kind === "connect") {
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-fn-id]")?.getAttribute("data-fn-id");
       setConnectTo(null);
@@ -247,9 +306,90 @@ export default function Idef0Editor({
     if (e.dataTransfer.getData("application/x-idef0-new")) addAt(toWorld(e.clientX, e.clientY));
   };
 
+  // --- группа: копирование, вставка, выравнивание ---
+
+  /** Выделить набор блоков: два и больше — группа, один — обычное выделение. */
+  function selectIds(ids: string[]) {
+    setMulti(ids.length >= 2 ? ids : []);
+    pick(ids.length === 0 ? null : { kind: "fn", id: ids[ids.length - 1] });
+  }
+  const copySelected = () => {
+    const frag = copyFragment(draftRef.current, cur, pickedIds);
+    if (!frag) return showHint("Сначала выделите блоки");
+    setClipboard(frag);
+    showHint(`Скопировано: ${frag.nodes.length} (Ctrl+V — вставить, можно на другой уровень; вложенные функции не копируются)`);
+  };
+  const pasteFrom = (frag: NonNullable<ReturnType<typeof copyFragment>>, off: number) => {
+    const r = pasteFragment(draftRef.current, cur, frag, off, off);
+    commit(r.model);
+    selectIds(r.ids);
+  };
+  const pasteClipboard = () => {
+    const c = takeClipboard();
+    if (!c) return showHint("Буфер пуст: выделите блоки и нажмите Ctrl+C");
+    pasteFrom(c.fragment, 40 * c.n);
+  };
+  const duplicateSelected = () => {
+    const frag = copyFragment(draftRef.current, cur, pickedIds);
+    if (frag) pasteFrom(frag, 40);
+  };
+  const deleteSelected = () => {
+    if (pickedIds.length === 0) return;
+    commit(deleteGroup(draftRef.current, pickedIds), null);
+    setMulti([]);
+  };
+  const zoomToSelection = () => {
+    const b = boundsOf(draftRef.current, cur, pickedIds);
+    const el = wrapRef.current;
+    if (!b || !el) return showHint("Сначала выделите блоки");
+    const k = Math.min(1.5, Math.max(0.3, Math.min(el.clientWidth / (b.w + 120), el.clientHeight / (b.h + 120))));
+    setView({ k, tx: el.clientWidth / 2 - (b.x + b.w / 2) * k, ty: el.clientHeight / 2 - (b.y + b.h / 2) * k });
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (isTextInput(e.target)) return;
     if (handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() })) return;
+    const mod = e.ctrlKey || e.metaKey;
+    const key = (l: string) => e.key.toLowerCase() === l || e.code === `Key${l.toUpperCase()}`; // в русской раскладке key — другая буква
+    if (mod && key("a")) {
+      e.preventDefault();
+      selectIds(selectableIds(draftRef.current, cur));
+      return;
+    }
+    if (mod && key("c")) {
+      e.preventDefault();
+      copySelected();
+      return;
+    }
+    if (mod && key("x")) {
+      e.preventDefault();
+      copySelected();
+      deleteSelected();
+      return;
+    }
+    if (mod && key("v")) {
+      e.preventDefault();
+      pasteClipboard();
+      return;
+    }
+    if (mod && key("d") && inGroup) {
+      e.preventDefault();
+      duplicateSelected();
+      return;
+    }
+    if (e.key.startsWith("Arrow") && inGroup) {
+      e.preventDefault();
+      const step = e.shiftKey ? 50 : 10;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      commit(moveGroup(draftRef.current, cur, groupIds, dx, dy));
+      return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && inGroup) {
+      e.preventDefault();
+      deleteSelected();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "d" || e.code === "KeyD") && curSel?.kind === "fn") {
       e.preventDefault(); // иначе браузер добавит страницу в закладки
       const r = duplicateNode(draft, curSel.id);
@@ -271,6 +411,7 @@ export default function Idef0Editor({
         if (a) commit(removeArrow(draft, a), null);
       }
     } else if (e.key === "Escape") {
+      setMulti([]);
       setSel(null);
       setEditing(null);
     }
@@ -314,6 +455,9 @@ export default function Idef0Editor({
         compact={embedded}
         extra={
           <>
+            <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">
+              Миникарта
+            </button>
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
             </button>
@@ -369,7 +513,7 @@ export default function Idef0Editor({
                 <ArrowShape key={a.key} arrow={a} selected={curSel?.kind === "arrow" && curSel.id === a.key} />
               ))}
               {layout.functions.map((f) => (
-                <BlockShape key={f.node.id} fn={f} selected={curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
+                <BlockShape key={f.node.id} fn={f} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
               ))}
 
               {connectHot && blocks.get(connectHot.id) && (
@@ -385,7 +529,13 @@ export default function Idef0Editor({
                 />
               )}
 
-              {selectedFn && !editing && (
+              {inGroup && (() => {
+                const b = boundsOf(draft, cur, groupIds);
+                return b && <rect data-group-box x={b.x - 8} y={b.y - 8} width={b.w + 16} height={b.h + 16} fill="none" stroke="#4338ca" strokeWidth={1} strokeDasharray="5 4" pointerEvents="none" />;
+              })()}
+              {marquee && <rect data-marquee x={marquee.x} y={marquee.y} width={marquee.w} height={marquee.h} fill="rgba(67,56,202,0.08)" stroke="#4338ca" strokeDasharray="4 3" pointerEvents="none" />}
+
+              {selectedFn && !inGroup && !editing && (
                 <g data-connect={selectedFn.node.id} style={{ cursor: "crosshair" }}>
                   <circle cx={selectedFn.box.x + selectedFn.box.w + 12} cy={selectedFn.box.y + selectedFn.box.h + 12} r={9} fill="#4338ca" />
                   <path
@@ -414,6 +564,48 @@ export default function Idef0Editor({
               view={view}
               onCommit={(v) => commit(updateNode(draftRef.current, editingFn.node.id, { name: v }))}
               onDone={() => setEditing(null)}
+            />
+          )}
+          {(pickedIds.length > 0 || hasClipboard()) && (
+            <div className="bpe-selbar" role="toolbar" aria-label="Действия с выделением">
+              {pickedIds.length > 0 && <span className="muted">Выделено: {pickedIds.length}</span>}
+              <button disabled={pickedIds.length === 0} onClick={copySelected} title="Копировать (Ctrl+C)">
+                Копировать
+              </button>
+              <button disabled={!hasClipboard()} onClick={pasteClipboard} title="Вставить (Ctrl+V); блоки можно вставить на другой уровень">
+                Вставить
+              </button>
+              <button disabled={pickedIds.length === 0} onClick={zoomToSelection} title="Показать выделенное крупно">
+                Приблизить
+              </button>
+              {inGroup && (
+                <>
+                  <button onClick={() => commit(alignLeft(draft, cur, groupIds))} title="Выровнять по левому краю">
+                    ⇤ Влево
+                  </button>
+                  <button onClick={() => commit(alignTop(draft, cur, groupIds))} title="Выровнять по верхнему краю">
+                    ⇥ Вверх
+                  </button>
+                  <button disabled={groupIds.length < 3} onClick={() => commit(distributeHorizontally(draft, cur, groupIds))} title="Равные промежутки по горизонтали (нужно три блока)">
+                    ⇹ Поровну
+                  </button>
+                  <button disabled={groupIds.length < 3} onClick={() => commit(distributeVertically(draft, cur, groupIds))} title="Равные промежутки по вертикали (нужно три блока)">
+                    ⇳ Поровну
+                  </button>
+                </>
+              )}
+              <button disabled={pickedIds.length === 0} onClick={deleteSelected} title="Удалить выделенное (Delete)">
+                Удалить
+              </button>
+            </div>
+          )}
+          {showMap && layout.functions.length > 0 && (
+            <MiniMap
+              nodes={layout.functions.map((f) => ({ id: f.node.id, box: f.box, type: "task", selected: pickedIds.includes(f.node.id) }))}
+              world={{ w: worldW, h: worldH }}
+              view={view}
+              size={{ w: wrapRef.current?.clientWidth ?? 800, h: wrapRef.current?.clientHeight ?? 400 }}
+              onCenter={(wx, wy) => centerOn({ x: wx, y: wy, w: 0, h: 0 })}
             />
           )}
           <div className="bpe-corner muted">
