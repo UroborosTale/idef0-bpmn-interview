@@ -10,6 +10,13 @@ import { FUNCTION_CODE, blockKey, hasVerbalNoun, looksLikeFact, normalizeCode } 
  * Ошибки (error) — модель некорректна (мешают завершить интервью), предупреждения (warning) — рекомендации.
  * Экспорт диаграмм доступен в обоих случаях.
  */
+/** Пары «выбросил ссылку → принимает ссылку» по одинаковому имени (без учёта регистра) среди событий диаграммы. */
+export function linkPairs(nodes: { id: string; type: string; subtype?: string | null; trigger?: unknown; attached_to?: string | null }[]): [string, string][] {
+  const links = nodes.filter((n) => n.type === "event").map((n) => ({ id: n.id, spec: eventSpec(n as never, false) })).filter((x) => x.spec.trigger === "link" && x.spec.details.name?.trim());
+  const key = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+  return links.filter((t) => t.spec.throwing).flatMap((t) => links.filter((c) => !c.spec.throwing && key(c.spec.details.name) === key(t.spec.details.name)).map((c) => [t.id, c.id] as [string, string]));
+}
+
 export function validateModel(model: Omit<ProcessLogicModel, "gaps">): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   let counter = 0;
@@ -47,6 +54,11 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
   for (const f of bpmnFlows) {
     outAdj.set(f.from, [...(outAdj.get(f.from) ?? []), f.to]);
     inCount.set(f.to, (inCount.get(f.to) ?? 0) + 1);
+  }
+  // события-ссылки: выбросивший ссылку «продолжает» поток у принимающего с тем же именем — это невидимая стрелка
+  for (const [from, to] of linkPairs(bpmnNodes)) {
+    outAdj.set(from, [...(outAdj.get(from) ?? []), to]);
+    inCount.set(to, (inCount.get(to) ?? 0) + 1);
   }
   // --- BPMN 5.1 ---
   // Генератор диаграмм (bpmn.ts) сам достраивает начало и конец, если явных событий нет:

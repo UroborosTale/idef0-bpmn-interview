@@ -4,6 +4,7 @@ import { REFERENCE_PROCESSES } from "../reference/index.js";
  * Загрузить эталонный или демонстрационный процесс в приложение новой сессией:
  *   npm run seed:process -w server -- c025      (процесс C025 «Организация обучения и аттестации персонала» по документу «ДПО от 05.10»)
  *   npm run seed:process -w server -- b002      (эталон B002 из документов организации)
+ *   npm run seed:process -w server -- demo      (демонстрационный процесс C090: все возможности редактора на одном процессе)
  * Откройте сессию в студии. Создание сессии — действие аналитика, поэтому при включённом AUTH_USERS нужны PM_LOGIN и PM_PASSWORD.
  */
 const name = (process.argv[2] ?? "").toLowerCase();

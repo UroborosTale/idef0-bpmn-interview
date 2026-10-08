@@ -4,7 +4,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, withLayout } from "./geometry";
+import { MIN_X, boxMap, boxOf, diagramExtras, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, visibleNodes, waypoints, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { EVENT_PALETTE, PALETTE, addBoundaryEvent, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
@@ -427,6 +427,20 @@ export default function BpmnEditor({
   const shown = visibleNodes(draft);
   const boxes = boxMap(shown);
   const extras = diagramExtras(draft, shown, boxes);
+  // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
+  const bottomUsed = new Set<string>();
+  for (const f of draft.flows) {
+    const a = boxes.get(f.from);
+    const b = boxes.get(f.to);
+    const fn = shown.find((n) => n.id === f.from);
+    const tn = shown.find((n) => n.id === f.to);
+    if (!a || !b || !fn || !tn) continue;
+    const pts = waypoints(a, b, [], { fromType: fn.type, toType: tn.type, fromBoundary: isBoundary(fn, shown) });
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    if (Math.abs(first[0] - (a.x + a.w / 2)) < 0.5 && Math.abs(first[1] - (a.y + a.h)) < 0.5) bottomUsed.add(f.from);
+    if (Math.abs(last[0] - (b.x + b.w / 2)) < 0.5 && Math.abs(last[1] - (b.y + b.h)) < 0.5) bottomUsed.add(f.to);
+  }
   const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
 
@@ -543,7 +557,7 @@ export default function BpmnEditor({
               ))}
 
               {shown.map((n) => (
-                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} />
+                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} />
               ))}
 
               {inGroup && (() => {

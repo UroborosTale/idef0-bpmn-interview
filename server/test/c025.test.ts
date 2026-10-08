@@ -194,7 +194,7 @@ describe("процесс C025 по документу «ДПО от 05.10»", ()
     const m = c025Model();
     const patched = applyPatch(m, { ops: [{ op: "set_assignments", node_id: null, items: [{ role_id: "r_spec", kind: "owner", functions: [] }] }] });
     expect(patched.errors).toEqual([]);
-    expect(Object.keys(REFERENCE_PROCESSES)).toEqual(["b002", "c025"]);
+    expect(Object.keys(REFERENCE_PROCESSES)).toEqual(["b002", "c025", "demo"]);
     // владелец процесса назначен — остаются замечания только по подпроцессам
     expect(validateModel(patched.model).filter((i) => i.rule === "role_no_owner")).toHaveLength(2);
   });

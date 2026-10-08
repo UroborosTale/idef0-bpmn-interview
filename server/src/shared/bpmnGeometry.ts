@@ -114,7 +114,9 @@ export function waypoints(from: Box, to: Box, obstacles: Box[] = [], kinds: EndK
 
 /**
  * Где подписать стрелку (условие ветки): у начала маршрута, чтобы подпись читалась рядом с шлюзом, а не посреди длинной линии.
- * Горизонтальный первый отрезок — подпись над ним; вертикальный — справа от него.
+ * Горизонтальный первый отрезок — подпись над ним. Вертикальный: если за ним идёт горизонтальный (ветка шлюза вверх или вниз
+ * к цели), подпись стоит над горизонтальным отрезком сразу за поворотом — у разных веток из одной вершины это разные места, и подписи
+ * не накладываются; иначе — справа от вертикального.
  */
 export function flowLabelPoint(points: Pt[]): { x: number; y: number; anchor: "middle" | "start" } {
   const [a, b] = [points[0], points[1] ?? points[0]];
@@ -123,6 +125,12 @@ export function flowLabelPoint(points: Pt[]): { x: number; y: number; anchor: "m
     const len = Math.abs(b[0] - a[0]);
     const dir = b[0] >= a[0] ? 1 : -1;
     return { x: a[0] + dir * Math.min(len / 2, 34), y: a[1] - 6, anchor: "middle" };
+  }
+  const c = points[2];
+  if (c && Math.abs(b[1] - c[1]) < 0.5) {
+    const len2 = Math.abs(c[0] - b[0]);
+    const dir2 = c[0] >= b[0] ? 1 : -1;
+    return { x: b[0] + dir2 * Math.min(len2 / 2, 34), y: b[1] - 6, anchor: "middle" };
   }
   const len = Math.abs(b[1] - a[1]);
   const dir = b[1] >= a[1] ? 1 : -1;

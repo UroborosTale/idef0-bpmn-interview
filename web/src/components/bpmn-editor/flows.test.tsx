@@ -18,7 +18,7 @@ const route = (el: Element) =>
     .map((p) => p.trim().split(" ").map(Number));
 
 describe("стрелки в редакторе", () => {
-  it("ветка шлюза вниз уходит из нижней вершины и входит в задачу слева; условие подписано у шлюза", () => {
+  it("ветка шлюза вниз уходит из нижней вершины и входит в задачу слева; условие подписано за поворотом", () => {
     const gateway = { x: 200, y: 125, w: 50, h: 50 };
     const task = { x: 400, y: 260, w: 100, h: 80 };
     const { container } = render(
@@ -29,8 +29,9 @@ describe("стрелки в редакторе", () => {
     expect(route(container)).toEqual([[225, 175], [225, 300], [400, 300]]);
     const label = container.querySelector("text")!;
     expect(label.textContent).toBe("Нет");
-    expect(Number(label.getAttribute("x"))).toBeCloseTo(231, 0); // правее вертикального отрезка
-    expect(label.getAttribute("text-anchor")).toBe("start");
+    expect(Number(label.getAttribute("x"))).toBeCloseTo(259, 0); // над горизонтальным отрезком за поворотом
+    expect(Number(label.getAttribute("y"))).toBe(294);
+    expect(label.getAttribute("text-anchor")).toBe("middle");
   });
 
   it("стрелка к шлюзу сверху входит в верхнюю вершину", () => {

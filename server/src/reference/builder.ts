@@ -6,7 +6,7 @@
 
 import type { EventTrigger, TriggerType } from "../shared/events.js";
 
-export type TaskKind = "user" | "manual" | "service" | "send" | "receive" | "business_rule";
+export type TaskKind = "user" | "manual" | "service" | "send" | "receive" | "script" | "business_rule";
 
 export interface StepOpts {
   /** Вид задачи: по умолчанию пользовательская. */
@@ -27,7 +27,7 @@ export type Item =
   | { kind: "sub"; key: string; name: string; r?: string }
   /** Событие: k — вид (start, end) или ждущее промежуточное с триггером (timer, message); trg — параметры и направление триггера. */
   | { kind: "event"; key: string; k: "start" | "end" | "timer" | "message" | "intermediate"; name: string; r?: string; trg?: EventTrigger }
-  | { kind: "gw"; key: string; k: "exclusive" | "parallel"; name: string; r?: string }
+  | { kind: "gw"; key: string; k: "exclusive" | "parallel" | "inclusive" | "event_based"; name: string; r?: string }
   /** Граничное событие на задаче host: прерывающее (interrupting) или нет. */
   | { kind: "boundary"; key: string; host: string; k: TriggerType; name: string; interrupting: boolean; trg?: EventTrigger };
 
@@ -43,6 +43,11 @@ export const MSG_SEND = (key: string, name: string, msg?: string, r?: string): I
 export const MSG_END = (key: string, name: string, msg?: string, r?: string): Item => ({ kind: "event", key, k: "end", name, r, trg: { type: "message", ...(msg ? { name: msg } : {}) } });
 export const XOR = (key: string, name = "Слияние потоков", r?: string): Item => ({ kind: "gw", key, k: "exclusive", name, r });
 export const AND = (key: string, name = "Слияние потоков", r?: string): Item => ({ kind: "gw", key, k: "parallel", name, r });
+/** Включающий шлюз (OR) и шлюз по событию: после второго идут события, кто наступит раньше — того и ветка. */
+export const OR = (key: string, name = "Слияние потоков", r?: string): Item => ({ kind: "gw", key, k: "inclusive", name, r });
+export const EVG = (key: string, name: string, r?: string): Item => ({ kind: "gw", key, k: "event_based", name, r });
+/** Событие с любым триггером: pos — начальное, промежуточное или конечное; направление промежуточного задаёт trg.direction. */
+export const EV = (key: string, pos: "start" | "intermediate" | "end", trg: EventTrigger, name: string, r?: string): Item => ({ kind: "event", key, k: pos, name, r, trg });
 export const BOUNDARY = (key: string, host: string, k: TriggerType, name: string, interrupting: boolean, trg?: Omit<EventTrigger, "type">): Item => ({ kind: "boundary", key, host, k, name, interrupting, ...(trg ? { trg: { type: k, ...trg } } : {}) });
 
 /** Стрелка с условием; без условия стрелки строятся цепочкой ключей. */

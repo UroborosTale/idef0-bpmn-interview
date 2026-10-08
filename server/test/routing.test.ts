@@ -152,5 +152,9 @@ describe("подпись стрелки", () => {
     expect(v).toMatchObject({ x: 106, anchor: "start" });
     expect(v.y).toBeGreaterThan(50);
     expect(flowLabelPoint([[100, 50], [100, -100]]).y).toBeLessThan(50);
+    // ветка шлюза: вертикаль и поворот — подпись над горизонтальным отрезком за поворотом, у веток вниз и вверх места разные
+    expect(flowLabelPoint([[100, 50], [100, 200], [400, 200]])).toMatchObject({ x: 134, y: 194, anchor: "middle" });
+    expect(flowLabelPoint([[100, 50], [100, 350], [400, 350]]).y).not.toBe(flowLabelPoint([[100, 50], [100, 200], [400, 200]]).y);
+    expect(flowLabelPoint([[100, 50], [100, -100], [30, -100]]).x).toBeLessThan(100);
   });
 });

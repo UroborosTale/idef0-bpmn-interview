@@ -3,6 +3,7 @@ import { layoutLayered, orthogonalWaypoints, type LayoutNodeIn, type LayoutEdgeI
 import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
+import { linkPairs } from "../shared/validate.js";
 import { eventSpec, type EventPosition, type EventSpec, type TriggerType } from "../shared/events.js";
 import { artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../shared/bpmnArtifacts.js";
 
@@ -194,8 +195,12 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // граничное событие входит в диаграмму через свою задачу: у него нет входящих стрелок, но оно не начало процесса
   const isBoundary = (n: ProcessNode) => isBoundaryNode(n, nodes);
   const hostOf = (n: ProcessNode) => (isBoundary(n) ? nodes.find((x) => x.id === n.attached_to)! : n);
-  const roots = nodes.filter((n) => (incomingCount.get(n.id) ?? 0) === 0 && !isBoundary(n));
-  const leaves = nodes.filter((n) => (outgoingCount.get(n.id) ?? 0) === 0 && !(n.type === "event" && n.subtype === "end"));
+  // событие-ссылка не начало и не конец потока: оно продолжается у парного события по имени
+  const links = linkPairs(nodes);
+  const linkCatch = new Set(links.map(([, c]) => c));
+  const linkThrow = new Set(links.map(([t]) => t));
+  const roots = nodes.filter((n) => (incomingCount.get(n.id) ?? 0) === 0 && !isBoundary(n) && !linkCatch.has(n.id));
+  const leaves = nodes.filter((n) => (outgoingCount.get(n.id) ?? 0) === 0 && !(n.type === "event" && n.subtype === "end") && !linkThrow.has(n.id));
 
   type SynthEvent = { id: string; name: string; kind: "start" | "end" };
   const synthEvents: SynthEvent[] = [];

@@ -41,12 +41,14 @@ function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: s
   }
 }
 
-function Label({ cx, y, text }: { cx: number; y: number; text: string }) {
+/** Подпись под фигурой; left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
+function Label({ cx, y, text, left = false }: { cx: number; y: number; text: string; left?: boolean }) {
   const lines = wrapText(text, 20, 3);
+  const x = left ? cx - 8 : cx;
   return (
-    <text x={cx} y={y} textAnchor="middle" fontSize={11} fill={INK} pointerEvents="none">
+    <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={11} fill={INK} pointerEvents="none">
       {lines.map((l, i) => (
-        <tspan key={i} x={cx} dy={i === 0 ? 0 : 13}>
+        <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>
           {l}
         </tspan>
       ))}
@@ -54,7 +56,7 @@ function Label({ cx, y, text }: { cx: number; y: number; text: string }) {
   );
 }
 
-export function NodeShape({ node, box, selected, hot, boundary = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean }) {
+export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean }) {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -74,7 +76,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false }: { node
         <circle cx={cx} cy={cy} r={w / 2} fill={isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff"} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
         {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
         <EventGlyph cx={cx} cy={cy} trigger={spec.trigger} throwing={spec.throwing} />
-        <Label cx={cx} y={y + h + 14} text={node.name} />
+        <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} />
       </g>
     );
   } else if (node.type === "gateway") {
@@ -82,7 +84,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false }: { node
       <g>
         <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill="#fff" {...common} strokeLinejoin="round" />
         <GatewayGlyph cx={cx} cy={cy} subtype={node.subtype} />
-        <Label cx={cx} y={y + h + 14} text={node.name} />
+        <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} />
       </g>
     );
   } else {
