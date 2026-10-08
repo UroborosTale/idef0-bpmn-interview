@@ -181,3 +181,40 @@ describe("вопросы и отчёты агентов в студии", () => 
     await ctx.close();
   });
 });
+
+describe("конфиденциальная сессия и статистика агентов в студии", () => {
+  it("агент не видит закрытую сессию, пока аналитик не разрешит; после разрешения работает, и вкладка «Агенты» показывает его предложение", async () => {
+    const created = await api<{ id: string; model: any; updatedAt: string }>("POST", "/sessions/blank", { meta: { processName: "Закрытый процесс", confidential: true } });
+    const id = created.body.id;
+    expect((await api("GET", `/agent/sessions/${id}/model`)).status).toBe(403);
+
+    const { ctx, page, errors } = await openContext(browser);
+    page.on("dialog", (d) => void d.accept()); // подтверждение «тексты уйдут во внешнюю модель»
+    await page.goto(`${WEB}/s/${id}`);
+    await page.locator(".studio").waitFor();
+    await page.locator(".problems-head button", { hasText: "Агенты" }).click();
+    const bar = page.locator("[data-agent-access]");
+    await bar.waitFor();
+    expect(await bar.innerText()).toContain("доступа не имеют");
+
+    await page.getByRole("button", { name: "Разрешить доступ агентам" }).click();
+    await page.locator("[data-agent-access].allowed").waitFor();
+    expect((await api("GET", `/agent/sessions/${id}/model`)).status).toBe(200);
+
+    // агент присылает предложение; аналитик отклоняет его с причиной — сводка это показывает
+    const prop = await api<{ id: string }>("POST", `/agent/sessions/${id}/proposals`, { agent: "моделист", title: "Цель процесса", ops: [{ op: "set_process", patch: { goal: "Цель" } }] });
+    expect(prop.status).toBe(201);
+    await api("POST", `/proposals/${prop.body.id}/resolve`, { status: "rejected", reason: "Нет цитаты в интервью" });
+    await page.getByRole("button", { name: "Обновить" }).click();
+    const row = page.locator('tr[data-role="моделист"]');
+    await row.waitFor();
+    expect((await row.locator("td").allInnerTexts()).slice(0, 5)).toEqual(["моделист", "1", "0", "0", "1"]);
+    await page.getByText("Нет цитаты в интервью").first().waitFor();
+
+    await page.getByRole("button", { name: "Закрыть доступ" }).click();
+    await page.locator("[data-agent-access].denied").waitFor();
+    expect((await api("GET", `/agent/sessions/${id}/model`)).status).toBe(403);
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+});

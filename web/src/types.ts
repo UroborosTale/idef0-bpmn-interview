@@ -327,6 +327,8 @@ export interface SessionMeta {
   decompositionDepth: number;
   notations: ("IDEF0" | "BPMN")[];
   confidential?: boolean;
+  /** Конфиденциальную сессию агенты видят, только если аналитик разрешил. */
+  agentAccess?: boolean;
 }
 
 export interface Comment {

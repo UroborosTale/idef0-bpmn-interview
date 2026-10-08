@@ -582,3 +582,26 @@ export interface AgentReportRow {
   stale?: boolean;
   createdAt: string;
 }
+
+/** Сводка работы одной роли агента (предложения, задания, вопросы, отчёты) — для настройки инструкций по реальным запускам. */
+export interface AgentRoleStats {
+  role: string;
+  proposals: {
+    total: number;
+    pending: number;
+    applied: number;
+    rejected: number;
+    /** Доля применённых среди решённых; null — решений ещё нет. */
+    acceptance: number | null;
+    introduced: number;
+    resolved: number;
+    topReasons: { reason: string; count: number }[];
+  };
+  tasks: { taken: number; done: number; created: number };
+  questions: { added: number; asked: number; answered: number; dismissed: number };
+  reports: { total: number; unread: number; findings: number; highImpact: number };
+}
+export interface AgentStatsReport {
+  scope: "session" | "all";
+  roles: AgentRoleStats[];
+}

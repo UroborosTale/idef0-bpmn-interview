@@ -73,6 +73,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
   const [questions, setQuestions] = useState<AgentQuestionRow[]>([]);
+  const [agentAllowed, setAgentAllowed] = useState(!!session.meta.agentAccess);
   const [reports, setReports] = useState<AgentReportRow[]>([]);
   const nonce = useRef(0);
 
@@ -190,6 +191,16 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
   const nodeByCode = (code: string): string | null => {
     for (const map of [functionCodes(draft), stepCodes(draft)]) for (const [id, c] of map) if (c === code) return id;
     return null;
+  };
+  /** Конфиденциальная сессия: разрешить или закрыть доступ агентов — решение аналитика, сохраняется в мете сессии. */
+  const setAgentAccess = async (allowed: boolean) => {
+    if (allowed && !window.confirm("Тексты интервью и модель этой конфиденциальной сессии станут доступны агентам — то есть внешней модели Cline. Разрешить?")) return;
+    try {
+      await api.patchSession(session.id, { meta: { ...session.meta, agentAccess: allowed } });
+      setAgentAllowed(allowed);
+    } catch (e) {
+      setExportError(`Не удалось изменить доступ агентов: ${(e as Error).message}`);
+    }
   };
   const showTasks = () => setProblemsTab({ tab: "tasks", nonce: ++nonce.current });
   const handOffAnswers = async () => {
@@ -535,7 +546,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
             )}
             {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
           </div>
-          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} onHandOffAnswers={handOffAnswers} sessionId={session.id} nodeByCode={nodeByCode} onSelectFn={selectFn} onAssignFinding={assignFinding} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
+          {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} onHandOffAnswers={handOffAnswers} sessionId={session.id} agentAccess={session.meta.confidential ? { confidential: true, allowed: agentAllowed } : undefined} onSetAgentAccess={setAgentAccess} nodeByCode={nodeByCode} onSelectFn={selectFn} onAssignFinding={assignFinding} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
           <PropertiesPanel

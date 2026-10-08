@@ -16,6 +16,8 @@ export interface SessionMeta {
   decompositionDepth: number;
   notations: ("IDEF0" | "BPMN")[];
   confidential?: boolean; // ФТ-М9.3.2: обрабатывается только локальным провайдером; ФТ-М9.1.5: исключается из корпуса
+  /** Конфиденциальную сессию агенты (внешние модели Cline) видят, только если аналитик разрешил. Для обычных сессий не нужен. */
+  agentAccess?: boolean;
 }
 
 export interface VersionSnapshot {

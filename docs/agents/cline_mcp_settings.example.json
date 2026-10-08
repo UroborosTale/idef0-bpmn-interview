@@ -8,7 +8,7 @@
         "PM_AGENT_TOKEN": "тот же токен, что AGENT_API_TOKEN у приложения"
       },
       "disabled": false,
-      "autoApprove": ["get_conventions", "list_sessions", "get_model", "list_proposals", "get_proposal"]
+      "autoApprove": ["get_conventions", "list_sessions", "get_model", "get_fragments", "list_proposals", "get_proposal", "get_tasks", "list_questions", "list_reports", "get_report"]
     }
   }
 }

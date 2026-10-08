@@ -5,6 +5,7 @@ import ProposalsList from "./ProposalsList";
 import TasksPanel from "./TasksPanel";
 import QuestionsPanel, { isLiveQuestion } from "./QuestionsPanel";
 import ReportsPanel from "./ReportsPanel";
+import AgentStatsPanel from "./AgentStatsPanel";
 import { ruleTitle } from "./rule-titles";
 import type { QuickFix } from "./quick-fixes";
 
@@ -35,6 +36,8 @@ export default function ProblemsPanel({
   onReportStatus,
   onHandOffAnswers,
   sessionId,
+  agentAccess,
+  onSetAgentAccess,
   nodeByCode,
   onSelectFn,
   onAssignFinding,
@@ -53,7 +56,7 @@ export default function ProblemsPanel({
   onApplyProposal?: (p: Proposal) => void | Promise<void>;
   onRejectProposal?: (p: Proposal, reason: string) => void | Promise<void>;
   /** Открыть вкладку по запросу извне (кнопка «Предложения» в ленте); nonce меняется при каждом запросе. */
-  showTab?: { tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null;
+  showTab?: { tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports" | "agents"; nonce: number } | null;
   /** Задания аналитика агенту и их статусы. */
   tasks?: AgentTaskRow[];
   selectedFn?: { id: string; label: string } | null;
@@ -66,8 +69,11 @@ export default function ProblemsPanel({
   reports?: AgentReportRow[];
   onReportStatus?: (r: AgentReportRow, status: AgentReportRow["status"]) => void | Promise<void>;
   onHandOffAnswers?: () => void | Promise<void>;
-  /** Сессия студии — для выгрузок вопросов в Word. */
+  /** Сессия студии — для выгрузок вопросов в Word и сводки по агентам. */
   sessionId?: string;
+  /** Конфиденциальная сессия: агентам (внешним моделям) она открыта, только если аналитик разрешил; решение принимается здесь. */
+  agentAccess?: { confidential: boolean; allowed: boolean };
+  onSetAgentAccess?: (allowed: boolean) => void | Promise<void>;
   nodeByCode?: (code: string) => string | null;
   onSelectFn?: (nodeId: string) => void;
   onAssignFinding?: (report: AgentReportRow, finding: ReportFinding) => void | Promise<void>;
@@ -80,7 +86,7 @@ export default function ProblemsPanel({
   onAccept?: (issue: ValidationIssue, reason: string) => void;
   onRevoke?: (issue: ValidationIssue) => void;
 }) {
-  const [tab, setTab] = useState<"issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports">("issues");
+  const [tab, setTab] = useState<"issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports" | "agents">("issues");
   useEffect(() => {
     if (showTab) setTab(showTab.tab);
   }, [showTab?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -123,6 +129,9 @@ export default function ProblemsPanel({
         <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>
           Отчёты <span className={`pill-count ${reports.some((r) => r.status === "new") ? "warn" : ""}`}>{reports.filter((r) => r.status === "new").length}</span>
         </button>
+        <button className={tab === "agents" ? "active" : ""} onClick={() => setTab("agents")} title="Работа агентов по ролям: что принято, что отклонено и почему">
+          Агенты
+        </button>
         <span className="spacer" />
         {tab === "issues" && (
           <>
@@ -142,6 +151,16 @@ export default function ProblemsPanel({
         )}
       </div>
       <div className="problems-body">
+        {agentAccess?.confidential && (tab === "proposals" || tab === "tasks" || tab === "questions" || tab === "reports" || tab === "agents") && (
+          <div className={`agent-access ${agentAccess.allowed ? "allowed" : "denied"}`} data-agent-access>
+            <span>
+              Сессия конфиденциальна. Агенты (внешние модели Cline) {agentAccess.allowed ? "имеют доступ к тексту интервью и модели" : "доступа не имеют: не видят её и ничего в неё не добавляют"}.
+            </span>
+            <button onClick={() => void onSetAgentAccess?.(!agentAccess.allowed)} title="Решение за аналитиком: тексты уйдут во внешнюю модель, если разрешить">
+              {agentAccess.allowed ? "Закрыть доступ" : "Разрешить доступ агентам"}
+            </button>
+          </div>
+        )}
         {tab === "issues" && shown.length === 0 && !(show.accepted && acceptedIssues.length > 0) && (
           <div className="muted problems-empty">{issues.length === 0 ? (acceptedIssues.length > 0 ? `Действующих замечаний нет; принято: ${acceptedIssues.length}.` : "Замечаний нет — модель прошла все проверки.") : "Скрыто фильтром."}</div>
         )}
@@ -221,6 +240,7 @@ export default function ProblemsPanel({
         {tab === "tasks" && (
           <TasksPanel tasks={tasks} selected={selectedFn} labelOf={labelOf} onCreate={(t) => onCreateTask?.(t)} onCancel={(t) => onCancelTask?.(t)} onShowProposals={() => setTab("proposals")} />
         )}
+        {tab === "agents" && sessionId && <AgentStatsPanel sessionId={sessionId} />}
         {tab === "questions" && <QuestionsPanel questions={questions} labelOf={labelOf} processName={model.process.name} onStatus={(q, s, a) => onQuestionStatus?.(q, s, a)} onHandOff={onHandOffAnswers} sessionId={sessionId} />}
         {tab === "reports" && <ReportsPanel reports={reports} labelOf={labelOf} onStatus={(r, s) => onReportStatus?.(r, s)} nodeByCode={nodeByCode} onSelectFn={onSelectFn} onAssign={onAssignFinding} />}
         {tab === "gaps" && gaps.length === 0 && <div className="muted problems-empty">Открытых вопросов нет.</div>}

@@ -12,6 +12,7 @@ import { cancelTask, completeTask, createTask, getTask, listTasks, takeTask, typ
 import { ProcessLogicModel } from "../types/model.js";
 import { handOffAnswers } from "../answerHandoff.js";
 import { notifyAnalyst } from "../agentNotify.js";
+import { agentStats } from "../agentStats.js";
 import { buildQuestionsDocx, buildReportDocx } from "../export/agentDocs.js";
 import { addQuestion, getQuestion, listQuestions, setQuestionStatus, QUESTION_STATUSES, type QuestionStatus } from "../agentQuestions.js";
 import { addReport, getReport, listReports, modelFingerprint, setReportStatus, withStale, REPORT_STATUSES, type ReportStatus } from "../agentReports.js";
@@ -31,20 +32,50 @@ function present(p: Proposal, modelOf: (id: string) => ProcessLogicModel | undef
   return { ...p, lines: model ? describePatch(model, p.patch) : [] };
 }
 
+/** Сколько ожидающих решения предложений допустимо на сессию: у аналитика они копятся, и лавина их делает ревью невозможным. */
+const MAX_PENDING_PROPOSALS = 30;
+
+/**
+ * Конфиденциальные сессии обрабатываются только локальной моделью, а агенты (Cline) работают через внешнюю. Поэтому такая сессия
+ * закрыта для всех ручек /agent/*, пока аналитик не разрешил доступ (мета сессии, agentAccess) — решение за ним.
+ */
+function agentBlockedMessage(sessionId: string | undefined): string | null {
+  const meta = sessionId ? getSession(sessionId)?.meta : undefined;
+  return meta?.confidential && !meta.agentAccess ? "Сессия конфиденциальна: аналитик не разрешил агентам доступ к ней (разрешить можно в студии, вкладки агентов)." : null;
+}
+
+agentRouter.use("/agent", (req, res, next) => {
+  const m = /^\/(sessions|tasks|proposals|reports)\/([^/]+)/.exec(req.path);
+  if (!m) return next(); // правила и список сессий: список сам скрывает закрытые
+  const sessionId = m[1] === "sessions" ? m[2] : m[1] === "tasks" ? getTask(m[2])?.sessionId : m[1] === "proposals" ? getProposal(m[2])?.sessionId : getReport(m[2])?.sessionId;
+  const blocked = agentBlockedMessage(sessionId);
+  if (blocked) {
+    res.status(403).json({ error: blocked, code: "confidential" });
+    return;
+  }
+  next();
+});
+
 agentRouter.get("/agent/conventions", (_req, res) => {
   res.type("text/markdown; charset=utf-8").send(CONVENTIONS);
 });
 
 agentRouter.get("/agent/sessions", (_req, res) => {
   res.json(
-    listSessions().map((s) => ({
-      id: s.id,
-      title: s.title,
-      processName: s.meta.processName,
-      code: s.model?.process.code ?? null,
-      hasModel: !!s.model,
-      updatedAt: s.updatedAt,
-    }))
+    listSessions().map((s) => {
+      const blocked = !!s.meta.confidential && !s.meta.agentAccess;
+      // название закрытой сессии само может быть конфиденциальным — агенту видно только, что она есть и закрыта
+      return {
+        id: s.id,
+        title: blocked ? "" : s.title,
+        processName: blocked ? "" : s.meta.processName,
+        code: blocked ? null : s.model?.process.code ?? null,
+        hasModel: !!s.model,
+        updatedAt: s.updatedAt,
+        confidential: !!s.meta.confidential,
+        blocked,
+      };
+    })
   );
 });
 
@@ -91,6 +122,11 @@ agentRouter.post("/agent/sessions/:id/proposals", (req, res) => {
   const parsed = ProposalInput.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "предложение не соответствует формату", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) });
+    return;
+  }
+  const pending = listProposals(session.id, "pending").length;
+  if (pending >= MAX_PENDING_PROPOSALS) {
+    res.status(429).json({ error: `у аналитика уже ${pending} предложений ждут решения — подождите, пока он их разберёт (list_proposals со статусом pending)` });
     return;
   }
   const { agent, title, rationale, ops, task_id } = parsed.data;
@@ -535,6 +571,16 @@ agentRouter.get("/agent-reports/:rid/export.docx", async (req, res) => {
   const buf = await buildReportDocx(session, report);
   res.setHeader("Content-Disposition", `attachment; filename="report-${report.id}.docx"`);
   res.type(DOCX).send(buf);
+});
+
+/** Сводка работы агентов по ролям: по этой сессии или (all=1) по всем сессиям. */
+agentRouter.get("/sessions/:id/agent-stats", (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "сессия не найдена" });
+    return;
+  }
+  res.json(agentStats(req.query.all === "1" ? null : session.id));
 });
 
 /** Передать моделисту ответы, полученные на интервью, одним заданием «внеси ответы». */

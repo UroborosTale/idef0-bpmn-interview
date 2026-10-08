@@ -110,8 +110,12 @@ export function createAgentServer(api: AgentApi): McpServer {
     async () => {
       const r = await api.get("/agent/sessions");
       if (r.status !== 200) return apiError(r);
-      const rows = r.body as { id: string; title: string; processName: string; code: string | null; hasModel: boolean; updatedAt: string }[];
-      return ok(rows.length ? rows.map((s) => `${s.id} — ${s.processName}${s.code ? ` (${s.code})` : ""}${s.hasModel ? "" : " — модели ещё нет"}; обновлено ${s.updatedAt}`).join("\n") : "Сессий нет.");
+      const rows = r.body as { id: string; title: string; processName: string; code: string | null; hasModel: boolean; updatedAt: string; blocked?: boolean }[];
+      return ok(
+        rows.length
+          ? rows.map((s) => (s.blocked ? `${s.id} — КОНФИДЕНЦИАЛЬНАЯ сессия: аналитик не разрешил агентам доступ, не работайте с ней` : `${s.id} — ${s.processName}${s.code ? ` (${s.code})` : ""}${s.hasModel ? "" : " — модели ещё нет"}; обновлено ${s.updatedAt}`)).join("\n")
+          : "Сессий нет."
+      );
     }
   );
 
