@@ -3,6 +3,7 @@ import { idef0Codes, functionsOf as idef0Functions } from "./idef0Layout.js";
 import { bpmnHosts, functionDepth, isStructured, parseProcessCode } from "./codes.js";
 import { isBoundaryNode } from "./bpmnArtifacts.js";
 import { TRIGGER_LABELS, eventSpec, triggerGaps, triggerProblem, triggerSummary } from "./events.js";
+import { analyzeSoundness } from "./soundness.js";
 import { FUNCTION_CODE, blockKey, hasVerbalNoun, looksLikeFact, normalizeCode } from "./rules.js";
 
 /**
@@ -127,31 +128,47 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     }
   }
 
-  // простая проверка на возможный livelock: цикл без выхода
-  const visited = new Set<string>();
-  const stack = new Set<string>();
-  function dfs(id: string, path: string[]): void {
-    if (stack.has(id)) {
-      const cycle = path.slice(path.indexOf(id));
-      const hasExit = cycle.some((cid) => (reachAdj.get(cid) ?? []).some((t) => !cycle.includes(t)));
-      if (!hasExit) {
-        add(
-          "BPMN",
-          "warning",
-          "bpmn_possible_livelock",
-          `${where}Обнаружен цикл без выхода: ${cycle.map((cid) => nodeById.get(cid)?.name ?? cid).join(" → ")}.`,
-          id
-        );
+  // Поведение процесса: перебор состояний игры токенов (shared/soundness.ts) — блокировки, циклы без выхода, нехватка синхронизации, мёртвые шаги.
+  const soundness = analyzeSoundness(bpmnNodes, [...bpmnFlows, ...linkPairs(bpmnNodes).map(([from, to]) => ({ from, to }))]);
+  if (soundness.analyzed) {
+    const nm = (id: string) => `«${nodeById.get(id)?.name ?? id}»`;
+    const route = (trace: string[]) => (trace.length > 0 ? ` Путь к этому: ${trace.map((s) => `«${s}»`).join(" → ")}.` : "");
+    const gatewayKind = (id: string) => (nodeById.get(id)?.type === "gateway" ? (nodeById.get(id)!.subtype ?? "exclusive") : null);
+    for (const d of soundness.deadlocks.slice(0, 3)) {
+      const at = d.waiting.find((id) => gatewayKind(id) === "parallel") ?? d.waiting[0];
+      if (d.afterEnd) {
+        // обычное конечное событие закрывает только свой поток: параллельные ветки идут дальше и ждут тех, что уже закончились
+        add("BPMN", "warning", "bpmn_end_leaves_branches", `${where}Конечное событие закрывает только свою ветку, а параллельные продолжаются и застревают перед ${d.waiting.map(nm).join(", ")}. Если эта ветка должна остановить весь процесс, задайте конечному событию триггер «Завершение» (terminate).${route(d.trace)}`, at ?? null);
+        continue;
       }
-      return;
+      const why = gatewayKind(at) === "parallel" ? ` Параллельный шлюз ждёт все входящие ветки, а до него дошла только часть: остальные выбраны не были — ветки разошлись исключающим шлюзом (XOR), а сходятся параллельным (AND).` : "";
+      add("BPMN", "error", "bpmn_deadlock", `${where}Процесс может остановиться, не завершившись: поток застревает перед ${d.waiting.map(nm).join(", ")}.${why}${route(d.trace)}`, at ?? null);
     }
-    if (visited.has(id)) return;
-    visited.add(id);
-    stack.add(id);
-    for (const next of reachAdj.get(id) ?? []) dfs(next, [...path, id]);
-    stack.delete(id);
+    for (const l of soundness.livelocks.slice(0, 2)) {
+      add("BPMN", "warning", "bpmn_possible_livelock", `${where}Из этого места процесс не может завершиться: шаги ${l.looping.map(nm).join(", ")} повторяются бесконечно. Добавьте выход из цикла.${route(l.trace)}`, l.looping[0] ?? null);
+    }
+    for (const u of soundness.unsynchronized.slice(0, 3)) {
+      add("BPMN", "warning", "bpmn_lack_of_sync", `${where}К ${nm(u.node)} могут прийти сразу два потока: параллельные ветки сливаются без параллельного шлюза (AND), поэтому шаг выполнится дважды.${route(u.trace)}`, u.node);
+    }
+  } else {
+    // диаграмма слишком велика для перебора состояний — остаётся простая проверка: цикл без выхода
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+    const dfs = (id: string, path: string[]): void => {
+      if (stack.has(id)) {
+        const cycle = path.slice(path.indexOf(id));
+        const hasExit = cycle.some((cid) => (reachAdj.get(cid) ?? []).some((t) => !cycle.includes(t)));
+        if (!hasExit) add("BPMN", "warning", "bpmn_possible_livelock", `${where}Обнаружен цикл без выхода: ${cycle.map((cid) => nodeById.get(cid)?.name ?? cid).join(" → ")}.`, id);
+        return;
+      }
+      if (visited.has(id)) return;
+      visited.add(id);
+      stack.add(id);
+      for (const next of reachAdj.get(id) ?? []) dfs(next, [...path, id]);
+      stack.delete(id);
+    };
+    for (const n of bpmnNodes) dfs(n.id, []);
   }
-  for (const n of bpmnNodes) dfs(n.id, []);
 
   // --- граничные события ---
   for (const n of bpmnNodes) {
