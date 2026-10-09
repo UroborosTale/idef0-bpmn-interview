@@ -1,6 +1,7 @@
+import { MIN_DIAGRAM_W, clampDiagramWidth, clampLaneHeight } from "@shared/bpmnGeometry";
 import { allowedTriggers, eventSpec, withTrigger, type EventPosition, type EventTrigger, type TriggerType } from "@shared/events";
 import type { ExternalPool, FlowRoute, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { LANE_H, clampIntoLane, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, boxOf, triggerView, type Pt } from "./geometry";
+import { LANE_H, MIN_LANE_H, boxMap, boxOf, clampIntoLane, contentWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, triggerView, visibleNodes, type Pt } from "./geometry";
 
 type M = ProcessLogicModel;
 export interface OpResult {
@@ -98,13 +99,16 @@ export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpRe
 
 export const moveNode = (m: M, id: string, x: number, y: number): M => mapNode(m, id, (n) => ({ ...n, layout: { x, y } }));
 
-/** После перетаскивания: роль узла = дорожка под его центром, фигура удерживается внутри дорожки. */
-export function dropNodeIntoLane(m: M, id: string): M {
+/**
+ * После перетаскивания: роль узла = дорожка под его центром, фигура удерживается внутри дорожки. Положение ложится на сетку,
+ * кроме осей, по которым фигура выровнена по направляющей (keep): там оно остаётся точным.
+ */
+export function dropNodeIntoLane(m: M, id: string, keep: { x?: boolean; y?: boolean } = {}): M {
   const n = m.nodes.find((x) => x.id === id);
   if (!n) return m;
   const b = boxOf(n);
   const lane = laneIndexAtY(m, b.y + b.h / 2);
-  const [x, y] = clampIntoLane(m, n, snap(b.x), snapTop(b.y, b.h), lane);
+  const [x, y] = clampIntoLane(m, n, keep.x ? b.x : snap(b.x), keep.y ? b.y : snapTop(b.y, b.h), lane);
   return syncBoundaryRole(mapNode(m, id, (nn) => ({ ...nn, role_id: roleIdOfLane(m, lane), layout: { x, y } })), id);
 }
 
@@ -120,7 +124,7 @@ export function setNodeRole(m: M, id: string, roleId: string | null): M {
   if (!n) return m;
   const lane = laneIndexOfRole(m, roleId);
   const b = boxOf(n);
-  return syncBoundaryRole(mapNode(m, id, (nn) => ({ ...nn, role_id: roleId, layout: { x: b.x, y: laneTop(lane) + (LANE_H - b.h) / 2 } })), id);
+  return syncBoundaryRole(mapNode(m, id, (nn) => ({ ...nn, role_id: roleId, layout: { x: b.x, y: laneTop(m, lane) + (laneHeight(m, lane) - b.h) / 2 } })), id);
 }
 
 export function setNodeType(m: M, id: string, type: ProcessNode["type"]): M {
@@ -225,8 +229,20 @@ const cleanRoute = (r: FlowRoute): FlowRoute | null => {
   if (r.from_side) out.from_side = r.from_side;
   if (r.to_side) out.to_side = r.to_side;
   if (r.channel !== undefined && Number.isFinite(r.channel)) out.channel = r.channel;
+  for (const k of ["from_pos", "to_pos"] as const) {
+    const v = r[k];
+    if (v !== undefined && Number.isFinite(v)) out[k] = Math.min(1, Math.max(0, Math.round(v * 1000) / 1000)); // тысячные доли: выровненный по направляющей конец не должен «уплывать»
+  }
+  const points = (r.points ?? []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])).map((p): [number, number] => [Math.round(p[0] * 2) / 2, Math.round(p[1] * 2) / 2]);
+  if (points.length > 0) out.points = points.slice(0, 64);
   return Object.keys(out).length > 0 ? out : null;
 };
+
+/** Маршрут развёрнутой стрелки: концы меняются местами, точки идут в обратном порядке (средний участок сбрасывается). */
+export function reverseRoute(r: FlowRoute | null | undefined): FlowRoute | null {
+  if (!r) return null;
+  return cleanRoute({ from_side: r.to_side, to_side: r.from_side, from_pos: r.to_pos, to_pos: r.from_pos, points: r.points ? [...r.points].reverse() : undefined });
+}
 
 /** Ручной маршрут стрелки: заданные поля меняются, undefined — снимается (сторона или канал снова подбираются автоматически); null — весь маршрут автоматический. */
 export function setFlowRoute(m: M, id: string, patch: { [K in keyof FlowRoute]?: FlowRoute[K] | undefined } | null): M {
@@ -241,22 +257,24 @@ export function nearestSide(box: { x: number; y: number; w: number; h: number },
 
 /**
  * Конец стрелки перенесён на другую сторону той же фигуры (сторона запоминается) или на другую фигуру (с теми же проверками,
- * что при создании связи). Положение среднего участка при смене конца сбрасывается. viaEvent — стрелка идёт «X → блок»
- * через свёрнутый триггер блока (в модели её конец — событие): блок — конец-вход, на другую фигуру его переносить нельзя
- * (триггер блока переносят отдельно), меняется только сторона.
+ * что при создании связи). pos — положение конца вдоль стороны (0…1). Положение среднего участка при смене конца сбрасывается,
+ * а точки излома сохраняются только если конец остался на той же стороне (сдвинули вдоль неё): при смене стороны или фигуры
+ * старые точки не подходят. viaEvent — стрелка идёт «X → блок» через свёрнутый триггер блока (в модели её конец — событие):
+ * блок — конец-вход, на другую фигуру его переносить нельзя (триггер блока переносят отдельно), меняется только сторона.
  */
-export function reconnectFlow(m: M, id: string, end: "from" | "to", nodeId: string, side?: FlowSide, viaEvent?: string): OpResult {
+export function reconnectFlow(m: M, id: string, end: "from" | "to", nodeId: string, side?: FlowSide, viaEvent?: string, pos?: number): OpResult {
   const f = m.flows.find((x) => x.id === id);
   if (!f) return { model: m, error: "Стрелка не найдена" };
   const key = end === "from" ? "from_side" : "to_side";
+  const posKey = end === "from" ? "from_pos" : "to_pos";
   const locked = end === "to" && !!viaEvent;
   const current = locked ? m.flows.find((x) => x.from === viaEvent)?.to ?? f.to : f[end];
-  if (nodeId === current) return { model: setFlowRoute(m, id, { [key]: side, channel: undefined }) };
+  if (nodeId === current) return { model: setFlowRoute(m, id, { [key]: side, [posKey]: pos, channel: undefined, ...(f.route?.[key] === side ? {} : { points: undefined }) }) };
   if (locked) return { model: m, error: "К блоку с триггером стрелку можно только переставить на другую сторону: триггер блока переносят отдельно (удалите значок и добавьте его другому блоку)" };
   const without = { ...m, flows: m.flows.filter((x) => x.id !== id) };
   const check = end === "from" ? addFlow(without, nodeId, f.to) : addFlow(without, f.from, nodeId);
   if (check.error) return { model: m, error: check.error };
-  const route = cleanRoute({ ...(f.route ?? {}), channel: undefined, [key]: side, ...(end === "from" ? { from_side: side } : { to_side: side }) });
+  const route = cleanRoute({ ...(f.route ?? {}), channel: undefined, points: undefined, [key]: side, [posKey]: pos });
   return { model: { ...m, flows: m.flows.map((x) => (x.id === id ? { ...x, [end]: nodeId, route } : x)) } };
 }
 
@@ -265,8 +283,80 @@ function shiftForLanes(oldM: M, newM: M): M {
   return {
     ...newM,
     nodes: newM.nodes.map((n) => {
-      const delta = laneIndexOfRole(newM, n.role_id) - laneIndexOfRole(oldM, n.role_id);
-      return delta && n.layout ? { ...n, layout: { x: n.layout.x, y: n.layout.y + delta * LANE_H } } : n;
+      // фигура едет вместе со своей дорожкой: на разность верхних границ (у дорожек разная высота)
+      const dy = laneTop(newM, laneIndexOfRole(newM, n.role_id)) - laneTop(oldM, laneIndexOfRole(oldM, n.role_id));
+      return dy && n.layout ? { ...n, layout: { x: n.layout.x, y: n.layout.y + dy } } : n;
+    }),
+  };
+}
+
+// --- размер дорожек ---
+
+// --- ширина дорожек ---
+
+/** Наименьшая ширина дорожек: фигурам и внешним пулам должно хватать места; кратна 10. */
+export const diagramMinWidth = (m: M): number => Math.max(MIN_DIAGRAM_W, Math.ceil(contentWidth(m) / 10) * 10);
+
+/**
+ * Ширина дорожек показанной диаграммы (правый край), не меньше diagramMinWidth: уже содержимого дорожки не сделать, а запрошенное
+ * меньше прижимается к минимуму (так дорожки можно ужать вплотную к фигурам). null — настройка снимается: ширина по содержимому, но
+ * не меньше 1400, чтобы на пустой диаграмме было место для новых фигур.
+ */
+export function setDiagramWidth(m: M, width: number | null): M {
+  const rest = { ...(m.diagram_widths ?? {}) };
+  delete rest[""];
+  if (width !== null && Number.isFinite(width)) rest[""] = Math.max(clampDiagramWidth(width), diagramMinWidth(m));
+  const same = (m.diagram_widths?.[""] ?? null) === (rest[""] ?? null);
+  if (same) return m;
+  return { ...m, diagram_widths: Object.keys(rest).length > 0 ? rest : undefined };
+}
+
+/** Допуск, в пределах которого фигура считается стоящей по центру дорожки (и при изменении высоты остаётся по центру). */
+const CENTER_TOL = 6;
+
+/**
+ * Наименьшая высота дорожки: все её фигуры остаются внутри с отступом 8, но не меньше MIN_LANE_H. Фигура по центру дорожки при
+ * сужении переходит к новому центру, поэтому ей нужна высота вдвое больше её половины (у задачи с граничными событиями — с
+ * запасом на них); фигуре, поставленной вручную в другом месте, нужно, чтобы её низ остался в дорожке. Значки данных над и под
+ * задачей в расчёт не входят — им место даёт стандартная высота.
+ */
+export function laneMinHeight(m: M, laneIndex: number): number {
+  const shown = visibleNodes(m);
+  const boxes = boxMap(shown);
+  const top = laneTop(m, laneIndex);
+  const center = top + laneHeight(m, laneIndex) / 2;
+  let need = MIN_LANE_H;
+  for (const n of shown) {
+    const b = boxes.get(n.id);
+    if (!b || isBoundary(n, shown) || laneIndexOfRole(m, n.role_id) !== laneIndex) continue;
+    const below = b.y + b.h + (shown.some((x) => x.attached_to === n.id) ? 18 : 0); // граничные события выступают под задачей
+    if (Math.abs(b.y + b.h / 2 - center) <= CENTER_TOL) need = Math.max(need, 2 * Math.max(center - b.y, below - center) + 16);
+    else need = Math.max(need, below - top + 8);
+  }
+  return Math.ceil(need / 10) * 10;
+}
+
+/**
+ * Высота дорожки: не меньше laneMinHeight и в допустимых пределах, кратна 10. Дорожки ниже сдвигаются целиком; фигуры самой
+ * дорожки, стоявшие по её центру, остаются по центру, а поставленные вручную в другом месте — на месте.
+ */
+export function setLaneHeight(m: M, laneIndex: number, height: number): M {
+  if (laneIndex < 0 || laneIndex >= laneCount(m) || !Number.isFinite(height)) return m;
+  const h = clampLaneHeight(Math.max(height, laneMinHeight(m, laneIndex)));
+  const old = laneHeight(m, laneIndex);
+  if (h === old) return m;
+  const delta = h - old;
+  const store = h === LANE_H ? null : h; // стандартная высота — это отсутствие настройки
+  const oldCenter = laneTop(m, laneIndex) + old / 2;
+  const base: M = laneIndex < m.roles.length ? { ...m, roles: m.roles.map((r, k) => (k === laneIndex ? { ...r, lane_height: store } : r)) } : { ...m, process: { ...m.process, unassigned_lane_height: store } };
+  return {
+    ...base,
+    nodes: base.nodes.map((n) => {
+      if (!n.layout) return n;
+      const lane = laneIndexOfRole(m, n.role_id);
+      if (lane > laneIndex) return { ...n, layout: { x: n.layout.x, y: n.layout.y + delta } };
+      if (lane === laneIndex && Math.abs(n.layout.y + sizeOf(n).h / 2 - oldCenter) <= CENTER_TOL) return { ...n, layout: { x: n.layout.x, y: n.layout.y + delta / 2 } };
+      return n;
     }),
   };
 }

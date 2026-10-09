@@ -4,23 +4,29 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { MIN_X, boxMap, boxOf, diagramLayout, isBoundary, laneIndexAtY, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
+import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, configuredWidth, diagramLayout, diagramWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
+import { positionOnSide } from "@shared/bpmnManual";
+import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
+import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, snapShape, type Guide, type GuideTarget } from "./guides";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
-import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
+import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
 type Sel = { kind: "node" | "flow" | "lane"; id: string } | null;
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
-  | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
+  | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number; keep: { x: boolean; y: boolean } }
   | { kind: "connect"; from: string }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
-  | { kind: "flowChannel"; id: string; axis: "x" | "y"; lo: number; hi: number; startModel: M; moved: boolean; x0: number; y0: number }
+  | { kind: "laneStretch"; base: M; startModel: M; x0: number; w0: number; moved: boolean }
+  | { kind: "laneResize"; i: number; base: M; startModel: M; y0: number; h0: number; moved: boolean }
+  | { kind: "flowSeg"; id: string; i: number; axis: "x" | "y"; g: FlowGeometry; startModel: M; moved: boolean; x0: number; y0: number }
+  | { kind: "flowCorner"; id: string; i: number; v: Pt; g: FlowGeometry; startModel: M; moved: boolean; x0: number; y0: number }
   | { kind: "flowEnd"; id: string; end: "from" | "to" }
-  | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean };
+  | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean; keep: { x: boolean; y: boolean } };
 
 export default function BpmnEditor({
   model,
@@ -68,7 +74,13 @@ export default function BpmnEditor({
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showMap, setShowMap] = useState(true);
   /** Конец стрелки в руках пользователя: куда он сейчас указывает (точка, фигура под ней, ближайшая сторона). */
-  const [flowGhost, setFlowGhost] = useState<{ id: string; end: "from" | "to"; pt: Pt; target: string | null; side: FlowSide | null } | null>(null);
+  const [flowGhost, setFlowGhost] = useState<{ id: string; end: "from" | "to"; pt: Pt; target: string | null; side: FlowSide | null; pos: number | null } | null>(null);
+  /** Направляющие выравнивания: ровные линии, которые видны, пока отрезок, излом или конец стрелки перетаскивают и он выровнен с чем-то. */
+  const [guides, setGuides] = useState<Guide[]>([]);
+  /** Дорожка, высоту которой сейчас тянут: её нижняя граница подсвечена. */
+  const [resizingLane, setResizingLane] = useState<number | null>(null);
+  /** Правый край дорожек тянут: он подсвечен. */
+  const [stretching, setStretching] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
@@ -144,18 +156,44 @@ export default function BpmnEditor({
     const artifactEl = t.closest("[data-artifact]");
     const markerEl = t.closest("[data-marker]");
     const handleEl = t.closest("[data-flow-handle]");
-    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl && !artifactEl && !markerEl && !handleEl;
+    const resizeEl = t.closest("[data-lane-resize]");
+    const stretchEl = t.closest("[data-lane-stretch]");
+    const onEmpty = !connectEl && !nodeEl && !flowEl && !laneEl && !artifactEl && !markerEl && !handleEl && !resizeEl && !stretchEl;
+
+    if (stretchEl && e.button === 0) {
+      // правый край дорожек: ширину меняют перетаскиванием
+      const [wx] = toWorld(e.clientX, e.clientY);
+      dragRef.current = { kind: "laneStretch", base: viewRef.current, startModel: draftRef.current, x0: wx, w0: diagramWidth(viewRef.current), moved: false };
+      setStretching(true);
+      svgRef.current!.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    if (resizeEl && e.button === 0) {
+      // граница дорожки: высоту меняют перетаскиванием
+      const i = Number(resizeEl.getAttribute("data-lane-resize"));
+      const [, wy] = toWorld(e.clientX, e.clientY);
+      dragRef.current = { kind: "laneResize", i, base: viewRef.current, startModel: draftRef.current, y0: wy, h0: laneHeight(viewRef.current, i), moved: false };
+      setResizingLane(i);
+      svgRef.current!.setPointerCapture(e.pointerId);
+      return;
+    }
 
     if (handleEl && e.button === 0 && curSel?.kind === "flow") {
-      // ручки выбранной стрелки: концы переносят на другую сторону или фигуру, средний участок сдвигают
+      // ручки выбранной стрелки: концы переносят на другую сторону или фигуру (и вдоль стороны), отрезки и изломы двигают свободно
       const kind = handleEl.getAttribute("data-flow-handle")!;
-      const channel = layoutInfo.get(curSel.id)?.channel;
+      const g = flowGeometry(curSel.id);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      if (kind === "channel" && channel) dragRef.current = { kind: "flowChannel", id: curSel.id, axis: channel.axis, lo: channel.lo, hi: channel.hi, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
-      else if (kind === "from" || kind === "to") {
+      if (kind.startsWith("seg:") && g) {
+        const i = Number(kind.slice(4));
+        dragRef.current = { kind: "flowSeg", id: curSel.id, i, axis: Math.abs(g.poly[i][1] - g.poly[i + 1][1]) < 0.5 ? "y" : "x", g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
+      } else if (kind.startsWith("corner:") && g) {
+        const i = Number(kind.slice(7));
+        dragRef.current = { kind: "flowCorner", id: curSel.id, i, v: g.poly[i], g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
+      } else if (kind === "from" || kind === "to") {
         dragRef.current = { kind: "flowEnd", id: curSel.id, end: kind };
-        setFlowGhost({ id: curSel.id, end: kind, pt: [wx, wy], target: null, side: null });
-      }
+        setFlowGhost({ id: curSel.id, end: kind, pt: [wx, wy], target: null, side: null, pos: null });
+      } else return;
       svgRef.current!.setPointerCapture(e.pointerId);
       return;
     }
@@ -199,7 +237,7 @@ export default function BpmnEditor({
       if (inGroup && groupIds.includes(id)) {
         // потянули фигуру из выделенной группы — едет вся группа
         const [wx, wy] = toWorld(e.clientX, e.clientY);
-        dragRef.current = { kind: "group", id, ids: groupIds, base: viewRef.current, startModel: draftRef.current, x0: wx, y0: wy, moved: false };
+        dragRef.current = { kind: "group", id, ids: groupIds, base: viewRef.current, startModel: draftRef.current, x0: wx, y0: wy, moved: false, keep: { x: false, y: false } };
         svgRef.current!.setPointerCapture(e.pointerId);
         return;
       }
@@ -211,7 +249,7 @@ export default function BpmnEditor({
       }
       const b = boxOf(n);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
+      dragRef.current = { kind: "node", id, offX: wx - b.x, offY: wy - b.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY, keep: { x: false, y: false } };
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (markerEl) {
       // значок триггера: выбирает событие (его свойства — в панели), перетаскивать нельзя — он стоит на блоке
@@ -239,15 +277,70 @@ export default function BpmnEditor({
       if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
       d.moved = true;
       const [wx, wy] = toWorld(e.clientX, e.clientY);
-      setDraft((m) => moveNode(m, d.id, Math.max(MIN_X, snap(wx - d.offX)), snapTop(wy - d.offY, boxOf(m.nodes.find((x) => x.id === d.id)!).h)));
+      const cur = viewRef.current.nodes.find((x) => x.id === d.id)!;
+      const size = boxOf(cur);
+      let [x, y] = [Math.max(MIN_X, snap(wx - d.offX)), snapTop(wy - d.offY, size.h)];
+      d.keep = { x: false, y: false };
+      if (!e.altKey) {
+        // направляющие: края и середина фигуры ищут совпадение с краями и серединой остальных фигур, середина — ещё и с центрами дорожек
+        const rect = { x: wx - d.offX, y: wy - d.offY, w: size.w, h: size.h };
+        const s = snapShape(rect, otherBoxes([d.id]), GUIDE_SNAP_PX / view.k, laneCenters());
+        if (s.x) (x = Math.max(MIN_X, rect.x + s.dx), (d.keep.x = true));
+        if (s.y) (y = rect.y + s.dy, (d.keep.y = true));
+        setGuides(s.guides);
+      } else setGuides([]);
+      setDraft((m) => moveNode(m, d.id, x, y));
       setHotLane(laneIndexAtY(viewRef.current, wy));
-    } else if (d.kind === "flowChannel") {
+    } else if (d.kind === "laneStretch") {
+      // ширина кратна 10 (Alt — точно); уже содержимого дорожки не делаются — край упирается в самую правую фигуру
+      const [wx] = toWorld(e.clientX, e.clientY);
+      const raw = d.w0 + wx - d.x0;
+      if (!d.moved && Math.abs(raw - d.w0) * view.k < 4) return;
+      d.moved = true;
+      setDraft(() => setDiagramWidth(d.base, e.altKey ? raw : Math.round(raw / 10) * 10));
+    } else if (d.kind === "laneResize") {
+      // высота кратна 10 (Alt — точно), не меньше, чем нужно фигурам дорожки; дорожки ниже едут вместе с границей
+      const [, wy] = toWorld(e.clientX, e.clientY);
+      const raw = d.h0 + wy - d.y0;
+      if (!d.moved && Math.abs(raw - d.h0) * view.k < 4) return;
+      d.moved = true;
+      setDraft(() => setLaneHeight(d.base, d.i, e.altKey ? raw : Math.round(raw / 10) * 10));
+    } else if (d.kind === "flowSeg") {
+      // отрезок сдвигается поперёк себя: прилипает к направляющей (граница или середина фигуры, порт, другой излом) или к сетке в 5 пикселей; Alt — без привязки
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      const raw = d.axis === "y" ? wy - d.y0 : wx - d.x0;
+      if (!d.moved && Math.abs(raw) * view.k < 4) return;
+      d.moved = true;
+      const [a, b] = [d.g.poly[d.i], d.g.poly[d.i + 1]];
+      const base = d.axis === "y" ? a[1] : a[0];
+      let value = base + (e.altKey ? raw : Math.round(raw / 5) * 5);
+      let guide: Guide | null = null;
+      if (!e.altKey) {
+        const last = d.g.poly.length - 1;
+        const snap = snapAxis(base + raw, guideTargets(d.axis, boxes.values(), d.g.poly, [d.i, d.i + 1].filter((j) => j > 0 && j < last), otherFlowLines(d.id)), GUIDE_SNAP_PX / view.k);
+        if (snap.hit.length > 0) {
+          value = snap.value;
+          guide = guideFor(d.axis, value, snap.hit, d.axis === "y" ? [a[0], b[0]] : [a[1], b[1]]);
+        }
+      }
+      setGuides(guide ? [guide] : []);
+      setDraft((m) => dragSegment(m, d.id, d.g, d.i, value - base));
+    } else if (d.kind === "flowCorner") {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
       d.moved = true;
-      const raw = Math.round((d.axis === "x" ? wx : wy) / 5) * 5;
-      const value = Number.isFinite(d.lo) && Number.isFinite(d.hi) ? Math.min(Math.max(raw, d.lo), d.hi) : raw;
-      setDraft((m) => setFlowRoute(m, d.id, { channel: value }));
+      const [rx, ry] = [d.v[0] + wx - d.x0, d.v[1] + wy - d.y0];
+      let [x, y] = e.altKey ? [rx, ry] : [Math.round(rx / 5) * 5, Math.round(ry / 5) * 5];
+      const found: { axis: "x" | "y"; hit: GuideTarget[] }[] = [];
+      if (!e.altKey) {
+        const tol = GUIDE_SNAP_PX / view.k;
+        const sx = snapAxis(rx, guideTargets("x", boxes.values(), d.g.poly, [d.i], otherFlowLines(d.id)), tol);
+        const sy = snapAxis(ry, guideTargets("y", boxes.values(), d.g.poly, [d.i], otherFlowLines(d.id)), tol);
+        if (sx.hit.length > 0) (x = sx.value, found.push({ axis: "x", hit: sx.hit }));
+        if (sy.hit.length > 0) (y = sy.value, found.push({ axis: "y", hit: sy.hit }));
+      }
+      setGuides(found.map((f) => guideFor(f.axis, f.axis === "x" ? x : y, f.hit, f.axis === "x" ? [y - 12, y + 12] : [x - 12, x + 12])));
+      setDraft((m) => dragCorner(m, d.id, d.g, d.i, [x, y]));
     } else if (d.kind === "flowEnd") {
       // куда указывает конец: фигура под курсором и ближайшая к курсору её сторона
       const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -255,7 +348,32 @@ export default function BpmnEditor({
         const b = boxes.get(n.id)!;
         return wx > b.x - 10 && wx < b.x + b.w + 10 && wy > b.y - 10 && wy < b.y + b.h + 10;
       });
-      setFlowGhost({ id: d.id, end: d.end, pt: [wx, wy], target: hit?.id ?? null, side: hit ? nearestSide(boxes.get(hit.id)!, [wx, wy]) : null });
+      const side = hit ? nearestSide(boxes.get(hit.id)!, [wx, wy]) : null;
+      let pos = hit && side ? positionOnSide(boxes.get(hit.id)!, side, [wx, wy]) : null;
+      let guide: Guide | null = null;
+      if (hit && side && !e.altKey) {
+        // конец вдоль стороны прилипает к линии другого конца стрелки (тогда она идёт прямо) и к середине стороны
+        const g = flowGeometry(d.id);
+        const other = g ? (d.end === "from" ? g.poly[g.poly.length - 1] : g.poly[0]) : null;
+        const b = boxes.get(hit.id)!;
+        if (other) {
+          const horizontalSide = side === "L" || side === "R";
+          const [cur, start, size] = horizontalSide ? [wy, b.y, b.h] : [wx, b.x, b.w];
+          const edge = horizontalSide ? (side === "L" ? b.x : b.x + b.w) : side === "T" ? b.y : b.y + b.h;
+          const along = horizontalSide ? other[0] : other[1];
+          const targets: GuideTarget[] = [
+            { at: horizontalSide ? other[1] : other[0], lo: along, hi: along },
+            { at: start + size / 2, lo: edge, hi: edge },
+          ];
+          const snap = snapAxis(cur, targets, GUIDE_SNAP_PX / view.k);
+          if (snap.hit.length > 0) {
+            pos = Math.min(0.9, Math.max(0.1, (snap.value - start) / size));
+            guide = guideFor(horizontalSide ? "y" : "x", snap.value, snap.hit, [edge, edge]);
+          }
+        }
+      }
+      setGuides(guide ? [guide] : []);
+      setFlowGhost({ id: d.id, end: d.end, pt: [wx, wy], target: hit?.id ?? null, side, pos });
       setConnectHot(hit?.id ?? null);
     } else if (d.kind === "marquee") {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -264,7 +382,17 @@ export default function BpmnEditor({
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
       d.moved = true;
-      setDraft(() => moveGroup(d.base, d.ids, wx - d.x0, wy - d.y0));
+      let [dx, dy] = [wx - d.x0, wy - d.y0];
+      d.keep = { x: false, y: false };
+      const bb = e.altKey ? null : boundsOf(d.base, d.ids);
+      if (bb) {
+        // рамка группы выравнивается с остальными фигурами как одна фигура
+        const s = snapShape({ x: bb.x + dx, y: bb.y + dy, w: bb.w, h: bb.h }, otherBoxes(d.ids), GUIDE_SNAP_PX / view.k);
+        if (s.x) (dx += s.dx, (d.keep.x = true));
+        if (s.y) (dy += s.dy, (d.keep.y = true));
+        setGuides(s.guides);
+      } else setGuides([]);
+      setDraft(() => moveGroup(d.base, d.ids, dx, dy, d.keep));
     } else {
       setConnectTo(toWorld(e.clientX, e.clientY));
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-node-id]")?.getAttribute("data-node-id") ?? null;
@@ -275,13 +403,20 @@ export default function BpmnEditor({
   const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {
     const d = dragRef.current;
     dragRef.current = null;
+    setGuides([]);
     if (svgRef.current?.hasPointerCapture(e.pointerId)) svgRef.current.releasePointerCapture(e.pointerId);
     if (!d) return;
     if (d.kind === "node" && d.moved) {
       h.recordPast(d.startModel);
-      setDraft((m) => dropNodeIntoLane(m, d.id));
+      setDraft((m) => dropNodeIntoLane(m, d.id, d.keep));
       setHotLane(null);
-    } else if (d.kind === "flowChannel") {
+    } else if (d.kind === "laneStretch") {
+      setStretching(false);
+      if (d.moved) h.recordPast(d.startModel);
+    } else if (d.kind === "laneResize") {
+      setResizingLane(null);
+      if (d.moved) h.recordPast(d.startModel);
+    } else if (d.kind === "flowSeg" || d.kind === "flowCorner") {
       if (d.moved) h.recordPast(d.startModel);
     } else if (d.kind === "flowEnd") {
       const ghost = flowGhost;
@@ -289,14 +424,14 @@ export default function BpmnEditor({
       setConnectHot(null);
       if (ghost?.target) {
         const flow = vflows.find((f) => f.id === d.id);
-        const r = reconnectFlow(viewRef.current, d.id, d.end, ghost.target, ghost.side ?? undefined, flow?.viaEvent);
+        const r = reconnectFlow(viewRef.current, d.id, d.end, ghost.target, ghost.side ?? undefined, flow?.viaEvent, ghost.pos ?? undefined);
         if (r.error) showHint(r.error);
         else commit(r.model);
       }
     } else if (d.kind === "group") {
       if (d.moved) {
         h.recordPast(d.startModel);
-        setDraft((m) => dropGroup(m, d.ids));
+        setDraft((m) => dropGroup(m, d.ids, d.keep));
       } else {
         // щелчок без движения по члену группы — оставляем только эту фигуру
         setMulti([]);
@@ -323,7 +458,24 @@ export default function BpmnEditor({
   };
 
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const id = (e.target as Element).closest("[data-node-id]")?.getAttribute("data-node-id");
+    const t = e.target as Element;
+    if (curSel?.kind === "flow") {
+      const g = flowGeometry(curSel.id);
+      const handle = t.closest("[data-flow-handle]")?.getAttribute("data-flow-handle");
+      if (g && handle?.startsWith("corner:")) {
+        // двойной щелчок по излому — убрать его
+        commit(removeBend(viewRef.current, curSel.id, g, Number(handle.slice(7))));
+        return;
+      }
+      if (g && t.closest("[data-flow-id]")?.getAttribute("data-flow-id") === curSel.id) {
+        // двойной щелчок по выбранной стрелке — добавить излом в этом месте
+        const next = addBend(viewRef.current, curSel.id, g, toWorld(e.clientX, e.clientY));
+        if (next === viewRef.current) showHint("Здесь не получится: отрезок слишком короткий для излома");
+        else commit(next);
+        return;
+      }
+    }
+    const id = t.closest("[data-node-id]")?.getAttribute("data-node-id");
     if (id) setEditing(id);
   };
 
@@ -481,10 +633,25 @@ export default function BpmnEditor({
 
   // --- отрисовка ---
 
-  const { w: worldW, h: worldH } = modelExtents(draft);
-  const W = Math.max(worldW, 1400);
+  const { h: worldH } = modelExtents(draft);
+  const W = diagramWidth(draft);
   // фигуры, значки триггеров, документы, пулы и ВСЕ стрелки считаются вместе (geometry.diagramLayout)
   const { shown, boxes, extras, flows: vflows, markers, routes, info: layoutInfo, bottomUsed } = useMemo(() => diagramLayout(draft), [draft]);
+  /** Рамки остальных фигур диаграммы (без перетаскиваемых, их граничных событий и самих граничных событий) — с ними выравнивают фигуру. */
+  const otherBoxes = (skip: string[]) => {
+    const skipSet = new Set(skip);
+    return shown.filter((n) => !skipSet.has(n.id) && !(n.attached_to && skipSet.has(n.attached_to)) && !isBoundary(n, shown)).map((n) => boxes.get(n.id)!);
+  };
+  /** Линии центров дорожек: фигура, стоящая по центру дорожки, выровнена с остальными. */
+  const laneCenters = () => Array.from({ length: laneCount(viewRef.current) }, (_, i) => laneTop(viewRef.current, i) + laneHeight(viewRef.current, i) / 2);
+  /** Ломаные остальных стрелок: их изломы — опорные линии для выравнивания правимой стрелки. */
+  const otherFlowLines = (id: string) => [...routes].filter(([k]) => k !== id && !k.startsWith("msg:")).map(([, pts]) => pts);
+  /** Нарисованная сейчас ломаная стрелки и её стороны — исходные данные для свободной правки маршрута. */
+  const flowGeometry = (id: string): FlowGeometry | null => {
+    const poly = routes.get(id);
+    const inf = layoutInfo.get(id);
+    return poly && inf ? { poly, from: inf.from, to: inf.to } : null;
+  };
   const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
 
@@ -607,21 +774,33 @@ export default function BpmnEditor({
 
               {[...markers].map(([blockId, list]) => (boxes.has(blockId) ? <TriggerMarkers key={blockId} box={boxes.get(blockId)!} markers={list} selectedId={curSel?.kind === "node" ? curSel.id : null} /> : null))}
 
+              <LaneResizeHandles model={draft} width={W} activeLane={resizingLane} stretching={stretching} />
+
               {curSel?.kind === "flow" &&
                 (() => {
-                  // ручки выбранной стрелки: концы (перенести на другую сторону или фигуру) и средний участок (сдвинуть)
-                  const pts = routes.get(curSel.id);
-                  const inf = layoutInfo.get(curSel.id);
-                  if (!pts || !inf) return null;
-                  const ch = inf.channel;
+                  // ручки выбранной стрелки: концы (на другую сторону или фигуру, вдоль стороны), отрезки (сдвинуть поперёк) и изломы (перенести)
+                  const g = flowGeometry(curSel.id);
+                  if (!g) return null;
+                  const pts = g.poly;
                   const stroke = "#4338ca";
                   return (
                     <g>
-                      {ch && (
-                        <rect data-flow-handle="channel" x={ch.handle[0] - (ch.axis === "x" ? 4 : 9)} y={ch.handle[1] - (ch.axis === "x" ? 9 : 4)} width={ch.axis === "x" ? 8 : 18} height={ch.axis === "x" ? 18 : 8} rx={3} fill="#fff" stroke={stroke} strokeWidth={1.8} style={{ cursor: ch.axis === "x" ? "ew-resize" : "ns-resize" }}>
-                          <title>Потяните, чтобы сдвинуть средний участок стрелки</title>
+                      {pts.slice(0, -1).map((a, i) => {
+                        const b = pts[i + 1];
+                        const horizontal = Math.abs(a[1] - b[1]) < 0.5;
+                        if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) < MIN_HANDLE_LEN) return null;
+                        const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+                        return (
+                          <rect key={`seg${i}`} data-flow-handle={`seg:${i}`} x={mx - (horizontal ? 9 : 3.5)} y={my - (horizontal ? 3.5 : 9)} width={horizontal ? 18 : 7} height={horizontal ? 7 : 18} rx={3} fill="#fff" stroke={stroke} strokeWidth={1.6} style={{ cursor: horizontal ? "ns-resize" : "ew-resize" }}>
+                            <title>Потяните, чтобы сдвинуть этот участок стрелки (Alt — без привязки к сетке)</title>
+                          </rect>
+                        );
+                      })}
+                      {pts.slice(1, -1).map((p, k) => (
+                        <rect key={`corner${k + 1}`} data-flow-handle={`corner:${k + 1}`} x={p[0] - 4} y={p[1] - 4} width={8} height={8} fill={stroke} stroke="#fff" strokeWidth={1.2} style={{ cursor: "move" }}>
+                          <title>Потяните излом куда нужно; двойной щелчок — убрать излом</title>
                         </rect>
-                      )}
+                      ))}
                       <circle data-flow-handle="from" cx={pts[0][0]} cy={pts[0][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
                         <title>Потяните конец на другую сторону фигуры или на другую фигуру</title>
                       </circle>
@@ -631,13 +810,28 @@ export default function BpmnEditor({
                     </g>
                   );
                 })()}
+              {guides.map((gd, i) => (
+                <line
+                  key={`guide${i}`}
+                  data-guide={gd.axis}
+                  x1={gd.axis === "y" ? gd.from : gd.at}
+                  y1={gd.axis === "y" ? gd.at : gd.from}
+                  x2={gd.axis === "y" ? gd.to : gd.at}
+                  y2={gd.axis === "y" ? gd.at : gd.to}
+                  stroke="#db2777"
+                  strokeWidth={1.2}
+                  strokeDasharray="6 3"
+                  pointerEvents="none"
+                />
+              ))}
               {flowGhost &&
                 (() => {
                   const pts = routes.get(flowGhost.id);
                   if (!pts) return null;
                   const anchor = flowGhost.end === "to" ? pts[0] : pts[pts.length - 1];
                   const tb = flowGhost.target ? boxes.get(flowGhost.target) : undefined;
-                  const mid = tb && flowGhost.side ? { L: [tb.x, tb.y + tb.h / 2], R: [tb.x + tb.w, tb.y + tb.h / 2], T: [tb.x + tb.w / 2, tb.y], B: [tb.x + tb.w / 2, tb.y + tb.h] }[flowGhost.side] : null;
+                  const pos = flowGhost.pos ?? 0.5;
+                  const mid = tb && flowGhost.side ? { L: [tb.x, tb.y + pos * tb.h], R: [tb.x + tb.w, tb.y + pos * tb.h], T: [tb.x + pos * tb.w, tb.y], B: [tb.x + pos * tb.w, tb.y + tb.h] }[flowGhost.side] : null;
                   return (
                     <g pointerEvents="none" data-flow-ghost>
                       <path d={`M${anchor[0]} ${anchor[1]} L${(mid ?? flowGhost.pt)[0]} ${(mid ?? flowGhost.pt)[1]}`} stroke="#4338ca" strokeWidth={2} strokeDasharray="6 4" fill="none" />
@@ -686,6 +880,78 @@ export default function BpmnEditor({
               </span>
             </div>
           )}
+          {curSel?.kind === "lane" &&
+            (() => {
+              const index = laneIndexOfRole(draft, curSel.id);
+              const current = laneHeight(draft, index);
+              const apply = (raw: string) => {
+                const v = Number(raw);
+                if (!Number.isFinite(v) || raw.trim() === "") return;
+                const next = setLaneHeight(draft, index, v);
+                if (next !== draft) commit(next);
+                else if (Math.round(v / 10) * 10 < laneMinHeight(draft, index)) showHint(`Ниже ${laneMinHeight(draft, index)} px нельзя: дорожка не вместит свои фигуры`);
+              };
+              const applyWidth = (raw: string) => {
+                const v = Number(raw);
+                if (!Number.isFinite(v) || raw.trim() === "") return;
+                const next = setDiagramWidth(draft, v);
+                if (next !== draft) commit(next);
+              };
+              return (
+                <div className="bpe-selbar" role="toolbar" aria-label="Размер дорожки">
+                  <label className="muted" htmlFor="lane-height">
+                    Высота дорожки, px
+                  </label>
+                  <input
+                    id="lane-height"
+                    key={`${curSel.id}:${current}`}
+                    type="number"
+                    min={MIN_LANE_H}
+                    max={MAX_LANE_H}
+                    step={10}
+                    defaultValue={current}
+                    style={{ width: 72 }}
+                    onBlur={(e) => apply(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") apply((e.target as HTMLInputElement).value);
+                    }}
+                  />
+                  <button disabled={current === LANE_H} onClick={() => apply(String(LANE_H))} title="Стандартная высота дорожки">
+                    Стандартная
+                  </button>
+                  <button
+                    onClick={() => {
+                      let next = draft;
+                      for (let i = 0; i < laneCount(draft); i++) next = setLaneHeight(next, i, current);
+                      if (next !== draft) commit(next);
+                    }}
+                    title="Сделать все дорожки такой же высоты (дорожка, которой не хватает места для фигур, остаётся выше)"
+                  >
+                    Всем дорожкам
+                  </button>
+                  <label className="muted" htmlFor="lane-width">
+                    Ширина дорожек, px
+                  </label>
+                  <input
+                    id="lane-width"
+                    key={`w:${W}`}
+                    type="number"
+                    min={diagramMinWidth(draft)}
+                    step={10}
+                    defaultValue={W}
+                    style={{ width: 80 }}
+                    onBlur={(e) => applyWidth(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") applyWidth((e.target as HTMLInputElement).value);
+                    }}
+                  />
+                  <button disabled={configuredWidth(draft) === undefined} onClick={() => commit(setDiagramWidth(draft, null))} title="Снять заданную ширину: дорожки по содержимому">
+                    По содержимому
+                  </button>
+                  <span className="muted">границы дорожек можно тянуть мышью: нижнюю — высота ({MIN_LANE_H}–{MAX_LANE_H} px), правую — ширина (не уже, чем нужно фигурам, сейчас от {diagramMinWidth(draft)} px); шаг 10, Alt — точно</span>
+                </div>
+              );
+            })()}
           {curSel?.kind === "flow" &&
             (() => {
               const flow = draft.flows.find((f) => f.id === curSel.id);
@@ -693,13 +959,24 @@ export default function BpmnEditor({
               return (
                 <div className="bpe-selbar" role="toolbar" aria-label="Действия со стрелкой">
                   <span className="muted">{flow.route ? "Маршрут задан вручную" : "Маршрут автоматический"}</span>
+                  <button
+                    onClick={() => {
+                      const g = flowGeometry(flow.id);
+                      const next = g ? addBend(draft, flow.id, g) : draft;
+                      if (next === draft) showHint("Нет отрезка, на котором можно добавить излом");
+                      else commit(next);
+                    }}
+                    title="Добавить ступеньку на самом длинном отрезке — её можно потянуть куда нужно (то же: двойной щелчок по стрелке)"
+                  >
+                    Добавить излом
+                  </button>
                   <button disabled={!flow.route} onClick={() => commit(setFlowRoute(draft, flow.id, null))} title="Вернуть автоматическую прокладку этой стрелки">
                     Сбросить маршрут
                   </button>
                   <button onClick={() => commit(deleteFlow(draft, flow.id), null)} title="Удалить стрелку (Delete)">
                     Удалить
                   </button>
-                  <span className="muted">● — перенести конец, ▮ — сдвинуть участок</span>
+                  <span className="muted">● — конец (на другую сторону, фигуру или вдоль стороны) · ▮ — сдвинуть участок · ■ — перенести излом · двойной щелчок по линии — новый излом, по излому — убрать · розовая линия — выравнивание, к ней прилипает (Alt — без привязки)</span>
                 </div>
               );
             })()}

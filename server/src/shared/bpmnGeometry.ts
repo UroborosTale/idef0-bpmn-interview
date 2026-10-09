@@ -22,6 +22,27 @@ export const SIZE: Record<string, { w: number; h: number }> = {
 
 export const LANE_H = 150;
 export const START_Y = 60;
+/** Высота дорожки настраивается: не меньше MIN_LANE_H (под фигуру 80 и значки данных над и под ней ещё нужно место) и не больше MAX_LANE_H. */
+export const MIN_LANE_H = 120;
+export const MAX_LANE_H = 600;
+/** Допустимая высота дорожки: кратна 10, в пределах MIN_LANE_H…MAX_LANE_H. */
+export const clampLaneHeight = (h: number): number => Math.min(MAX_LANE_H, Math.max(MIN_LANE_H, Math.round(h / 10) * 10));
+/** Высота дорожки по настройке; нет настройки или она не число — стандартная LANE_H. */
+export const laneHeightOf = (h: number | null | undefined): number => (typeof h === "number" && Number.isFinite(h) ? clampLaneHeight(h) : LANE_H);
+/** Ширина дорожек диаграммы (правый край) настраивается: не меньше MIN_DIAGRAM_W (и не меньше, чем нужно фигурам) и не больше MAX_DIAGRAM_W. */
+export const MIN_DIAGRAM_W = 600;
+export const MAX_DIAGRAM_W = 20000;
+/** Допустимая ширина дорожек: кратна 10, в пределах MIN_DIAGRAM_W…MAX_DIAGRAM_W. */
+export const clampDiagramWidth = (w: number): number => Math.min(MAX_DIAGRAM_W, Math.max(MIN_DIAGRAM_W, Math.round(w / 10) * 10));
+/** Верхняя граница каждой дорожки по высотам дорожек сверху вниз. */
+export function laneTops(heights: number[]): number[] {
+  let y = START_Y;
+  return heights.map((h) => {
+    const top = y;
+    y += h;
+    return top;
+  });
+}
 /** Левый край дорожек; полоса подписи дорожки — LABEL_W, фигуры начинаются правее (MIN_X). */
 export const LANE_X = 80;
 export const LABEL_W = 30;
@@ -37,6 +58,8 @@ export interface EndKinds {
   /** Источник — граничное событие на нижней границе задачи: стрелка уходит вниз. */
   fromBoundary?: boolean;
 }
+
+export { wrapText, labelBox, LABEL_CHARS, LABEL_LINES } from "./bpmnLabels.js";
 
 // Прокладка стрелок — bpmnRouting.ts (по всей диаграмме сразу; waypoints — маршрут одной стрелки).
 export { waypoints, routeFlows } from "./bpmnRouting.js";

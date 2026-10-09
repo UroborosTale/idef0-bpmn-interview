@@ -9,8 +9,8 @@ type M = ProcessLogicModel;
 /** Диаграмма: начало → «Принять» (с таймером на границе) → шлюз → «Передать»; дорожки r1 и r2. */
 function diagram(): M {
   const base = purchaseModel();
-  const y1 = laneTop(laneIndexOfRole(base, "r1")) + 20;
-  const y2 = laneTop(laneIndexOfRole(base, "r2")) + 20;
+  const y1 = laneTop(base, laneIndexOfRole(base, "r1")) + 20;
+  const y2 = laneTop(base, laneIndexOfRole(base, "r2")) + 20;
   return {
     ...base,
     nodes: [
@@ -63,7 +63,7 @@ describe("перенос и удаление группой", () => {
 
   it("после переноса вниз фигура получает должность дорожки, в которую попала", () => {
     const m = diagram();
-    const dy = laneTop(laneIndexOfRole(m, "r2")) - laneTop(laneIndexOfRole(m, "r1"));
+    const dy = laneTop(m, laneIndexOfRole(m, "r2")) - laneTop(m, laneIndexOfRole(m, "r1"));
     const moved = dropGroup(moveGroup(m, ["b", "g"], 0, dy), ["b", "g"]);
     expect(moved.nodes.find((n) => n.id === "b")!.role_id).toBe("r2");
     expect(moved.nodes.find((n) => n.id === "g")!.role_id).toBe("r2");

@@ -23,6 +23,8 @@ export interface Role {
   owner?: string | null;
   /** Должность: требуемая квалификация и специализация. */
   qualification?: string | null;
+  /** Высота дорожки роли на диаграммах BPMN, px (120…600); без неё стандартная. */
+  lane_height?: number | null;
 }
 
 export interface SystemEntity {
@@ -98,7 +100,7 @@ export interface ProcessFlow {
   from: string;
   to: string;
   condition?: string | null;
-  /** Ручной маршрут: стороны выхода и входа и положение среднего участка; без него маршрут выбирается автоматически. */
+  /** Ручной маршрут: стороны, положение концов, точки излома; без него маршрут выбирается автоматически. */
   route?: FlowRoute | null;
   source: SourceRef[];
   confirmed_by: string[];
@@ -108,6 +110,11 @@ export interface FlowRoute {
   from_side?: "L" | "R" | "T" | "B";
   to_side?: "L" | "R" | "T" | "B";
   channel?: number;
+  /** Положение конца вдоль стороны фигуры (0…1); без него концы разводятся автоматически. */
+  from_pos?: number;
+  to_pos?: number;
+  /** Внутренние точки излома от выхода ко входу; линия идёт строго через них. */
+  points?: [number, number][];
 }
 
 /** Внешний пул: другой процесс (по коду) или внешний участник; на диаграмме — свёрнутый пул. */
@@ -187,6 +194,8 @@ export interface ProcessMeta {
   trigger?: string;
   result?: string;
   decomposition_depth: number;
+  /** Высота дорожки «Без исполнителя», px (120…600); без неё стандартная. */
+  unassigned_lane_height?: number | null;
   notations: ("IDEF0" | "BPMN")[];
   code?: string | null;
   level?: "L0" | "L1" | "L2" | "L3" | null;
@@ -266,6 +275,8 @@ export interface ProcessLogicModel {
   assignments: RoleAssignment[];
   pools: ExternalPool[];
   messages: MessageFlow[];
+  /** Ширина дорожек диаграмм BPMN, px: ключ — id операции, "" — общая схема процесса; нижняя граница, шире содержимого. */
+  diagram_widths?: Record<string, number>;
   accepted_issues: AcceptedIssue[];
   respondents: Respondent[];
   discrepancies: Discrepancy[];

@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { useViewport } from "../editor-core/hooks";
-import { diagramLayout, isBoundary, modelExtents, positionsFromBpmnXml, withLayout } from "./geometry";
+import { diagramLayout, diagramWidth, isBoundary, modelExtents, positionsFromBpmnXml, withLayout } from "./geometry";
 import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers } from "./shapes";
 
 /**
@@ -34,7 +34,7 @@ export default function BpmnDiagram({
   if (!laid) return <p className="muted">Диаграмма BPMN ещё не сгенерирована.</p>;
 
   const { shown, boxes, extras, flows, markers, routes, bottomUsed } = diagramLayout(laid);
-  const W = Math.max(modelExtents(laid).w, 1400);
+  const W = diagramWidth(laid);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     // id фигуры запоминаем сразу: после setPointerCapture target у pointerup — сам svg

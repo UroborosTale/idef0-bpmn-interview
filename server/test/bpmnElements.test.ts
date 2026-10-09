@@ -78,7 +78,7 @@ describe("элементы BPMN по Соглашению: генерация", 
     expect(xml).not.toMatch(/boundaryEvent/);
   });
 
-  it("документы и хранилища данных: значки над задачей с ассоциациями и фигурами в DI", async () => {
+  it("документы и хранилища данных: документы над задачей, хранилища под ней, с ассоциациями и фигурами в DI", async () => {
     const m = structuredModel();
     const b1 = m.nodes.find((n) => n.id === "b1")!;
     b1.inputs = ["d1"];
@@ -95,7 +95,13 @@ describe("элементы BPMN по Соглашению: генерация", 
     const arts = diagram.extras.filter((e) => e.kind === "data" || e.kind === "store");
     expect(arts.map((e) => e.kind)).toEqual(["data", "data", "store"]);
     for (const a of arts) {
-      expect(a.y + a.h).toBeLessThan(host.y); // значок над задачей
+      if (a.kind === "store") {
+        expect(a.y).toBeGreaterThan(host.y + host.h); // хранилище данных — под задачей
+        expect(a.y + a.h + 11).toBeLessThanOrEqual(host.y + host.h + 35); // вместе с подписью — в пределах дорожки
+      } else {
+        expect(a.y + a.h).toBeLessThan(host.y); // документ — над задачей
+        expect(a.y - 11).toBeGreaterThanOrEqual(host.y - 35);
+      }
       expect(a.link).toHaveLength(2);
     }
     expect(arts[0].linkDirection).toBe("to-task");
@@ -155,16 +161,44 @@ describe("добавочные элементы: общая геометрия",
     expect(b.get("e1")!.y + 18).toBe(180);
   });
 
-  it("значки документов не выходят за пределы области над задачей, даже когда их много", () => {
+  it("значки не выходят за пределы области над и под задачей, даже когда их много: документы сверху, хранилища снизу", () => {
     const names = { data: new Map(Array.from({ length: 8 }, (_, i) => [`d${i}`, `Документ ${i}`])), systems: new Map([["s", "1С"]]) };
     const n = node("t", { inputs: ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "нет"], system_ids: ["s", "нет"] });
     const arts = artifactsOf([n] as never[], boxes, names);
     expect(arts).toHaveLength(9); // неизвестные записи пропускаются
     for (const a of arts) {
-      expect(a.box.y + a.box.h).toBeLessThanOrEqual(100);
+      if (a.kind === "store") {
+        expect(a.box.y).toBeGreaterThanOrEqual(180); // низ задачи
+        expect(a.box.y + a.box.h + 11).toBeLessThanOrEqual(180 + 35); // со своей подписью — внутри дорожки
+      } else {
+        expect(a.box.y + a.box.h).toBeLessThanOrEqual(100); // верх задачи
+        expect(a.box.y - 11).toBeGreaterThanOrEqual(100 - 35);
+      }
       expect(a.box.x).toBeGreaterThanOrEqual(200 - 20 - 22);
       expect(a.box.x + a.box.w).toBeLessThanOrEqual(300 + 20 + 22);
     }
+  });
+
+  it("хранилища данных идут правее граничных событий и обходят вертикаль потока сообщений, а документы от них не зависят", () => {
+    const names = { data: new Map([["d0", "Заявка"]]), systems: new Map([["s0", "1С"], ["s1", "ELMA365"]]) };
+    const host = node("t", { inputs: ["d0"], system_ids: ["s0", "s1"] });
+    const event = { id: "be", type: "event", attached_to: "t", inputs: [], outputs: [], system_ids: [] };
+    // граничное событие стоит на нижней границе слева: его центр — x задачи + 22
+    const withEvent = artifactsOf([host, event] as never[], boxes, names);
+    const stores = withEvent.filter((a) => a.kind === "store");
+    expect(stores[0].box.x).toBeGreaterThan(200 + 22 + 18);
+    // документ над задачей остаётся по центру, граничное событие ему не мешает
+    const doc = withEvent.find((a) => a.kind === "input")!;
+    expect(doc.box.y + doc.box.h).toBeLessThan(100);
+    expect(doc.box.x + doc.box.w / 2).toBeCloseTo(250);
+    // поток сообщений уходит вниз из середины задачи (x = 250): значки в этой полосе не стоят
+    const withMessage = artifactsOf([host] as never[], boxes, names, new Set(["t"]));
+    for (const a of withMessage.filter((x) => x.kind === "store")) expect(a.box.x + a.box.w <= 250 - 12 || a.box.x >= 250 + 12).toBe(true);
+    // ассоциация хранилища идёт от нижней стороны задачи к значку, документа — от верхней
+    const store = withMessage.find((a) => a.kind === "store")!;
+    expect(store.edge.map((p) => p[1]).sort((p, q) => p - q)).toEqual([180, store.box.y]);
+    const doc2 = withMessage.find((a) => a.kind === "input")!;
+    expect(doc2.edge.map((p) => p[1]).sort((p, q) => p - q)).toEqual([doc2.box.y + doc2.box.h, 100]);
   });
 
   it("пулы не налезают друг на друга, а их порядок следует за шагами", () => {

@@ -34,7 +34,7 @@ export function boundsOf(m: M, ids: string[]): Box | null {
 }
 
 /** Сдвиг группы от исходного положения; фигуры не уходят левее поля дорожек. Дорожку определяет drop (после отпускания). */
-export function moveGroup(base: M, ids: string[], dx: number, dy: number): M {
+export function moveGroup(base: M, ids: string[], dx: number, dy: number, keep: { x?: boolean; y?: boolean } = {}): M {
   const set = new Set(ids);
   const minX = Math.min(...base.nodes.filter((n) => set.has(n.id)).map((n) => boxOf(n).x), Infinity);
   const sx = Number.isFinite(minX) ? Math.max(dx, MIN_X - minX) : dx;
@@ -43,13 +43,14 @@ export function moveGroup(base: M, ids: string[], dx: number, dy: number): M {
     nodes: base.nodes.map((n) => {
       if (!set.has(n.id)) return n;
       const b = boxOf(n);
-      return { ...n, layout: { x: snap(b.x + sx), y: snapTop(b.y + dy, b.h) } };
+      // keep — группа выровнена по направляющей на этой оси: сдвиг точный, фигуры не прыгают на сетку
+      return { ...n, layout: { x: keep.x ? b.x + sx : snap(b.x + sx), y: keep.y ? b.y + dy : snapTop(b.y + dy, b.h) } };
     }),
   };
 }
 
 /** После переноса группы каждая фигура становится в дорожку под своим центром. */
-export const dropGroup = (m: M, ids: string[]): M => ids.reduce((acc, id) => dropNodeIntoLane(acc, id), m);
+export const dropGroup = (m: M, ids: string[], keep: { x?: boolean; y?: boolean } = {}): M => ids.reduce((acc, id) => dropNodeIntoLane(acc, id, keep), m);
 
 export function deleteGroup(m: M, ids: string[]): M {
   return ids.reduce((acc, id) => deleteNode(acc, id), m);

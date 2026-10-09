@@ -103,7 +103,7 @@ describe("геометрия добавочных элементов в реда
     expect(isBoundary(laid.nodes.find((n) => n.id === b.id)!, laid.nodes)).toBe(true);
   });
 
-  it("документы и хранилища над задачей; пулы и потоки сообщений под дорожками; мир диаграммы растёт", () => {
+  it("документы над задачей, хранилища под ней; пулы и потоки сообщений под дорожками; мир диаграммы растёт", () => {
     let m = withLayout(flat());
     m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
     m.nodes.find((n) => n.id === "b1")!.outputs = ["d2"];
@@ -115,7 +115,10 @@ describe("геометрия добавочных элементов в реда
     const ex = diagramExtras(m, shown, boxes);
     expect(ex.artifacts.map((a) => a.kind)).toEqual(["input", "output", "store"]); // d1, d2, ELMA365
     const host = boxes.get("b1")!;
-    for (const a of ex.artifacts) expect(a.box.y + a.box.h).toBeLessThan(host.y);
+    for (const a of ex.artifacts) {
+      if (a.kind === "store") expect(a.box.y).toBeGreaterThan(host.y + host.h);
+      else expect(a.box.y + a.box.h).toBeLessThan(host.y);
+    }
     expect(ex.pools).toHaveLength(1);
     expect(ex.pools[0].box.y).toBeGreaterThan(Math.max(...[...boxes.values()].map((b) => b.y + b.h)));
     expect(ex.messages).toHaveLength(1);

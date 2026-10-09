@@ -22,6 +22,7 @@
         "trigger": { "type": "string" },
         "result": { "type": "string" },
         "decomposition_depth": { "type": "integer", "minimum": 1 },
+        "unassigned_lane_height": { "type": ["number", "null"], "minimum": 120, "maximum": 600, "description": "Высота дорожки «Без исполнителя» на диаграммах BPMN, px" },
         "notations": { "type": "array", "items": { "enum": ["IDEF0", "BPMN"] } },
         "code": { "type": ["string", "null"], "description": "Код процесса в реестре (М3.1)" },
         "level": { "enum": ["L0", "L1", "L2", "L3", null], "description": "Уровень иерархии реестра процессов (М3.1)" },
@@ -42,6 +43,7 @@
           "name": { "type": "string" },
           "kind": { "enum": ["internal", "external"] },
           "qualification": { "type": ["string", "null"], "description": "Требуемая квалификация и специализация должности" },
+          "lane_height": { "type": ["number", "null"], "minimum": 120, "maximum": 600, "description": "Высота дорожки роли на диаграммах BPMN, px; без неё стандартная (150)" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
@@ -155,11 +157,14 @@
           "condition": { "type": ["string", "null"] },
           "route": {
             "type": ["object", "null"],
-            "description": "Ручной маршрут стрелки: стороны выхода и входа (L, R, T, B) и положение среднего участка; чего нет — выбирает автоматическая прокладка",
+            "description": "Ручной маршрут стрелки: стороны выхода и входа (L, R, T, B), положение конца на стороне, положение среднего участка и свободные точки излома; чего нет — выбирает автоматическая прокладка",
             "properties": {
               "from_side": { "enum": ["L", "R", "T", "B"] },
               "to_side": { "enum": ["L", "R", "T", "B"] },
-              "channel": { "type": "number" }
+              "channel": { "type": "number" },
+              "from_pos": { "type": "number", "minimum": 0, "maximum": 1 },
+              "to_pos": { "type": "number", "minimum": 0, "maximum": 1 },
+              "points": { "type": "array", "maxItems": 64, "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 } }
             }
           },
           "source": { "$ref": "#/definitions/sourceList" }
@@ -250,6 +255,11 @@
           "functions": { "type": "array", "items": { "type": "string" } }
         }
       }
+    },
+    "diagram_widths": {
+      "type": "object",
+      "description": "Ширина дорожек диаграмм BPMN (правый край, px; нижняя граница): ключ — id операции, пустая строка — общая схема процесса",
+      "additionalProperties": { "type": "number", "minimum": 600, "maximum": 20000 }
     },
     "pools": {
       "type": "array",

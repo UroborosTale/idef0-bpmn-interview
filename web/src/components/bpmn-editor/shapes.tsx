@@ -2,7 +2,7 @@ import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
 import { eventSpec, scaleGlyphs, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
 import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
-import { LANE_H, LANE_X, LABEL_W, flowLabelPoint, laneCount, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
+import { LANE_X, LABEL_W, LABEL_CHARS, LABEL_LINES, flowLabelPoint, laneCount, laneHeights, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
 const INK = "#1e293b";
 const ACCENT = "#4338ca";
@@ -44,7 +44,7 @@ function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: s
 
 /** Подпись под фигурой; left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
 function Label({ cx, y, text, left = false }: { cx: number; y: number; text: string; left?: boolean }) {
-  const lines = wrapText(text, 20, 3);
+  const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
   const x = left ? cx - 8 : cx;
   return (
     <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={11} fill={INK} pointerEvents="none">
@@ -196,7 +196,7 @@ export function ArtifactShape({ artifact: a }: { artifact: Artifact }) {
           <path d={`M${x + w - 7} ${y} V${y + 7} H${x + w}`} fill="none" />
         </g>
       )}
-      <text x={x + w / 2} y={y - 3} textAnchor="middle" fontSize={8} fill={GREY} pointerEvents="none">
+      <text x={x + w / 2} y={a.kind === "store" ? y + h + 9 : y - 3} textAnchor="middle" fontSize={8} fill={GREY} pointerEvents="none">
         {a.name.length > 14 ? a.name.slice(0, 13) + "…" : a.name}
       </text>
     </g>
@@ -246,19 +246,21 @@ export const UNASSIGNED_LANE = "__unassigned__";
 
 /** Фон дорожек с подписями; lanes кликабельны только если передан data-атрибут (в редакторе). */
 export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: ProcessLogicModel; width: number; hotLane?: number | null; selectedLaneId?: string | null }) {
+  const heights = laneHeights(model);
   return (
     <>
       {Array.from({ length: laneCount(model) }, (_, i) => {
         const id = model.roles[i]?.id ?? UNASSIGNED_LANE;
         const name = model.roles[i]?.name ?? "Без исполнителя";
-        const top = laneTop(i);
+        const top = laneTop(model, i);
+        const laneH = heights[i];
         return (
           <g key={id}>
-            <rect x={LANE_X} y={top} width={width - LANE_X} height={LANE_H} fill={hotLane === i ? "#eef2ff" : i % 2 ? "#f8fafc" : "#fff"} stroke="#cbd5e1" />
+            <rect x={LANE_X} y={top} width={width - LANE_X} height={laneH} fill={hotLane === i ? "#eef2ff" : i % 2 ? "#f8fafc" : "#fff"} stroke="#cbd5e1" />
             <g data-lane-id={id} style={{ cursor: "pointer" }}>
-              <rect x={LANE_X} y={top} width={LABEL_W} height={LANE_H} fill={selectedLaneId === id ? "#c7d2fe" : "#e2e8f0"} stroke="#cbd5e1" />
+              <rect x={LANE_X} y={top} width={LABEL_W} height={laneH} fill={selectedLaneId === id ? "#c7d2fe" : "#e2e8f0"} stroke="#cbd5e1" />
               <text
-                transform={`translate(${LANE_X + LABEL_W / 2 + 4} ${top + LANE_H / 2}) rotate(-90)`}
+                transform={`translate(${LANE_X + LABEL_W / 2 + 4} ${top + laneH / 2}) rotate(-90)`}
                 textAnchor="middle"
                 fontSize={12}
                 fontWeight={600}
@@ -272,6 +274,35 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
         );
       })}
     </>
+  );
+}
+
+/**
+ * Ручки изменения высоты дорожек: полоса вдоль нижней границы каждой дорожки, её тянут вверх или вниз. Рисуется поверх фигур и
+ * стрелок, чтобы к ручке можно было подобраться и там, где через границу проходит стрелка.
+ */
+export function LaneResizeHandles({ model, width, activeLane, stretching }: { model: ProcessLogicModel; width: number; activeLane?: number | null; stretching?: boolean }) {
+  const heights = laneHeights(model);
+  const bottom = laneTop(model, heights.length - 1) + heights[heights.length - 1];
+  return (
+    <g>
+      {/* правый край дорожек: его тянут вправо, чтобы растянуть дорожки в сторону */}
+      {stretching && <line x1={width} x2={width} y1={laneTop(model, 0)} y2={bottom} stroke="#4338ca" strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />}
+      <rect data-lane-stretch x={width - 4} y={laneTop(model, 0)} width={8} height={Math.max(0, bottom - laneTop(model, 0))} fill="transparent" style={{ cursor: "ew-resize" }}>
+        <title>Потяните правый край, чтобы изменить ширину дорожек</title>
+      </rect>
+      {heights.map((h, i) => {
+        const y = laneTop(model, i) + h;
+        return (
+          <g key={`lane-resize-${i}`}>
+            {activeLane === i && <line x1={LANE_X} x2={width} y1={y} y2={y} stroke="#4338ca" strokeWidth={2} strokeDasharray="6 4" pointerEvents="none" />}
+            <rect data-lane-resize={i} x={LANE_X + LABEL_W} y={y - 4} width={Math.max(0, width - LANE_X - LABEL_W)} height={8} fill="transparent" style={{ cursor: "ns-resize" }}>
+              <title>Потяните границу, чтобы изменить высоту дорожки</title>
+            </rect>
+          </g>
+        );
+      })}
+    </g>
   );
 }
 

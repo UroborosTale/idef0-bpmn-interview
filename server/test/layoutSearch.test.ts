@@ -38,7 +38,7 @@ describe("подбор раскладки: меньше пересечений �
       }
     }
     expect(before).toBe(43);
-    expect(after).toBeLessThanOrEqual(16); // замер: 14
+    expect(after).toBeLessThanOrEqual(8); // замер: 6
   }, 120_000);
 
   it("на всех диаграммах эталонов фигуры не налезают друг на друга и не выходят за левый край дорожек", async () => {
@@ -77,16 +77,25 @@ describe("подбор раскладки: меньше пересечений �
     expect(rankColumns({ ids: ["x"], lane: new Map([["x", 0]]), edges: [{ from: "x", to: "x" }, { from: "x", to: "нет" }] }).rank.get("x")).toBe(0);
   });
 
-  it("LAYOUT_SEARCH=0 возвращает прежнюю раскладку: ровно 43 пересечения на тех же диаграммах", async () => {
+  it("LAYOUT_SEARCH=0 возвращает раскладку без подбора: ровно 41 пересечение на тех же диаграммах (прокладка с парным пересмотром сторон, обходом подписей и значками данных: документы над задачами, хранилища под ними)", async () => {
     process.env.LAYOUT_SEARCH = "0";
     try {
       let total = 0;
       for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) for (const h of bpmnHosts(m)) total += await crossingsOf(m, h.id);
-      expect(total).toBe(43);
+      expect(total).toBe(41);
     } finally {
       delete process.env.LAYOUT_SEARCH;
     }
   }, 120_000);
+
+  it("перестановки по дорожке: «Поиск программы» встаёт сразу за шлюзом, а не дугой над соседями (c025, операция 1.3)", async () => {
+    // Раньше поиск стоял после «Подтвердить программу», и «Нет»-ветки обоих шлюзов шли дугами над соседними шагами: 3 пересечения.
+    const m = c025Model();
+    const { diagram } = await generateBpmn(m, "o13");
+    const x = (name: string) => diagram.shapes.find((s) => s.name.startsWith(name))!.x;
+    expect(x("Поиск программы")).toBeLessThan(x("Договор с учебной организацией"));
+    expect(await crossingsOf(m, "o13")).toBeLessThanOrEqual(2);
+  }, 60_000);
 
   it("число проверяемых вариантов зависит только от размера диаграммы: на малых — полный перебор, на больших меньше, на огромных подбора нет", () => {
     expect(evaluationsFor(10)).toBe(200);

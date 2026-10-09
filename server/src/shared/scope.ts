@@ -26,6 +26,13 @@ export interface ScopeModel<N extends ScopeNode = ScopeNode, R extends ScopeRole
   /** Внешние пулы и потоки сообщений: вид области содержит потоки её шагов и пулы, с которыми они связаны. */
   pools?: { id: string }[];
   messages?: { id: string; from: string; to: string }[];
+  /**
+   * Ширина дорожек диаграмм: в полной модели ключ — id операции ("" — общая схема); в виде области — только ключ "" (ширина показанной
+   * диаграммы), чтобы редактор и генератор не знали, какая это область.
+   */
+  diagram_widths?: Record<string, number>;
+  /** Настройка процесса, которую меняют на диаграмме: высота дорожки «Без исполнителя» (у неё нет роли, чтобы хранить её там). */
+  process?: { unassigned_lane_height?: number | null };
 }
 
 /** Виды ролей, чьи должности образуют дорожки диаграммы операции. */
@@ -57,6 +64,7 @@ export function scopeView<M extends ScopeModel>(m: M, scope: string | null): M {
     nodes: view,
     flows: m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)),
     roles: lanes ? m.roles.filter((r) => lanes.has(r.id)) : m.roles,
+    ...(scope !== null ? { diagram_widths: m.diagram_widths?.[scope] === undefined ? undefined : { "": m.diagram_widths[scope] } } : {}),
     ...(m.messages ? { messages, pools: (m.pools ?? []).filter((p) => usedPools.has(p.id)) } : {}),
   };
 }
@@ -141,8 +149,25 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
   }
   if (removed.length > 0 && assignments) assignments = assignments.filter((a) => !a.node_id || !removed.includes(a.node_id));
 
+  // высота дорожки «Без исполнителя» меняется на диаграмме, а хранится в настройках процесса
+  const laneH = next.process?.unassigned_lane_height;
+  const process = full.process && next.process && laneH !== full.process.unassigned_lane_height ? { ...full.process, unassigned_lane_height: laneH } : full.process;
+
+  // ширина дорожек показанной диаграммы: в виде она под ключом "", в модели — под id области
+  const key = scope ?? "";
+  const width = next.diagram_widths?.[""];
+  let diagram_widths = full.diagram_widths;
+  if (width !== full.diagram_widths?.[key]) {
+    const copy = { ...(full.diagram_widths ?? {}) };
+    if (width === undefined) delete copy[key];
+    else copy[key] = width;
+    diagram_widths = Object.keys(copy).length > 0 ? copy : undefined;
+  }
+
   return {
     ...full,
+    ...(process ? { process } : {}),
+    ...(diagram_widths !== full.diagram_widths ? { diagram_widths } : {}),
     nodes,
     flows,
     roles,

@@ -3,9 +3,9 @@ import * as ElkNS from "elkjs";
 // elkjs публикует CJS-модуль с default-совместимой формой; в NodeNext-режиме
 // TS не всегда разрешает интероп автоматически, поэтому берём конструктор
 // явно (как это делает сам bpmn-generator-подобный тулинг).
-import { LANE_H, MIN_X, START_Y, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
+import { LANE_H, MIN_X, START_Y, laneTops, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
 import { rankColumns } from "../shared/bpmnRank.js";
-import { MIN_EVALUATIONS, evaluationsFor, routeFlows, routeQuality, type RouteFlow, type RouteNode } from "../shared/bpmnRouting.js";
+import { MIN_EVALUATIONS, crossingCount, evaluationsFor, routeFlows, routeQuality, type RouteFlow, type RouteNode } from "../shared/bpmnRouting.js";
 
 // бюджет перебора общий с редактором в браузере (shared/bpmnRouting.ts); здесь он нужен и тестам
 export { MIN_EVALUATIONS, evaluationsFor };
@@ -19,6 +19,8 @@ export interface LayoutNodeIn {
   laneIndex: number;
   /** Вид фигуры (task | subprocess | gateway | event): от него зависит прокладка стрелок при подборе раскладки. */
   type?: string;
+  /** Название: у событий и шлюзов оно подписано под фигурой, и при подборе стрелки обходят подпись. */
+  label?: string;
   /** Позиция, заданная в редакторе: фигура остаётся на месте, остальные подбираются вокруг неё. */
   fixed?: { x: number; y: number } | null;
 }
@@ -29,12 +31,16 @@ export interface LayoutEdgeIn {
   /** Стрелка уходит от граничного события задачи (from — сама задача, для раскладки): при оценке прокладки она идёт от него. */
   viaBoundary?: string;
 }
-/** Что известно о диаграмме сверх фигур: значки документов над задачами (их обходят стрелки) и задачи, у которых верхняя сторона занята. */
+/** Что известно о диаграмме сверх фигур: значки данных (их обходят стрелки) и задачи, у которых верхняя (документы) или нижняя (хранилища) сторона занята. */
 export type LayoutExtras = (boxes: Map<string, LayoutBox>) => {
   obstacles: { x: number; y: number; w: number; h: number }[];
   withArtifacts: Set<string>;
-  /** Фигуры, которых нет в раскладке, но от которых идут стрелки (граничные события на нижней границе задач). */
+  /** Задачи, под которыми стоят хранилища данных: нижняя сторона занята. */
+  withStores: Set<string>;
+  /** Фигуры, которых нет в раскладке, но от которых идут стрелки (граничные события на нижней границе задач, свёрнутые внешние пулы). */
   extraNodes: RouteNode[];
+  /** Стрелки, которых нет среди связей раскладки, но которые прокладываются вместе с ними (потоки сообщений к внешним пулам). */
+  extraFlows?: RouteFlow[];
 };
 
 export interface LayoutBox {
@@ -52,8 +58,14 @@ export interface LayoutResult {
 }
 
 // Дорожки начинаются с LANE_X, подпись дорожки занимает LABEL_W — фигуры начинаются правее (MIN_X).
-const LANE_HEIGHT = LANE_H;
 const START_X = MIN_X;
+
+/** Дорожки диаграммы: верх и высота каждой (высоты настраиваются, дорожки идут сверху вниз без промежутков). */
+export interface Lanes {
+  tops: number[];
+  heights: number[];
+}
+const lanesOf = (heights: number[]): Lanes => ({ tops: laneTops(heights), heights });
 
 const elk = new ElkCtor();
 
@@ -67,7 +79,7 @@ interface Placement {
  * Ставит фигуры по дорожкам: слой ELK даёт x, дорожка — y. Фигуры одного слоя в одной дорожке идут ступенькой, а те, что
  * всё равно налезают друг на друга, сдвигаются вправо. Заданные в редакторе позиции остаются как есть.
  */
-function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<string, number>): Map<string, LayoutBox> {
+function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<string, number>, lanes: Lanes): Map<string, LayoutBox> {
   const boxes = new Map<string, LayoutBox>();
   const occupied = new Map<string, number>(); // key `${roundedX}:${lane}` -> stagger count
   const pinned = new Set(nodes.filter((n) => n.fixed).map((n) => n.id));
@@ -82,8 +94,8 @@ function placeBoxes(nodes: LayoutNodeIn[], rawX: Map<string, number>, rank: Map<
     occupied.set(key, stagger + 1);
 
     const x = START_X + x0 + stagger * 40;
-    const laneY = START_Y + n.laneIndex * LANE_HEIGHT;
-    const y = laneY + (LANE_HEIGHT - n.height) / 2 + stagger * 26;
+    const laneY = lanes.tops[n.laneIndex] ?? START_Y;
+    const y = laneY + ((lanes.heights[n.laneIndex] ?? LANE_H) - n.height) / 2 + stagger * 26;
     boxes.set(n.id, { x, y, width: n.width, height: n.height });
   }
 
@@ -119,6 +131,8 @@ const defaultType = (n: LayoutNodeIn) => n.type ?? (n.width <= 40 ? "event" : n.
 /** Ширина столбца раскладки по столбцам (как у кнопки «Расставить» в редакторе) и отступ первого столбца от левого края. */
 const COLUMN_W = 170;
 const COLUMN_X0 = 60 - 25;
+/** До скольких стрелок подбор пробует перестановки, вставки и переносы фигур по столбцам (дальше — только сдвиги и порядок слоя). */
+const EXTRA_MOVES_MAX_FLOWS = 40;
 
 /**
  * Раскладка по столбцам (shared/bpmnRank.ts): столбец — длиннейший путь от начала, строка — дорожка, в ячейке одна фигура. Ветки
@@ -131,23 +145,46 @@ function columnPlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]): Placemen
   return { rawX: new Map(nodes.map((n) => [n.id, COLUMN_X0 + (rank.get(n.id) ?? 0) * COLUMN_W] as const)), rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
 }
 
-async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], elkStart: Placement, extras?: LayoutExtras): Promise<Placement> {
+async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], elkStart: Placement, lanes: Lanes, extras?: LayoutExtras): Promise<Placement> {
   const free = nodes.filter((n) => !n.fixed);
   const maxEvals = evaluationsFor(edges.length);
   // LAYOUT_SEARCH=0 выключает подбор (для сравнения и на случай жалоб на скорость)
   if (process.env.LAYOUT_SEARCH === "0" || nodes.length < 4 || edges.length < 3 || free.length < 2 || maxEvals < MIN_EVALUATIONS) return elkStart;
 
   const flows: RouteFlow[] = edges.map((e) => ({ id: e.id, from: e.viaBoundary ?? e.from, to: e.to }));
-  const score = (p: Placement): number => {
-    const boxes = placeBoxes(nodes, p.rawX, p.rank);
+  // оценка варианта запоминается: «запутанные» фигуры текущего варианта берутся из уже сделанной прокладки, а не считаются заново
+  const evaluated = new WeakMap<Placement, ReturnType<typeof evaluateOnce>>();
+  const evaluate = (p: Placement) => {
+    let e = evaluated.get(p);
+    if (!e) evaluated.set(p, (e = evaluateOnce(p)));
+    return e;
+  };
+  function evaluateOnce(p: Placement) {
+    const boxes = placeBoxes(nodes, p.rawX, p.rank, lanes);
     const ex = extras?.(boxes);
     const routeNodes: RouteNode[] = nodes.map((n) => {
       const b = boxes.get(n.id)!;
-      return { id: n.id, type: defaultType(n), box: { x: b.x, y: b.y, w: b.width, h: b.height }, artifacts: ex?.withArtifacts.has(n.id) };
+      return { id: n.id, type: defaultType(n), box: { x: b.x, y: b.y, w: b.width, h: b.height }, artifacts: ex?.withArtifacts.has(n.id), stores: ex?.withStores.has(n.id), label: n.label };
     });
     const all = [...routeNodes, ...(ex?.extraNodes ?? [])];
-    const q = routeQuality(all, flows, routeFlows(all, flows, ex?.obstacles ?? []));
-    return q.crossings * 10 + q.cuts * 40 + q.length / 400;
+    const allFlows = [...flows, ...(ex?.extraFlows ?? [])];
+    const routes = routeFlows(all, allFlows, ex?.obstacles ?? []);
+    const q = routeQuality(all, allFlows, routes, ex?.obstacles ?? []);
+    return { value: q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400, routes, flows: allFlows };
+  }
+  const score = (p: Placement): number => evaluate(p).value;
+  /** Фигуры, у которых есть пересекающиеся стрелки: именно их перестановки могут что-то дать. */
+  const tangledNodes = (p: Placement): Set<string> => {
+    const { routes, flows: all } = evaluate(p);
+    const out = new Set<string>();
+    for (let i = 0; i < all.length; i++) {
+      for (let j = i + 1; j < all.length; j++) {
+        const [a, b] = [routes.get(all[i].id), routes.get(all[j].id)];
+        if (!a || !b || crossingCount(a, b) === 0) continue;
+        for (const f of [all[i], all[j]]) (out.add(f.from), out.add(f.to));
+      }
+    }
+    return out;
   };
 
   // два исходных варианта — раскладка ELK и раскладка по столбцам; дальше улучшается лучший из них
@@ -206,6 +243,65 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], el
       rawX.set(n.id, next);
       if (await tryMove({ rawX, rank: cur.rank })) improved = true;
     }
+    // 3. две фигуры одной дорожки меняются столбцами; стрелки вперёд остаются стрелками вперёд
+    // Новые ходы (3–5) перебирают пары и перестановки фигур — вариантов много, и на большой диаграмме они выбирают весь бюджет,
+    // хотя прежние ходы заканчивались за долю секунды. Выигрыш они дали на небольших диаграммах, где и остаются.
+    if (curScore > 0.5 && evals < maxEvals && edges.length <= EXTRA_MOVES_MAX_FLOWS) {
+      const tangled = tangledNodes(cur);
+      const laneOf = new Map(nodes.map((n) => [n.id, n.laneIndex] as const));
+      // стрелка вперёд остаётся стрелкой вперёд; в одном столбце ей можно стоять только между разными дорожками (это вертикаль)
+      const keepsForward = (rawX: Map<string, number>) =>
+        edges.every((e) => {
+          if ((cur.rawX.get(e.from) ?? 0) >= (cur.rawX.get(e.to) ?? 0)) return true;
+          const [fx, tx] = [rawX.get(e.from) ?? 0, rawX.get(e.to) ?? 0];
+          return fx < tx - 1 || (Math.abs(fx - tx) <= 1 && laneOf.get(e.from) !== laneOf.get(e.to));
+        });
+      const lanes = new Map<number, string[]>();
+      for (const n of free) lanes.set(n.laneIndex, [...(lanes.get(n.laneIndex) ?? []), n.id]);
+      for (const ids of lanes.values()) {
+        for (let i = 0; i < ids.length; i++) {
+          for (let j = i + 1; j < ids.length; j++) {
+            const [a, b] = [ids[i], ids[j]];
+            const [xa, xb] = [cur.rawX.get(a) ?? 0, cur.rawX.get(b) ?? 0];
+            if (Math.abs(xa - xb) < 1 || (!tangled.has(a) && !tangled.has(b))) continue;
+            const rawX = new Map(cur.rawX);
+            rawX.set(a, xb);
+            rawX.set(b, xa);
+            if (keepsForward(rawX) && (await tryMove({ rawX, rank: cur.rank }))) improved = true;
+          }
+        }
+      }
+      // 5. вставка: запутанная фигура встаёт на другое место в порядке своей дорожки, остальные сдвигаются на освободившиеся
+      // столбцы (набор столбцов дорожки не меняется). Так «Нет»-ветка шлюза оказывается рядом со шлюзом, а не дугой над соседями.
+      insertion: for (const ids of lanes.values()) {
+        const ordered = [...ids].sort((a, b) => (cur.rawX.get(a) ?? 0) - (cur.rawX.get(b) ?? 0));
+        const slots = ordered.map((id) => cur.rawX.get(id) ?? 0);
+        for (let i = 0; i < ordered.length; i++) {
+          if (!tangled.has(ordered[i])) continue;
+          for (let j = 0; j < ordered.length; j++) {
+            if (j === i) continue;
+            const order = ordered.slice();
+            order.splice(j, 0, order.splice(i, 1)[0]);
+            const rawX = new Map(cur.rawX);
+            order.forEach((id, k) => rawX.set(id, slots[k]));
+            if (keepsForward(rawX) && (await tryMove({ rawX, rank: cur.rank }))) {
+              improved = true;
+              break insertion; // порядок дорожки изменился: следующий проход начнёт с новых данных
+            }
+          }
+        }
+      }
+      // 4. запутанная фигура переходит в любой другой столбец (а не только на следующий)
+      for (const n of free) {
+        if (!tangled.has(n.id)) continue;
+        for (const layer of layers) {
+          if (Math.abs(layer - (cur.rawX.get(n.id) ?? 0)) < 1) continue;
+          const rawX = new Map(cur.rawX);
+          rawX.set(n.id, layer);
+          if (keepsForward(rawX) && (await tryMove({ rawX, rank: cur.rank }))) improved = true;
+        }
+      }
+    }
     if (!improved) break;
   }
   return cur;
@@ -217,7 +313,10 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], el
  * внутри столбца переопределяется по дорожке-роли (swimlane), т.к.
  * дорожки — это семантика BPMN, которую сам ELK не знает.
  */
-export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], laneCount: number, extras?: LayoutExtras): Promise<LayoutResult> {
+/** lanes — высоты дорожек сверху вниз (их число — число дорожек) или просто число дорожек стандартной высоты. */
+export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], laneSpec: number[] | number, extras?: LayoutExtras): Promise<LayoutResult> {
+  const laneHeights = typeof laneSpec === "number" ? Array.from({ length: laneSpec }, () => LANE_H) : laneSpec;
+  const lanes = lanesOf(laneHeights);
   const elkGraph = {
     id: "root",
     layoutOptions: {
@@ -242,19 +341,15 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
 
   const edgeList = edges.filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
   const start: Placement = { rawX: elkX, rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
-  const best = await improvePlacement(nodes, edgeList, start, extras);
-  const boxes = placeBoxes(nodes, best.rawX, best.rank);
+  const best = await improvePlacement(nodes, edgeList, start, lanes, extras);
+  const boxes = placeBoxes(nodes, best.rawX, best.rank, lanes);
 
   let maxRight = 0;
   for (const b of boxes.values()) maxRight = Math.max(maxRight, b.x + b.width);
   const totalWidth = maxRight + 80;
-  const totalHeight = START_Y + laneCount * LANE_HEIGHT + 40;
+  const totalHeight = START_Y + laneHeights.reduce((s, h) => s + h, 0) + 40;
 
-  const laneBounds = Array.from({ length: laneCount }, (_, i) => ({
-    laneIndex: i,
-    y: START_Y + i * LANE_HEIGHT,
-    height: LANE_HEIGHT,
-  }));
+  const laneBounds = laneHeights.map((height, i) => ({ laneIndex: i, y: lanes.tops[i], height }));
   return { boxes, laneBounds, totalWidth, totalHeight };
 }
 
@@ -266,3 +361,6 @@ export function orthogonalWaypoints(from: LayoutBox, to: LayoutBox, obstacles: L
   const box = (b: LayoutBox) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
   return waypoints(box(from), box(to), obstacles.map(box), kinds);
 }
+
+
+

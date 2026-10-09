@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_DIAGRAM_W, MAX_LANE_H, MIN_DIAGRAM_W, MIN_LANE_H } from "../shared/bpmnGeometry.js";
 import { TRIGGER_TYPES } from "../shared/events.js";
 
 /**
@@ -32,6 +33,8 @@ export const Role = z.object({
   ...Card,
   // Должность: требуемая квалификация и специализация (таблица ролей в регламентах и инструкциях)
   qualification: z.string().nullable().optional(),
+  // Высота дорожки роли на диаграммах BPMN (px); без неё — стандартная (shared/bpmnGeometry.ts). Одна на все диаграммы, где есть эта роль.
+  lane_height: z.number().min(MIN_LANE_H).max(MAX_LANE_H).nullable().optional(),
 });
 export type Role = z.infer<typeof Role>;
 
@@ -158,12 +161,17 @@ export const MessageFlow = z.object({
 });
 export type MessageFlow = z.infer<typeof MessageFlow>;
 
-// Ручной маршрут стрелки: стороны выхода и входа и положение среднего участка (x или y в координатах диаграммы).
-// Всё необязательно; чего нет — выбирает автоматическая прокладка (shared/bpmnRouting.ts).
+// Ручной маршрут стрелки: стороны выхода и входа, положение конца на стороне, положение среднего участка (x или y в координатах
+// диаграммы) и свободные точки излома. Всё необязательно; чего нет — выбирает автоматическая прокладка (shared/bpmnRouting.ts).
 export const FlowRoute = z.object({
   from_side: z.enum(["L", "R", "T", "B"]).optional(),
   to_side: z.enum(["L", "R", "T", "B"]).optional(),
   channel: z.number().optional(),
+  // Положение конца вдоль стороны фигуры: 0…1 слева направо (верх, низ) или сверху вниз (лево, право); без него концы разводятся сами.
+  from_pos: z.number().min(0).max(1).optional(),
+  to_pos: z.number().min(0).max(1).optional(),
+  // Внутренние точки излома (координаты диаграммы) от выхода ко входу: линия идёт строго через них, недостающие колена достраиваются.
+  points: z.array(z.tuple([z.number(), z.number()])).max(64).optional(),
 });
 
 export const ProcessFlow = z.object({
@@ -234,6 +242,8 @@ export const ProcessMeta = z.object({
   trigger: z.string().optional(),
   result: z.string().optional(),
   decomposition_depth: z.number().default(2),
+  // Высота дорожки «Без исполнителя» на диаграммах BPMN (у неё нет роли, поэтому настройка здесь); без неё — стандартная.
+  unassigned_lane_height: z.number().min(MIN_LANE_H).max(MAX_LANE_H).nullable().optional(),
   notations: z.array(z.enum(["IDEF0", "BPMN"])).default(["IDEF0", "BPMN"]),
   // --- PLM v2 (портфель процессов М3, жизненный цикл М7) ---
   code: z.string().nullable().optional(), // код процесса в реестре (М3.1)
@@ -348,6 +358,9 @@ export const ProcessLogicModel = z.object({
   assignments: z.array(RoleAssignment).default([]),
   pools: z.array(ExternalPool).default([]),
   messages: z.array(MessageFlow).default([]),
+  // Ширина дорожек диаграмм BPMN (правый край, px): ключ — id операции, пустая строка — общая схема процесса. Это нижняя граница:
+  // шире содержимого дорожки растягивают, чтобы оставить место для новых фигур; без записи ширина по содержимому.
+  diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
   respondents: z.array(Respondent).default([]),
   discrepancies: z.array(Discrepancy).default([]),

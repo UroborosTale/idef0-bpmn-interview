@@ -3,13 +3,13 @@ import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, routeFlowsDetailed, routeQ
 import { rankColumns } from "@shared/bpmnRank";
 import { collapseTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
-import { LANE_H, MIN_X, START_Y, sizeOf, type Box } from "@shared/bpmnGeometry";
+import { LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
 import { mergeScope, scopeView } from "@shared/scope";
-import { POOL_H, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
+import { POOL_H, artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
 
 // Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
 // (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
-export { SIZE, LANE_H, START_Y, LANE_X, LABEL_W, MIN_X, sizeOf, waypoints, flowLabelPoint } from "@shared/bpmnGeometry";
+export { SIZE, LANE_H, MIN_LANE_H, MAX_LANE_H, START_Y, LANE_X, LABEL_W, MIN_X, LABEL_CHARS, LABEL_LINES, sizeOf, waypoints, flowLabelPoint, wrapText } from "@shared/bpmnGeometry";
 export type { Box, EndKinds } from "@shared/bpmnGeometry";
 export type { Pt };
 
@@ -65,34 +65,59 @@ export function boxMap(nodes: ProcessNode[]): Map<string, Box> {
 export const isBoundary = (n: ProcessNode, nodes: ProcessNode[]) => isBoundaryNode(n, nodes);
 
 /** Верх полосы свёрнутых внешних пулов — под дорожками. */
-export const poolsTop = (m: ProcessLogicModel) => laneTop(laneCount(m)) + 30;
+export const poolsTop = (m: ProcessLogicModel) => lanesBottom(m) + 30;
 
 /**
  * Добавочные элементы диаграммы, положение которых выводится из шагов: документы и хранилища данных у задач,
  * свёрнутые внешние пулы под дорожками и потоки сообщений к ним (общая геометрия с генератором BPMN).
  */
 export function diagramExtras(m: ProcessLogicModel, shown: ProcessNode[], boxes: Map<string, Box>) {
-  const artifacts: Artifact[] = artifactsOf(shown, boxes, { data: new Map(m.data.map((d) => [d.id, d.name])), systems: new Map(m.systems.map((s) => [s.id, s.name])) });
   const messages = (m.messages ?? []).filter((x) => boxes.has(x.from) || boxes.has(x.to));
+  const artifacts: Artifact[] = artifactsOf(shown, boxes, { data: new Map(m.data.map((d) => [d.id, d.name])), systems: new Map(m.systems.map((s) => [s.id, s.name])) }, new Set(messages.flatMap((x) => [x.from, x.to])));
   const rects = poolBoxes(m.pools ?? [], messages, boxes, poolsTop(m));
   const pools = (m.pools ?? []).flatMap((p) => (rects.has(p.id) ? [{ pool: p, box: rects.get(p.id)! }] : []));
   return { artifacts, pools, messages: messageEdges(messages, boxes, rects) };
 }
 
-/** Размер «мира» диаграммы: ширина по самой правой фигуре, высота по числу дорожек (и полосе внешних пулов). */
-export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
+/** Ширина, которой хватает фигурам и внешним пулам: самая правая из них с отступом (но не меньше 900). */
+export function contentWidth(m: ProcessLogicModel): number {
   let maxX = 900;
   const shown = visibleNodes(m);
   const boxes = boxMap(shown);
   for (const b of boxes.values()) maxX = Math.max(maxX, b.x + b.w + 120);
   const { pools } = diagramExtras(m, shown, boxes);
   for (const p of pools) maxX = Math.max(maxX, p.box.x + p.box.w + 60);
-  return { w: maxX, h: laneTop(laneCount(m)) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0) };
+  return maxX;
+}
+
+/** Ширина дорожек, заданная пользователем для показанной диаграммы (в виде области она под ключом ""); без настройки — undefined. */
+export const configuredWidth = (m: ProcessLogicModel): number | undefined => m.diagram_widths?.[""];
+
+/**
+ * Ширина дорожек (правый край): заданная пользователем, но не меньше нужной фигурам; без настройки — по содержимому, но не
+ * меньше 1400 (чтобы на пустой диаграмме было место для новых фигур).
+ */
+export function diagramWidth(m: ProcessLogicModel): number {
+  const content = contentWidth(m);
+  const set = configuredWidth(m);
+  return set === undefined ? Math.max(content, 1400) : Math.max(content, set);
+}
+
+/** Размер «мира» диаграммы: ширина по самой правой фигуре или заданная, высота по высотам дорожек (и полосе внешних пулов). */
+export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
+  const { pools } = diagramExtras(m, visibleNodes(m), boxMap(visibleNodes(m)));
+  const set = configuredWidth(m);
+  return { w: set === undefined ? contentWidth(m) : diagramWidth(m), h: lanesBottom(m) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0) };
 }
 
 /** Дорожек на одну больше числа ролей: последняя — «Без исполнителя». */
 export const laneCount = (m: ProcessLogicModel) => m.roles.length + 1;
-export const laneTop = (i: number) => START_Y + i * LANE_H;
+/** Высоты дорожек сверху вниз: у роли — lane_height, у «Без исполнителя» — настройка процесса; без настройки — стандартная. */
+export const laneHeights = (m: ProcessLogicModel): number[] => [...m.roles.map((r) => laneHeightOf(r.lane_height)), laneHeightOf(m.process.unassigned_lane_height)];
+export const laneTop = (m: ProcessLogicModel, i: number): number => laneTops(laneHeights(m))[i] ?? START_Y;
+export const laneHeight = (m: ProcessLogicModel, i: number): number => laneHeights(m)[i] ?? LANE_H;
+/** Нижняя граница последней дорожки. */
+export const lanesBottom = (m: ProcessLogicModel): number => START_Y + laneHeights(m).reduce((s, h) => s + h, 0);
 
 export function laneIndexOfRole(m: ProcessLogicModel, roleId: string | null | undefined): number {
   const i = roleId ? m.roles.findIndex((r) => r.id === roleId) : -1;
@@ -100,8 +125,10 @@ export function laneIndexOfRole(m: ProcessLogicModel, roleId: string | null | un
 }
 
 export function laneIndexAtY(m: ProcessLogicModel, y: number): number {
-  const i = Math.floor((y - START_Y) / LANE_H);
-  return Math.max(0, Math.min(laneCount(m) - 1, i));
+  const tops = laneTops(laneHeights(m));
+  let i = 0;
+  while (i + 1 < tops.length && y >= tops[i + 1]) i++;
+  return i;
 }
 
 export function roleIdOfLane(m: ProcessLogicModel, laneIndex: number): string | null {
@@ -111,8 +138,8 @@ export function roleIdOfLane(m: ProcessLogicModel, laneIndex: number): string | 
 /** Удерживает фигуру целиком внутри дорожки и правее подписи дорожки. */
 export function clampIntoLane(m: ProcessLogicModel, n: Pick<ProcessNode, "type">, x: number, y: number, laneIndex: number): Pt {
   const s = sizeOf(n);
-  const top = laneTop(laneIndex);
-  return [Math.max(MIN_X, x), Math.min(Math.max(y, top + 4), top + LANE_H - s.h - 4)];
+  const top = laneTop(m, laneIndex);
+  return [Math.max(MIN_X, x), Math.min(Math.max(y, top + 4), top + laneHeight(m, laneIndex) - s.h - 4)];
 }
 
 export function labelPoint(pts: Pt[]): Pt {
@@ -126,6 +153,8 @@ interface Ranked {
   /** Столбец фигуры: длиннейший путь от начала (петли игнорируются), две фигуры в одной ячейке «столбец × дорожка» не допускаются. */
   rank: Map<string, number>;
   laneOf: Map<string, number>;
+  /** Верх и высота каждой дорожки: по ним фигуры встают в центр своей дорожки. */
+  lanes: { tops: number[]; heights: number[] };
   /** Прямые (без петель) связи между показанными фигурами. */
   fwd: Map<string, string[]>;
   preds: Map<string, string[]>;
@@ -139,14 +168,15 @@ function rankLayout(m: ProcessLogicModel): Ranked {
   const laneOf = new Map(shown.map((n) => [n.id, laneIndexOfRole(m, n.role_id)] as const));
   const edges = visibleFlows(m).map((f) => ({ from: hostOf.get(f.from) ?? f.from, to: f.to }));
   const { rank, fwd, preds } = rankColumns({ ids: shown.map((n) => n.id), lane: laneOf, edges });
-  return { shown, rank, laneOf, fwd, preds };
+  const heights = laneHeights(m);
+  return { shown, rank, laneOf, lanes: { tops: laneTops(heights), heights }, fwd, preds };
 }
-function placeRanks({ shown, laneOf }: Ranked, rank: Map<string, number>): Map<string, { x: number; y: number }> {
+function placeRanks({ shown, laneOf, lanes }: Ranked, rank: Map<string, number>): Map<string, { x: number; y: number }> {
   const result = new Map<string, { x: number; y: number }>();
   for (const n of shown) {
     const s = sizeOf(n);
     const cx = MIN_X + 60 + (rank.get(n.id) ?? 0) * COL_W;
-    result.set(n.id, { x: snap(cx - s.w / 2), y: laneTop(laneOf.get(n.id)!) + (LANE_H - s.h) / 2 }); // центры — на одной линии
+    result.set(n.id, { x: snap(cx - s.w / 2), y: lanes.tops[laneOf.get(n.id)!] + (lanes.heights[laneOf.get(n.id)!] - s.h) / 2 }); // центры — на одной линии
   }
   return result;
 }
@@ -178,9 +208,9 @@ export function optimizedLayout(m: ProcessLogicModel): Map<string, { x: number; 
     const pos = placeRanks(ranked, rank);
     const candidate: ProcessLogicModel = { ...m, nodes: m.nodes.map((n) => (pos.has(n.id) ? { ...n, layout: pos.get(n.id)! } : n)) };
     const d = diagramLayout(candidate);
-    const nodes = d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)! }));
-    const q = routeQuality(nodes, d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes);
-    return q.crossings * 10 + q.cuts * 40 + q.length / 400;
+    const nodes = d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)!, label: n.name }));
+    const q = routeQuality(nodes, d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes, d.extras.artifacts.map(artifactObstacle));
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400;
   };
 
   let rank = ranked.rank;
@@ -270,34 +300,6 @@ export function withScopeLayouts(m: ProcessLogicModel): ProcessLogicModel {
   return out;
 }
 
-export function wrapText(text: string, maxChars: number, maxLines: number): string[] {
-  const lines: string[] = [];
-  let cur = "";
-  for (let word of text.split(/\s+/).filter(Boolean)) {
-    while (word.length > maxChars) {
-      if (cur) {
-        lines.push(cur);
-        cur = "";
-      }
-      lines.push(word.slice(0, maxChars));
-      word = word.slice(maxChars);
-    }
-    if (!cur) cur = word;
-    else if ((cur + " " + word).length <= maxChars) cur += " " + word;
-    else {
-      lines.push(cur);
-      cur = word;
-    }
-  }
-  if (cur) lines.push(cur);
-  if (lines.length > maxLines) {
-    const cut = lines.slice(0, maxLines);
-    cut[maxLines - 1] = cut[maxLines - 1].replace(/.{0,1}$/, "…");
-    return cut;
-  }
-  return lines;
-}
-
 /**
  * Всё, что нужно нарисовать: фигуры, добавочные элементы (документы, пулы, сообщения), значки триггеров и маршруты ВСЕХ стрелок,
  * рассчитанные вместе (shared/bpmnRouting.ts): без общих портов и наложений. Общая функция редактора и просмотра.
@@ -308,13 +310,14 @@ export function diagramLayout(m: ProcessLogicModel) {
   const extras = diagramExtras(m, shown, boxes);
   const tv = triggerView(m);
   const flows = tv.flows.filter((f) => boxes.has(f.from) && boxes.has(f.to));
-  const withArtifacts = new Set(extras.artifacts.map((a) => a.nodeId));
+  const withArtifacts = new Set(extras.artifacts.filter((a) => !isStoreArtifact(a)).map((a) => a.nodeId));
+  const withStores = new Set(extras.artifacts.filter(isStoreArtifact).map((a) => a.nodeId));
   const poolIds = new Set(extras.pools.map((p) => p.pool.id));
   const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
   const info = routeFlowsDetailed(
-    [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id) })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
+    [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
     [...flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true }))],
-    extras.artifacts.map((a) => a.box)
+    extras.artifacts.map(artifactObstacle)
   );
   const routes = new Map([...info].map(([id, r]) => [id, r.pts] as const));
   // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии

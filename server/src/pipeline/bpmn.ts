@@ -1,13 +1,13 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
-import { LANE_X, SIZE } from "../shared/bpmnGeometry.js";
+import { LANE_H, LANE_X, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
 import { collapseTriggers } from "../shared/bpmnTriggers.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
 import { eventSpec, type EventPosition, type EventSpec, type TriggerType } from "../shared/events.js";
-import { artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../shared/bpmnArtifacts.js";
+import { artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../shared/bpmnArtifacts.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
 export interface BpmnDiagramData {
@@ -232,6 +232,9 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const unassignedIndex = laneRoles.length;
   if (hasUnassigned) laneIndexOf.set(UNASSIGNED_LANE, unassignedIndex);
   const laneCount = laneRoles.length + (hasUnassigned ? 1 : 0);
+  // высоты дорожек настраиваются: у роли — lane_height, у дорожки «Без исполнителя» — настройка процесса
+  const laneHeights = [...laneRoles.map((r) => laneHeightOf(r.lane_height)), ...(hasUnassigned ? [laneHeightOf(view.process.unassigned_lane_height)] : [])];
+  if (laneHeights.length === 0) laneHeights.push(LANE_H);
 
   // --- layout ---
   // граничные события в раскладке не участвуют: они стоят на границе своей задачи, а их стрелки идут «от задачи»
@@ -245,11 +248,12 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
         height: size.h,
         laneIndex: laneIndexOf.get(laneIdOf(roleOf(n))) ?? unassignedIndex,
         type: n.type,
+        label: n.name,
         fixed: n.layout ?? null,
       };
     });
   for (const se of synthEvents) {
-    layoutNodes.push({ id: se.id, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h, laneIndex: unassignedIndex, type: "event" });
+    layoutNodes.push({ id: se.id, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h, laneIndex: unassignedIndex, type: "event", label: se.name });
   }
   const layoutSource = (id: string) => {
     const n = nodes.find((x) => x.id === id);
@@ -259,18 +263,29 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     ...tview.flows.map((f) => ({ id: f.id, from: nodeIdOf(layoutSource(f.from)), to: nodeIdOf(f.to), ...(layoutSource(f.from) !== f.from ? { viaBoundary: nodeIdOf(f.from) } : {}) })),
     ...synthFlows.filter((f) => ![f.from, f.to].some((id) => tview.hidden.has(id.replace(/^Node_/, "")))).map((f) => ({ id: f.id, from: f.from, to: f.to })),
   ];
-  // значки документов над задачами зависят от положения задач — при подборе раскладки они учитываются так же, как при итоговой прокладке
+  // внешние пулы — свёрнутые участники под диаграммой, потоки сообщений идут к ним от шагов
+  const knownPools = new Set((view.pools ?? []).map((q) => q.id));
+  const messages = (view.messages ?? []).filter((m) => (visibleIds.has(m.from) && knownPools.has(m.to)) || (knownPools.has(m.from) && visibleIds.has(m.to)));
+  const poolEndId = (id: string) => (knownPools.has(id) ? `Pool_${id}` : nodeIdOf(id));
+  // у шагов с потоком сообщений снизу идёт вертикаль: значки данных её обходят
+  const messageNodes = new Set(messages.flatMap((m) => [m.from, m.to]));
+  // значки данных зависят от положения задач — при подборе раскладки они учитываются так же, как при итоговой прокладке
   const layoutExtras: LayoutExtras = (boxes) => {
     const hb = new Map<string, { x: number; y: number; w: number; h: number }>();
     for (const n of nodes) {
       const b = boxes.get(nodeIdOf(n.id));
       if (b) hb.set(n.id, { x: b.x, y: b.y, w: b.width, h: b.height });
     }
-    const arts = artifactsOf(nodes, hb, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) });
-    const extraNodes: RouteNode[] = [...boundaryBoxes(nodes, hb)].map(([id, b]) => ({ id: nodeIdOf(id), type: "event", box: b, boundary: true }));
-    return { obstacles: arts.map((a) => a.box), withArtifacts: new Set(arts.map((a) => nodeIdOf(a.nodeId))), extraNodes };
+    const arts = artifactsOf(nodes, hb, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) }, messageNodes);
+    const extraNodes: RouteNode[] = [...boundaryBoxes(nodes, hb)].map(([id, b]) => ({ id: nodeIdOf(id), type: "event", box: b, boundary: true, label: nodes.find((n) => n.id === id)?.name }));
+    // пулы стоят под диаграммой (положение по высоте — приближённо: итоговое зависит ещё от аннотаций), а их сообщения занимают
+    // нижние стороны шагов и вытесняют обычные стрелки — без них подбор оценивал бы не ту прокладку, которая получится
+    const poolsTop = 40 + Math.max(START_Y + laneHeights.reduce((s, h) => s + h, 0) + 40, 120) + 20 + 50;
+    const pools: RouteNode[] = [...poolBoxes(view.pools ?? [], messages, hb, poolsTop)].map(([id, box]) => ({ id: `Pool_${id}`, type: "pool", box }));
+    const extraFlows = pools.length === 0 ? [] : messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true }));
+    return { obstacles: arts.map(artifactObstacle), withArtifacts: new Set(arts.filter((a) => !isStoreArtifact(a)).map((a) => nodeIdOf(a.nodeId))), withStores: new Set(arts.filter(isStoreArtifact).map((a) => nodeIdOf(a.nodeId))), extraNodes: [...extraNodes, ...pools], extraFlows };
   };
-  const layout = await layoutLayered(layoutNodes, layoutEdges, Math.max(laneCount, 1), layoutExtras);
+  const layout = await layoutLayered(layoutNodes, layoutEdges, laneHeights, layoutExtras);
 
   // Позиции, заданные в редакторе (node.layout), приоритетнее авто-раскладки.
   for (const n of nodes) {
@@ -296,8 +311,8 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const flowElementsXml: string[] = [];
   const shapesXml: string[] = [];
 
-  // документы и хранилища данных у задач: значки над задачей с ассоциациями
-  const artifacts = artifactsOf(nodes, hostBoxes, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) });
+  // документы и хранилища данных у задач: документы над задачей, хранилища данных под ней, с ассоциациями
+  const artifacts = artifactsOf(nodes, hostBoxes, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) }, messageNodes);
   const artId = (a: { nodeId: string; kind: string; entityId: string }) => `${a.kind === "store" ? "StoreRef" : "DataRef"}_${a.nodeId}_${a.entityId}`;
 
   const events = createEventWriter();
@@ -371,7 +386,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     const { x, y, w, h } = a.box;
     diagramExtras.push({ kind: a.kind === "store" ? "store" : "data", name: a.name, x, y, w, h, link: a.edge, linkDirection: a.kind === "store" ? "none" : a.kind === "input" ? "to-task" : "from-task" });
     dataShapesXml.push(
-      `<bpmndi:BPMNShape id="${ref}_di" bpmnElement="${ref}"><dc:Bounds x="${Math.round(x)}" y="${Math.round(y)}" width="${w}" height="${h}" /><bpmndi:BPMNLabel><dc:Bounds x="${Math.round(x + w / 2 - 35)}" y="${Math.round(y - 13)}" width="70" height="12" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>`
+      `<bpmndi:BPMNShape id="${ref}_di" bpmnElement="${ref}"><dc:Bounds x="${Math.round(x)}" y="${Math.round(y)}" width="${w}" height="${h}" /><bpmndi:BPMNLabel><dc:Bounds x="${Math.round(x + w / 2 - 35)}" y="${Math.round(a.kind === "store" ? y + h + 1 : y - 13)}" width="70" height="12" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>`
     );
     const assoc = a.kind === "store" ? `Assoc_${ref}` : a.kind === "input" ? `DIA_${a.nodeId}_${a.entityId}` : `DOA_${a.nodeId}_${a.entityId}`;
     dataShapesXml.push(`<bpmndi:BPMNEdge id="${assoc}_di" bpmnElement="${assoc}">${wp(a.edge)}</bpmndi:BPMNEdge>`);
@@ -438,36 +453,35 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
 
   const laneSetXml = laneCount > 0 ? `<bpmn:laneSet id="LaneSet_1">${lanesXml.join("")}</bpmn:laneSet>` : "";
 
-  const poolWidth = layout.totalWidth + 20;
+  // ширина дорожек — по содержимому, но не меньше заданной пользователем (правый край дорожек = ширина пула)
+  const poolWidth = Math.max(layout.totalWidth + 20, view.diagram_widths?.[""] ?? 0);
   const poolHeight = Math.max(layout.totalHeight, 120) + 20;
 
-  // внешние пулы — свёрнутые участники под диаграммой (и под аннотациями), потоки сообщений идут к ним от шагов
+  // внешние пулы стоят под диаграммой (и под аннотациями)
   const allBoxes = new Map<string, { x: number; y: number; w: number; h: number }>();
   for (const n of nodes) {
     const b = layout.boxes.get(nodeIdOf(n.id));
     if (b) allBoxes.set(n.id, { x: b.x, y: b.y, w: b.width, h: b.height });
   }
-  const knownPools = new Set((view.pools ?? []).map((q) => q.id));
-  const messages = (view.messages ?? []).filter((m) => (visibleIds.has(m.from) && knownPools.has(m.to)) || (knownPools.has(m.from) && visibleIds.has(m.to)));
   const annotationsBottom = diagramExtras.filter((e) => e.kind === "annotation").reduce((mx, e) => Math.max(mx, e.y + e.h), 0);
   const poolsTop = Math.max(40 + poolHeight, annotationsBottom) + 50;
   const poolRects = poolBoxes(view.pools ?? [], messages, allBoxes, poolsTop);
   const poolLabel = (q: { name: string; code?: string | null }) => `${q.code ? `${q.code} ` : ""}${q.name}`;
-  const poolEndId = (id: string) => (knownPools.has(id) ? `Pool_${id}` : nodeIdOf(id));
 
   // стрелки и потоки сообщений прокладываются все вместе (shared/bpmnRouting.ts): без общих портов и наложений.
   // Два расчёта: для XML — со всеми событиями (свёрнутые стоят слева от блока), для диаграммы Visio — со свёрнутыми
   // триггерами: без их фигур и стрелок «событие → блок».
-  const withArtifacts = new Set(artifacts.map((a) => a.nodeId));
+  const withArtifacts = new Set(artifacts.filter((a) => !isStoreArtifact(a)).map((a) => a.nodeId));
+  const withStores = new Set(artifacts.filter(isStoreArtifact).map((a) => a.nodeId));
   const toBox = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
   const routeNodes: RouteNode[] = [
     ...nodes.flatMap((n) => {
       const b = layout.boxes.get(nodeIdOf(n.id));
-      return b ? [{ id: nodeIdOf(n.id), box: toBox(b), type: n.type, boundary: isBoundary(n), artifacts: withArtifacts.has(n.id) }] : [];
+      return b ? [{ id: nodeIdOf(n.id), box: toBox(b), type: n.type, boundary: isBoundary(n), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name }] : [];
     }),
     ...synthEvents.flatMap((se) => {
       const b = layout.boxes.get(se.id);
-      return b ? [{ id: se.id, box: toBox(b), type: "event" }] : [];
+      return b ? [{ id: se.id, box: toBox(b), type: "event", label: se.name }] : [];
     }),
     ...[...poolRects].map(([id, r]) => ({ id: `Pool_${id}`, box: r, type: "pool" })),
   ];
@@ -476,12 +490,12 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     routeNodes,
     // ручной маршрут стрелки учитывается и в XML — кроме стрелок к свёрнутым событиям: их стороны заданы для диаграммы без события
     [...flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: tview.hidden.has(f.to) || tview.hidden.has(f.from) ? undefined : fixedRoute(f.route) })), ...synthFlows.map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
-    artifacts.map((a) => a.box)
+    artifacts.map(artifactObstacle)
   );
   const routedView = routeFlows(
     routeNodes.filter((n) => !isHidden(n.id)),
     [...tview.flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: fixedRoute(f.route) })), ...synthFlows.filter((sf) => !isHidden(sf.from) && !isHidden(sf.to)).map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
-    artifacts.map((a) => a.box)
+    artifacts.map(artifactObstacle)
   );
 
   const edgesXml: string[] = [];
@@ -567,3 +581,6 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
 
   return { xml, elementIndex, diagram };
 }
+
+
+
