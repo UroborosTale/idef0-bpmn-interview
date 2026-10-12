@@ -1,6 +1,44 @@
+import type { FrameGeometry } from "@shared/idef0Frame";
 import { FREE_END } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
+
+const clip = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s);
+
+/** Рамка листа: клетчатое поле, контур, штамп (NODE / TITLE / NO.). Надписи штампа правятся двойным щелчком. */
+export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean }) {
+  const { sheet, footer } = geo;
+  return (
+    <g data-frame>
+      <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="#fff" pointerEvents="none" />
+      {grid && (
+        <g data-frame-grid pointerEvents="none">
+          {geo.gridXs.map((l) => (
+            <line key={`x${l.at}`} x1={l.at} y1={0} x2={l.at} y2={footer.y} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+          ))}
+          {geo.gridYs.map((l) => (
+            <line key={`y${l.at}`} x1={0} y1={l.at} x2={sheet.w} y2={l.at} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+          ))}
+        </g>
+      )}
+      <line x1={geo.guideX} y1={0} x2={geo.guideX} y2={footer.y} stroke="#1f2937" strokeWidth={0.8} strokeDasharray="3 3" pointerEvents="none" />
+      <rect x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="#e8eef9" stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
+      {geo.dividers.map((x) => (
+        <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
+      ))}
+      <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#1f2937" strokeWidth={1.2} pointerEvents="none" />
+      {geo.cells.map((c) => (
+        <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
+          <title>Двойной щелчок — изменить надпись</title>
+          <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="transparent" />
+          <text x={c.tx} y={c.y + c.h / 2 + 5} textAnchor={c.anchor} fontSize={15} fontFamily="Arial, sans-serif" fill="#111827" pointerEvents="none">
+            {clip(c.text, Math.floor(c.w / 8))}
+          </text>
+        </g>
+      ))}
+    </g>
+  );
+}
 
 const INK = "#1f2937";
 const ACCENT = "#4338ca";

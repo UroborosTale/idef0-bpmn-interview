@@ -393,6 +393,17 @@ export const ProcessLogicModel = z.object({
   messages: z.array(MessageFlow).default([]),
   // Ширина дорожек диаграмм BPMN (правый край, px): ключ — id операции, пустая строка — общая схема процесса. Это нижняя граница:
   // шире содержимого дорожки растягивают, чтобы оставить место для новых фигур; без записи ширина по содержимому.
+  // Рамка листа и сетка диаграмм IDEF0 (shared/idef0Frame.ts): ключ — id функции, "" — верхняя диаграмма, "ctx" — контекстная.
+  idef0_frames: z
+    .record(
+      z.string(),
+      z.object({
+        show: z.boolean().optional(),
+        grid: z.boolean().optional(),
+        texts: z.record(z.enum(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]), z.string().max(500)).optional(),
+      })
+    )
+    .optional(),
   diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
   respondents: z.array(Respondent).default([]),

@@ -7,11 +7,12 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
+import { frameGeometry, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
-import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom } from "./ops";
+import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
 import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { ArrowHandles, ArrowShape, BlockShape, Idef0Defs } from "./shapes";
+import { ArrowHandles, ArrowShape, BlockShape, FrameLayer, Idef0Defs } from "./shapes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
@@ -101,7 +102,10 @@ export default function Idef0Editor({
   const layout = buildIdef0(draft, cur);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
-  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => idef0Extents(layoutRef.current), { fitKey: cur ?? "root" });
+  const frame = draft.idef0_frames?.[frameKey(cur)];
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
+  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => withFrameHeight(idef0Extents(layoutRef.current), frameRef.current), { fitKey: cur ?? "root" });
   useBeforeUnload(h.dirty && !embedded);
 
   const codes = idef0Codes(draft);
@@ -468,6 +472,11 @@ export default function Idef0Editor({
     const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
     const id = t.closest("[data-fn-id]")?.getAttribute("data-fn-id");
     if (t.closest("[data-open]")) return;
+    const frameField = t.closest("[data-frame-field]")?.getAttribute("data-frame-field");
+    if (frameField) {
+      setEditing(`frame:${frameField}`);
+      return;
+    }
     // двойной щелчок: по излому — убрать его; по стрелке — править название (с Ctrl — добавить излом); по функции — править название;
     // по пустому месту ничего не происходит, а с Ctrl — создаётся функция
     const ctrl = e.ctrlKey || e.metaKey;
@@ -632,6 +641,14 @@ export default function Idef0Editor({
   const editingArrow = editing?.startsWith("arrow:") ? layout.arrows.find((a) => a.key === editing.slice(6)) : undefined;
   const { w: worldW, h: worldH } = idef0Extents(layout);
   const parentNode = cur ? draft.nodes.find((n) => n.id === cur) : undefined;
+  const frameOn = frameShown(frame);
+  // надписи штампа по умолчанию: узел, название и номер листа
+  const frameGeo = frameGeometry({ w: worldW, h: worldH }, frame, {
+    node: cur ? codes.get(cur) ?? "A?" : "A0",
+    title: cur ? `${codes.get(cur) ?? ""} ${parentNode?.name ?? ""}`.trim() : `${processCodeOf(draft)} ${draft.process.name}`.trim(),
+    no: "1.0",
+  });
+  const editingFrame = editing?.startsWith("frame:") ? frameGeo.cells.find((c) => c.field === (editing.slice(6) as FrameField)) : undefined;
   const crumbs: { id: string | null; label: string }[] = [
     { id: null, label: processCodeOf(draft) },
     ...(cur ? [...ancestorsOf(draft, cur), cur] : []).map((id) => ({ id, label: codes.get(id) ?? "A?" })),
@@ -668,6 +685,12 @@ export default function Idef0Editor({
           <>
             <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">
               Миникарта
+            </button>
+            <button className={frameOn ? "on" : ""} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { show: !frameOn }))} title="Рамка листа со штампом: NODE, TITLE, NO. (надписи правятся двойным щелчком)">
+              Рамка
+            </button>
+            <button className={frameOn && gridShown(frame) ? "on" : ""} disabled={!frameOn} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { grid: !gridShown(frame) }))} title="Клетчатая разметка листа">
+              Сетка
             </button>
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
@@ -712,9 +735,10 @@ export default function Idef0Editor({
           >
             <Idef0Defs />
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
-              <text x={16} y={24} fontSize={14} fontWeight="bold" fontFamily="Arial, sans-serif" fill="#1f2937" pointerEvents="none">
+              {frameOn && <FrameLayer geo={frameGeo} grid={gridShown(frame)} />}
+              {!frameOn && <text x={16} y={24} fontSize={14} fontWeight="bold" fontFamily="Arial, sans-serif" fill="#1f2937" pointerEvents="none">
                 {cur ? `${codes.get(cur) ?? ""} — ${parentNode?.name ?? ""}` : `${processCodeOf(draft)} — ${draft.process.name}`}
-              </text>
+              </text>}
               {layout.functions.length === 0 && (
                 <text x={16} y={60} fontSize={13} fontFamily="Arial, sans-serif" fill="#64748b" pointerEvents="none">
                   Диаграмма пуста: добавьте функцию — Ctrl + двойной щелчок или перетащите её из палитры слева.
@@ -791,6 +815,18 @@ export default function Idef0Editor({
               box={editingFn.box}
               view={view}
               onCommit={(v) => commit(updateNode(draftRef.current, editingFn.node.id, { name: v }))}
+              onDone={() => setEditing(null)}
+            />
+          )}
+          {editingFrame && (
+            <RenameOverlay
+              key={`frame-${editingFrame.field}`}
+              name={editingFrame.text}
+              box={{ x: editingFrame.x, y: editingFrame.y + 3, w: Math.max(editingFrame.w, 120), h: editingFrame.h - 6 }}
+              view={view}
+              allowEmpty
+              placeholder="Пусто — вернуть автоматическую надпись"
+              onCommit={(v) => commit(setFrame(draftRef.current, frameKey(cur), { text: { field: editingFrame.field, value: v } }))}
               onDone={() => setEditing(null)}
             />
           )}

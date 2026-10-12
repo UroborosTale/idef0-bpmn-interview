@@ -1,9 +1,32 @@
+import type { FrameField, IdefFrame } from "@shared/idef0Frame";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { nextId, setNodeRole, updateNode, type OpResult } from "../bpmn-editor/model-ops";
 import { BLOCK_H, BLOCK_W, functionsOf, snap, MIN_POS, type Arrow } from "./geometry";
 import { setArrowRoute, shiftRoutes } from "./arrow-edit";
 
 type M = ProcessLogicModel;
+
+/** Настройки рамки листа диаграммы: показать или скрыть рамку и сетку, переопределить надпись штампа (пустая — вернуть автоматическую). */
+export function setFrame(m: M, key: string, patch: { show?: boolean; grid?: boolean; text?: { field: FrameField; value: string } }): M {
+  const cur: IdefFrame = m.idef0_frames?.[key] ?? {};
+  const next: IdefFrame = { ...cur };
+  if (patch.show !== undefined) next.show = patch.show;
+  if (patch.grid !== undefined) next.grid = patch.grid;
+  if (patch.text) {
+    const texts = { ...(cur.texts ?? {}) };
+    if (patch.text.value.trim()) texts[patch.text.field] = patch.text.value.trim();
+    else delete texts[patch.text.field];
+    next.texts = Object.keys(texts).length ? texts : undefined;
+  }
+  if (next.show === true) delete next.show; // значения по умолчанию не храним
+  if (next.grid === true) delete next.grid;
+  if (!next.texts) delete next.texts;
+  const frames = { ...(m.idef0_frames ?? {}) };
+  if (Object.keys(next).length) frames[key] = next;
+  else delete frames[key];
+  if (JSON.stringify(frames[key]) === JSON.stringify(m.idef0_frames?.[key])) return m;
+  return { ...m, idef0_frames: Object.keys(frames).length ? frames : undefined };
+}
 
 /**
  * Какие поля функции образуют стороны блока IDEF0: вход/выход — данные, управление — регламенты

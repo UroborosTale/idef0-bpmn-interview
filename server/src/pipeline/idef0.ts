@@ -1,6 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
 import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
 export type { ArrowKind, LabelSide, Pt };
 
@@ -223,7 +224,33 @@ function textBlock(x: number, y: number, text: string, maxChars: number, fontSiz
 /** Положение подписи стрелки; общее для SVG, VSDX и редактора. */
 export const arrowLabelPlacement = (a: Idef0Arrow) => labelSpec(a);
 
-function renderSvg(d: Idef0DiagramData): string {
+/** Рамка листа в SVG: клетки, контур, пунктир правой полосы и штамп (shared/idef0Frame.ts — как в редакторе). */
+function frameSvg(geo: FrameGeometry, grid: boolean): string {
+  const out: string[] = [];
+  if (grid) {
+    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="0" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
+    for (const l of geo.gridYs) out.push(`<line x1="0" y1="${l.at}" x2="${geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
+  }
+  out.push(`<line x1="${geo.guideX}" y1="0" x2="${geo.guideX}" y2="${geo.footer.y}" stroke="#1f2937" stroke-width="0.8" stroke-dasharray="3 3" />`);
+  out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef9" stroke="#1f2937" />`);
+  for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" />`);
+  out.push(`<rect x="0" y="0" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
+  for (const c of geo.cells) {
+    const max = Math.floor(c.w / 8);
+    const text = c.text.length > max ? c.text.slice(0, Math.max(1, max - 1)) + "…" : c.text;
+    out.push(`<text x="${c.tx}" y="${c.y + c.h / 2 + 5}" font-size="15" text-anchor="${c.anchor}" font-family="Arial, sans-serif" fill="#111827">${esc(text)}</text>`);
+  }
+  return out.join("\n    ");
+}
+
+/** Ключ рамки и надписи штампа по умолчанию для диаграммы (A-0, A0 или вложенной функции). */
+function frameInfo(d: Idef0DiagramData, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): { key: string; defaults: FrameDefaults } {
+  if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: d.title.replace(/ — /, " ").replace(" (контекстная диаграмма)", ""), no: "1.0" } };
+  if (kind === "root") return { key: frameKey(null), defaults: { node: "A0", title: `${processCodeOf(model)} ${model.process.name}`.trim(), no: "1.0" } };
+  return { key: frameKey(parentNodeId ?? null), defaults: { node: d.code, title: d.title.replace(/ — /, " "), no: "1.0" } };
+}
+
+function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefined; defaults: FrameDefaults }): string {
   const parts: string[] = [DEFS];
   for (const b of d.blocks) {
     const big = b.w >= 200; // блок контекстной диаграммы
@@ -247,6 +274,14 @@ function renderSvg(d: Idef0DiagramData): string {
   d.footer.forEach((line, i) => {
     parts.push(`<text x="16" y="${d.height - 30 + i * 18}" font-size="11" font-family="Arial, sans-serif" fill="#374151">${esc(line)}</text>`);
   });
+  if (frame && frameShown(frame.settings)) {
+    const geo = frameGeometry({ w: d.width, h: d.height }, frame.settings, frame.defaults);
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.sheet.w} ${geo.sheet.h}" width="${geo.sheet.w}" height="${geo.sheet.h}">
+    <rect x="0" y="0" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="#ffffff" />
+    ${frameSvg(geo, gridShown(frame.settings))}
+    ${parts.join("\n    ")}
+  </svg>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${d.width} ${d.height}" width="${d.width}" height="${d.height}">
     <rect x="0" y="0" width="${d.width}" height="${d.height}" fill="#ffffff" />
     <text x="16" y="24" font-size="14" font-weight="bold" font-family="Arial, sans-serif">${esc(d.title)}</text>
@@ -299,14 +334,18 @@ function renderNodeTree(model: ProcessLogicModel, codes: Map<string, string>): s
 export function generateIdef0(model: ProcessLogicModel): Idef0Result {
   const codes = idef0Codes(model);
   const { context, root, children } = buildIdef0Diagrams(model);
+  const framed = (d: Idef0DiagramData, kind: "context" | "root" | "child", parentNodeId?: string) => {
+    const f = frameInfo(d, model, kind, parentNodeId);
+    return renderSvg(d, { settings: model.idef0_frames?.[f.key], defaults: f.defaults });
+  };
   return {
-    contextSvg: renderSvg(context),
-    decompositionSvg: renderSvg(root),
+    contextSvg: framed(context, "context"),
+    decompositionSvg: framed(root, "root"),
     nodeTreeSvg: renderNodeTree(model, codes),
     blocks: root.blocks,
     width: root.width,
     height: root.height,
-    children: children.map((c) => ({ parentNodeId: c.parentNodeId, code: c.code, name: c.name, svg: renderSvg(c), blocks: c.blocks, width: c.width, height: c.height })),
+    children: children.map((c) => ({ parentNodeId: c.parentNodeId, code: c.code, name: c.name, svg: framed(c, "child", c.parentNodeId), blocks: c.blocks, width: c.width, height: c.height })),
   };
 }
 

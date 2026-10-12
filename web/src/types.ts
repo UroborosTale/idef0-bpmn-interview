@@ -1,4 +1,5 @@
 import type { EventTrigger } from "@shared/events";
+import type { IdefFrame } from "@shared/idef0Frame";
 export type Speaker = "interviewer" | "owner" | "participant" | "unknown";
 
 export interface Fragment {
@@ -304,6 +305,8 @@ export interface ProcessLogicModel {
   messages: MessageFlow[];
   /** Ширина дорожек диаграмм BPMN, px: ключ — id операции, "" — общая схема процесса; нижняя граница, шире содержимого. */
   diagram_widths?: Record<string, number>;
+  /** Рамка листа и сетка диаграмм IDEF0: ключ — id функции, "" — верхняя диаграмма. */
+  idef0_frames?: Record<string, IdefFrame>;
   accepted_issues: AcceptedIssue[];
   respondents: Respondent[];
   discrepancies: Discrepancy[];
