@@ -9,7 +9,7 @@ import { DraftBanner } from "../editor-core/fields";
 import BpmnEditor from "../bpmn-editor/BpmnEditor";
 import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
-import { functionsOf, withIdef0Layout } from "../idef0-editor/geometry";
+import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
 import { deleteNode, duplicateNode } from "../bpmn-editor/model-ops";
 import { diagramSvg, download, svgToPng } from "./export-image";
@@ -64,6 +64,8 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
+  /** Бумага для печати листа IDEF0: "" — по формату листа диаграммы (если он стандартный), иначе A4. */
+  const [paper, setPaper] = useState("");
   const [propsOpen, setPropsOpen] = useState(true);
   const [full, setFull] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -477,6 +479,36 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
           </div>
           <div className="ribbon-caption">Выгрузка</div>
         </div>
+        {active.kind === "idef0" && (
+          <div className="ribbon-group">
+            <div className="ribbon-buttons ribbon-links">
+              {(() => {
+                // адрес диаграммы в выгрузке: верхняя — decomposition, диаграмма функции — её код
+                const diagram = active.parent === null ? "decomposition" : idef0Codes(draft).get(active.parent);
+                if (!diagram) return null;
+                const q = paper ? `?paper=${paper}` : "";
+                const guard = { className: h.dirty ? "disabled-link" : "", onClick: (e: React.MouseEvent) => h.dirty && e.preventDefault(), title: h.dirty ? "Печатается сохранённая версия — сначала сохраните" : undefined };
+                return (
+                  <>
+                    <select aria-label="Бумага для печати" value={paper} onChange={(e) => setPaper(e.target.value)} title="Бумага: «По листу» берёт формат рамки диаграммы (A4, A3, A2), иначе A4">
+                      <option value="">Бумага: по листу</option>
+                      <option value="A4">A4</option>
+                      <option value="A3">A3</option>
+                      <option value="A2">A2</option>
+                    </select>
+                    <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.pdf${q}`)} target="_blank" rel="noreferrer" {...guard}>
+                      Лист в PDF
+                    </a>
+                    <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.print.html${q}`)} target="_blank" rel="noreferrer" {...guard}>
+                      Печать…
+                    </a>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="ribbon-caption">Печать листа IDEF0</div>
+          </div>
+        )}
         {onOpenImport && (
           <div className="ribbon-group">
             <div className="ribbon-buttons">

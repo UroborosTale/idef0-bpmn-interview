@@ -3,6 +3,8 @@ import { getSession } from "../repo.js";
 import { idef0ToDrawio } from "../pipeline/idef0.js";
 import { buildAlbumHtml } from "../export/album.js";
 import { buildVsdx } from "../export/vsdx.js";
+import { launchPdfBrowser } from "../export/pdfBrowser.js";
+import { PAPER_MM, idef0PrintHtml, type Orientation } from "../export/idef0Print.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { bpmnHosts } from "../shared/codes.js";
@@ -119,6 +121,64 @@ exportRouter.get("/sessions/:id/export/idef0/:diagram.svg", (req, res) => {
   res.type("image/svg+xml").send(svg);
 });
 
+/** Параметры печати листа IDEF0: paper (A4, A3, A2) и orientation (landscape, portrait); без них — по формату листа диаграммы. */
+function printOptions(req: { query: Record<string, unknown> }): { paper?: string; orientation?: Orientation } | null {
+  const paper = typeof req.query.paper === "string" ? req.query.paper.toUpperCase() : undefined;
+  const orientation = typeof req.query.orientation === "string" ? req.query.orientation : undefined;
+  if ((paper && !PAPER_MM[paper]) || (orientation && orientation !== "landscape" && orientation !== "portrait")) return null;
+  return { paper, orientation: orientation as Orientation | undefined };
+}
+
+/** Страница для печати листа IDEF0: бумага нужного формата, лист вписан по центру. */
+exportRouter.get("/sessions/:id/export/idef0/:diagram.print.html", (req, res) => {
+  const session = requireReady(req, res);
+  if (!session) return;
+  const opts = printOptions(req);
+  if (!opts) {
+    res.status(400).json({ error: "paper: A4, A3 или A2; orientation: landscape или portrait" });
+    return;
+  }
+  const page = idef0PrintHtml(session.model!, req.params.diagram, opts);
+  if (!page) {
+    res.status(404).json({ error: "неизвестная диаграмма" });
+    return;
+  }
+  res.type("text/html; charset=utf-8").send(page.html);
+});
+
+/** Лист IDEF0 в PDF (нужен Chromium, как у альбома); без него — подсказка про страницу печати. */
+exportRouter.get("/sessions/:id/export/idef0/:diagram.pdf", async (req, res) => {
+  const session = requireReady(req, res);
+  if (!session) return;
+  const opts = printOptions(req);
+  if (!opts) {
+    res.status(400).json({ error: "paper: A4, A3 или A2; orientation: landscape или portrait" });
+    return;
+  }
+  const page = idef0PrintHtml(session.model!, req.params.diagram, opts);
+  if (!page) {
+    res.status(404).json({ error: "неизвестная диаграмма" });
+    return;
+  }
+  try {
+    const browser = await launchPdfBrowser();
+    try {
+      const p = await browser.newPage();
+      await p.setContent(page.html, { waitUntil: "load" });
+      const pdf = await p.pdf({ format: page.paper as "A4", landscape: page.orientation === "landscape", printBackground: true, preferCSSPageSize: true, margin: { top: "0", bottom: "0", left: "0", right: "0" } });
+      attachment(res, `${session.meta.processName}.idef0-${req.params.diagram}.${page.paper}.pdf`);
+      res.type("application/pdf").send(pdf);
+    } finally {
+      await browser.close();
+    }
+  } catch (e) {
+    res.status(501).json({
+      error: `PDF-рендеринг недоступен в этом окружении (нет Chromium). Откройте /export/idef0/${req.params.diagram}.print.html и сохраните страницу в PDF из браузера.`,
+      details: (e as Error).message,
+    });
+  }
+});
+
 exportRouter.get("/sessions/:id/export/vsdx", async (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
@@ -172,13 +232,15 @@ exportRouter.get("/sessions/:id/export/album.pdf", async (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
   try {
-    const { chromium } = await import("playwright");
-    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH || "/opt/pw-browsers/chromium";
-    const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] }).catch(() => chromium.launch());
-    const page = await browser.newPage();
-    await page.setContent(await buildAlbumHtml(session), { waitUntil: "networkidle" });
-    const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
-    await browser.close();
+    const browser = await launchPdfBrowser();
+    let pdf: Buffer;
+    try {
+      const page = await browser.newPage();
+      await page.setContent(await buildAlbumHtml(session), { waitUntil: "networkidle" });
+      pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
+    } finally {
+      await browser.close();
+    }
     attachment(res, `${session.meta.processName}.album.pdf`);
     res.type("application/pdf").send(pdf);
   } catch (e) {

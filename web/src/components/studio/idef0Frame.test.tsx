@@ -196,3 +196,32 @@ describe("студия: кнопка импорта в ленте", () => {
     expect(screen.queryByText("Импорт…")).toBeNull();
   });
 });
+
+describe("студия: печать листа IDEF0", () => {
+  const links = () => ({ pdf: screen.getByText("Лист в PDF").closest("a")!, print: screen.getByText("Печать…").closest("a")! });
+
+  it("на диаграмме IDEF0 в ленте есть PDF и страница печати; бумага добавляется в адрес, по умолчанию — по формату листа", () => {
+    open();
+    expect(links().pdf.getAttribute("href")).toMatch(/\/export\/idef0\/decomposition\.pdf$/);
+    expect(links().print.getAttribute("href")).toMatch(/\/export\/idef0\/decomposition\.print\.html$/);
+    fireEvent.change(screen.getByLabelText("Бумага для печати"), { target: { value: "A3" } });
+    expect(links().pdf.getAttribute("href")).toMatch(/decomposition\.pdf\?paper=A3$/);
+    expect(links().print.getAttribute("href")).toMatch(/decomposition\.print\.html\?paper=A3$/);
+    fireEvent.change(screen.getByLabelText("Бумага для печати"), { target: { value: "" } });
+    expect(links().pdf.getAttribute("href")).not.toContain("paper=");
+  });
+
+  it("несохранённые правки: ссылки отключены — печатается сохранённая версия", () => {
+    open();
+    fireEvent.click(button("Рамка")); // правка модели — черновик стал «грязным»
+    expect(links().pdf.className).toContain("disabled-link");
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    links().print.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+  });
+
+  it("на диаграмме BPMN блока печати нет", () => {
+    render(<Studio session={session(purchaseModel())} busy={false} onSave={vi.fn(async () => true)} />);
+    expect(screen.queryByText("Лист в PDF")).toBeNull();
+  });
+});
