@@ -87,6 +87,8 @@ export default function BpmnEditor({
   const [editing, setEditing] = useState<string | null>(null);
   /** Инструмент «Поток сообщений»: щелчок по началу (шаг или пул), затем по концу — парному объекту. from — уже выбранное начало. */
   const [msgTool, setMsgTool] = useState<{ from: string | null } | null>(null);
+  // другая диаграмма — инструмент начинается заново: начало, выбранное на прежней, к этой не относится
+  useEffect(() => setMsgTool(null), [scope]);
   /** Правка текста стрелки (условие ветки) или значка-триггера на блоке; at — где открыть поле, в координатах диаграммы. */
   const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker" | "artifact" | "pool" | "message"; id: string; dict?: "data" | "systems"; at: Pt } | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
