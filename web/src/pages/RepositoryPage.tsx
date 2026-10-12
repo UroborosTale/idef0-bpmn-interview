@@ -130,8 +130,9 @@ export default function RepositoryPage() {
         (утверждённые версии не меняются); прежнее название остаётся синонимом. В студии: «Справочники → Из репозитория…» и ⇪ у записи.
       </p>
 
-      <div className="dict-add">
+      <div className="repo-add">
         <input
+          className="repo-name"
           placeholder={`Новый объект: ${CLASSES.find((c) => c.cls === cls)!.one}`}
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -158,7 +159,7 @@ export default function RepositoryPage() {
         <thead>
           <tr>
             <th>Название</th>
-            {kinds && <th style={{ width: 120 }}>Вид</th>}
+            {kinds && <th style={{ width: 150 }}>Вид</th>}
             <th>Синонимы (через запятую)</th>
             <th>Описание</th>
             <th style={{ width: 150 }}>{cls === "role" ? "Подразделение" : "Ответственный"}</th>

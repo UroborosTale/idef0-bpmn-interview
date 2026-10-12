@@ -117,6 +117,7 @@ export default function DictionaryView({
           onPick={(obj) => {
             if (hasRepoObject(model, kind, obj.id)) return;
             onChange(addLinkedEntry(model, kind, obj).model);
+            setPicking(false);
             setRepoMsg(`«${obj.name}» добавлена из репозитория.`);
           }}
         />

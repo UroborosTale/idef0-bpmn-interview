@@ -341,6 +341,11 @@ button.danger:hover { background: #fef2f2; }
 .usage-chip { margin: 2px 6px 2px 0; font-size: 12px; border-radius: 12px; padding: 2px 10px; }
 
 /* общий репозиторий объектов */
+.repo-add { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.repo-add .repo-name { flex: 1 1 260px; max-width: 460px; min-width: 160px; }
+.repo-add select { width: auto; flex: 0 0 auto; }
+.repo-add .dict-search { flex: 0 0 240px; width: 240px; }
+.repo-add button { white-space: nowrap; }
 .dict-picker { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
 .dict-picker-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
 .dict-picker-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-top: 1px solid #eef1f6; font-size: 13px; }
