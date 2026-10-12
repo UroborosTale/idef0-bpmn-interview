@@ -318,6 +318,28 @@ describe("студия: новые элементы на диаграмме оп
       expect([pool().getAttribute("x"), pool().getAttribute("y")]).toEqual(before);
     });
 
+    it("инструмент «Поток сообщений» из палитры: щелчок по шагу, затем по пулу создаёт отдельную стрелку; Esc отменяет", () => {
+      studio(addPool(structuredModel(), "Поставщики", null, "o1").model);
+      const press = (el: Element) => {
+        fireEvent.pointerDown(el, { button: 0, pointerId: 3 });
+        fireEvent.pointerUp(svgEl(), { pointerId: 3 });
+      };
+      const tool = screen.getByText("Поток сообщений");
+      fireEvent.click(tool);
+      expect(tool.getAttribute("aria-pressed")).toBe("true");
+      press(document.querySelector('.studio g[data-node-id="b1"]')!);
+      press(document.querySelector("[data-pool-id]")!);
+      expect(document.querySelector("[data-message-id]")).not.toBeNull();
+      expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Поток сообщений/);
+      expect(tool.getAttribute("aria-pressed")).toBe("false");
+      // инструмент выключен: щелчок по пулу снова обычный выбор
+      press(document.querySelector("[data-pool-id]")!);
+      expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Внешний пул/);
+      fireEvent.click(tool);
+      fireEvent.keyDown(document.querySelector(".bpe-root") ?? svgEl(), { key: "Escape" });
+      expect(tool.getAttribute("aria-pressed")).toBe("false");
+    });
+
     it("● шага, отпущенная на пуле, создаёт поток сообщений", () => {
       const m = addPool(structuredModel(), "Поставщики", null, "o1").model;
       studio(m);

@@ -178,6 +178,7 @@ a { color: var(--accent); }
 .bpe-body { display: grid; grid-template-columns: 150px 1fr 310px; gap: 12px; height: calc(100vh - 270px); min-height: 520px; }
 .bpe-palette { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .bpe-palette button { text-align: left; cursor: grab; }
+.bpe-palette button.active { background: #e0e7ff; border-color: #4338ca; color: #312e81; }
 .bpe-canvas { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
 .bpe-svg { width: 100%; height: 100%; display: block; user-select: none; touch-action: none; }
 .bpe-rename { position: absolute; transform: translate(-50%, -50%); width: 150px; z-index: 5; border: 2px solid var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.15); text-align: center; }

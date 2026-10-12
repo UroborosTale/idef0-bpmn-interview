@@ -85,6 +85,8 @@ export default function BpmnEditor({
   /** Правый край дорожек тянут: он подсвечен. */
   const [stretching, setStretching] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /** Инструмент «Поток сообщений»: щелчок по началу (шаг или пул), затем по концу — парному объекту. from — уже выбранное начало. */
+  const [msgTool, setMsgTool] = useState<{ from: string | null } | null>(null);
   /** Правка текста стрелки (условие ветки) или значка-триггера на блоке; at — где открыть поле, в координатах диаграммы. */
   const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker" | "artifact" | "pool" | "message"; id: string; dict?: "data" | "systems"; at: Pt } | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
@@ -157,6 +159,28 @@ export default function BpmnEditor({
     rootRef.current?.focus();
     if (editing) return;
     const t = e.target as Element;
+    if (msgTool && e.button === 0) {
+      // инструмент «Поток сообщений»: выбираем начало и конец щелчками, остальные действия мыши отключены
+      const id = t.closest("[data-node-id]")?.getAttribute("data-node-id") ?? t.closest("[data-pool-id]")?.getAttribute("data-pool-id") ?? t.closest("[data-artifact]")?.getAttribute("data-artifact");
+      if (!id) {
+        showHint("Щёлкните по шагу диаграммы или по внешнему пулу. Esc — отмена.");
+        return;
+      }
+      if (!msgTool.from) {
+        setMsgTool({ from: id });
+        showHint("Теперь щёлкните по второму концу: шаг — для пула, пул — для шага.");
+        return;
+      }
+      const r = addMessage(viewRef.current, msgTool.from, id);
+      if (r.error) {
+        showHint(r.error);
+        setMsgTool({ from: null });
+        return;
+      }
+      setMsgTool(null);
+      commit(r.model, { kind: "message", id: r.id! });
+      return;
+    }
     const connectEl = t.closest("[data-connect]");
     const nodeEl = t.closest("[data-node-id]");
     const flowEl = t.closest("[data-flow-id]");
@@ -718,6 +742,7 @@ export default function BpmnEditor({
       else if (curSel.kind === "pool" && h.commit(deletePool(draftRef.current, curSel.id))) setSel(null);
       else if (curSel.kind === "message" && h.commit(deleteMessage(draftRef.current, curSel.id))) setSel(null);
     } else if (e.key === "Escape") {
+      setMsgTool(null);
       setMulti([]);
       setSel(null);
       setEditing(null);
@@ -805,6 +830,9 @@ export default function BpmnEditor({
               {p.label}
             </button>
           ))}
+          <button className={msgTool ? "active" : undefined} aria-pressed={!!msgTool} onClick={() => setMsgTool((t) => (t ? null : { from: null }))} title="Стрелка между шагом и внешним пулом: щёлкните по началу, затем по концу">
+            Поток сообщений
+          </button>
           <button onClick={addExternalPool} title="Пул другого процесса или внешнего участника (поставщик, клиент): к нему идут потоки сообщений">
             Внешний пул
           </button>
