@@ -25,6 +25,8 @@ export interface Role {
   qualification?: string | null;
   /** Высота дорожки роли на диаграммах BPMN, px (120…600); без неё стандартная. */
   lane_height?: number | null;
+  /** Объект общего репозитория организации. */
+  repo_id?: string | null;
 }
 
 export interface SystemEntity {
@@ -33,6 +35,7 @@ export interface SystemEntity {
   source: SourceRef[];
   description?: string | null;
   owner?: string | null;
+  repo_id?: string | null;
 }
 
 export interface DataEntity {
@@ -47,6 +50,7 @@ export interface DataEntity {
   consumer?: string | null;
   value?: string | null;
   quality_standard?: string | null;
+  repo_id?: string | null;
 }
 
 export interface ControlEntity {

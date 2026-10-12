@@ -1,4 +1,5 @@
 import type { AssignmentKind, ProcessLogicModel, ProcessNode } from "../../types";
+import type { RepoClass, RepoObject } from "../../api/types";
 import { addRole, deleteRole, nextId, renameRole, setNodeRole } from "../bpmn-editor/model-ops";
 import type { DictKind } from "./docs";
 
@@ -98,6 +99,23 @@ export function addEntry(m: M, kind: DictKind, name: string): { model: M; id: st
       return { model: { ...m, process: { ...m.process, risks: [...m.process.risks, { id, name, mitigation: null, source: [] }] } }, id };
     }
   }
+}
+
+/** Справочники модели, которые ведутся в общем репозитории организации. */
+export const REPO_CLASS: Partial<Record<DictKind, RepoClass>> = { roles: "role", systems: "system", data: "data" };
+
+/** Запись справочника модели, связанная с объектом репозитория (или null). */
+export const repoIdOf = (m: M, kind: DictKind, id: string): string | null => (entryOf(m, kind, id) as { repo_id?: string | null } | undefined)?.repo_id ?? null;
+
+/** Есть ли в модели запись, связанная с этим объектом репозитория. */
+export const hasRepoObject = (m: M, kind: DictKind, repoId: string): boolean => entriesOf(m, kind).some((e) => (e as { repo_id?: string | null }).repo_id === repoId);
+
+/** Объект репозитория → запись справочника модели: название, описание, ответственный и вид копируются, ссылка repo_id сохраняется. */
+export function addLinkedEntry(m: M, kind: DictKind, obj: RepoObject): { model: M; id: string } {
+  const added = addEntry(m, kind, obj.name);
+  const patch: Record<string, unknown> = { repo_id: obj.id, description: obj.description, owner: obj.owner };
+  if (obj.kind) patch.kind = obj.kind;
+  return { model: updateEntry(added.model, kind, added.id, patch), id: added.id };
 }
 
 /** Изменить поля записи справочника (название, вид, целевое значение…). Название роли меняет подпись дорожки. */

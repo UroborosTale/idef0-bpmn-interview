@@ -104,6 +104,37 @@ export interface ProcessLink {
   created_at: string;
 }
 
+/** Общий репозиторий объектов организации: роль, информационная система, документ — один раз на все процессы. */
+export type RepoClass = "role" | "system" | "data";
+
+export interface RepoObject {
+  id: string;
+  class: RepoClass;
+  name: string;
+  synonyms: string[];
+  description: string | null;
+  owner: string | null;
+  kind: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Объект с числом процессов, записей справочников и шагов, где он используется. */
+export interface RepoListItem extends RepoObject {
+  sessions: number;
+  entries: number;
+  uses: number;
+}
+
+export interface RepoUsage {
+  sessionId: string;
+  sessionTitle: string;
+  approved: boolean;
+  entryId: string;
+  entryName: string;
+  uses: number;
+}
+
 export interface GlossaryEntry {
   key: string;
   kind: string;

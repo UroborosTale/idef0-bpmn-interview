@@ -8,6 +8,7 @@ import NewSessionPage from "./pages/NewSessionPage";
 import WorkspacePage from "./pages/WorkspacePage";
 import RegistryPage from "./pages/RegistryPage";
 import GlossaryPage from "./pages/GlossaryPage";
+import RepositoryPage from "./pages/RepositoryPage";
 import RespondentInterviewPage from "./pages/RespondentInterviewPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import RequirementsPage from "./pages/RequirementsPage";
@@ -89,6 +90,7 @@ export default function App() {
           )}
           {link({ name: "list" }, "Сессии")}
           {link({ name: "registry" }, "Реестр процессов")}
+          {link({ name: "repository" }, "Репозиторий")}
           {link({ name: "notifications" }, `Уведомления${unreadCount > 0 ? ` (${unreadCount})` : ""}`)}
           <details className="nav-more">
             <summary>Ещё</summary>
@@ -120,6 +122,7 @@ export default function App() {
             />
           )}
           {route.name === "registry" && <RegistryPage />}
+          {route.name === "repository" && <RepositoryPage />}
           {route.name === "glossary" && <GlossaryPage />}
           {route.name === "notifications" && <NotificationsPage />}
           {route.name === "requirements" && <RequirementsPage />}

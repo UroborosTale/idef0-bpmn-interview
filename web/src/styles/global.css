@@ -340,6 +340,14 @@ button.danger:hover { background: #fef2f2; }
 .dict-usage td { background: #f6f9fe; }
 .usage-chip { margin: 2px 6px 2px 0; font-size: 12px; border-radius: 12px; padding: 2px 10px; }
 
+/* общий репозиторий объектов */
+.dict-picker { border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(15, 23, 42, .08); }
+.dict-picker-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.dict-picker-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-top: 1px solid #eef1f6; font-size: 13px; }
+.repo-badge { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--bs-blue); background: var(--bs-light); border-radius: 3px; padding: 0 5px; cursor: help; }
+.dict-repo { font-size: 13px; padding: 0 5px; margin-right: 2px; }
+.repo-usage a { margin-right: 10px; font-size: 12px; }
+
 /* паспорт процесса и отчёты */
 .passport { padding: 4px 6px; }
 .passport-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }

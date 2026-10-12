@@ -1,5 +1,6 @@
 import type { SessionListItem, SessionMeta, SessionRecord, VersionListItem, HistoryEvent, InterviewTrack, SessionRespondent, ChatMessage, Discrepancy, SourceRef, Gap, RequirementLink } from "../types";
 import type { CampaignRespondentStatus, Campaign, CampaignStatus, VerificationParagraph, ReviewStep, ImpactReport, ReviewRoute, NotificationRow, RegistryProcess, ProcessLink, GlossaryEntry, PositionRow, RegulationStaleness, ProcessCard, PathInfo, NodeHeat, BottleneckReport, AntipatternFinding, RoleRate, RoleCost, CostReport, SensitivityPoint, RequirementRow, ChecklistRuleRow, ChecklistRuleResult, ChecklistResult, RegistryMapNode, RegistryMapEdge, RegistryMap, DuplicateCandidate, StalenessRow, TraceabilityRequirementRow, TraceabilityReport, AuditLogRow, AgentConfigRow, AgentRunRow, CorpusStats, CorpusEntryRow, SimilarCorpusEntry, EvalCaseResult, EvalSummary, LLMStatus, HypothesisRow, CompareDelta, CompareReport, DfgEdge, MiningImportResult, MiningMappingRow, ConformanceDeviation, ActivityStat, ConformanceReport, MiningReport, CriticalityScore, RequirementAuditCoverage, CompletenessReport, BpmnReconcileChanges, DrawioReconcileChange, DiagramImportResult, JobProgress, Job, LlmUsage, Proposal, AgentTaskRow, AgentQuestionRow, AgentReportRow, AgentStatsReport } from "./types";
+import type { RepoClass, RepoListItem, RepoObject, RepoUsage } from "./types";
 import { BASE, req, waitJob } from "./http";
 
 export * from "./types";
@@ -97,6 +98,27 @@ export const api = {
   suggestProcessLinks: () => req<{ from_process_id: string; to_process_id: string; data_label: string }[]>("GET", "/registry/links/suggest"),
   processLinkGaps: () =>
     req<{ processId: string; name: string; unconsumedOutputs: string[]; unproducedInputs: string[] }[]>("GET", "/registry/links/gaps"),
+
+  // --- Общий репозиторий объектов ---
+  listRepository: (filters?: { class?: RepoClass; q?: string }) => {
+    const params = new URLSearchParams();
+    if (filters) for (const [k, v] of Object.entries(filters)) if (v) params.set(k, v);
+    const qs = params.toString();
+    return req<RepoListItem[]>("GET", `/repository${qs ? `?${qs}` : ""}`);
+  },
+  getRepositoryObject: (id: string) => req<RepoObject & { usage: RepoUsage[] }>("GET", `/repository/${id}`),
+  matchRepositoryObject: (cls: RepoClass, name: string) =>
+    req<{ object: RepoObject | null }>("GET", `/repository/match?class=${cls}&name=${encodeURIComponent(name)}`).then((r) => r.object),
+  createRepositoryObject: (input: { class: RepoClass; name: string; synonyms?: string[]; description?: string | null; owner?: string | null; kind?: string | null }) =>
+    req<RepoObject>("POST", "/repository", input),
+  /** propagate=false — менять только репозиторий, не записи моделей. */
+  patchRepositoryObject: (id: string, patch: Partial<Pick<RepoObject, "name" | "synonyms" | "description" | "owner" | "kind">>, propagate = true) =>
+    req<{ object: RepoObject; updated: number; skipped: number }>("PATCH", `/repository/${id}${propagate ? "" : "?propagate=0"}`, patch),
+  mergeRepositoryObject: (id: string, intoId: string) =>
+    req<{ object: RepoObject; relinked: number; skipped: number }>("POST", `/repository/${id}/merge`, { intoId }),
+  /** Без replaceWith используемый объект не удаляется (409). */
+  deleteRepositoryObject: (id: string, replaceWith?: string) =>
+    req<void>("DELETE", `/repository/${id}${replaceWith ? `?replaceWith=${encodeURIComponent(replaceWith)}` : ""}`),
 
   // --- М3.5 Справочники ---
   listGlossary: (filters?: { kind?: string; status?: string }) => {

@@ -10,6 +10,7 @@ export type Route =
   | { name: "new" }
   | { name: "workspace"; id: string; tab?: string }
   | { name: "registry" }
+  | { name: "repository" }
   | { name: "glossary" }
   | { name: "notifications" }
   | { name: "requirements" }
@@ -21,6 +22,7 @@ export type Route =
 const STATIC: Record<string, Route["name"]> = {
   "/new": "new",
   "/registry": "registry",
+  "/repository": "repository",
   "/glossary": "glossary",
   "/notifications": "notifications",
   "/requirements": "requirements",

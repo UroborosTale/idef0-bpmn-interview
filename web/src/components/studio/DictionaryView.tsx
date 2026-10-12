@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { ProcessLogicModel } from "../../types";
+import { api } from "../../api/client";
 import { DICT_TITLES, type DictKind } from "./docs";
-import { KIND_OPTIONS, addEntry, entriesOf, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
+import { KIND_OPTIONS, REPO_CLASS, addEntry, addLinkedEntry, entriesOf, hasRepoObject, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
+import RepoPicker from "./RepoPicker";
 
 type M = ProcessLogicModel;
 
@@ -44,6 +46,28 @@ export default function DictionaryView({
   const options = KIND_OPTIONS[kind];
   const withUsage = kind !== "kpi" && kind !== "risks";
   const unlinked = unlinkedCount(model, kind);
+  const repoClass = REPO_CLASS[kind];
+  const [picking, setPicking] = useState(false);
+  const [repoMsg, setRepoMsg] = useState<string | null>(null);
+
+  /** Передать запись модели в общий репозиторий: найденный по названию или синониму объект подхватывается, иначе создаётся новый. */
+  const publish = async (id: string) => {
+    const entry = rows.find((r) => r.id === id) as unknown as Record<string, string | null | undefined> | undefined;
+    if (!repoClass || !entry?.name) return;
+    try {
+      const found = await api.matchRepositoryObject(repoClass, entry.name);
+      if (found) {
+        onChange(updateEntry(model, kind, id, { name: found.name, repo_id: found.id, description: found.description, owner: found.owner }));
+        setRepoMsg(`«${entry.name}» связана с объектом репозитория «${found.name}».`);
+        return;
+      }
+      const created = await api.createRepositoryObject({ class: repoClass, name: entry.name, description: entry.description ?? null, owner: entry.owner ?? null, kind: entry.kind ?? null });
+      onChange(updateEntry(model, kind, id, { repo_id: created.id }));
+      setRepoMsg(`«${entry.name}» передана в репозиторий — теперь её можно использовать в других процессах.`);
+    } catch (e) {
+      setRepoMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const add = () => {
     const name = adding.trim();
@@ -82,7 +106,21 @@ export default function DictionaryView({
         <button className="primary" disabled={!adding.trim()} onClick={add}>
           + Добавить
         </button>
+        {repoClass && <button onClick={() => setPicking((v) => !v)}>Из репозитория…</button>}
       </div>
+      {repoMsg && <p className="muted dict-hint">{repoMsg}</p>}
+      {picking && repoClass && (
+        <RepoPicker
+          cls={repoClass}
+          taken={new Set(rows.map((r) => (r as unknown as { repo_id?: string | null }).repo_id).filter((x): x is string => !!x))}
+          onClose={() => setPicking(false)}
+          onPick={(obj) => {
+            if (hasRepoObject(model, kind, obj.id)) return;
+            onChange(addLinkedEntry(model, kind, obj).model);
+            setRepoMsg(`«${obj.name}» добавлена из репозитория.`);
+          }}
+        />
+      )}
 
       <table className="dict-table">
         <thead>
@@ -99,7 +137,7 @@ export default function DictionaryView({
             {kind === "risks" && <th>Мера снижения</th>}
             <th style={{ width: 200 }}>Описание</th>
             {withUsage && <th style={{ width: 150 }}>Используется</th>}
-            <th style={{ width: 36 }} />
+            <th style={{ width: repoClass ? 62 : 36 }} />
           </tr>
         </thead>
         <tbody>
@@ -113,12 +151,18 @@ export default function DictionaryView({
           {shown.map((r, i) => {
             const usage = withUsage ? usageOf(model, kind, r.id) : [];
             const rec = r as unknown as Record<string, string | null | undefined>;
+            const repoLinked = !!rec.repo_id;
             return (
               <FragmentRows key={r.id}>
                 <tr className={`${usage.length === 0 && withUsage ? "dict-unused" : ""} ${selectedId === r.id ? "dict-selected" : ""}`} onClick={() => onSelect(r.id)}>
                   <td className="muted">{i + 1}</td>
                   <td>
                     <CellInput value={r.name} onCommit={(v) => v && onChange(updateEntry(model, kind, r.id, { name: v }))} />
+                    {repoLinked && (
+                      <span className="repo-badge" title="Объект общего репозитория: изменения названия и карточки в репозитории попадают сюда">
+                        репозиторий
+                      </span>
+                    )}
                   </td>
                   {options && (
                     <td>
@@ -161,6 +205,11 @@ export default function DictionaryView({
                     </td>
                   )}
                   <td>
+                    {repoClass && !repoLinked && (
+                      <button className="dict-repo" title="Передать в репозиторий организации, чтобы использовать в других процессах" onClick={() => publish(r.id)}>
+                        ⇪
+                      </button>
+                    )}
                     <button className="dict-del" title="Удалить" onClick={() => remove(r.id, r.name)}>
                       ✕
                     </button>

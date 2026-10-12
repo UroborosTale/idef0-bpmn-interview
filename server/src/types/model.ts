@@ -25,12 +25,17 @@ const Card = {
   owner: z.string().nullable().optional(), // у исполнителя — подразделение, у остальных — ответственный
 };
 
+// Ссылка на общий объект репозитория организации (server/src/objectRepo.ts): у ролей, систем и документов.
+// Запись с одним repo_id в разных процессах — один и тот же объект.
+const RepoLink = { repo_id: z.string().nullable().optional() };
+
 export const Role = z.object({
   id: z.string(),
   name: z.string(),
   kind: z.enum(["internal", "external"]).default("internal"),
   source: z.array(SourceRef).default([]),
   ...Card,
+  ...RepoLink,
   // Должность: требуемая квалификация и специализация (таблица ролей в регламентах и инструкциях)
   qualification: z.string().nullable().optional(),
   // Высота дорожки роли на диаграммах BPMN (px); без неё — стандартная (shared/bpmnGeometry.ts). Одна на все диаграммы, где есть эта роль.
@@ -43,6 +48,7 @@ export const SystemEntity = z.object({
   name: z.string(),
   source: z.array(SourceRef).default([]),
   ...Card,
+  ...RepoLink,
 });
 export type SystemEntity = z.infer<typeof SystemEntity>;
 
@@ -52,6 +58,7 @@ export const DataEntity = z.object({
   kind: z.enum(["document", "data"]).default("document"),
   source: z.array(SourceRef).default([]),
   ...Card,
+  ...RepoLink,
   // Карточка продукта (входы и выходы по Соглашению о моделировании). Источник и назначение внутри модели
   // выводятся из связей функций; supplier/consumer — только для внешних («Протокол совещания», «Конечный продукт»).
   supplier: z.string().nullable().optional(),

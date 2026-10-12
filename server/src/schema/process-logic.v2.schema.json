@@ -44,6 +44,7 @@
           "kind": { "enum": ["internal", "external"] },
           "qualification": { "type": ["string", "null"], "description": "Требуемая квалификация и специализация должности" },
           "lane_height": { "type": ["number", "null"], "minimum": 120, "maximum": 600, "description": "Высота дорожки роли на диаграммах BPMN, px; без неё стандартная (150)" },
+          "repo_id": { "type": ["string", "null"], "description": "Объект общего репозитория организации" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
@@ -58,6 +59,7 @@
         "properties": {
           "id": { "type": "string" },
           "name": { "type": "string" },
+          "repo_id": { "type": ["string", "null"], "description": "Объект общего репозитория организации" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
@@ -77,6 +79,7 @@
           "consumer": { "type": ["string", "null"], "description": "Внешний потребитель продукта" },
           "value": { "type": ["string", "null"], "description": "Ценность для потребителя" },
           "quality_standard": { "type": ["string", "null"], "description": "Стандарт качества" },
+          "repo_id": { "type": ["string", "null"], "description": "Объект общего репозитория организации" },
           "source": { "$ref": "#/definitions/sourceList" },
           "description": { "type": ["string", "null"] },
           "owner": { "type": ["string", "null"] }
