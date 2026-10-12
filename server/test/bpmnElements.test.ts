@@ -179,6 +179,13 @@ describe("добавочные элементы: общая геометрия",
     }
   });
 
+  it("подписи соседних значков не налезают друг на друга: расстояние между значками не меньше полусуммы ширин подписей", () => {
+    const names = { data: new Map([["a", "Потребность"], ["b", "Заявка на закупку"]]), systems: new Map() };
+    const arts = artifactsOf([node("t", { inputs: ["a", "b"] })] as never[], boxes, names);
+    const labelW = (n: string) => Math.min(n.length, 14) * 4.6 + 2;
+    expect(arts[1].box.x - arts[0].box.x).toBeGreaterThanOrEqual((labelW("Потребность") + labelW("Заявка на закупку")) / 2);
+  });
+
   it("хранилища данных идут правее граничных событий и обходят вертикаль потока сообщений, а документы от них не зависят", () => {
     const names = { data: new Map([["d0", "Заявка"]]), systems: new Map([["s0", "1С"], ["s1", "ELMA365"]]) };
     const host = node("t", { inputs: ["d0"], system_ids: ["s0", "s1"] });

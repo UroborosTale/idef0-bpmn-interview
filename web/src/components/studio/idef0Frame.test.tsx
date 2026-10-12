@@ -131,6 +131,33 @@ describe("IDEF0: рамка листа и сетка", () => {
     }
   });
 
+  it("формат листа: A4 задаёт размер, поворот меняет ориентацию, «Лист: авто» возвращает; блоки вне листа отмечаются", () => {
+    open();
+    const outer = () => {
+      const r = [...document.querySelectorAll(".studio [data-frame] > rect")].find((e) => e.getAttribute("fill") === "none")!;
+      return [Number(r.getAttribute("width")), Number(r.getAttribute("height"))];
+    };
+    const select = screen.getByLabelText("Формат листа") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "A4" } });
+    expect(outer()).toEqual([1120, 790]); // поле 760 + штамп 30
+    expect((screen.getByLabelText("Формат листа") as HTMLSelectElement).value).toBe("A4");
+    fireEvent.click(screen.getByTitle("Повернуть лист: альбомная ↔ книжная"));
+    expect(outer()).toEqual([760, 1150]);
+    fireEvent.change(screen.getByLabelText("Формат листа"), { target: { value: "A3" } });
+    expect(outer()).toEqual([1080, 1610]); // книжная ориентация сохраняется при смене формата
+    fireEvent.change(screen.getByLabelText("Формат листа"), { target: { value: "auto" } });
+    expect(document.querySelector(".bpe-warn")).toBeNull();
+
+    // уменьшенный лист не вмещает функции
+    const svg = document.querySelector(".studio svg.bpe-svg")!;
+    fireEvent.pointerDown(document.querySelector('.studio [data-frame-resize="se"]')!, { button: 0, pointerId: 8, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(svg, { pointerId: 8, clientX: -9000, clientY: -9000 });
+    fireEvent.pointerUp(svg, { pointerId: 8, clientX: -9000, clientY: -9000 });
+    expect(document.querySelector(".bpe-warn")!.textContent).toMatch(/Вне листа: \d+/);
+    fireEvent.click(button("Авторазмер"));
+    expect(document.querySelector(".bpe-warn")).toBeNull();
+  });
+
   it("лист не сжимается меньше минимального размера", () => {
     open();
     const svg = document.querySelector(".studio svg.bpe-svg")!;
@@ -153,5 +180,19 @@ describe("IDEF0: рамка листа и сетка", () => {
     const hidden = setFrame(m, "", { show: false });
     expect(hidden.idef0_frames).toEqual({ "": { show: false } });
     expect(setFrame(hidden, "", { show: true }).idef0_frames).toBeUndefined();
+  });
+});
+
+describe("студия: кнопка импорта в ленте", () => {
+  it("«Импорт…» открывает приём правок из внешних редакторов", () => {
+    const onOpenImport = vi.fn();
+    render(<Studio session={session(purchaseModel())} busy={false} onSave={vi.fn(async () => true)} onOpenImport={onOpenImport} />);
+    fireEvent.click(screen.getByText("Импорт…"));
+    expect(onOpenImport).toHaveBeenCalledTimes(1);
+  });
+
+  it("без обработчика кнопки импорта нет", () => {
+    render(<Studio session={session(purchaseModel())} busy={false} onSave={vi.fn(async () => true)} />);
+    expect(screen.queryByText("Импорт…")).toBeNull();
   });
 });

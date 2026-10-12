@@ -39,7 +39,7 @@ const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(wi
 /** У операции есть своя диаграмма BPMN — в модели есть её шаги. */
 const hasOperationDiagram = (m: ProcessLogicModel, id: string) => m.nodes.some((n) => n.bpmn_scope === id);
 
-export default function Studio({ session, busy, onSave }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean> }) {
+export default function Studio({ session, busy, onSave, onOpenImport }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean>; /** Открыть вкладку приёма правок из внешних редакторов. */ onOpenImport?: () => void }) {
   const model = session.model!;
   const h = useModelHistory<M>(() => seed(model, session.bpmnXml));
   const draft = h.draft;
@@ -477,6 +477,16 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
           </div>
           <div className="ribbon-caption">Выгрузка</div>
         </div>
+        {onOpenImport && (
+          <div className="ribbon-group">
+            <div className="ribbon-buttons">
+              <button onClick={onOpenImport} title="Загрузить правки из bpmn.io, Camunda Modeler или draw.io: переименования применятся, новые элементы появятся как гипотезы. Новую модель из Visio, Excel или изображения создают на странице «Новая сессия».">
+                Импорт…
+              </button>
+            </div>
+            <div className="ribbon-caption">Импорт</div>
+          </div>
+        )}
         <div className="ribbon-group">
           <div className="ribbon-buttons">
             <button onClick={() => void exportDiagram("svg")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">

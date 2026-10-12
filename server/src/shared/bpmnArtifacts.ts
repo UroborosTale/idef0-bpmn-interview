@@ -133,13 +133,20 @@ export function artifactsOf(
 
     const row = (items: typeof docs, below: boolean) => {
       if (items.length === 0) return;
-      const span = host.w + 40;
-      const step = Math.max(10, Math.min(ARTIFACT_W + 6, (span - ARTIFACT_W) / Math.max(items.length - 1, 1)));
-      const total = ARTIFACT_W + (items.length - 1) * step;
+      // расстояние между соседними значками — по ширине их подписей (кегль 8, до 14 знаков), чтобы подписи не налезали друг на друга
+      const labelW = (name: string) => Math.min(name.length, 14) * 4.6 + 2;
+      const wanted = items.slice(1).map((it, i) => Math.max(ARTIFACT_W + 6, (labelW(items[i].name) + labelW(it.name)) / 2 + 3));
+      // ряд не шире задачи с запасом по 20 пикселей: если подписи не помещаются, значки сближаются (но не ближе 10 пикселей)
+      const room = host.w + 40 - ARTIFACT_W;
+      const sum = wanted.reduce((t, g) => t + g, 0);
+      const gaps = sum > room ? wanted.map((g) => Math.max(10, (g * room) / sum)) : wanted;
+      const offsets = [0];
+      for (const g of gaps) offsets.push(offsets[offsets.length - 1] + g);
+      const total = ARTIFACT_W + offsets[offsets.length - 1];
       const left = below ? Math.max(host.x + host.w / 2 - total / 2, afterEvents) : host.x + host.w / 2 - total / 2;
       let prev = -Infinity;
       items.forEach((it, i) => {
-        let x = Math.max(left + i * step, prev + step);
+        let x = Math.max(left + offsets[i], i === 0 ? -Infinity : prev + gaps[i - 1]);
         if (below && msg && x < msg[1] && x + ARTIFACT_W > msg[0]) x = msg[1];
         prev = x;
         const auto = { x, y: below ? host.y + host.h + ARTIFACT_GAP : host.y - ARTIFACT_GAP - ARTIFACT_H, w: ARTIFACT_W, h: ARTIFACT_H };

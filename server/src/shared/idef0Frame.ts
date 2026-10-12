@@ -76,6 +76,22 @@ export interface FrameGeometry {
   cells: FrameCell[];
 }
 
+/** Стандартные форматы листа (альбомная ориентация): размер поля без штампа в пикселях при 96 dpi, кратный клетке. */
+export const SHEET_FORMATS: { id: string; label: string; w: number; h: number }[] = [
+  { id: "A4", label: "A4", w: 1120, h: 760 },
+  { id: "A3", label: "A3", w: 1580, h: 1080 },
+  { id: "A2", label: "A2", w: 2240, h: 1560 },
+];
+
+/** Формат листа по размеру поля (с учётом поворота); null — размер нестандартный. */
+export function sheetFormatOf(w: number, h: number): { id: string; portrait: boolean } | null {
+  for (const f of SHEET_FORMATS) {
+    if (f.w === w && f.h === h) return { id: f.id, portrait: false };
+    if (f.w === h && f.h === w) return { id: f.id, portrait: true };
+  }
+  return null;
+}
+
 /** Меньше этого размера поле листа не делают. */
 export const FRAME_MIN = 200;
 

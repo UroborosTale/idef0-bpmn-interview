@@ -318,7 +318,36 @@ describe("студия: новые элементы на диаграмме оп
       expect([pool().getAttribute("x"), pool().getAttribute("y")]).toEqual(before);
     });
 
-    it("инструмент «Поток сообщений» из палитры: щелчок по шагу, затем по пулу создаёт отдельную стрелку; Esc отменяет", () => {
+    it("панель выбранного значка и пула: «Вернуть на место» возвращает автоматическое положение", () => {
+    const m = structuredModel();
+    m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
+    studio(addPool(m, "Поставщики", null, "o1").model);
+    const svg = document.querySelector(".studio svg.bpe-svg")!;
+    const move = (el: Element, dx: number, dy: number) => {
+      fireEvent.pointerDown(el, { button: 0, pointerId: 9, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(svg, { pointerId: 9, clientX: 100 + dx, clientY: 100 + dy });
+      fireEvent.pointerUp(svg, { pointerId: 9, clientX: 100 + dx, clientY: 100 + dy });
+    };
+    const reset = () => screen.getByText("Вернуть на место", { selector: "button" }) as HTMLButtonElement;
+    const icon = () => document.querySelector('[data-artifact-kind="input"]')!;
+    const iconAt = () => icon().querySelector("g path")!.getAttribute("d");
+    const auto = iconAt();
+    move(icon(), 60, 40);
+    expect(iconAt()).not.toBe(auto);
+    expect(reset().disabled).toBe(false);
+    fireEvent.click(reset());
+    expect(iconAt()).toBe(auto);
+    expect(reset().disabled).toBe(true);
+
+    const poolAt = () => document.querySelector("[data-pool-id] rect")!.getAttribute("x");
+    const poolAuto = poolAt();
+    move(document.querySelector("[data-pool-id]")!, 80, 30);
+    expect(poolAt()).not.toBe(poolAuto);
+    fireEvent.click(reset());
+    expect(poolAt()).toBe(poolAuto);
+  });
+
+  it("инструмент «Поток сообщений» из палитры: щелчок по шагу, затем по пулу создаёт отдельную стрелку; Esc отменяет", () => {
       studio(addPool(structuredModel(), "Поставщики", null, "o1").model);
       const press = (el: Element) => {
         fireEvent.pointerDown(el, { button: 0, pointerId: 3 });

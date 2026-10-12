@@ -7,7 +7,7 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
-import { frameGeometry, FRAME_GRID, FRAME_MIN, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { frameGeometry, FRAME_GRID, FRAME_MIN, SHEET_FORMATS, sheetFormatOf, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
@@ -693,6 +693,9 @@ export default function Idef0Editor({
     title: cur ? `${codes.get(cur) ?? ""} ${parentNode?.name ?? ""}`.trim() : `${processCodeOf(draft)} ${draft.process.name}`.trim(),
     no: "1.0",
   });
+  const sheetFormat = frame?.w !== undefined && frame?.h !== undefined ? sheetFormatOf(frame.w, frame.h) : null;
+  // функции, не помещающиеся на лист: лист заданный вручную не подгоняется под диаграмму
+  const outside = frameOn && frame?.w !== undefined ? layout.functions.filter((f) => f.box.x < frameGeo.sheet.x || f.box.y < frameGeo.sheet.y || f.box.x + f.box.w > frameGeo.sheet.x + frameGeo.sheet.w || f.box.y + f.box.h > frameGeo.footer.y).length : 0;
   const editingFrame = editing?.startsWith("frame:") ? frameGeo.cells.find((c) => c.field === (editing.slice(6) as FrameField)) : undefined;
   const crumbs: { id: string | null; label: string }[] = [
     { id: null, label: processCodeOf(draft) },
@@ -734,6 +737,43 @@ export default function Idef0Editor({
             <button className={frameOn ? "on" : ""} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { show: !frameOn }))} title="Рамка листа со штампом: NODE, TITLE, NO. (надписи правятся двойным щелчком)">
               Рамка
             </button>
+            <select
+              aria-label="Формат листа"
+              disabled={!frameOn}
+              value={sheetFormat?.id ?? (frame?.w === undefined ? "auto" : "custom")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "auto") commit(setFrame(draftRef.current, frameKey(cur), { rect: null }));
+                else {
+                  const f = SHEET_FORMATS.find((x) => x.id === v);
+                  if (!f) return;
+                  const portrait = !!sheetFormat?.portrait;
+                  commit(setFrame(draftRef.current, frameKey(cur), { rect: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: portrait ? f.h : f.w, h: portrait ? f.w : f.h } }));
+                }
+              }}
+              title="Формат листа: A4, A3 или A2 (поле листа без штампа); «Авто» — лист по размеру диаграммы"
+            >
+              <option value="auto">Лист: авто</option>
+              {frame?.w !== undefined && !sheetFormat && <option value="custom">Лист: свой размер</option>}
+              {SHEET_FORMATS.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                  {sheetFormat?.id === f.id ? (sheetFormat.portrait ? " книжная" : " альбомная") : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              disabled={!frameOn || frame?.w === undefined}
+              onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: frameGeo.footer.y - frameGeo.sheet.y, h: frameGeo.sheet.w } }))}
+              title="Повернуть лист: альбомная ↔ книжная"
+            >
+              ⟳
+            </button>
+            {outside > 0 && (
+              <span className="bpe-warn" role="status" title="Часть функций лежит за пределами листа: растяните или подвиньте лист, либо нажмите «Лист: авто»">
+                ⚠ Вне листа: {outside}
+              </span>
+            )}
             <button disabled={!frameOn || frame?.w === undefined} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: null }))} title="Вернуть лист на всю диаграмму: размер и положение снова автоматические">
               Авторазмер
             </button>

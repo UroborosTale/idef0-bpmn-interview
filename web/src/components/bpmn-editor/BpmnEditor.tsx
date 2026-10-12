@@ -16,7 +16,7 @@ import type { Selection } from "../studio/selection";
 import { entryOf, updateEntry } from "../studio/dict-ops";
 
 type M = ProcessLogicModel;
-type Sel = { kind: "node" | "flow" | "lane"; id: string } | { kind: "artifact"; dict: "data" | "systems"; id: string } | { kind: "pool" | "message"; id: string } | null;
+type Sel = { kind: "node" | "flow" | "lane"; id: string } | { kind: "artifact"; dict: "data" | "systems"; id: string; node: string; key: string } | { kind: "pool" | "message"; id: string } | null;
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number; keep: { x: boolean; y: boolean } }
@@ -292,10 +292,10 @@ export default function BpmnEditor({
     } else if (artifactEl) {
       // значок документа или хранилища: выбирает запись справочника — её карточка открывается в «Свойствах»
       setMulti([]);
-      pick({ kind: "artifact", dict: artifactEl.getAttribute("data-artifact-kind") === "store" ? "systems" : "data", id: artifactEl.getAttribute("data-artifact-entity")! });
       // значок можно перетащить: смещение от автоматического места хранится у задачи
       const nodeId = artifactEl.getAttribute("data-artifact")!;
       const key = `${artifactEl.getAttribute("data-artifact-kind")}:${artifactEl.getAttribute("data-artifact-entity")}`;
+      pick({ kind: "artifact", dict: artifactEl.getAttribute("data-artifact-kind") === "store" ? "systems" : "data", id: artifactEl.getAttribute("data-artifact-entity")!, node: nodeId, key });
       const cur = draft.nodes.find((x) => x.id === nodeId)?.artifact_offsets?.[key];
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       dragRef.current = { kind: "artifact", nodeId, key, dx0: cur?.dx ?? 0, dy0: cur?.dy ?? 0, x0: wx, y0: wy, startModel: draftRef.current, moved: false };
@@ -1142,6 +1142,37 @@ export default function BpmnEditor({
                     Удалить
                   </button>
                   <span className="muted">● — конец (на другую сторону, фигуру или вдоль стороны) · ▮ — сдвинуть участок · ■ — перенести излом · Ctrl + двойной щелчок по линии — новый излом, двойной щелчок по излому — убрать, по линии без Ctrl — править условие · розовая линия — выравнивание, к ней прилипает (Alt — без привязки)</span>
+                </div>
+              );
+            })()}
+          {curSel?.kind === "artifact" &&
+            (() => {
+              const sel = curSel;
+              const placed = draft.nodes.find((n) => n.id === sel.node)?.artifact_offsets?.[sel.key];
+              return (
+                <div className="bpe-selbar" role="toolbar" aria-label="Действия со значком">
+                  <span className="muted">{placed ? "Положение задано вручную" : "Положение автоматическое"}</span>
+                  <button disabled={!placed} onClick={() => commit(setArtifactOffset(draft, sel.node, sel.key, null))} title="Вернуть значок на автоматическое место у задачи">
+                    Вернуть на место
+                  </button>
+                  <span className="muted">Потяните значок, чтобы переставить; двойной щелчок — переименовать.</span>
+                </div>
+              );
+            })()}
+          {curSel?.kind === "pool" &&
+            (() => {
+              const pool = (draft.pools ?? []).find((p) => p.id === curSel.id);
+              if (!pool) return null;
+              const placed = !!(pool.dx || pool.dy);
+              return (
+                <div className="bpe-selbar" role="toolbar" aria-label="Действия с пулом">
+                  <span className="muted">{placed ? "Положение задано вручную" : "Положение автоматическое"}</span>
+                  <button disabled={!placed} onClick={() => h.commit(setPoolOffset(draftRef.current, pool.id, 0, 0))} title="Вернуть пул на автоматическое место под диаграммой">
+                    Вернуть на место
+                  </button>
+                  <button onClick={() => h.commit(deletePool(draftRef.current, pool.id)) && setSel(null)} title="Удалить пул вместе с потоками сообщений (Delete)">
+                    Удалить
+                  </button>
                 </div>
               );
             })()}
