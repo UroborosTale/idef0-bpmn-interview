@@ -61,3 +61,6 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+# золотые снимки раскладки сравниваются построчно: перевод строк всегда LF
+**/__golden__/*.txt text eol=lf
