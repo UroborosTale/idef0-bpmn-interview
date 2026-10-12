@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ProcessLogicModel, ProcessNode } from "../types";
+import { KIND_OPTIONS, addEntry, removeEntry, updateEntry, usageOf } from "./studio/dict-ops";
 
 const TYPE_LABEL: Record<string, string> = { task: "Действие", event: "Событие", gateway: "Ветвление", subprocess: "Подпроцесс" };
 
@@ -8,15 +9,19 @@ export default function ModelPanel({
   selectedId,
   onSelectElement,
   onUpdateNode,
+  onUpdateModel,
 }: {
   model: ProcessLogicModel;
   selectedId: string | null;
   onSelectElement: (id: string | null) => void;
   onUpdateNode: (nodeId: string, patch: Partial<ProcessNode>) => void;
+  /** Сохранить модель целиком — правки документов и данных. */
+  onUpdateModel?: (next: ProcessLogicModel) => void;
 }) {
   const [onlyHypotheses, setOnlyHypotheses] = useState(false);
   const [threshold, setThreshold] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [newData, setNewData] = useState("");
 
   const roleById = new Map(model.roles.map((r) => [r.id, r.name] as const));
 
@@ -75,7 +80,81 @@ export default function ModelPanel({
       </details>
       <details>
         <summary>Документы и данные ({model.data.length})</summary>
-        <ul>{model.data.map((d) => <li key={d.id}>{d.name} <span className="muted">({d.kind})</span></li>)}</ul>
+        <ul className="model-data-list">
+          {model.data.map((d) => {
+            const used = usageOf(model, "data", d.id).length;
+            return (
+              <li key={d.id} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 4 }}>
+                {onUpdateModel ? (
+                  <>
+                    <input
+                      key={d.name}
+                      defaultValue={d.name}
+                      aria-label={`Название: ${d.name}`}
+                      style={{ flex: 1 }}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (!v) e.target.value = d.name;
+                        else if (v !== d.name) onUpdateModel(updateEntry(model, "data", d.id, { name: v }));
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape") {
+                          (e.target as HTMLInputElement).value = d.name;
+                          (e.target as HTMLInputElement).blur();
+                        }
+                      }}
+                    />
+                    <select value={d.kind} aria-label={`Вид: ${d.name}`} onChange={(e) => onUpdateModel(updateEntry(model, "data", d.id, { kind: e.target.value }))}>
+                      {KIND_OPTIONS.data!.map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      title="Удалить"
+                      onClick={() => {
+                        const warn = used > 0 ? `«${d.name}» используется в ${used} элем. — ссылки на неё будут убраны (шаги останутся). Удалить?` : `Удалить «${d.name}»?`;
+                        if (window.confirm(warn)) onUpdateModel(removeEntry(model, "data", d.id));
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {d.name} <span className="muted">({d.kind})</span>
+                  </>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {onUpdateModel && (
+          <div style={{ display: "flex", gap: 6 }}>
+            <input
+              placeholder="Новый документ или данные"
+              value={newData}
+              onChange={(e) => setNewData(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newData.trim()) {
+                  onUpdateModel(addEntry(model, "data", newData.trim()).model);
+                  setNewData("");
+                }
+              }}
+            />
+            <button
+              disabled={!newData.trim()}
+              onClick={() => {
+                onUpdateModel(addEntry(model, "data", newData.trim()).model);
+                setNewData("");
+              }}
+            >
+              + Добавить
+            </button>
+          </div>
+        )}
       </details>
       <details>
         <summary>Информационные системы ({model.systems.length})</summary>

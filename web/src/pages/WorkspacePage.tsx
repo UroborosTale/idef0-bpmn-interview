@@ -332,6 +332,7 @@ export default function WorkspacePage({
                     setSession(await api.putModel(sessionId, updatedModel, session.updatedAt));
                   })
                 }
+                onUpdateModel={(next) => withBusy(async () => setSession(await api.putModel(sessionId, next, session.updatedAt))).then(() => {})}
               />
             )}
             {tab === "model" && !model && <p className="muted">Модель ещё не построена.</p>}

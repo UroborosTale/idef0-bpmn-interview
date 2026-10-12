@@ -194,8 +194,8 @@ export default function DictionaryView({
                       <CellInput value={rec.mitigation ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { mitigation: v || null }))} />
                     </td>
                   )}
-                  <td className="dict-desc muted" title={rec.description ?? undefined}>
-                    {rec.description || "—"}
+                  <td className="dict-desc">
+                    <CellInput value={rec.description ?? ""} onCommit={(v) => onChange(updateEntry(model, kind, r.id, { description: v || null }))} />
                   </td>
                   {withUsage && (
                     <td>

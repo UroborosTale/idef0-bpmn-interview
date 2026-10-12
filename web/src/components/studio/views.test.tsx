@@ -20,7 +20,7 @@ describe("справочник (таблица)", () => {
     const rows = document.querySelectorAll(".dict-table tbody tr");
     expect(rows).toHaveLength(4);
     expect(rows[1].className).toMatch(/dict-selected/);
-    expect(rows[0].querySelector(".dict-desc")!.textContent).toBe("Форма З-1");
+    expect((rows[0].querySelector(".dict-desc input") as HTMLInputElement).value).toBe("Форма З-1");
   });
 
   it("добавление по Enter, щелчок по строке выбирает запись", () => {
