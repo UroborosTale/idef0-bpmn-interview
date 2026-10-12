@@ -5,6 +5,7 @@ import type { ProcessFlow, ProcessNode, Role } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
 import type { EventTrigger, TriggerType } from "../shared/events.js";
 import { importedModel } from "./diagramImport.js";
+import { zipReader } from "../util/zipSafe.js";
 
 /**
  * Импорт Visio (.vsdx → модель процесса, ТЗ Р10, М9.5). Файл — ZIP-пакет OPC: страницы лежат в visio/pages, имена
@@ -18,6 +19,10 @@ import { importedModel } from "./diagramImport.js";
  */
 
 const IN = 96; // дюйм Visio → пиксели
+/** Имена, которые Visio даёт фигурам сам: «Sheet.5», «Shape3», «Лист.7», «Фигура.2». */
+const AUTO_NAME = /^(sheet|shape|лист|фигура|форма)[.\s]*\d*$/;
+const MAX_PAGES = 100;
+const MAX_SHAPES = 6000; // на странице
 
 export interface VsdxBox {
   x: number;
@@ -258,10 +263,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   } catch {
     throw new Error("Файл не открывается как .vsdx: это должен быть пакет Visio 2013 и новее. Старый формат .vsd сохраните в Visio как «Рисунок Visio (*.vsdx)».");
   }
-  const read = async (name: string) => {
-    const f = zip.file(name);
-    return f ? await f.async("string") : null;
-  };
+  const read = zipReader(zip);
   const pagesXml = await read("visio/pages/pages.xml");
   if (!pagesXml || !(await read("visio/document.xml"))) throw new Error("В файле нет страниц Visio (visio/pages/pages.xml) — это не .vsdx.");
   if (Object.keys(zip.files).length > 2000) throw new Error("В пакете слишком много частей — файл отклонён.");
@@ -291,7 +293,8 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   const pages: VsdxPage[] = [];
   let skippedIdef0 = 0;
   const pageList = arr<X>(parser.parse(pagesXml).Pages?.Page);
-  for (let pi = 0; pi < pageList.length; pi++) {
+  if (pageList.length > MAX_PAGES) warnings.push(`В файле ${pageList.length} страниц — прочитаны первые ${MAX_PAGES}.`);
+  for (let pi = 0; pi < Math.min(pageList.length, MAX_PAGES); pi++) {
     const p = pageList[pi];
     const name = attr(p, "NameU") ?? attr(p, "Name") ?? `Страница ${pi + 1}`;
     const sheet = cells(p.PageSheet);
@@ -318,9 +321,14 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
 function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, warnings: string[]): VsdxPage {
   // все фигуры страницы, включая вложенные в группы
   const all: Shp[] = [];
+  let truncated = false;
   const byId = new Map<string, Shp>();
   const walk = (shapes: X[], parent: Shp | null, origin: { x: number; y: number }) => {
     for (const shape of shapes) {
+      if (all.length >= MAX_SHAPES) {
+        truncated = true;
+        return;
+      }
       const id = attr(shape, "ID");
       if (!id) continue;
       const b = boxOf(shape, origin, pageH);
@@ -329,7 +337,8 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
         id,
         shape,
         parent,
-        name: norm(master ?? attr(shape, "NameU") ?? attr(shape, "Name") ?? ""),
+        // фигура без мастера получает от Visio служебное имя «Sheet.5» — это не подсказка о виде, поэтому считается безымянной
+        name: master ? norm(master) : AUTO_NAME.test(norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? "")) ? "" : norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? ""),
         user: userCells(shape),
         box: b.box,
         pin: b.pin,
@@ -341,7 +350,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
   };
   walk(arr<X>(contents.Shapes?.Shape), null, { x: 0, y: 0 });
-  if (all.length > 6000) warnings.push(`На странице «${pageName}» больше 6000 фигур — разобраны не все.`);
+  if (truncated) warnings.push(`На странице «${pageName}» больше ${MAX_SHAPES} фигур — прочитаны первые ${MAX_SHAPES}.`);
 
   // соединители: фигуры с началом и концом (одномерные) и всё, что упомянуто в Connect как «от»
   const connects = arr<X>(contents.Connects?.Connect);

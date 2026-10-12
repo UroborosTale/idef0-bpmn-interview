@@ -98,6 +98,16 @@ describe("импорт из таблицы Excel (.xlsx)", () => {
     expect(model.flows.map((f) => `${f.from === model.nodes[2].id ? "Четвёртый" : "?"}→${f.to === model.nodes[0].id ? "Первый" : "?"}`)).toEqual(["Четвёртый→Первый"]);
   });
 
+  it("скобки в названии шага не принимаются за условие ветки", async () => {
+    const { model, warnings } = await load(
+      book(["Шаги", [["№", "Название", "Следующий шаг"], ["1", "Проверить заявку", "Оплатить (частично); Оплатить (частично) (да); Отклонить заявку (нет)"], ["2", "Оплатить (частично)", ""], ["3", "Отклонить заявку", ""]]])
+    );
+    const id = (n: string) => model.nodes.find((x) => x.name === n)!.id;
+    const out = model.flows.filter((f) => f.from === id("Проверить заявку")).map((f) => `${model.nodes.find((n) => n.id === f.to)!.name}|${f.condition ?? ""}`).sort();
+    // целиком по названию — без условия; «… (да)» — название со скобками и условие «да»; «… (нет)» — условие «нет»
+    expect(out).toEqual(["Оплатить (частично)|", "Оплатить (частично)|да", "Отклонить заявку|нет"]);
+    expect(warnings.filter((w) => /не найден/.test(w))).toEqual([]);
+  });
   it("книга, собранная вручную: inline-строки, булевы значения, скрытый лист пропускается", async () => {
     const zip = new JSZip();
     const ns = `xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"`;

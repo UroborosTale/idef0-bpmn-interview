@@ -1,7 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { nextId, setNodeRole, updateNode, type OpResult } from "../bpmn-editor/model-ops";
 import { BLOCK_H, BLOCK_W, functionsOf, snap, MIN_POS, type Arrow } from "./geometry";
-import { setArrowRoute } from "./arrow-edit";
+import { setArrowRoute, shiftRoutes } from "./arrow-edit";
 
 type M = ProcessLogicModel;
 
@@ -125,7 +125,12 @@ function removeRelation(m: M, a: { kind: string; nodeId: string; entityId: strin
   }
 }
 
-export const moveFunction = (m: M, id: string, x: number, y: number): M => mapNode(m, id, (n) => ({ ...n, idef0_layout: { x, y } }));
+/** Перенос блока: маршруты его внешних стрелок едут вместе с ним (подробнее — shiftRoutes). */
+export const moveFunction = (m: M, id: string, x: number, y: number): M =>
+  mapNode(m, id, (n) => {
+    const moved = n.idef0_layout ? shiftRoutes(n, x - n.idef0_layout.x, y - n.idef0_layout.y) : n;
+    return { ...moved, idef0_layout: { x, y } };
+  });
 
 /**
  * Роль — механизм IDEF0, но она же определяет дорожку в BPMN. Если у узла есть позиция в BPMN,

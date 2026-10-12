@@ -52,13 +52,42 @@ describe("репозиторий: слияние и удаление через 
 
   it("подтверждённое слияние уходит на сервер, окно закрывается, результат показан", async () => {
     await setup();
-    const merge = vi.spyOn(api, "mergeRepositoryObject").mockResolvedValue({ object: ROWS[1], relinked: 2, skipped: 1 });
+    const merge = vi.spyOn(api, "mergeRepositoryObject").mockResolvedValue({ object: ROWS[1], relinked: 2, skipped: 1, duplicated: 0 });
     fireEvent.click(within(rowOf("Начальник отдела")).getByTitle("Объединить с другим объектом (дубли)"));
     fireEvent.click(within(dialog()).getByText("Руководитель отдела"));
     fireEvent.click(within(dialog()).getByRole("button", { name: "Объединить" }));
     await waitFor(() => expect(merge).toHaveBeenCalledWith("o1", "o2"));
     expect(screen.queryByRole("dialog")).toBeNull();
-    await screen.findByText(/Объединено с «Руководитель отдела»\. Записей перенесено: 2; утверждённых версий не менялось: 1\./);
+    await screen.findByText(/Объединено с «Руководитель отдела»\. Процессов обновлено: 2; утверждённых версий не менялось: 1\./);
+  });
+
+  it("если в процессе после слияния оказались две записи с одним названием — об этом сказано", async () => {
+    await setup();
+    vi.spyOn(api, "mergeRepositoryObject").mockResolvedValue({ object: ROWS[1], relinked: 3, skipped: 0, duplicated: 2 });
+    fireEvent.click(within(rowOf("Начальник отдела")).getByTitle("Объединить с другим объектом (дубли)"));
+    fireEvent.click(within(dialog()).getByText("Руководитель отдела"));
+    fireEvent.click(within(dialog()).getByRole("button", { name: "Объединить" }));
+    await screen.findByText(/В процессах \(2\) теперь две записи с одним названием — объедините их в самой модели/);
+  });
+
+  it("ответ на устаревший запрос не затирает свежий (быстрый ввод в поиске)", async () => {
+    const slow: { resolve?: (r: RepoListItem[]) => void } = {};
+    const list = vi.spyOn(api, "listRepository");
+    list.mockResolvedValueOnce(ROWS).mockResolvedValueOnce(ROWS); // первая загрузка: список и «все»
+    render(<RepositoryPage />);
+    await screen.findByDisplayValue("Начальник отдела");
+    // запрос «сек» медленный, следующий «рук» быстрый и приходит раньше
+    list.mockImplementationOnce(() => new Promise((res) => (slow.resolve = res))).mockResolvedValueOnce([]); // поиск «сек»: список (медленно) и «все»
+    fireEvent.change(screen.getByPlaceholderText("Поиск по названию и синонимам…"), { target: { value: "сек" } });
+    await waitFor(() => expect(slow.resolve).toBeDefined());
+    list.mockResolvedValueOnce([ROWS[1]]).mockResolvedValueOnce(ROWS); // поиск «рук»
+    fireEvent.change(screen.getByPlaceholderText("Поиск по названию и синонимам…"), { target: { value: "рук" } });
+    // ждём, пока применится свежий ответ (из таблицы уходят объекты, не подходящие под «рук»)
+    await waitFor(() => expect(screen.queryByDisplayValue("Начальник отдела")).toBeNull());
+    slow.resolve!([ROWS[2]]); // устаревший ответ приходит позже всех
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByDisplayValue("Секретарь")).toBeNull();
+    expect(screen.getByDisplayValue("Руководитель отдела")).toBeTruthy();
   });
 
   it("поиск по списку, Esc и «Отмена» закрывают окно без действий", async () => {

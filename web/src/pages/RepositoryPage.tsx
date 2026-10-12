@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type RepoClass, type RepoListItem, type RepoUsage } from "../api/client";
 import { routePath } from "../router";
 import ChoiceDialog, { type Choice } from "../components/ChoiceDialog";
@@ -30,9 +30,13 @@ export default function RepositoryPage() {
   const [name, setName] = useState("");
   const [kind, setKind] = useState("");
 
+  // ответы могут прийти не по порядку (быстрый ввод в поиске): показываем только самый свежий запрос
+  const latest = useRef(0);
   const reload = useCallback(async () => {
+    const mine = ++latest.current;
     try {
       const [shown, all] = await Promise.all([api.listRepository({ class: cls, q: query.trim() }), api.listRepository({ class: cls })]);
+      if (mine !== latest.current) return;
       setRows(shown);
       setOthers(all);
     } catch (e) {
@@ -275,8 +279,11 @@ export default function RepositoryPage() {
             close();
             run(async () => {
               const r = mode === "merge" ? await api.mergeRepositoryObject(o.id, c.id) : await api.deleteRepositoryObject(o.id, c.id);
-              const done = r as { relinked?: number; skipped?: number } | undefined;
-              const detail = done && typeof done === "object" && done.relinked !== undefined ? ` Записей перенесено: ${done.relinked}${done.skipped ? `; утверждённых версий не менялось: ${done.skipped}` : ""}.` : "";
+              const done = r as { relinked?: number; skipped?: number; duplicated?: number } | undefined;
+              const detail =
+                done && typeof done === "object" && done.relinked !== undefined
+                  ? ` Процессов обновлено: ${done.relinked}${done.skipped ? `; утверждённых версий не менялось: ${done.skipped}` : ""}.${done.duplicated ? ` В процессах (${done.duplicated}) теперь две записи с одним названием — объедините их в самой модели.` : ""}`
+                  : "";
               return mode === "merge" ? `Объединено с «${c.title}».${detail}` : `Объект заменён на «${c.title}» и удалён.${detail}`;
             });
           }}

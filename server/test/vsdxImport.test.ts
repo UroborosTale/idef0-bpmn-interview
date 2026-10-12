@@ -164,6 +164,38 @@ describe("импорт Visio (.vsdx)", () => {
     expect(warnings.join(" ")).toMatch(/каждая стала диаграммой операции/);
   });
 
+  it("фигуры, нарисованные вручную без мастера (Visio называет их «Sheet.N»): прямоугольник — шаг, ромб — шлюз, овал — событие", async () => {
+    const zip = new JSZip();
+    const ns3 = `xmlns="http://schemas.microsoft.com/office/visio/2012/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"`;
+    zip.file("visio/document.xml", `<VisioDocument ${ns3}/>`);
+    zip.file("visio/pages/pages.xml", `<Pages ${ns3}><Page ID="0" NameU="Страница-1"><PageSheet>${c("PageHeight", 8)}</PageSheet><Rel r:id="rId1"/></Page></Pages>`);
+    zip.file("visio/pages/_rels/pages.xml.rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="x" Target="page1.xml"/></Relationships>`);
+    const geom = (rows: string) => `<Section N="Geometry" IX="0">${rows}</Section>`;
+    const rect = (w: number, h: number) => geom(`<Row T="MoveTo" IX="1"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row><Row T="LineTo" IX="2"><Cell N="X" V="${w}"/><Cell N="Y" V="0"/></Row><Row T="LineTo" IX="3"><Cell N="X" V="${w}"/><Cell N="Y" V="${h}"/></Row><Row T="LineTo" IX="4"><Cell N="X" V="0"/><Cell N="Y" V="${h}"/></Row><Row T="LineTo" IX="5"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row>`);
+    const diamond = (w: number, h: number) => geom(`<Row T="MoveTo" IX="1"><Cell N="X" V="${w / 2}"/><Cell N="Y" V="0"/></Row><Row T="LineTo" IX="2"><Cell N="X" V="${w}"/><Cell N="Y" V="${h / 2}"/></Row><Row T="LineTo" IX="3"><Cell N="X" V="${w / 2}"/><Cell N="Y" V="${h}"/></Row><Row T="LineTo" IX="4"><Cell N="X" V="0"/><Cell N="Y" V="${h / 2}"/></Row><Row T="LineTo" IX="5"><Cell N="X" V="${w / 2}"/><Cell N="Y" V="0"/></Row>`);
+    const ellipse = (w: number, h: number) => geom(`<Row T="Ellipse" IX="1"><Cell N="X" V="${w / 2}"/><Cell N="Y" V="${h / 2}"/><Cell N="A" V="${w}"/><Cell N="B" V="${h / 2}"/><Cell N="C" V="${w / 2}"/><Cell N="D" V="${h}"/></Row>`);
+    zip.file(
+      "visio/pages/page1.xml",
+      `<PageContents ${ns3}><Shapes>` +
+        shape(1, { name: "Sheet.1", x: 1, y: 4, w: 0.5, h: 0.5, text: "Начало", extra: ellipse(0.5, 0.5) }) +
+        shape(2, { name: "Sheet.2", x: 3, y: 4, w: 1.5, h: 0.8, text: "Принять заявку", extra: rect(1.5, 0.8) }) +
+        shape(3, { name: "Sheet.3", x: 5.5, y: 4, w: 0.8, h: 0.8, text: "Верно?", extra: diamond(0.8, 0.8) }) +
+        shape(4, { name: "Sheet.4", x: 8, y: 4, w: 1.5, h: 0.8, text: "Выдать решение", extra: rect(1.5, 0.8) }) +
+        shape(5, { name: "Sheet.5", x: 3, y: 6.5, w: 3, h: 0.5, text: "Подпись под схемой" }) + // ничем не связана и без формы: оформление
+        connector(10, [1.25, 4], [2.25, 4]) +
+        connector(11, [3.75, 4], [5.1, 4]) +
+        connector(12, [5.9, 4], [7.25, 4], "да") +
+        `</Shapes><Connects>${connect(10, "Begin", 1)}${connect(10, "End", 2)}${connect(11, "Begin", 2)}${connect(11, "End", 3)}${connect(12, "Begin", 3)}${connect(12, "End", 4)}</Connects></PageContents>`
+    );
+    const { model } = await importFile(await zip.generateAsync({ type: "nodebuffer" }));
+    const byName = (n: string) => model.nodes.find((x) => x.name === n);
+    expect(model.nodes.map((n) => n.name).sort()).toEqual(["Верно?", "Выдать решение", "Начало", "Принять заявку"]); // подпись не стала шагом
+    expect(byName("Принять заявку")).toMatchObject({ type: "task" });
+    expect(byName("Верно?")).toMatchObject({ type: "gateway", subtype: "exclusive" });
+    expect(byName("Начало")).toMatchObject({ type: "event", subtype: "start" });
+    expect(model.flows).toHaveLength(3);
+    expect(model.flows.find((f) => f.condition === "да")).toBeTruthy();
+  });
   it("не .vsdx: понятные ошибки", async () => {
     await expect(parseVsdx(Buffer.from("это не архив"))).rejects.toThrow(/не открывается как \.vsdx/);
     const zip = new JSZip();

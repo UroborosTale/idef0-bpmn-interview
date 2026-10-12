@@ -115,7 +115,7 @@ export const api = {
   patchRepositoryObject: (id: string, patch: Partial<Pick<RepoObject, "name" | "synonyms" | "description" | "owner" | "kind">>, propagate = true) =>
     req<{ object: RepoObject; updated: number; skipped: number }>("PATCH", `/repository/${id}${propagate ? "" : "?propagate=0"}`, patch),
   mergeRepositoryObject: (id: string, intoId: string) =>
-    req<{ object: RepoObject; relinked: number; skipped: number }>("POST", `/repository/${id}/merge`, { intoId }),
+    req<{ object: RepoObject; relinked: number; skipped: number; duplicated: number }>("POST", `/repository/${id}/merge`, { intoId }),
   /** Без replaceWith используемый объект не удаляется (409). */
   deleteRepositoryObject: (id: string, replaceWith?: string) =>
     req<void>("DELETE", `/repository/${id}${replaceWith ? `?replaceWith=${encodeURIComponent(replaceWith)}` : ""}`),

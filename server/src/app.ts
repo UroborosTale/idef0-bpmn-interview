@@ -117,6 +117,16 @@ app.use("/api", agentRouter);
 app.use("/api", repositoryRouter);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // ошибки разбора запроса (body-parser) несут свой код: слишком большое тело — 413, повреждённый JSON — 400; это не сбой сервера
+  const status = Number(err?.status ?? err?.statusCode);
+  if (status === 413) {
+    res.status(413).json({ error: "Запрос слишком большой: предел — 25 МБ (файл при передаче занимает на треть больше своего размера). Уменьшите файл или разбейте схему на несколько." });
+    return;
+  }
+  if (status >= 400 && status < 500) {
+    res.status(status).json({ error: err.type === "entity.parse.failed" ? "Запрос не разобран: тело не является корректным JSON" : err.message ?? "bad request" });
+    return;
+  }
   console.error(err);
   res.status(500).json({ error: err?.message ?? "internal error" });
 });

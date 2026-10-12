@@ -106,6 +106,24 @@ describe("общий репозиторий объектов", () => {
     expect((await app.call("POST", `/repository/${keep.id}/merge`, { intoId: sys.id })).status).toBe(400);
   });
 
+  it("слияние сообщает, в скольких процессах теперь две записи с одним названием", async () => {
+    const keep = await create({ class: "role", name: "Главный технолог" });
+    const dup = await create({ class: "role", name: "Технолог главный" });
+    // в одной модели обе записи сразу
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Две роли" } })).body;
+    const model = s.model;
+    model.roles = [
+      { id: "r1", name: "Главный технолог", kind: "internal", source: [], repo_id: keep.id },
+      { id: "r2", name: "Технолог главный", kind: "internal", source: [], repo_id: dup.id },
+    ];
+    expect((await app.call("PUT_BASE", `/sessions/${s.id}/model|${s.updatedAt}`, model)).status).toBe(200);
+    // в другой — только дубль
+    await makeProcess("Одна роль", { role: dup.id });
+    const r = await app.call("POST", `/repository/${dup.id}/merge`, { intoId: keep.id });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ relinked: 2, duplicated: 1 }); // обновлено процессов: 2; в одном из них теперь две записи с одним названием
+  });
+
   it("используемый объект удалить нельзя без замены; неиспользуемый удаляется", async () => {
     const doc = await create({ class: "data", name: "Договор поставки" });
     const other = await create({ class: "data", name: "Договор оказания услуг" });

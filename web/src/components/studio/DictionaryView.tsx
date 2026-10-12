@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { api } from "../../api/client";
 import { DICT_TITLES, type DictKind } from "./docs";
@@ -47,6 +47,9 @@ export default function DictionaryView({
   const withUsage = kind !== "kpi" && kind !== "risks";
   const unlinked = unlinkedCount(model, kind);
   const repoClass = REPO_CLASS[kind];
+  // пока идёт запрос к серверу, пользователь может править модель дальше — результат применяем к актуальной модели, а не к снимку на момент щелчка
+  const modelRef = useRef(model);
+  modelRef.current = model;
   const [picking, setPicking] = useState(false);
   const [repoMsg, setRepoMsg] = useState<string | null>(null);
 
@@ -57,12 +60,12 @@ export default function DictionaryView({
     try {
       const found = await api.matchRepositoryObject(repoClass, entry.name);
       if (found) {
-        onChange(updateEntry(model, kind, id, { name: found.name, repo_id: found.id, description: found.description, owner: found.owner }));
+        onChange(updateEntry(modelRef.current, kind, id, { name: found.name, repo_id: found.id, description: found.description, owner: found.owner }));
         setRepoMsg(`«${entry.name}» связана с объектом репозитория «${found.name}».`);
         return;
       }
       const created = await api.createRepositoryObject({ class: repoClass, name: entry.name, description: entry.description ?? null, owner: entry.owner ?? null, kind: entry.kind ?? null });
-      onChange(updateEntry(model, kind, id, { repo_id: created.id }));
+      onChange(updateEntry(modelRef.current, kind, id, { repo_id: created.id }));
       setRepoMsg(`«${entry.name}» передана в репозиторий — теперь её можно использовать в других процессах.`);
     } catch (e) {
       setRepoMsg(e instanceof Error ? e.message : String(e));

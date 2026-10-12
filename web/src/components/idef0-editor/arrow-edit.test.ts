@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { labelSpec as sharedLabelSpec } from "@shared/idef0Layout";
 import { purchaseModel } from "../../test/fixtures";
 import type { ProcessLogicModel } from "../../types";
-import { addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, routeOf, setArrowRoute, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
-import { buildIdef0, idef0Extents, labelSpec, type Arrow } from "./geometry";
-import { reconnectArrow, removeArrow, setArrowIcom } from "./ops";
+import { addBend, clampFreeEnd, routesForCopy, shiftRoutes, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, routeOf, setArrowRoute, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
+import { buildIdef0, idef0Extents, labelSpec, withIdef0Layout, type Arrow } from "./geometry";
+import { duplicateNode } from "../bpmn-editor/model-ops";
+import { copyFragment, moveGroup, pasteFragment } from "./selection-ops";
+import { moveFunction, reconnectArrow, removeArrow, setArrowIcom } from "./ops";
 
 type M = ProcessLogicModel;
 
@@ -223,5 +225,75 @@ describe("перенос конца на другую функцию меняе�
     const removed = removeArrow(routed, a);
     expect(removed.nodes.find((n) => n.id === "c")!.inputs).not.toContain("d2");
     expect(removed.nodes.find((n) => n.id === "c")!.arrow_routes).toBeUndefined();
+  });
+});
+
+describe("маршруты едут вместе с блоками", () => {
+  /** Модель с позициями блоков и ручными маршрутами: внешний вход и выход у c, связь a → b у b. */
+  const routed = () => {
+    let m = withIdef0Layout(purchaseModel());
+    const bC = buildIdef0(m, null).functions.find((f) => f.node.id === "c")!.box;
+    m = setFreeEnd(m, arrow(m, "input:c:d2"), [bC.x - 120, bC.y - 90]);
+    m = setLabelOffset(m, arrow(m, "output:c:d4"), 10, 5);
+    m = dragSegment(m, arrow(m, "link:b:d1"), 1, 30);
+    return m;
+  };
+  const route = (m: M, node: string, key: string) => m.nodes.find((n) => n.id === node)!.arrow_routes?.[key];
+
+  it("перенос одного блока: свободный конец и изломы внешних стрелок едут с ним, изломы связи с другой функцией остаются", () => {
+    const m = routed();
+    const before = route(m, "c", "input:d2")!;
+    const pos = m.nodes.find((n) => n.id === "c")!.idef0_layout!;
+    const moved = moveFunction(m, "c", pos.x + 60, pos.y + 40);
+    expect(route(moved, "c", "input:d2")!.end).toEqual([before.end![0] + 60, before.end![1] + 40]);
+    expect(route(moved, "c", "output:d4")).toEqual(route(m, "c", "output:d4")); // у подписи только сдвиг — он относительный
+    // связь a → b: двигаем получателя, изломы стоят на месте
+    const bPos = m.nodes.find((n) => n.id === "b")!.idef0_layout!;
+    expect(route(moveFunction(m, "b", bPos.x + 50, bPos.y), "b", "link:d1")).toEqual(route(m, "b", "link:d1"));
+    // перенос на то же место ничего не меняет и не создаёт новой модели маршрутов
+    expect(route(moveFunction(m, "c", pos.x, pos.y), "c", "input:d2")).toEqual(before);
+  });
+
+  it("перенос группы: связь внутри группы едет целиком, связь с блоком вне группы — нет", () => {
+    const m = routed();
+    const link = route(m, "b", "link:d1")!;
+    expect(link.points!.length).toBeGreaterThan(0);
+    const both = moveGroup(m, null, ["a", "b"], 80, 20); // источник a и получатель b едут вместе
+    expect(route(both, "b", "link:d1")!.points).toEqual(link.points!.map(([x, y]) => [x + 80, y + 20]));
+    const onlyB = moveGroup(m, null, ["b", "c"], 80, 20); // источник a остаётся
+    expect(route(onlyB, "b", "link:d1")!.points).toEqual(link.points);
+    expect(route(onlyB, "c", "input:d2")!.end![0]).toBe(route(m, "c", "input:d2")!.end![0] + 80);
+  });
+
+  it("копия блока: внешние стрелки едут с копией, связи с другими функциями сбрасываются; у оригинала всё на месте", () => {
+    const m = routed();
+    const frag = copyFragment(m, null, ["c", "b"])!;
+    const pasted = pasteFragment(m, null, frag, 100, 60);
+    const [copyC, copyB] = [pasted.model.nodes.find((n) => n.id === pasted.ids[frag.nodes.findIndex((n) => n.id === "c")])!, pasted.model.nodes.find((n) => n.id === pasted.ids[frag.nodes.findIndex((n) => n.id === "b")])!];
+    const orig = route(m, "c", "input:d2")!.end!;
+    const posC = m.nodes.find((n) => n.id === "c")!.idef0_layout!;
+    const dx = copyC.idef0_layout!.x - posC.x;
+    const dy = copyC.idef0_layout!.y - posC.y;
+    expect(copyC.arrow_routes!["input:d2"].end).toEqual([orig[0] + dx, orig[1] + dy]);
+    expect(copyB.arrow_routes?.["link:d1"]).toBeUndefined();
+    expect(route(pasted.model, "c", "input:d2")!.end).toEqual(orig); // оригинал не тронут
+  });
+
+  it("дублирование блока: то же правило, смещение (40, 40)", () => {
+    const m = routed();
+    const orig = route(m, "c", "input:d2")!.end!;
+    const dup = duplicateNode(m, "c");
+    const copy = dup.model.nodes.find((n) => n.id === dup.id)!;
+    expect(copy.arrow_routes!["input:d2"].end).toEqual([orig[0] + 40, orig[1] + 40]);
+    expect(route(dup.model, "c", "input:d2")!.end).toEqual(orig);
+  });
+
+  it("shiftRoutes и routesForCopy: без маршрутов и при нулевом сдвиге возвращают тот же узел", () => {
+    const m = routed();
+    const a = m.nodes.find((n) => n.id === "a")!;
+    expect(shiftRoutes(a, 10, 10)).toBe(a);
+    const c = m.nodes.find((n) => n.id === "c")!;
+    expect(shiftRoutes(c, 0, 0)).toBe(c);
+    expect(routesForCopy(a, 5, 5)).toBe(a);
   });
 });

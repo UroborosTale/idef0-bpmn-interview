@@ -228,7 +228,7 @@ export function syncLinkedEntries(obj: RepoObject): { updated: number; skipped: 
  * Слияние дублей: записи всех моделей, связанные с `fromId`, переходят на `intoId`; название и синонимы
  * исходного объекта становятся синонимами целевого, исходный объект удаляется.
  */
-export function mergeObjects(fromId: string, intoId: string): { object: RepoObject; relinked: number; skipped: number } {
+export function mergeObjects(fromId: string, intoId: string): { object: RepoObject; relinked: number; skipped: number; duplicated: number } {
   const from = getObject(fromId);
   const into = getObject(intoId);
   if (!from || !into) throw new Error("Объект не найден");
@@ -244,6 +244,11 @@ export function mergeObjects(fromId: string, intoId: string): { object: RepoObje
   db.prepare(`DELETE FROM repo_objects WHERE id = ?`).run(fromId);
   // записи, перешедшие к целевому объекту, получают его название и карточку (утверждённые версии не меняются)
   const sync = syncLinkedEntries(merged);
-  logAudit(null, "analyst", "repository_merge", { fromId, intoId, relinked });
-  return { object: getObject(intoId)!, relinked, skipped: sync.skipped };
+  // в одной модели могли быть обе записи (например, два исполнителя-дубля): теперь у них одно название при разных id — это нужно объединить
+  // в самой модели вручную (шаги ссылаются на запись по id), поэтому считаем такие процессы и сообщаем
+  const perSession = new Map<string, number>();
+  for (const e of linkedEntries(intoId).get(intoId) ?? []) perSession.set(e.sessionId, (perSession.get(e.sessionId) ?? 0) + 1);
+  const duplicated = [...perSession.values()].filter((n) => n > 1).length;
+  logAudit(null, "analyst", "repository_merge", { fromId, intoId, relinked, duplicated });
+  return { object: getObject(intoId)!, relinked, skipped: sync.skipped, duplicated };
 }

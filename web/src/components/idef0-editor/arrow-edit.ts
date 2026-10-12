@@ -1,7 +1,7 @@
-import type { ArrowRoute, ProcessLogicModel } from "../../types";
+import type { ArrowRoute, ProcessLogicModel, ProcessNode } from "../../types";
 import { ARROW_DIRS, FREE_END, MIN_FREE, PORT_SIDE, arrowRouteKey } from "@shared/idef0Layout";
 import { insertJog, interiorOf, moveCorner, moveSegment, nearestSegment, orthogonalPath, positionOnSide, type Pt } from "@shared/bpmnManual";
-import type { Arrow, Box } from "./geometry";
+import type { Arrow, ArrowKind, Box } from "./geometry";
 
 type M = ProcessLogicModel;
 
@@ -24,8 +24,9 @@ export const routeOf = (m: M, a: RouteArrow): ArrowRoute | undefined => m.nodes.
 
 const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const finPt = (p: unknown): p is [number, number] => Array.isArray(p) && p.length === 2 && fin(p[0]) && fin(p[1]);
-const half = (v: number) => Math.round(v * 2) / 2;
-const frac = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000));
+// + 0 превращает -0 в 0: в JSON они совпадают, а в памяти различались бы (модель после сохранения не равнялась бы себе)
+const half = (v: number) => Math.round(v * 2) / 2 + 0;
+const frac = (v: number) => Math.min(1, Math.max(0, Math.round(v * 1000) / 1000)) + 0;
 
 /** Маршрут в чистом виде: числа округлены и ограничены, нечисловое отброшено. null — ничего не задано. */
 function tidyRoute(r: ArrowRoute): ArrowRoute | null {
@@ -45,6 +46,10 @@ function tidyRoute(r: ArrowRoute): ArrowRoute | null {
  */
 export function setArrowRoute(m: M, a: RouteArrow, patch: { [K in keyof ArrowRoute]?: ArrowRoute[K] | undefined } | null): M {
   const key = arrowRouteKey(a.kind, a.entityId);
+  // ничего не изменилось — та же модель (иначе в историю попадает пустой шаг «Отменить»)
+  const prevRoute = m.nodes.find((n) => n.id === a.nodeId)?.arrow_routes?.[key];
+  const nextRoute = patch === null ? null : tidyRoute({ ...prevRoute, ...patch });
+  if (JSON.stringify(prevRoute ?? null) === JSON.stringify(nextRoute)) return m;
   return {
     ...m,
     nodes: m.nodes.map((n) => {
@@ -152,3 +157,45 @@ export const setFreeEnd = (m: M, a: RouteArrow, pt: Pt): M => setArrowRoute(m, a
 
 /** Подпись сдвинута на (dx, dy) от обычного места. */
 export const setLabelOffset = (m: M, a: RouteArrow, dx: number, dy: number): M => setArrowRoute(m, a, { label: [dx, dy] });
+
+// --- маршруты при переносе и копировании блоков ---
+
+const shifted = (r: ArrowRoute, dx: number, dy: number): ArrowRoute => ({
+  ...r,
+  ...(r.points ? { points: r.points.map(([x, y]) => [x + dx, y + dy] as [number, number]) } : {}),
+  ...(r.end ? { end: [r.end[0] + dx, r.end[1] + dy] as [number, number] } : {}),
+});
+
+const kindOfKey = (key: string) => key.split(":")[0] as ArrowKind;
+const entityOfKey = (key: string) => key.split(":").slice(1).join(":");
+
+/**
+ * Блок сдвинут на (dx, dy): маршруты его внешних стрелок (вход, управление, выход, механизм) едут вместе с ним — иначе свободный
+ * конец и изломы остались бы на старом месте. Связь с другой функцией сохраняет изломы (их положил пользователь), если источник не
+ * сдвинулся: followLink(сущность) — сдвинулся ли и он (перенос группы).
+ */
+export function shiftRoutes(n: ProcessNode, dx: number, dy: number, followLink: (entityId: string) => boolean = () => false): ProcessNode {
+  if (!n.arrow_routes || (dx === 0 && dy === 0)) return n;
+  let changed = false;
+  const out: Record<string, ArrowRoute> = {};
+  for (const [key, r] of Object.entries(n.arrow_routes)) {
+    const follows = FREE_END[kindOfKey(key)] !== undefined || followLink(entityOfKey(key));
+    if (follows && (r.points || r.end)) {
+      out[key] = shifted(r, dx, dy);
+      changed = true;
+    } else out[key] = r;
+  }
+  return changed ? { ...n, arrow_routes: out } : n;
+}
+
+/**
+ * Маршруты копии блока, перенесённой на (dx, dy): внешние стрелки едут с копией, связи с другими функциями сбрасываются
+ * (их источник остался на старом месте, автоматическая прокладка точнее чужих изломов).
+ */
+export function routesForCopy(n: ProcessNode, dx: number, dy: number): ProcessNode {
+  if (!n.arrow_routes) return n;
+  const kept = Object.entries(n.arrow_routes).filter(([key]) => FREE_END[kindOfKey(key)] !== undefined);
+  const { arrow_routes: _drop, ...rest } = n;
+  if (kept.length === 0) return rest;
+  return { ...rest, arrow_routes: Object.fromEntries(kept.map(([k, r]) => [k, shifted(r, dx, dy)])) };
+}

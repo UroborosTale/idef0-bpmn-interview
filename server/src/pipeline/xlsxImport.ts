@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import type { DataEntity, ProcessFlow, ProcessNode, Role, SystemEntity } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
 import { importedModel } from "./diagramImport.js";
+import { zipReader } from "../util/zipSafe.js";
 
 /**
  * Модель из таблицы Excel (.xlsx, ТЗ Р10 «перечень элементов → создание модели»): одна строка — один шаг.
@@ -56,7 +57,7 @@ export async function parseXlsx(buffer: Buffer): Promise<TableSheet[]> {
   } catch {
     throw new Error("Файл не открывается как .xlsx: нужна книга Excel 2007 и новее. Старый формат .xls сохраните как «Книга Excel (*.xlsx)».");
   }
-  const read = async (name: string) => (await zip.file(name)?.async("string")) ?? null;
+  const read = zipReader(zip);
   const workbook = await read("xl/workbook.xml");
   if (!workbook) throw new Error("В файле нет книги Excel (xl/workbook.xml) — это не .xlsx.");
 
@@ -256,8 +257,13 @@ export function buildModelFromTable(sheets: TableSheet[], meta: SessionMeta) {
   if (columns.has("next")) {
     for (const it of items) {
       for (const ref of parts(it.next)) {
-        // «5 (да)» или «Проверить заявку [нет]»
-        const m = /^(.*?)\s*[([]\s*(.+?)\s*[)\]]$/.exec(ref);
+        // сначала ссылка целиком: в названии шага могут быть скобки («Оплатить (частично)»); затем «5 (да)» или «Проверить заявку [нет]»
+        const whole = keys.get(norm(ref)) ?? byName.get(norm(ref));
+        if (whole) {
+          link(it, whole, null, `${sheet.name}, строка ${it.rowNo}`);
+          continue;
+        }
+        const m = /^(.*?)\s*[([]\s*([^()[\]]+?)\s*[)\]]$/.exec(ref);
         const [target, condition] = m ? [clean(m[1]), clean(m[2])] : [ref, null];
         const to = keys.get(norm(target)) ?? byName.get(norm(target));
         if (!to) warnings.push(`Строка ${it.rowNo}: следующий шаг «${target}» не найден ни по номеру, ни по названию — связь пропущена.`);

@@ -1,4 +1,5 @@
 import { MIN_DIAGRAM_W, clampDiagramWidth, clampLaneHeight } from "@shared/bpmnGeometry";
+import { routesForCopy } from "../idef0-editor/arrow-edit";
 import { allowedTriggers, eventSpec, withTrigger, type EventPosition, type EventTrigger, type TriggerType } from "@shared/events";
 import type { ExternalPool, FlowRoute, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import { LANE_H, MIN_LANE_H, boxMap, boxOf, clampIntoLane, contentWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, triggerView, visibleNodes, type Pt } from "./geometry";
@@ -196,7 +197,9 @@ export function duplicateNode(m: M, id: string): OpResult {
     status: "confirmed",
     confidence: 1,
   };
-  const next = { ...m, nodes: [...m.nodes, copy] };
+  // маршруты стрелок IDEF0: у копии, сдвинутой на (40, 40), внешние стрелки едут вместе с ней, связи с другими функциями — автоматические
+  const placed = n.idef0_layout ? routesForCopy(copy, 40, 40) : copy;
+  const next = { ...m, nodes: [...m.nodes, placed] };
   return { model: n.layout ? dropNodeIntoLane(next, copy.id) : next, id: copy.id };
 }
 
