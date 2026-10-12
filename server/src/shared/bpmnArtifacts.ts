@@ -30,6 +30,8 @@ export interface ArtMessage {
   from: string;
   to: string;
   name?: string | null;
+  /** Ручной маршрут стрелки (как у потока управления): точки излома и положение участков. */
+  route?: { from_side?: "L" | "R" | "T" | "B"; to_side?: "L" | "R" | "T" | "B"; channel?: number; from_pos?: number; to_pos?: number; points?: Pt[] } | null;
 }
 
 const isHostType = (type: string) => type === "task" || type === "subprocess";

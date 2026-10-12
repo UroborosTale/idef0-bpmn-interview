@@ -318,7 +318,7 @@ export function diagramLayout(m: ProcessLogicModel) {
   const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
   const info = routeFlowsDetailed(
     [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
-    [...flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true }))],
+    [...flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true, fixed: fixedRoute(message.route) }))],
     extras.artifacts.map(artifactObstacle)
   );
   const routes = new Map([...info].map(([id, r]) => [id, r.pts] as const));

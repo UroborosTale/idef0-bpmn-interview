@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { session, structuredModel } from "../../test/fixtures";
 import { commit, field, renderWithModel } from "../../test/harness";
@@ -409,6 +409,25 @@ describe("студия: новые элементы на диаграмме оп
       expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Поток сообщений/);
       fireEvent.keyDown(document.querySelector(".bpe-root") ?? svgEl(), { key: "Delete" });
       expect(document.querySelector("[data-message-id]")).toBeNull();
+    });
+
+    it("поток сообщений к пулу: ручки отрезка и излома, ручной маршрут сохраняется в потоке, «Сбросить маршрут» возвращает автоматический", () => {
+      studio(withPool());
+      fireEvent.pointerDown(document.querySelector("[data-message-id]")!, { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 1 });
+      const bar = () => screen.getByRole("toolbar", { name: "Действия с потоком сообщений" });
+      expect(bar().textContent).toContain("Маршрут автоматический");
+      expect(document.querySelector('[data-flow-handle="from"]')).toBeNull(); // концы стоят на шаге и пуле — не тянутся
+      fireEvent.click(screen.getByText("Добавить излом"));
+      expect(bar().textContent).toContain("Маршрут задан вручную");
+      expect(document.querySelectorAll('[data-flow-handle^="corner:"]').length).toBeGreaterThan(0);
+      const seg = document.querySelector('[data-flow-handle^="seg:"]')!;
+      fireEvent.pointerDown(seg, { button: 0, pointerId: 2, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(svgEl(), { pointerId: 2, clientX: 160, clientY: 150 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 2, clientX: 160, clientY: 150 });
+      fireEvent.click(within(bar()).getByText("Сбросить маршрут"));
+      expect(bar().textContent).toContain("Маршрут автоматический");
+      expect(document.querySelectorAll('[data-flow-handle^="corner:"]').length).toBe(0);
     });
 
     it("поток сообщений переименовывается двойным щелчком по линии", () => {

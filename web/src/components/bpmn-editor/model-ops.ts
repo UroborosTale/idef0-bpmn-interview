@@ -262,6 +262,11 @@ export function reverseRoute(r: FlowRoute | null | undefined): FlowRoute | null 
 
 /** Ручной маршрут стрелки: заданные поля меняются, undefined — снимается (сторона или канал снова подбираются автоматически); null — весь маршрут автоматический. */
 export function setFlowRoute(m: M, id: string, patch: { [K in keyof FlowRoute]?: FlowRoute[K] | undefined } | null): M {
+  // маршрут потока сообщений ("msg:<id>") хранится в самом потоке и правится теми же операциями, что и маршрут потока управления
+  if (id.startsWith("msg:")) {
+    const mid = id.slice(4);
+    return { ...m, messages: (m.messages ?? []).map((x) => (x.id === mid ? { ...x, route: patch === null ? null : cleanRoute({ ...(x.route ?? {}), ...patch }) } : x)) };
+  }
   return { ...m, flows: m.flows.map((f) => (f.id === id ? { ...f, route: patch === null ? null : cleanRoute({ ...(f.route ?? {}), ...patch }) } : f)) };
 }
 

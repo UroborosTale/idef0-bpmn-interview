@@ -137,6 +137,21 @@ describe("элементы BPMN по Соглашению: генерация", 
     expect(diagram.messages[1].points[0][1]).toBe(pool.y);
   });
 
+  it("ручной маршрут потока сообщений: линия идёт через заданную точку излома, остальные потоки не меняются", async () => {
+    const m = structuredModel();
+    m.pools.push({ id: "x1", name: "Поставщики" });
+    m.messages.push({ id: "m1", from: "b2", to: "x1", name: "Запрос" }, { id: "m2", from: "x1", to: "b1", name: "Ответ" });
+    const auto = (await generateBpmn(m, "o1")).diagram;
+    const pool = auto.pools[0];
+    const mid: [number, number] = [pool.x + pool.w / 2 + 137, pool.y - 61];
+    m.messages[0].route = { points: [mid] };
+    const manual = (await generateBpmn(m, "o1")).diagram;
+    expect(manual.messages[0].points.some((p) => Math.abs(p[0] - mid[0]) < 1 && Math.abs(p[1] - mid[1]) < 1)).toBe(true);
+    expect(auto.messages[0].points.some((p) => Math.abs(p[0] - mid[0]) < 1 && Math.abs(p[1] - mid[1]) < 1)).toBe(false);
+    expect(manual.messages[1].points).toEqual(auto.messages[1].points);
+    expect(manual.messages[0].points.at(-1)![1]).toBe(pool.y); // по-прежнему приходит на верхнюю границу пула
+  });
+
   it("пул без потоков сообщений и поток к шагу другой диаграммы не попадают на диаграмму", async () => {
     const m = structuredModel();
     m.pools.push({ id: "x1", name: "Внешний участник" }, { id: "x2", name: "Ещё один" });

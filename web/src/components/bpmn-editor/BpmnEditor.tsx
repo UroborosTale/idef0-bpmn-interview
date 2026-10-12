@@ -132,6 +132,9 @@ export default function BpmnEditor({
       ? sel
       : null;
 
+  /** Выбранная стрелка с ручками: поток управления (его id) или поток сообщений ("msg:<id>"). */
+  const routedId = curSel?.kind === "flow" ? curSel.id : curSel?.kind === "message" ? `msg:${curSel.id}` : null;
+
   const groupIds = multi.filter(nodeExists);
   const inGroup = groupIds.length >= 2;
   /** Что сейчас выделено: группа, одна фигура или ничего. */
@@ -213,18 +216,19 @@ export default function BpmnEditor({
       return;
     }
 
-    if (handleEl && e.button === 0 && curSel?.kind === "flow") {
+    if (handleEl && e.button === 0 && routedId) {
       // ручки выбранной стрелки: концы переносят на другую сторону или фигуру (и вдоль стороны), отрезки и изломы двигают свободно
+      // (у потока сообщений концы стоят на шаге и пуле, поэтому тянутся только отрезки и изломы)
       const kind = handleEl.getAttribute("data-flow-handle")!;
-      const g = flowGeometry(curSel.id);
+      const g = flowGeometry(routedId);
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       if (kind.startsWith("seg:") && g) {
         const i = Number(kind.slice(4));
-        dragRef.current = { kind: "flowSeg", id: curSel.id, i, axis: Math.abs(g.poly[i][1] - g.poly[i + 1][1]) < 0.5 ? "y" : "x", g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
+        dragRef.current = { kind: "flowSeg", id: routedId, i, axis: Math.abs(g.poly[i][1] - g.poly[i + 1][1]) < 0.5 ? "y" : "x", g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
       } else if (kind.startsWith("corner:") && g) {
         const i = Number(kind.slice(7));
-        dragRef.current = { kind: "flowCorner", id: curSel.id, i, v: g.poly[i], g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
-      } else if (kind === "from" || kind === "to") {
+        dragRef.current = { kind: "flowCorner", id: routedId, i, v: g.poly[i], g, startModel: draftRef.current, moved: false, x0: wx, y0: wy };
+      } else if ((kind === "from" || kind === "to") && curSel?.kind === "flow") {
         dragRef.current = { kind: "flowEnd", id: curSel.id, end: kind };
         setFlowGhost({ id: curSel.id, end: kind, pt: [wx, wy], target: null, side: null, pos: null });
       } else return;
@@ -544,9 +548,9 @@ export default function BpmnEditor({
     const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
     const at = toWorld(e.clientX, e.clientY);
     const handle = t.closest("[data-flow-handle]")?.getAttribute("data-flow-handle");
-    if (curSel?.kind === "flow" && handle?.startsWith("corner:")) {
-      const g = flowGeometry(curSel.id);
-      if (g) commit(removeBend(viewRef.current, curSel.id, g, Number(handle.slice(7))));
+    if (routedId && handle?.startsWith("corner:")) {
+      const g = flowGeometry(routedId);
+      if (g) commit(removeBend(viewRef.current, routedId, g, Number(handle.slice(7))));
       return;
     }
     // ручка отрезка — часть линии: двойной щелчок по ней то же, что по самой выбранной стрелке
@@ -556,9 +560,15 @@ export default function BpmnEditor({
       setEditSpot({ kind: "pool", id: poolId, at });
       return;
     }
-    const messageId = handle ? null : t.closest("[data-message-id]")?.getAttribute("data-message-id");
+    const messageId = handle ? (curSel?.kind === "message" ? curSel.id : null) : t.closest("[data-message-id]")?.getAttribute("data-message-id");
     if (messageId) {
-      setEditSpot({ kind: "message", id: messageId, at });
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl + двойной щелчок по линии потока сообщений — новый излом, как у потока управления
+        const g = flowGeometry(`msg:${messageId}`);
+        const next = g ? addBend(viewRef.current, `msg:${messageId}`, g, at) : viewRef.current;
+        if (next === viewRef.current) showHint("Здесь не получится: отрезок слишком короткий для излома");
+        else commit(next);
+      } else setEditSpot({ kind: "message", id: messageId, at });
       return;
     }
     const artifactEl = handle ? null : t.closest("[data-artifact]");
@@ -900,10 +910,10 @@ export default function BpmnEditor({
 
               <LaneResizeHandles model={draft} width={W} activeLane={resizingLane} stretching={stretching} />
 
-              {curSel?.kind === "flow" &&
+              {routedId &&
                 (() => {
                   // ручки выбранной стрелки: концы (на другую сторону или фигуру, вдоль стороны), отрезки (сдвинуть поперёк) и изломы (перенести)
-                  const g = flowGeometry(curSel.id);
+                  const g = flowGeometry(routedId);
                   if (!g) return null;
                   const pts = g.poly;
                   const stroke = "#4338ca";
@@ -925,12 +935,12 @@ export default function BpmnEditor({
                           <title>Потяните излом куда нужно; двойной щелчок — убрать излом</title>
                         </rect>
                       ))}
-                      <circle data-flow-handle="from" cx={pts[0][0]} cy={pts[0][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
+                      {curSel?.kind === "flow" && <circle data-flow-handle="from" cx={pts[0][0]} cy={pts[0][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
                         <title>Потяните конец на другую сторону фигуры или на другую фигуру</title>
-                      </circle>
-                      <circle data-flow-handle="to" cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
+                      </circle>}
+                      {curSel?.kind === "flow" && <circle data-flow-handle="to" cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r={6} fill="#fff" stroke={stroke} strokeWidth={2} style={{ cursor: "grab" }}>
                         <title>Потяните конец на другую сторону фигуры или на другую фигуру</title>
-                      </circle>
+                      </circle>}
                     </g>
                   );
                 })()}
@@ -1142,6 +1152,35 @@ export default function BpmnEditor({
                     Удалить
                   </button>
                   <span className="muted">● — конец (на другую сторону, фигуру или вдоль стороны) · ▮ — сдвинуть участок · ■ — перенести излом · Ctrl + двойной щелчок по линии — новый излом, двойной щелчок по излому — убрать, по линии без Ctrl — править условие · розовая линия — выравнивание, к ней прилипает (Alt — без привязки)</span>
+                </div>
+              );
+            })()}
+          {curSel?.kind === "message" &&
+            (() => {
+              const msg = (draft.messages ?? []).find((x) => x.id === curSel.id);
+              if (!msg) return null;
+              const rid = `msg:${msg.id}`;
+              return (
+                <div className="bpe-selbar" role="toolbar" aria-label="Действия с потоком сообщений">
+                  <span className="muted">{msg.route ? "Маршрут задан вручную" : "Маршрут автоматический"}</span>
+                  <button
+                    onClick={() => {
+                      const g = flowGeometry(rid);
+                      const next = g ? addBend(draft, rid, g) : draft;
+                      if (next === draft) showHint("Нет отрезка, на котором можно добавить излом");
+                      else commit(next);
+                    }}
+                    title="Добавить ступеньку на самом длинном отрезке — её можно потянуть (то же: Ctrl + двойной щелчок по линии)"
+                  >
+                    Добавить излом
+                  </button>
+                  <button disabled={!msg.route} onClick={() => commit(setFlowRoute(draft, rid, null))} title="Вернуть автоматическую прокладку этой стрелки">
+                    Сбросить маршрут
+                  </button>
+                  <button onClick={() => h.commit(deleteMessage(draftRef.current, msg.id)) && setSel(null)} title="Удалить поток сообщений (Delete)">
+                    Удалить
+                  </button>
+                  <span className="muted">▮ — сдвинуть участок · ■ — перенести излом · двойной щелчок по излому — убрать, по линии — переименовать</span>
                 </div>
               );
             })()}

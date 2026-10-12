@@ -155,6 +155,8 @@ export interface ExternalPool {
 /** Поток сообщений между шагом диаграммы и внешним пулом (from/to — id узла и id пула). */
 export interface MessageFlow {
   id: string;
+  /** Ручной маршрут стрелки (точки излома и положение участков). */
+  route?: FlowRoute | null;
   from: string;
   to: string;
   name?: string | null;

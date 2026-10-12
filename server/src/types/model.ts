@@ -185,15 +185,6 @@ export const ExternalPool = z.object({
 });
 export type ExternalPool = z.infer<typeof ExternalPool>;
 
-// Поток сообщений между шагом диаграммы и внешним пулом: from/to — id узла и id пула (в любом порядке).
-export const MessageFlow = z.object({
-  id: z.string(),
-  from: z.string(),
-  to: z.string(),
-  name: z.string().nullable().optional(),
-});
-export type MessageFlow = z.infer<typeof MessageFlow>;
-
 // Ручной маршрут стрелки: стороны выхода и входа, положение конца на стороне, положение среднего участка (x или y в координатах
 // диаграммы) и свободные точки излома. Всё необязательно; чего нет — выбирает автоматическая прокладка (shared/bpmnRouting.ts).
 export const FlowRoute = z.object({
@@ -206,6 +197,17 @@ export const FlowRoute = z.object({
   // Внутренние точки излома (координаты диаграммы) от выхода ко входу: линия идёт строго через них, недостающие колена достраиваются.
   points: z.array(z.tuple([z.number(), z.number()])).max(64).optional(),
 });
+
+// Поток сообщений между шагом диаграммы и внешним пулом: from/to — id узла и id пула (в любом порядке).
+export const MessageFlow = z.object({
+  id: z.string(),
+  // Ручной маршрут стрелки (точки излома и положение участков), как у потока управления; без него прокладка автоматическая.
+  route: FlowRoute.nullable().optional(),
+  from: z.string(),
+  to: z.string(),
+  name: z.string().nullable().optional(),
+});
+export type MessageFlow = z.infer<typeof MessageFlow>;
 
 export const ProcessFlow = z.object({
   id: z.string(),

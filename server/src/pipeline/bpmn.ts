@@ -282,7 +282,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     // нижние стороны шагов и вытесняют обычные стрелки — без них подбор оценивал бы не ту прокладку, которая получится
     const poolsTop = 40 + Math.max(START_Y + laneHeights.reduce((s, h) => s + h, 0) + 40, 120) + 20 + 50;
     const pools: RouteNode[] = [...poolBoxes(view.pools ?? [], messages, hb, poolsTop)].map(([id, box]) => ({ id: `Pool_${id}`, type: "pool", box }));
-    const extraFlows = pools.length === 0 ? [] : messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true }));
+    const extraFlows = pools.length === 0 ? [] : messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true, fixed: fixedRoute(m.route) }));
     return { obstacles: arts.map(artifactObstacle), withArtifacts: new Set(arts.filter((a) => !isStoreArtifact(a)).map((a) => nodeIdOf(a.nodeId))), withStores: new Set(arts.filter(isStoreArtifact).map((a) => nodeIdOf(a.nodeId))), extraNodes: [...extraNodes, ...pools], extraFlows };
   };
   const layout = await layoutLayered(layoutNodes, layoutEdges, laneHeights, layoutExtras);
@@ -485,7 +485,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     }),
     ...[...poolRects].map(([id, r]) => ({ id: `Pool_${id}`, box: r, type: "pool" })),
   ];
-  const messageFlows = messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true }));
+  const messageFlows = messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true, fixed: fixedRoute(m.route) }));
   const routed = routeFlows(
     routeNodes,
     // ручной маршрут стрелки учитывается и в XML — кроме стрелок к свёрнутым событиям: их стороны заданы для диаграммы без события
