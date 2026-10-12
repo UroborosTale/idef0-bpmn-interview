@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { artifactsOf } from "../src/shared/bpmnArtifacts.js";
+import { artifactsOf, messageEdges, poolBoxes } from "../src/shared/bpmnArtifacts.js";
 
 const names = { data: new Map([["d1", "Заявка"]]), systems: new Map([["s1", "1С"]]) };
 const node = (extra = {}) => ({ id: "t", type: "task", inputs: ["d1"], outputs: [], system_ids: ["s1"], ...extra });
@@ -20,5 +20,27 @@ describe("значки документов: ручное смещение", () 
     expect(end[0]).toBe(200); // левая сторона задачи
     expect(end[1]).toBeGreaterThanOrEqual(100);
     expect(end[1]).toBeLessThanOrEqual(160);
+  });
+});
+
+describe("значки и пулы едут вместе с задачами", () => {
+  it("смещение значка хранится относительно задачи: при сдвиге задачи (в том числе группой) значок с его ручным смещением сдвигается на столько же", () => {
+    const n = node({ artifact_offsets: { "input:d1": { dx: 40, dy: -10 } } });
+    const at = (x: number, y: number) => artifactsOf([n], new Map([["t", { x, y, w: 100, h: 60 }]]), names);
+    const [a, b] = [at(200, 100), at(500, 340)];
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i].box.x - a[i].box.x).toBe(300);
+      expect(b[i].box.y - a[i].box.y).toBe(240);
+    }
+  });
+
+  it("пул со своим смещением следует за шагом, к которому привязан: ручное смещение остаётся относительным", () => {
+    const msgs = [{ id: "m", from: "t", to: "p" }];
+    const pools = [{ id: "p", name: "Поставщики", dx: 70, dy: 25 }];
+    const one = poolBoxes(pools, msgs, new Map([["t", { x: 200, y: 100, w: 100, h: 60 }]]), 400).get("p")!;
+    const two = poolBoxes(pools, msgs, new Map([["t", { x: 500, y: 100, w: 100, h: 60 }]]), 400).get("p")!;
+    expect(two.x - one.x).toBe(300);
+    expect(two.y).toBe(one.y);
+    expect(messageEdges(msgs, new Map([["t", { x: 500, y: 100, w: 100, h: 60 }]]), new Map([["p", two]]))[0].points.at(-1)![0]).toBe(two.x + two.w / 2);
   });
 });
