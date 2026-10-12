@@ -150,7 +150,8 @@ authRouter.post("/auth/logout", (req, res) => {
 /** Базовые заголовки безопасности для ответов API. */
 export function securityHeaders(_req: Request, res: Response, next: NextFunction) {
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "DENY");
+  // SAMEORIGIN: предпросмотр регламента встроен в страницу приложения через iframe (тот же источник); чужим сайтам встраивание по-прежнему закрыто
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Referrer-Policy", "same-origin");
   next();
 }

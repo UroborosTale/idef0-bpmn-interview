@@ -52,6 +52,12 @@ describe("вход", () => {
     app.resetCookie();
   });
 
+  it("заголовки безопасности: встраивание в iframe только со своего источника (предпросмотр регламента), sniffing запрещён", async () => {
+    const r = await fetch(`${app.url}/api/health`);
+    expect(r.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+
   it("перебор паролей ограничен", async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 12; i++) statuses.push((await app.call("POST", "/auth/login", { login: "owner", password: "x" })).status);
