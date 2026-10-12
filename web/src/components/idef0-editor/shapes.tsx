@@ -26,10 +26,10 @@ export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean })
       {grid && (
         <g data-frame-grid pointerEvents="none">
           {geo.gridXs.map((l) => (
-            <line key={`x${l.at}`} x1={l.at} y1={0} x2={l.at} y2={footer.y} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+            <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
           ))}
           {geo.gridYs.map((l) => (
-            <line key={`y${l.at}`} x1={0} y1={l.at} x2={sheet.w} y2={l.at} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+            <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
           ))}
         </g>
       )}

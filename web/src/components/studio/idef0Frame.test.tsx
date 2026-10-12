@@ -103,6 +103,34 @@ describe("IDEF0: рамка листа и сетка", () => {
     expect(rect()).toEqual([x0, y0, w0, h0]);
   });
 
+  it("сетка заполняет весь лист после растягивания вверх, влево и вправо: линии идут от края до края", () => {
+    open();
+    const svg = document.querySelector(".studio svg.bpe-svg")!;
+    const drag = (id: string, dx: number, dy: number) => {
+      fireEvent.pointerDown(document.querySelector(`.studio [data-frame-resize="${id}"]`)!, { button: 0, pointerId: 7, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(svg, { pointerId: 7, clientX: 100 + dx, clientY: 100 + dy });
+      fireEvent.pointerUp(svg, { pointerId: 7, clientX: 100 + dx, clientY: 100 + dy });
+    };
+    drag("n", 0, -120);
+    drag("w", -140, 0);
+    drag("e", 220, 0);
+    const outer = [...document.querySelectorAll(".studio [data-frame] > rect")].find((r) => r.getAttribute("fill") === "none")!;
+    const [x, y, w, h] = ["x", "y", "width", "height"].map((a) => Number(outer.getAttribute(a)));
+    const lines = [...document.querySelectorAll(".studio [data-frame-grid] line")];
+    const vertical = lines.filter((l) => l.getAttribute("x1") === l.getAttribute("x2"));
+    const horizontal = lines.filter((l) => l.getAttribute("y1") === l.getAttribute("y2"));
+    expect(vertical.length).toBeGreaterThan(0);
+    expect(horizontal.length).toBeGreaterThan(0);
+    for (const l of vertical) {
+      expect(Number(l.getAttribute("y1"))).toBe(y); // от верхнего края листа
+      expect(Number(l.getAttribute("y2"))).toBe(y + h - 30); // до штампа
+    }
+    for (const l of horizontal) {
+      expect(Number(l.getAttribute("x1"))).toBe(x); // от левого края листа
+      expect(Number(l.getAttribute("x2"))).toBe(x + w); // до правого
+    }
+  });
+
   it("лист не сжимается меньше минимального размера", () => {
     open();
     const svg = document.querySelector(".studio svg.bpe-svg")!;
