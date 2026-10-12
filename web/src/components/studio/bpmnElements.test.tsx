@@ -299,6 +299,23 @@ describe("студия: новые элементы на диаграмме оп
     expect(document.querySelector(".studio")!.textContent).toContain("Заявка v2");
   });
 
+  it("значок документа можно перетащить: он смещается, задача остаётся на месте, отмена возвращает значок", () => {
+    const m = structuredModel();
+    m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
+    studio(m);
+    const icon = () => document.querySelector('[data-artifact-kind="input"]')!;
+    const spot = () => icon().querySelector("g path")!.getAttribute("d");
+    const task = () => document.querySelector('.studio g[data-node-id="b1"] rect')!.getAttribute("x");
+    const [before, taskBefore] = [spot(), task()];
+    fireEvent.pointerDown(icon(), { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(document.querySelector(".studio svg.bpe-svg")!, { pointerId: 1, clientX: 160, clientY: 130 });
+    fireEvent.pointerUp(document.querySelector(".studio svg.bpe-svg")!, { pointerId: 1, clientX: 160, clientY: 130 });
+    expect(spot()).not.toBe(before);
+    expect(task()).toBe(taskBefore);
+    fireEvent.keyDown(document.querySelector(".studio .bpe-root, .studio")!, { key: "z", ctrlKey: true });
+    expect(spot()).toBe(before);
+  });
+
   it("ArtifactShape: подсказка с названием и видом, у хранилища нет стрелки", () => {
     const art = { key: "k", nodeId: "t", kind: "store" as const, entityId: "s", name: "ELMA365", box: { x: 0, y: 0, w: 22, h: 26 }, edge: [[11, 26], [11, 40]] as [number, number][] };
     const { container } = render(

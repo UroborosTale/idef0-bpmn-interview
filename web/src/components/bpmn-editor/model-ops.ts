@@ -145,6 +145,19 @@ export function setNodeType(m: M, id: string, type: ProcessNode["type"]): M {
 
 export const updateNode = (m: M, id: string, patch: Partial<ProcessNode>): M => mapNode(m, id, (n) => ({ ...n, ...patch }));
 
+/** Ручное смещение значка документа или хранилища у задачи (null или почти нулевое — вернуть на автоматическое место). */
+export function setArtifactOffset(m: M, nodeId: string, key: string, off: { dx: number; dy: number } | null): M {
+  const n = m.nodes.find((x) => x.id === nodeId);
+  if (!n) return m;
+  const rounded = off && (Math.abs(off.dx) >= 1 || Math.abs(off.dy) >= 1) ? { dx: Math.round(off.dx), dy: Math.round(off.dy) } : null;
+  const cur = n.artifact_offsets?.[key];
+  if ((cur?.dx ?? null) === (rounded?.dx ?? null) && (cur?.dy ?? null) === (rounded?.dy ?? null)) return m;
+  const next = { ...(n.artifact_offsets ?? {}) };
+  if (rounded) next[key] = rounded;
+  else delete next[key];
+  return updateNode(m, nodeId, { artifact_offsets: Object.keys(next).length ? next : undefined });
+}
+
 /** Вложенные функции IDEF0 (на любую глубину) принадлежат родителю и удаляются вместе с ним. */
 function subtreeIds(m: M, id: string): Set<string> {
   const ids = new Set([id]);

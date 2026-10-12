@@ -181,7 +181,7 @@ export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; s
   const d = a.edge.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const arrow = a.kind === "store" ? undefined : "url(#bpe-arrow-thin)";
   return (
-    <g data-artifact={a.nodeId} data-artifact-kind={a.kind} data-artifact-entity={a.entityId} style={{ cursor: "pointer" }}>
+    <g data-artifact={a.nodeId} data-artifact-kind={a.kind} data-artifact-entity={a.entityId} style={{ cursor: "move" }}>
       <title>{`${a.kind === "input" ? "Входной документ" : a.kind === "output" ? "Выходной документ" : "Хранилище данных"}: ${a.name}`}</title>
       <path d={d} fill="none" stroke={GREY} strokeWidth={1} strokeDasharray="2 2" markerEnd={arrow} />
       {selected && <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={3} fill="none" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="3 2" pointerEvents="none" />}

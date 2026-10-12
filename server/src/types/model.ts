@@ -156,6 +156,8 @@ export const ProcessNode = z.object({
   idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   // Ручные маршруты стрелок IDEF0, привязанных к этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1, system:s1…).
   arrow_routes: z.record(z.string(), ArrowRoute).optional(),
+  // Ручное смещение значков документов и хранилищ BPMN от автоматического места у задачи: ключ «вид:сущность» (input:d1, output:d2, store:s1).
+  artifact_offsets: z.record(z.string(), z.object({ dx: z.number().min(-5000).max(5000), dy: z.number().min(-5000).max(5000) })).optional(),
   status: z.enum(["confirmed", "hypothesis"]).default("hypothesis"),
   confidence: z.number().min(0).max(1).default(0.5),
   source: z.array(SourceRef).default([]),

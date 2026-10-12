@@ -103,6 +103,8 @@ export interface ProcessNode {
   idef0_layout?: { x: number; y: number } | null;
   /** Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность». */
   arrow_routes?: Record<string, ArrowRoute>;
+  /** Ручное смещение значков документов и хранилищ BPMN от автоматического места: ключ «вид:сущность». */
+  artifact_offsets?: Record<string, { dx: number; dy: number }>;
   note?: string;
   status: "confirmed" | "hypothesis";
   confidence: number;

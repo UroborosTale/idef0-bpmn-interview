@@ -13,6 +13,8 @@ export interface ArtNode {
   inputs: string[];
   outputs: string[];
   system_ids: string[];
+  /** Ручное смещение значков от автоматического места: ключ «вид:сущность». */
+  artifact_offsets?: Record<string, { dx: number; dy: number }>;
 }
 
 export interface ArtPool {
@@ -138,11 +140,25 @@ export function artifactsOf(
         let x = Math.max(left + i * step, prev + step);
         if (below && msg && x < msg[1] && x + ARTIFACT_W > msg[0]) x = msg[1];
         prev = x;
-        const box = { x, y: below ? host.y + host.h + ARTIFACT_GAP : host.y - ARTIFACT_GAP - ARTIFACT_H, w: ARTIFACT_W, h: ARTIFACT_H };
+        const auto = { x, y: below ? host.y + host.h + ARTIFACT_GAP : host.y - ARTIFACT_GAP - ARTIFACT_H, w: ARTIFACT_W, h: ARTIFACT_H };
+        const off = n.artifact_offsets?.[`${it.kind}:${it.entityId}`];
+        const box = off ? { ...auto, x: auto.x + off.dx, y: auto.y + off.dy } : auto;
         const cx = box.x + box.w / 2;
-        const tx = Math.min(Math.max(cx, host.x + 10), host.x + host.w - 10);
-        const onTask: Pt = [tx, below ? host.y + host.h : host.y];
-        const onIcon: Pt = [cx, below ? box.y : box.y + box.h];
+        const cy = box.y + box.h / 2;
+        let onTask: Pt;
+        let onIcon: Pt;
+        if (!off || cy < host.y || cy > host.y + host.h) {
+          // значок над задачей или под ней: ассоциация идёт к верхней или нижней стороне
+          const underTask = off ? cy > host.y + host.h : below;
+          const tx = Math.min(Math.max(cx, host.x + 10), host.x + host.w - 10);
+          onTask = [tx, underTask ? host.y + host.h : host.y];
+          onIcon = [cx, underTask ? box.y : box.y + box.h];
+        } else {
+          // значок сбоку от задачи: ассоциация идёт к левой или правой стороне
+          const left = cx < host.x + host.w / 2;
+          onTask = [left ? host.x : host.x + host.w, Math.min(Math.max(cy, host.y + 10), host.y + host.h - 10)];
+          onIcon = [left ? box.x + box.w : box.x, cy];
+        }
         // у входа и хранилища ассоциация идёт от значка к задаче, у выхода — от задачи к значку
         out.push({ key: `${n.id}:${it.kind}:${it.entityId}`, nodeId: n.id, kind: it.kind, entityId: it.entityId, name: it.name, box, edge: it.kind === "output" ? [onTask, onIcon] : [onIcon, onTask] });
       });

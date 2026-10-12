@@ -10,7 +10,7 @@ import { positionOnSide } from "@shared/bpmnManual";
 import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, snapShape, type Guide, type GuideTarget } from "./guides";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
+import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, setArtifactOffset, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 import { entryOf, updateEntry } from "../studio/dict-ops";
@@ -21,6 +21,7 @@ type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number; keep: { x: boolean; y: boolean } }
   | { kind: "connect"; from: string }
+  | { kind: "artifact"; nodeId: string; key: string; dx0: number; dy0: number; x0: number; y0: number; startModel: M; moved: boolean }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
   | { kind: "laneStretch"; base: M; startModel: M; x0: number; w0: number; moved: boolean }
   | { kind: "laneResize"; i: number; base: M; startModel: M; y0: number; h0: number; moved: boolean }
@@ -263,6 +264,13 @@ export default function BpmnEditor({
       // значок документа или хранилища: выбирает запись справочника — её карточка открывается в «Свойствах»
       setMulti([]);
       pick({ kind: "artifact", dict: artifactEl.getAttribute("data-artifact-kind") === "store" ? "systems" : "data", id: artifactEl.getAttribute("data-artifact-entity")! });
+      // значок можно перетащить: смещение от автоматического места хранится у задачи
+      const nodeId = artifactEl.getAttribute("data-artifact")!;
+      const key = `${artifactEl.getAttribute("data-artifact-kind")}:${artifactEl.getAttribute("data-artifact-entity")}`;
+      const cur = draft.nodes.find((x) => x.id === nodeId)?.artifact_offsets?.[key];
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      dragRef.current = { kind: "artifact", nodeId, key, dx0: cur?.dx ?? 0, dy0: cur?.dy ?? 0, x0: wx, y0: wy, startModel: draftRef.current, moved: false };
+      svgRef.current!.setPointerCapture(e.pointerId);
     } else if (flowEl) {
       setMulti([]);
       pick({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
@@ -296,6 +304,12 @@ export default function BpmnEditor({
       } else setGuides([]);
       setDraft((m) => moveNode(m, d.id, x, y));
       setHotLane(laneIndexAtY(viewRef.current, wy));
+    } else if (d.kind === "artifact") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
+      d.moved = true;
+      const step = e.altKey ? 1 : 5;
+      setDraft((m) => setArtifactOffset(m, d.nodeId, d.key, { dx: Math.round((d.dx0 + wx - d.x0) / step) * step, dy: Math.round((d.dy0 + wy - d.y0) / step) * step }));
     } else if (d.kind === "laneStretch") {
       // ширина кратна 10 (Alt — точно); уже содержимого дорожки не делаются — край упирается в самую правую фигуру
       const [wx] = toWorld(e.clientX, e.clientY);
@@ -415,6 +429,8 @@ export default function BpmnEditor({
       h.recordPast(d.startModel);
       setDraft((m) => dropNodeIntoLane(m, d.id, d.keep));
       setHotLane(null);
+    } else if (d.kind === "artifact") {
+      if (d.moved) h.recordPast(d.startModel);
     } else if (d.kind === "laneStretch") {
       setStretching(false);
       if (d.moved) h.recordPast(d.startModel);
