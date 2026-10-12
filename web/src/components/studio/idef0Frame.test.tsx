@@ -58,6 +58,35 @@ describe("IDEF0: рамка листа и сетка", () => {
     expect(document.querySelector(".studio [data-frame]")).not.toBeNull();
   });
 
+  it("края листа тянутся мышью: ширина, высота и угол; размер не меньше содержимого, отмена возвращает", () => {
+    open();
+    const sizeOf = () => {
+      const outer = [...document.querySelectorAll(".studio [data-frame] > rect")].find((r) => r.getAttribute("fill") === "none")!;
+      return [Number(outer.getAttribute("width")), Number(outer.getAttribute("height"))];
+    };
+    const svg = document.querySelector(".studio svg.bpe-svg")!;
+    const [w0, h0] = sizeOf();
+    const drag = (axis: string, dx: number, dy: number) => {
+      fireEvent.pointerDown(document.querySelector(`.studio [data-frame-resize="${axis}"]`)!, { button: 0, pointerId: 5, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(svg, { pointerId: 5, clientX: 100 + dx, clientY: 100 + dy });
+      fireEvent.pointerUp(svg, { pointerId: 5, clientX: 100 + dx, clientY: 100 + dy });
+    };
+    drag("w", 200, 0);
+    expect(sizeOf()[0]).toBeGreaterThan(w0);
+    expect(sizeOf()[1]).toBe(h0);
+    drag("h", 0, 150);
+    expect(sizeOf()[1]).toBeGreaterThan(h0);
+    drag("wh", -5000, -5000); // не меньше содержимого: размер снова автоматический
+    expect(sizeOf()).toEqual([w0, h0]);
+    fireEvent.click(screen.getByTitle(/Отменить/));
+    expect(sizeOf()[1]).toBeGreaterThan(h0);
+  });
+
+  it("пунктирной линии на листе нет", () => {
+    open();
+    expect(document.querySelector(".studio [data-frame] [stroke-dasharray]")).toBeNull();
+  });
+
   it("setFrame не хранит значения по умолчанию и не меняет модель без изменений", () => {
     const m = purchaseModel();
     expect(setFrame(m, "", { show: true })).toBe(m);

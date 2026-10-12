@@ -21,12 +21,21 @@ export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean })
           ))}
         </g>
       )}
-      <line x1={geo.guideX} y1={0} x2={geo.guideX} y2={footer.y} stroke="#1f2937" strokeWidth={0.8} strokeDasharray="3 3" pointerEvents="none" />
       <rect x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="#e8eef9" stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
       {geo.dividers.map((x) => (
         <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
       ))}
       <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#1f2937" strokeWidth={1.2} pointerEvents="none" />
+      {/* края листа тянут мышью: правый — ширину, нижний — высоту, угол — обе */}
+      <rect data-frame-resize="w" x={sheet.w - 5} y={0} width={10} height={sheet.h - 10} fill="transparent" style={{ cursor: "ew-resize" }}>
+        <title>Потяните, чтобы изменить ширину листа</title>
+      </rect>
+      <rect data-frame-resize="h" x={0} y={sheet.h - 5} width={sheet.w - 10} height={10} fill="transparent" style={{ cursor: "ns-resize" }}>
+        <title>Потяните, чтобы изменить высоту листа</title>
+      </rect>
+      <rect data-frame-resize="wh" x={sheet.w - 10} y={sheet.h - 10} width={14} height={14} fill="#94a3b8" opacity={0.55} style={{ cursor: "nwse-resize" }}>
+        <title>Потяните, чтобы изменить размер листа</title>
+      </rect>
       {geo.cells.map((c) => (
         <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
           <title>Двойной щелчок — изменить надпись</title>

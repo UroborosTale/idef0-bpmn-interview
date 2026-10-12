@@ -22,6 +22,16 @@ describe("рамка листа IDEF0", () => {
     expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(g.sheet.w);
   });
 
+  it("размер листа можно задать вручную, но меньше содержимого он не бывает; пунктира нет", () => {
+    const g = frameGeometry({ w: 900, h: 500 }, { w: 1300, h: 700 }, defaults);
+    expect(g.sheet).toEqual({ x: 0, y: 0, w: 1300, h: 730 });
+    expect(g.footer.y).toBe(700);
+    const small = frameGeometry({ w: 900, h: 500 }, { w: 300, h: 300 }, defaults);
+    expect(small.sheet).toEqual({ x: 0, y: 0, w: 900, h: 530 });
+    expect("guideX" in g).toBe(false);
+    expect(generateIdef0(purchaseModel()).decompositionSvg).not.toContain("stroke-dasharray");
+  });
+
   it("лист с очень далёкими блоками не плодит миллионы линий сетки", () => {
     const g = frameGeometry({ w: 5e8, h: 3e8 }, undefined, defaults);
     expect(g.gridXs.length).toBeLessThanOrEqual(400);

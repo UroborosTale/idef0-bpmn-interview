@@ -400,6 +400,8 @@ export const ProcessLogicModel = z.object({
       z.object({
         show: z.boolean().optional(),
         grid: z.boolean().optional(),
+        w: z.number().min(200).max(20000).optional(),
+        h: z.number().min(200).max(20000).optional(),
         texts: z.record(z.enum(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]), z.string().max(500)).optional(),
       })
     )

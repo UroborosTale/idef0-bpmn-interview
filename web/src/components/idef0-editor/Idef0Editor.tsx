@@ -7,7 +7,7 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
-import { frameGeometry, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { frameGeometry, minSheet, FRAME_GRID, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
@@ -24,6 +24,8 @@ type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "fn"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
+  // размер листа тянут за край: w0/h0 — размер в начале жеста, min — размер содержимого (меньше нельзя)
+  | { kind: "frame"; axis: "w" | "h" | "wh"; w0: number; h0: number; min: { w: number; h: number }; x0: number; y0: number; startModel: M; moved: boolean }
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
   | { kind: "connect"; from: string }
   // правка выбранной стрелки: a — стрелка в начале жеста (от её ломаной пересчитывается каждый шаг), start — модель до жеста
@@ -324,6 +326,23 @@ export default function Idef0Editor({
       openDiagram(openEl.getAttribute("data-open"));
       return;
     }
+    const resizeEl = t.closest("[data-frame-resize]");
+    if (resizeEl && e.button === 0) {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      dragRef.current = {
+        kind: "frame",
+        axis: resizeEl.getAttribute("data-frame-resize") as "w" | "h" | "wh",
+        w0: frameGeo.sheet.w,
+        h0: frameGeo.footer.y,
+        min: minSheet({ w: worldW, h: worldH }),
+        x0: wx,
+        y0: wy,
+        startModel: draftRef.current,
+        moved: false,
+      };
+      svgRef.current!.setPointerCapture(e.pointerId);
+      return;
+    }
     // ручки выбранной стрелки
     const handleEl = t.closest("[data-ah]");
     if (handleEl && e.button === 0 && arrowSel) {
@@ -406,6 +425,18 @@ export default function Idef0Editor({
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const d = dragRef.current;
     if (!d) return;
+    if (d.kind === "frame") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 3) return;
+      d.moved = true;
+      const grid = (v: number) => Math.round(v / FRAME_GRID) * FRAME_GRID;
+      const size: { w?: number | null; h?: number | null } = {};
+      // не меньше содержимого: достигнув его, размер снова автоматический
+      if (d.axis !== "h") size.w = Math.max(d.min.w, grid(d.w0 + wx - d.x0)) > d.min.w ? Math.max(d.min.w, grid(d.w0 + wx - d.x0)) : null;
+      if (d.axis !== "w") size.h = Math.max(d.min.h, grid(d.h0 + wy - d.y0)) > d.min.h ? Math.max(d.min.h, grid(d.h0 + wy - d.y0)) : null;
+      setDraft((m) => setFrame(m, frameKey(cur), { size }));
+      return;
+    }
     if (d.kind === "pan") {
       setView((v) => ({ ...v, tx: d.tx + e.clientX - d.sx, ty: d.ty + e.clientY - d.sy }));
     } else if (d.kind === "fn") {
@@ -438,6 +469,8 @@ export default function Idef0Editor({
     if (!d) return;
     if (d.kind === "fn" && d.moved) {
       h.recordPast(d.startModel);
+    } else if (d.kind === "frame") {
+      if (d.moved) h.recordPast(d.startModel);
     } else if (d.kind === "group") {
       if (d.moved) h.recordPast(d.startModel);
       else {

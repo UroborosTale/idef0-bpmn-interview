@@ -224,14 +224,13 @@ function textBlock(x: number, y: number, text: string, maxChars: number, fontSiz
 /** Положение подписи стрелки; общее для SVG, VSDX и редактора. */
 export const arrowLabelPlacement = (a: Idef0Arrow) => labelSpec(a);
 
-/** Рамка листа в SVG: клетки, контур, пунктир правой полосы и штамп (shared/idef0Frame.ts — как в редакторе). */
+/** Рамка листа в SVG: клетки, контур и штамп (shared/idef0Frame.ts — как в редакторе). */
 function frameSvg(geo: FrameGeometry, grid: boolean): string {
   const out: string[] = [];
   if (grid) {
     for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="0" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
     for (const l of geo.gridYs) out.push(`<line x1="0" y1="${l.at}" x2="${geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
   }
-  out.push(`<line x1="${geo.guideX}" y1="0" x2="${geo.guideX}" y2="${geo.footer.y}" stroke="#1f2937" stroke-width="0.8" stroke-dasharray="3 3" />`);
   out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef9" stroke="#1f2937" />`);
   for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" />`);
   out.push(`<rect x="0" y="0" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
