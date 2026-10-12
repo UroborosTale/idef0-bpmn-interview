@@ -83,3 +83,23 @@ describe("справочники: удаление снимает ссылки",
     expect(removeEntry(purchaseModel(), "controls", "c1").nodes.every((n) => n.controls.length === 0)).toBe(true);
   });
 });
+
+describe("удаление записи убирает привязанные к ней ручные положения", () => {
+  it("смещения значков BPMN и маршруты стрелок IDEF0 удалённого документа не достаются новой записи с тем же id", async () => {
+    const { structuredModel } = await import("../../test/fixtures");
+    const { addEntry, removeEntry } = await import("./dict-ops");
+    const m = structuredModel();
+    const b1 = m.nodes.find((n) => n.id === "b1")!;
+    b1.inputs = ["d1"];
+    b1.artifact_offsets = { "input:d1": { dx: 40, dy: 10 }, "store:s1": { dx: 5, dy: 5 } };
+    const o1 = m.nodes.find((n) => n.id === "o1")!;
+    o1.arrow_routes = { "input:d1": { points: [[10, 20]] }, "control:c1": { pos: 0.3 } };
+    const removed = removeEntry(m, "data", "d1");
+    const nb1 = removed.nodes.find((n) => n.id === "b1")!;
+    expect(nb1.artifact_offsets).toEqual({ "store:s1": { dx: 5, dy: 5 } }); // чужие смещения остались
+    expect(removed.nodes.find((n) => n.id === "o1")!.arrow_routes).toEqual({ "control:c1": { pos: 0.3 } });
+    // новая запись с освободившимся id появляется без чужого положения
+    const again = addEntry(removed, "data", "Новый документ");
+    expect(again.model.nodes.find((n) => n.id === "b1")!.artifact_offsets?.[`input:${again.id}`]).toBeUndefined();
+  });
+});

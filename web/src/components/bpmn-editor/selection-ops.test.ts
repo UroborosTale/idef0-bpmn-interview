@@ -153,3 +153,21 @@ describe("копирование и вставка", () => {
     expect(hasClipboard()).toBe(false);
   });
 });
+
+describe("удаление на общей схеме не оставляет сирот вне вида", () => {
+  it("подпроцесс удалён на общей схеме — его операции и шаги их диаграмм BPMN (их вид не показывает) удаляются вместе с ним", async () => {
+    const { mergeScope, scopeView } = await import("@shared/scope");
+    const { structuredModel } = await import("../../test/fixtures");
+    const { deleteNode } = await import("./model-ops");
+    const full = structuredModel();
+    const view = scopeView(full, null);
+    expect(view.nodes.some((n) => n.bpmn_scope === "o1")).toBe(false); // шаги операции в виде общей схемы не видны
+    const merged = mergeScope(full, deleteNode(view, "s1"), null, view);
+    const ids = new Set(merged.nodes.map((n) => n.id));
+    expect(ids.has("s1")).toBe(false);
+    expect(ids.has("o1")).toBe(false);
+    expect(merged.nodes.filter((n) => n.bpmn_scope && !ids.has(n.bpmn_scope))).toEqual([]);
+    expect(merged.flows.every((f) => ids.has(f.from) && ids.has(f.to))).toBe(true);
+    expect((merged.assignments ?? []).every((a) => !a.node_id || ids.has(a.node_id))).toBe(true);
+  });
+});

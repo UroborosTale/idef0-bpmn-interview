@@ -129,9 +129,23 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
     else if (nextById.has(n.id)) nodes.push(mark(nextById.get(n.id)!));
   }
   for (const n of next.nodes) if (!prevIds.has(n.id)) nodes.push(mark(n));
-  const removed = [...prevIds].filter((id) => !nextById.has(id));
+  // удалённое в виде тянет за собой то, чего вид не показывает: шаги диаграмм удалённых операций (bpmn_scope), вложенные функции
+  // (idef0_parent) и граничные события (attached_to) — иначе они остались бы в модели без хозяина
+  const gone = new Set([...prevIds].filter((id) => !nextById.has(id)));
+  for (let grew = gone.size > 0; grew; ) {
+    grew = false;
+    for (const n of nodes as (ScopeNode & { attached_to?: string | null })[]) {
+      if (gone.has(n.id)) continue;
+      if ((n.bpmn_scope && gone.has(n.bpmn_scope)) || (n.idef0_parent && gone.has(n.idef0_parent)) || (n.attached_to && gone.has(n.attached_to))) {
+        gone.add(n.id);
+        grew = true;
+      }
+    }
+  }
+  if (gone.size > 0) nodes.splice(0, nodes.length, ...nodes.filter((n) => !gone.has(n.id)));
+  const removed = [...gone];
 
-  const flows = [...full.flows.filter((f) => !(prevIds.has(f.from) && prevIds.has(f.to))), ...next.flows];
+  const flows = [...full.flows.filter((f) => !(prevIds.has(f.from) && prevIds.has(f.to))), ...next.flows].filter((f) => !gone.has(f.from) && !gone.has(f.to));
 
   const known = new Map(full.roles.map((r) => [r.id, r] as const));
   const roles = [...full.roles.map((r) => (next.roles.find((x) => x.id === r.id) as typeof r | undefined) ?? r), ...next.roles.filter((r) => !known.has(r.id))];
@@ -140,7 +154,7 @@ export function mergeScope<M extends ScopeModel>(full: M, next: M, scope: string
   let messages = full.messages;
   let pools = full.pools;
   if (messages) {
-    messages = [...messages.filter((x) => !prevIds.has(x.from) && !prevIds.has(x.to)), ...(next.messages ?? []).filter((x) => !removed.includes(x.from) && !removed.includes(x.to))];
+    messages = [...messages.filter((x) => !prevIds.has(x.from) && !prevIds.has(x.to) && !gone.has(x.from) && !gone.has(x.to)), ...(next.messages ?? []).filter((x) => !gone.has(x.from) && !gone.has(x.to))];
     const poolIds = new Set((pools ?? []).map((p) => p.id));
     pools = [...(pools ?? []).map((p) => (next.pools?.find((x) => x.id === p.id) as typeof p | undefined) ?? p), ...(next.pools ?? []).filter((p) => !poolIds.has(p.id))];
   }

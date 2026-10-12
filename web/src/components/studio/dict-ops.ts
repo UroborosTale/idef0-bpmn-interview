@@ -141,8 +141,34 @@ export function updateEntry(m: M, kind: DictKind, id: string, patch: Record<stri
   }
 }
 
+/**
+ * Ручные положения, привязанные к записи по id: смещения значков BPMN (`input:<id>`, `output:<id>`, `store:<id>`) и маршруты стрелок
+ * IDEF0 (`<вид>:<id>`). При удалении записи они удаляются тоже — иначе новая запись, получившая освободившийся id, унаследовала бы
+ * чужое положение значка или маршрут стрелки.
+ */
+function dropPlacements(m: M, id: string): M {
+  const stale = (key: string) => key.split(":").slice(1).join(":") === id;
+  let changed = false;
+  const nodes = m.nodes.map((n) => {
+    const offs = n.artifact_offsets && Object.keys(n.artifact_offsets).some(stale) ? Object.fromEntries(Object.entries(n.artifact_offsets).filter(([k]) => !stale(k))) : n.artifact_offsets;
+    const routes = n.arrow_routes && Object.keys(n.arrow_routes).some(stale) ? Object.fromEntries(Object.entries(n.arrow_routes).filter(([k]) => !stale(k))) : n.arrow_routes;
+    if (offs === n.artifact_offsets && routes === n.arrow_routes) return n;
+    changed = true;
+    const next = { ...n, artifact_offsets: offs && Object.keys(offs).length ? offs : undefined, arrow_routes: routes && Object.keys(routes).length ? routes : undefined };
+    if (!next.artifact_offsets) delete next.artifact_offsets;
+    if (!next.arrow_routes) delete next.arrow_routes;
+    return next;
+  });
+  return changed ? { ...m, nodes } : m;
+}
+
 /** Удалить запись вместе со ссылками на неё: шаги остаются, но теряют исполнителя, систему, документ или регламент. */
 export function removeEntry(m: M, kind: DictKind, id: string): M {
+  const out = removeEntryLinks(m, kind, id);
+  return kind === "data" || kind === "systems" || kind === "controls" || kind === "roles" ? dropPlacements(out, id) : out;
+}
+
+function removeEntryLinks(m: M, kind: DictKind, id: string): M {
   const without = (xs: string[] | undefined) => (xs ? xs.filter((x) => x !== id) : xs);
   switch (kind) {
     case "roles": {
