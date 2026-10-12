@@ -177,6 +177,11 @@ export const ExternalPool = z.object({
   id: z.string(),
   name: z.string(),
   code: z.string().nullable().optional(),
+  // Пул без потоков сообщений показывается только на диаграмме, где его создали (id операции; "" — общая схема).
+  scope: z.string().optional(),
+  // Ручное смещение пула от автоматического места под диаграммой.
+  dx: z.number().min(-20000).max(20000).optional(),
+  dy: z.number().min(-20000).max(20000).optional(),
 });
 export type ExternalPool = z.infer<typeof ExternalPool>;
 

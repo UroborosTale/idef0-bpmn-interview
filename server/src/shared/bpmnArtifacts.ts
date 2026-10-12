@@ -21,6 +21,8 @@ export interface ArtPool {
   id: string;
   name: string;
   code?: string | null;
+  dx?: number;
+  dy?: number;
 }
 
 export interface ArtMessage {
@@ -184,11 +186,14 @@ export function poolBoxes(pools: ArtPool[], messages: ArtMessage[], boxes: Map<s
   const used = pools.filter((p) => anchor.has(p.id)).sort((p, q) => anchor.get(p.id)! - anchor.get(q.id)!);
   const out = new Map<string, Box>();
   let right = -Infinity;
-  for (const p of used) {
-    const x = Math.max(anchor.get(p.id)! - POOL_W / 2, right + 24);
-    out.set(p.id, { x, y: topY, w: POOL_W, h: POOL_H });
+  const place = (p: ArtPool, x: number) => {
+    // ручное смещение сдвигает пул, не меняя места остальных (ряд считается без него)
+    out.set(p.id, { x: Math.max(0, x + (p.dx ?? 0)), y: Math.max(0, topY + (p.dy ?? 0)), w: POOL_W, h: POOL_H });
     right = x + POOL_W;
-  }
+  };
+  for (const p of used) place(p, Math.max(anchor.get(p.id)! - POOL_W / 2, right + 24));
+  // пулы без потоков сообщений на этой диаграмме (созданные самостоятельно) стоят в ряду после связанных
+  for (const p of pools) if (!anchor.has(p.id)) place(p, right === -Infinity ? 60 : right + 24);
   return out;
 }
 

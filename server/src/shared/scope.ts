@@ -24,7 +24,7 @@ export interface ScopeModel<N extends ScopeNode = ScopeNode, R extends ScopeRole
   raci: { node_id: string }[];
   assignments?: { node_id: string | null; role_id: string; kind: string }[];
   /** Внешние пулы и потоки сообщений: вид области содержит потоки её шагов и пулы, с которыми они связаны. */
-  pools?: { id: string }[];
+  pools?: { id: string; scope?: string }[];
   messages?: { id: string; from: string; to: string }[];
   /**
    * Ширина дорожек диаграмм: в полной модели ключ — id операции ("" — общая схема); в виде области — только ключ "" (ширина показанной
@@ -59,13 +59,16 @@ export function scopeView<M extends ScopeModel>(m: M, scope: string | null): M {
   const lanes = scope === null ? null : laneRoleIds(m, scope);
   const messages = (m.messages ?? []).filter((x) => ids.has(x.from) || ids.has(x.to));
   const usedPools = new Set(messages.flatMap((x) => [x.from, x.to]));
+  // самостоятельный пул (без потоков сообщений) виден на диаграмме, где его создали
+  const linked = new Set((m.messages ?? []).flatMap((x) => [x.from, x.to]));
+  const here = (p: { id: string; scope?: string }) => usedPools.has(p.id) || (!linked.has(p.id) && (p.scope ?? "") === (scope ?? ""));
   return {
     ...m,
     nodes: view,
     flows: m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)),
     roles: lanes ? m.roles.filter((r) => lanes.has(r.id)) : m.roles,
     ...(scope !== null ? { diagram_widths: m.diagram_widths?.[scope] === undefined ? undefined : { "": m.diagram_widths[scope] } } : {}),
-    ...(m.messages ? { messages, pools: (m.pools ?? []).filter((p) => usedPools.has(p.id)) } : {}),
+    ...(m.messages ? { messages, pools: (m.pools ?? []).filter(here) } : {}),
   };
 }
 

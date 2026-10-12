@@ -107,7 +107,9 @@ export function diagramWidth(m: ProcessLogicModel): number {
 export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
   const { pools } = diagramExtras(m, visibleNodes(m), boxMap(visibleNodes(m)));
   const set = configuredWidth(m);
-  return { w: set === undefined ? contentWidth(m) : diagramWidth(m), h: lanesBottom(m) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0) };
+  // пул, оттянутый вниз, увеличивает высоту «мира»
+  const poolsBottom = pools.reduce((mx, p) => Math.max(mx, p.box.y + p.box.h + 20), 0);
+  return { w: set === undefined ? contentWidth(m) : diagramWidth(m), h: Math.max(lanesBottom(m) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0), poolsBottom) };
 }
 
 /** Дорожек на одну больше числа ролей: последняя — «Без исполнителя». */

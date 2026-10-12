@@ -201,12 +201,24 @@ describe("добавочные элементы: общая геометрия",
     expect(doc2.edge.map((p) => p[1]).sort((p, q) => p - q)).toEqual([doc2.box.y + doc2.box.h, 100]);
   });
 
+  it("ручное смещение пула сдвигает только его, ряд остальных не меняется; поток сообщений идёт к новому месту", () => {
+    const b = new Map([["a", { x: 300, y: 100, w: 100, h: 80 }]]);
+    const msgs = [{ id: "m1", from: "a", to: "p1" }];
+    const base = poolBoxes([{ id: "p1", name: "Первый" }, { id: "p2", name: "Второй" }], msgs, b, 400);
+    const moved = poolBoxes([{ id: "p1", name: "Первый", dx: 120, dy: 30 }, { id: "p2", name: "Второй" }], msgs, b, 400);
+    expect(moved.get("p1")).toEqual({ ...base.get("p1")!, x: base.get("p1")!.x + 120, y: 430 });
+    expect(moved.get("p2")).toEqual(base.get("p2")); // соседний пул не сдвинулся
+    const edge = messageEdges(msgs, b, moved)[0].points;
+    expect(edge.at(-1)![0]).toBe(moved.get("p1")!.x + moved.get("p1")!.w / 2);
+  });
+
   it("пулы не налезают друг на друга, а их порядок следует за шагами", () => {
     const b = new Map([["a", { x: 300, y: 100, w: 100, h: 80 }], ["c", { x: 320, y: 100, w: 100, h: 80 }]]);
     const pools = [{ id: "p1", name: "Первый" }, { id: "p2", name: "Второй" }, { id: "p3", name: "Без связей" }];
     const out = poolBoxes(pools, [{ id: "m1", from: "c", to: "p2" }, { id: "m2", from: "p1", to: "a" }], b, 400);
-    expect([...out.keys()]).toEqual(["p1", "p2"]);
+    expect([...out.keys()]).toEqual(["p1", "p2", "p3"]); // самостоятельный пул — в ряду после связанных
     expect(out.get("p2")!.x).toBeGreaterThanOrEqual(out.get("p1")!.x + out.get("p1")!.w + 24);
+    expect(out.get("p3")!.x).toBeGreaterThanOrEqual(out.get("p2")!.x + out.get("p2")!.w + 24);
     const edges = messageEdges([{ id: "m2", from: "p1", to: "a" }], b, out);
     expect(edges[0].points[0][1]).toBe(400); // от пула к шагу
     expect(edges[0].points.at(-1)![1]).toBe(180);

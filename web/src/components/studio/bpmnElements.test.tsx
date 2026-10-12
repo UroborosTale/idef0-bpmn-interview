@@ -123,8 +123,8 @@ describe("геометрия добавочных элементов в реда
     expect(ex.pools[0].box.y).toBeGreaterThan(Math.max(...[...boxes.values()].map((b) => b.y + b.h)));
     expect(ex.messages).toHaveLength(1);
     expect(modelExtents(m).h).toBeGreaterThan(before);
-    // пул без потоков сообщений не рисуется
-    expect(diagramExtras(addPool(withLayout(flat()), "Пустой").model, shown, boxes).pools).toEqual([]);
+    // самостоятельный пул без потоков сообщений тоже рисуется
+    expect(diagramExtras(addPool(withLayout(flat()), "Пустой").model, shown, boxes).pools).toHaveLength(1);
   });
 
   it("новая фигура из палитры не ломает граничные события", () => {
@@ -297,6 +297,42 @@ describe("студия: новые элементы на диаграмме оп
     fireEvent.change(input!, { target: { value: "Заявка v2" } });
     fireEvent.keyDown(input!, { key: "Enter" });
     expect(document.querySelector(".studio")!.textContent).toContain("Заявка v2");
+  });
+
+  describe("внешний пул добавляется и перемещается", () => {
+    const svgEl = () => document.querySelector(".studio svg.bpe-svg")!;
+    const pool = () => document.querySelector("[data-pool-id] rect")!;
+
+    it("кнопка палитры добавляет пул, выбирает его; пул перетаскивается, отмена возвращает его", () => {
+      studio(structuredModel());
+      expect(document.querySelector("[data-pool-id]")).toBeNull();
+      fireEvent.click(screen.getByText("Внешний пул"));
+      expect(document.querySelector("[data-pool-id]")).not.toBeNull();
+      expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Внешний пул/);
+      const before = [pool().getAttribute("x"), pool().getAttribute("y")];
+      fireEvent.pointerDown(document.querySelector("[data-pool-id]")!, { button: 0, pointerId: 1, clientX: 100, clientY: 100 });
+      fireEvent.pointerMove(svgEl(), { pointerId: 1, clientX: 220, clientY: 160 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 1, clientX: 220, clientY: 160 });
+      expect([pool().getAttribute("x"), pool().getAttribute("y")]).not.toEqual(before);
+      fireEvent.keyDown(document.querySelector(".studio")!, { key: "z", ctrlKey: true });
+      expect([pool().getAttribute("x"), pool().getAttribute("y")]).toEqual(before);
+    });
+
+    it("● шага, отпущенная на пуле, создаёт поток сообщений", () => {
+      const m = addPool(structuredModel(), "Поставщики", null, "o1").model;
+      studio(m);
+      fireEvent.pointerDown(document.querySelector('.studio g[data-node-id="b1"]')!, { button: 0, pointerId: 2, clientX: 10, clientY: 10 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 2, clientX: 10, clientY: 10 });
+      const from = document.querySelector("[data-connect]")!;
+      const id = from.getAttribute("data-connect")!;
+      fireEvent.pointerDown(from, { button: 0, pointerId: 1 });
+      const real = document.elementFromPoint;
+      document.elementFromPoint = () => document.querySelector("[data-pool-id] rect");
+      fireEvent.pointerUp(svgEl(), { pointerId: 1, clientX: 5, clientY: 5 });
+      document.elementFromPoint = real;
+      expect(document.querySelector("[data-message-id]")).not.toBeNull();
+      expect(id).toBeTruthy();
+    });
   });
 
   describe("внешний пул и поток сообщений правятся на диаграмме", () => {

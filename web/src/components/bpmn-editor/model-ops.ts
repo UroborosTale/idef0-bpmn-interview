@@ -543,9 +543,19 @@ export function setEventDirection(m: M, id: string, direction: "catch" | "throw"
   const t = { ...spec.details, direction };
   return setEventTrigger(m, id, allowedTriggers("intermediate", direction === "throw").includes(spec.trigger) ? t : { type: "none", direction });
 }
-export function addPool(m: M, name: string, code?: string | null): OpResult {
-  const pool: ExternalPool = { id: nextId("pool", (m.pools ?? []).map((p) => p.id)), name: name.trim() || "Внешний процесс", code: code?.trim() || null };
+export function addPool(m: M, name: string, code?: string | null, scope?: string): OpResult {
+  const pool: ExternalPool = { id: nextId("pool", (m.pools ?? []).map((p) => p.id)), name: name.trim() || "Внешний процесс", code: code?.trim() || null, ...(scope !== undefined ? { scope } : {}) };
   return { model: { ...m, pools: [...(m.pools ?? []), pool] }, id: pool.id };
+}
+
+/** Ручное смещение пула от автоматического места (почти нулевое — вернуть на место). */
+export function setPoolOffset(m: M, id: string, dx: number, dy: number): M {
+  const p = (m.pools ?? []).find((x) => x.id === id);
+  if (!p) return m;
+  const [rx, ry] = [Math.round(dx), Math.round(dy)];
+  if ((p.dx ?? 0) === rx && (p.dy ?? 0) === ry) return m;
+  const { dx: _dx, dy: _dy, ...rest } = p;
+  return { ...m, pools: (m.pools ?? []).map((x) => (x.id === id ? { ...rest, ...(rx ? { dx: rx } : {}), ...(ry ? { dy: ry } : {}) } : x)) };
 }
 
 export const updatePool = (m: M, id: string, patch: Partial<ExternalPool>): M => ({ ...m, pools: (m.pools ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p)) });
