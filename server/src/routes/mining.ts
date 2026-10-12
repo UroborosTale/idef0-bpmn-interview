@@ -49,7 +49,7 @@ miningRouter.post("/sessions/:id/mining/import", (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
   const { csv, filename } = req.body as { csv: string; filename?: string };
-  if (!csv || !csv.trim()) {
+  if (typeof csv !== "string" || !csv.trim()) {
     res.status(400).json({ error: "csv обязателен" });
     return;
   }
@@ -107,6 +107,10 @@ miningRouter.get("/sessions/:id/mining/mappings", (req, res) => {
 /** ФТ-М4.3.2: подтверждение/правка сопоставления активности с действием модели. */
 miningRouter.put("/sessions/:id/mining/mappings/:activity", (req, res) => {
   const { nodeId, confirmed } = req.body as { nodeId: string | null; confirmed?: boolean };
+  if ((nodeId !== null && typeof nodeId !== "string") || (confirmed !== undefined && typeof confirmed !== "boolean")) {
+    res.status(400).json({ error: "nodeId — строка или null, confirmed — логическое значение" });
+    return;
+  }
   const activity = req.params.activity;
   const existing = db.prepare(`SELECT * FROM mining_mappings WHERE session_id = ? AND activity = ?`).get(req.params.id, activity) as MiningMappingRow | undefined;
   if (existing) {

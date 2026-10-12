@@ -91,8 +91,20 @@ export function blockNumbers<N extends CodeNode>(m: CodeModel<N>): Map<string, s
 }
 
 /** Глубина функции в дереве IDEF0: 1 — верхний уровень (подпроцесс), 2 — операция. 0 — не функция. */
+// Словарь узлов по массиву: functionDepth вызывается для каждого узла, и построение словаря заново на каждый вызов давало квадрат.
+// Массивы модели неизменяемы (правка создаёт новый); на случай правки на месте словарь пересобирается при несовпадении размера.
+const nodeIndex = new WeakMap<object, { len: number; idx: Map<string, CodeNode> }>();
+function indexOf<N extends CodeNode>(nodes: N[]): Map<string, N> {
+  let hit = nodeIndex.get(nodes);
+  if (!hit || hit.len !== nodes.length) {
+    hit = { len: nodes.length, idx: new Map(nodes.map((n) => [n.id, n] as const)) };
+    nodeIndex.set(nodes, hit);
+  }
+  return hit.idx as Map<string, N>;
+}
+
 export function functionDepth<N extends CodeNode>(m: CodeModel<N>, id: string): number {
-  const byId = new Map(m.nodes.map((n) => [n.id, n] as const));
+  const byId = indexOf(m.nodes);
   let d = 0;
   let cur = byId.get(id);
   const seen = new Set<string>();

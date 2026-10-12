@@ -80,7 +80,7 @@ multiInterviewRouter.post("/sessions/:id/tracks/:trackId/ingest-text", (req, res
     return;
   }
   const { text } = req.body as { text: string };
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }
@@ -122,7 +122,7 @@ multiInterviewRouter.post("/sessions/:id/tracks/:trackId/interview/turn", async 
     return;
   }
   const { text } = req.body as { text: string };
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }

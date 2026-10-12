@@ -67,7 +67,7 @@ verificationRouter.post("/sessions/:id/verification/propose-edit", async (req, r
   const session = requireReady(req, res);
   if (!session) return;
   const { text } = req.body as { text: string };
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }

@@ -24,7 +24,7 @@ technologyRouter.get("/agent-config", (_req, res) => {
 
 technologyRouter.put("/agent-config/:agentKey", (req, res) => {
   const { modelName } = req.body as { modelName: string };
-  if (!modelName || !modelName.trim()) {
+  if (typeof modelName !== "string" || !modelName.trim() || modelName.length > 200) {
     res.status(400).json({ error: "modelName обязателен" });
     return;
   }
@@ -69,7 +69,7 @@ technologyRouter.get("/corpus", (_req, res) => {
 
 /** ФТ-М9.1.2: похожие утверждённые примеры из корпуса для заданного текста (TF-IDF, см. pipeline/corpus.ts). */
 technologyRouter.get("/corpus/similar", (req, res) => {
-  const text = (req.query.text as string) || "";
+  const text = typeof req.query.text === "string" ? req.query.text : "";
   if (!text.trim()) {
     res.status(400).json({ error: "text обязателен" });
     return;

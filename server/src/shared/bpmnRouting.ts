@@ -177,11 +177,37 @@ interface Ctx {
   to: string;
 }
 
+/**
+ * Габарит ломаной с запасом m. Пересечение (crossingCount), «крест-накрест» (crossedZ, допуск 3) и наложение отрезков (clash, допуск 5)
+ * возможны только у ломаных, чьи габариты с запасом 6 пересекаются, — поэтому остальные пары можно не сравнивать: результат тот же,
+ * а на больших диаграммах сравнений становится в разы меньше (прокладка росла как квадрат числа стрелок и блокировала сервер).
+ */
+function bboxOf(pts: Pt[], m = 0): Box {
+  let [x1, y1, x2, y2] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, y] of pts) {
+    if (x < x1) x1 = x;
+    if (y < y1) y1 = y;
+    if (x > x2) x2 = x;
+    if (y > y2) y2 = y;
+  }
+  return { x: x1 - m, y: y1 - m, w: x2 - x1 + 2 * m, h: y2 - y1 + 2 * m };
+}
+const boxesMeet = (a: Box, b: Box) => a.x <= b.x + b.w && b.x <= a.x + a.w && a.y <= b.y + b.h && b.y <= a.y + a.h;
+const NEAR = 6;
+const nearBox = new WeakMap<Pt[], Box>();
+const nearBoxOf = (pts: Pt[]) => {
+  let b = nearBox.get(pts);
+  if (!b) nearBox.set(pts, (b = bboxOf(pts, NEAR)));
+  return b;
+};
+
 /** Сколько чужих подписей задевает ломаная. */
 function softOf(pts: Pt[], ctx: Ctx): number {
   let n = 0;
+  const box = bboxOf(pts);
   for (const l of ctx.labels) {
     if (l.owner === ctx.from || l.owner === ctx.to) continue;
+    if (!boxesMeet(box, l.box)) continue; // ломаная целиком в стороне от подписи
     for (let i = 0; i + 1 < pts.length; i++) {
       if (cuts(pts[i], pts[i + 1], l.box)) {
         n++;
@@ -200,7 +226,9 @@ const made = (pts: Pt[], ctx: Ctx, channel?: Channel): Built => ({ pts, hits: hi
  */
 function hitsOf(pts: Pt[], ctx: Ctx): number {
   let n = 0;
+  const box = bboxOf(pts, CLEAR + 1);
   for (const o of ctx.obstacles) {
+    if (!boxesMeet(box, o.box)) continue; // фигура целиком в стороне от ломаной (запас — на отступ CLEAR)
     for (let i = 0; i + 1 < pts.length; i++) {
       if (i === 0 && o.id === ctx.from) continue;
       if (i === pts.length - 2 && o.id === ctx.to) continue;
@@ -479,11 +507,15 @@ export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extra
   let portFrac = new Map<string, number>();
 
   const flowById = new Map(list.map((f) => [f.id, f] as const));
+  // стрелки каждой фигуры: занятость сторон и порты считаются по ним, а не перебором всех проложенных (это было квадратом числа стрелок)
+  const touching = new Map<string, RouteFlow[]>();
+  for (const f of list) for (const id of [f.from, f.to]) touching.set(id, [...(touching.get(id) ?? []), f]);
   const used = (id: string, side: Side, except: string) => {
     let k = 0;
-    for (const [fid, c] of chosen) {
-      if (fid === except) continue;
-      const f = flowById.get(fid)!;
+    for (const f of touching.get(id) ?? []) {
+      if (f.id === except) continue;
+      const c = chosen.get(f.id);
+      if (!c) continue;
       if ((f.from === id && c.e === side) || (f.to === id && c.n === side)) k++;
     }
     return k;
@@ -511,9 +543,10 @@ export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extra
   /** Где окажется порт стрелки f на стороне side фигуры node, если выбрать эту сторону: среди уже занявших её стрелок. */
   const fracIfAdded = (node: RouteNode, side: Side, f: RouteFlow, end: "out" | "in", other: RouteNode) => {
     const items: Slot[] = [];
-    for (const [fid, c] of chosen) {
-      if (fid === f.id) continue;
-      const g = flowById.get(fid)!;
+    for (const g of touching.get(node.id) ?? []) {
+      if (g.id === f.id) continue;
+      const c = chosen.get(g.id);
+      if (!c) continue;
       if (g.from === node.id && c.e === side) items.push({ key: farKey(side, byId.get(g.to)!, node), end: "out" });
       if (g.to === node.id && c.n === side) items.push({ key: farKey(side, byId.get(g.from)!, node), end: "in" });
     }
@@ -538,8 +571,10 @@ export function routeFlowsDetailed(nodes: RouteNode[], flows: RouteFlow[], extra
     // ветка шлюза на другой уровень по соглашению уходит из верхней или нижней вершины, а не справа
     if (from.type === "gateway" && e === "R" && Math.abs(q[1] - p[1]) > 30) cost += 8;
     const mine = fixedSegs(built.pts, built.channel);
+    const near = nearBoxOf(built.pts);
     for (const [fid, c] of chosen) {
       if (fid === f.id) continue;
+      if (!boxesMeet(near, nearBoxOf(c.pts))) continue; // далёкие стрелки не пересекаются и не накладываются
       // пути стрелок не должны пересекаться: пересечение дороже любого обхода, кроме прохода сквозь фигуру
       cost += 150 * crossingCount(built.pts, c.pts) + (crossedZ(built.pts, c.pts) ? 1200 : 0);
       // наложение на неподвижный участок чужой стрелки: средние каналы разводятся потом, а такие участки сдвинуть нельзя

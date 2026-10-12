@@ -85,7 +85,8 @@ describe("студия в браузере", () => {
     await page.locator(`.studio g[data-node-id="${nodeId}"]`).click();
     expect(await field(page, "Исполнитель (дорожка BPMN, механизм IDEF0)").inputValue()).toBe(roleBefore);
     await page.locator(".bpe").first().evaluate((el) => el.dispatchEvent(new KeyboardEvent("keydown", { key: "я", code: "KeyZ", ctrlKey: true, bubbles: true })));
-    expect(await field(page, "Длительность").inputValue()).toBe("");
+    // синтетическое нажатие обрабатывается асинхронно: ждём перерисовки панели
+    await expect.poll(() => field(page, "Длительность").inputValue()).toBe("");
     expect(errors).toEqual([]);
     await ctx.close();
   });

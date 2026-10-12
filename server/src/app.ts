@@ -116,6 +116,33 @@ app.use("/api", auditPackageRouter);
 app.use("/api", agentRouter);
 app.use("/api", repositoryRouter);
 
+/**
+ * Express 4 не ловит исключения асинхронных обработчиков: запрос зависал без ответа, а необработанный отказ промиса в Node 15+
+ * завершает процесс — один запрос с неверными данными ронял сервер. Поэтому каждый обработчик маршрута оборачивается: исключение
+ * (обычное или асинхронное) уходит в общий обработчик ошибок ниже.
+ */
+function catchRouteErrors(stack: any[]) {
+  for (const layer of stack) {
+    if (layer.route) {
+      for (const inner of layer.route.stack) {
+        const fn = inner.handle;
+        if (fn.length > 3 || fn.__safe) continue; // обработчики ошибок (4 аргумента) не трогаем
+        const safe = function (req: express.Request, res: express.Response, next: express.NextFunction) {
+          try {
+            const r = fn(req, res, next);
+            if (r && typeof r.then === "function") r.catch(next);
+          } catch (e) {
+            next(e);
+          }
+        };
+        (safe as any).__safe = true;
+        inner.handle = safe;
+      }
+    } else if (layer.handle?.stack) catchRouteErrors(layer.handle.stack);
+  }
+}
+catchRouteErrors((app as any)._router.stack);
+
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   // ошибки разбора запроса (body-parser) несут свой код: слишком большое тело — 413, повреждённый JSON — 400; это не сбой сервера
   const status = Number(err?.status ?? err?.statusCode);
@@ -125,6 +152,11 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   }
   if (status >= 400 && status < 500) {
     res.status(status).json({ error: err.type === "entity.parse.failed" ? "Запрос не разобран: тело не является корректным JSON" : err.message ?? "bad request" });
+    return;
+  }
+  // страховка: объект или массив вместо строки дошёл до SQLite — это ошибка данных запроса, а не сервера
+  if ((err instanceof TypeError || err instanceof RangeError) && /bind|named parameters|parameter values/i.test(String(err.message))) {
+    res.status(400).json({ error: "Неверные данные запроса: поля должны быть строками или числами" });
     return;
   }
   console.error(err);

@@ -75,20 +75,22 @@ describe("правка стрелок и триггеры блока в брау
     await page.locator('.studio g[data-node-id="t2"]').waitFor();
     await actualSize(page);
 
-    // выбор стрелки: появляются ручки обоих концов и среднего участка
+    // выбор стрелки: появляются ручки обоих концов и отрезков
     const flowPath = '.studio [data-flow-id="f1"] path[marker-end]';
     await clickFlow(page, "f1");
-    await page.locator('[data-flow-handle="channel"]').waitFor();
+    await page.locator('[data-flow-handle^="seg:"]').first().waitFor();
     expect(await page.locator('[data-flow-handle="from"]').count()).toBe(1);
     expect(await page.locator('[data-flow-handle="to"]').count()).toBe(1);
     await page.getByRole("toolbar", { name: "Действия со стрелкой" }).getByText("Маршрут автоматический").waitFor();
 
-    // сдвиг среднего участка вправо: у стрелки появляется ручной канал
-    const before = center(await box(page, '[data-flow-handle="channel"]'));
-    await drag(page, before, { x: before.x + 60, y: before.y });
+    // сдвиг отрезка поперёк: у стрелки появляется ручной маршрут, линия смещается
+    const seg = page.locator('[data-flow-handle^="seg:"]').first();
+    const vertical = (await seg.evaluate((el) => getComputedStyle(el).cursor)) === "ew-resize";
+    const dBefore = await page.locator(flowPath).getAttribute("d");
+    const before = center((await seg.boundingBox())!);
+    await drag(page, before, vertical ? { x: before.x + 60, y: before.y } : { x: before.x, y: before.y + 60 });
     await page.getByRole("toolbar", { name: "Действия со стрелкой" }).getByText("Маршрут задан вручную").waitFor();
-    const after = center(await box(page, '[data-flow-handle="channel"]'));
-    expect(after.x - before.x).toBeGreaterThan(30);
+    expect(await page.locator(flowPath).getAttribute("d")).not.toBe(dBefore);
 
     // перенос конца-входа на верхнюю сторону той же фигуры: стрелка входит в блок сверху
     const t2 = await nodeBox(page, "t2");

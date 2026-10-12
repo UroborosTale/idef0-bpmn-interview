@@ -2,7 +2,27 @@ import { Router } from "express";
 import { db, logAudit } from "../db.js";
 import { nanoid } from "nanoid";
 import * as XLSX from "xlsx";
+import { excelSafeRows } from "../util/xlsxCells.js";
 import { detectDuplicates } from "../pipeline/duplicates.js";
+import { z } from "zod";
+
+// Поля процесса реестра: перечислимые значения и длины проверяются (раньше в реестр попадали «L9», статус «zzz», объекты вместо строк
+// и названия в сотни тысяч символов — последние ломали выгрузку в Excel). Лишние поля отбрасываются.
+const Str = (max: number) => z.string().trim().max(max);
+const RegistryFields = z.object({
+  code: Str(60).nullable().optional(),
+  name: Str(500).min(1),
+  level: z.enum(["L0", "L1", "L2", "L3"]).optional(),
+  parent_process_id: z.string().max(100).nullable().optional(),
+  classification: z.enum(["main", "support", "management"]).optional(),
+  owner: Str(300).nullable().optional(),
+  department: Str(300).nullable().optional(),
+  status: z.enum(["draft", "review", "needs_rework", "approved", "archived"]).optional(),
+  version: Str(20).optional(),
+  review_date: z.string().max(40).nullable().optional(),
+  session_id: z.string().max(100).nullable().optional(),
+});
+const zodMessage = (e: z.ZodError) => e.issues.map((i) => `${i.path.join(".") || "тело"}: ${i.message}`).join("; ");
 
 export const registryRouter = Router();
 
@@ -150,11 +170,12 @@ registryRouter.get("/registry/:id", (req, res) => {
 });
 
 registryRouter.post("/registry", (req, res) => {
-  const body = req.body as Partial<ProcessRow>;
-  if (!body.name) {
-    res.status(400).json({ error: "name is required" });
+  const parsed = RegistryFields.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: `Неверные поля процесса: ${zodMessage(parsed.error)}` });
     return;
   }
+  const body = parsed.data;
   const id = `proc_${nanoid(10)}`;
   const now = new Date().toISOString();
   db.prepare(
@@ -186,7 +207,12 @@ registryRouter.patch("/registry/:id", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const body = req.body as Partial<ProcessRow>;
+  const parsed = RegistryFields.partial().safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: `Неверные поля процесса: ${zodMessage(parsed.error)}` });
+    return;
+  }
+  const body = Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined)) as Partial<ProcessRow>;
   const merged: ProcessRow = { ...existing, ...body, id: existing.id, updated_at: new Date().toISOString() };
   db.prepare(
     `UPDATE processes SET code=?, name=?, level=?, parent_process_id=?, classification=?, owner=?, department=?, status=?, version=?, review_date=?, session_id=?, updated_at=?
@@ -235,7 +261,7 @@ registryRouter.get("/registry/export/xlsx", (_req, res) => {
     "Дата пересмотра": r.review_date ?? "",
   }));
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(sheetRows);
+  const ws = XLSX.utils.json_to_sheet(excelSafeRows(sheetRows));
   ws["!cols"] = [{ wch: 10 }, { wch: 40 }, { wch: 8 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 14 }];
   XLSX.utils.book_append_sheet(wb, ws, "Реестр процессов");
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });

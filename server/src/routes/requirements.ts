@@ -29,9 +29,10 @@ requirementsRouter.get("/requirements", (req, res) => {
   res.json(db.prepare(`SELECT * FROM requirements ${where} ORDER BY source, code`).all(...params));
 });
 
+const isText = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
 requirementsRouter.post("/requirements", (req, res) => {
   const { code, title, source } = req.body as { code: string; title: string; source?: string };
-  if (!code || !title) {
+  if (!isText(code, 100) || !isText(title, 4000) || !code.trim() || !title.trim() || (source !== undefined && !isText(source, 100))) {
     res.status(400).json({ error: "code and title are required" });
     return;
   }
@@ -48,6 +49,10 @@ requirementsRouter.patch("/requirements/:id", (req, res) => {
     return;
   }
   const { code, title, source } = req.body as Partial<RequirementRow>;
+  if ((code !== undefined && !isText(code, 100)) || (title !== undefined && !isText(title, 4000)) || (source !== undefined && !isText(source, 100))) {
+    res.status(400).json({ error: "code, title и source должны быть строками разумной длины" });
+    return;
+  }
   db.prepare(`UPDATE requirements SET code = ?, title = ?, source = ? WHERE id = ?`).run(
     code ?? existing.code,
     title ?? existing.title,

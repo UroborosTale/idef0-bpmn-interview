@@ -30,8 +30,8 @@ glossaryRouter.get("/glossary", (req, res) => {
 
 glossaryRouter.put("/glossary/:key", (req, res) => {
   const { kind, value, status } = req.body as { kind: string; value: string; status?: string };
-  if (!value) {
-    res.status(400).json({ error: "value is required" });
+  if (typeof value !== "string" || !value.trim() || value.length > 500 || (kind !== undefined && (typeof kind !== "string" || kind.length > 40)) || (status !== undefined && status !== "confirmed" && status !== "proposed")) {
+    res.status(400).json({ error: "value — непустая строка до 500 символов; kind — строка; status — confirmed или proposed" });
     return;
   }
   db.prepare(
@@ -155,7 +155,7 @@ glossaryRouter.delete("/role-position-map", (req, res) => {
  */
 glossaryRouter.post("/glossary/import-orgstructure", (req, res) => {
   const { csv } = req.body as { csv: string };
-  if (!csv || !csv.trim()) {
+  if (typeof csv !== "string" || !csv.trim()) {
     res.status(400).json({ error: "csv is required" });
     return;
   }

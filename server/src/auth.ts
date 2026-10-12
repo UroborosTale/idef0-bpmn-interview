@@ -55,6 +55,8 @@ function userOf(req: Request): AuthUser | null {
   if (!token) return null;
   const row = db.prepare(`SELECT login, expires_at FROM auth_sessions WHERE token = ?`).get(token) as { login: string; expires_at: number } | undefined;
   if (!row || row.expires_at < Date.now()) return null;
+  // пользователя убрали из AUTH_USERS — его вход больше не действует (раньше сессия жила до истечения, 12 ч)
+  if (!users().has(row.login)) return null;
   return { login: row.login };
 }
 

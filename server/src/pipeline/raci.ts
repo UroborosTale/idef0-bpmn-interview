@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { excelSafeRows } from "../util/xlsxCells.js";
 import type { ProcessLogicModel, RaciEntry } from "../types/model.js";
 
 /**
@@ -70,7 +71,7 @@ export function buildRaciWorkbookBuffer(model: ProcessLogicModel): Buffer {
   });
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(sheetRows);
+  const ws = XLSX.utils.json_to_sheet(excelSafeRows(sheetRows));
   ws["!cols"] = [{ wch: 40 }, ...model.roles.map(() => ({ wch: 14 }))];
   XLSX.utils.book_append_sheet(wb, ws, "RACI");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

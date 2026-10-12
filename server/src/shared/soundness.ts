@@ -191,6 +191,19 @@ export function analyzeSoundness(nodes: SoundNode[], flows: SoundFlow[]): Soundn
     return true;
   };
 
+  // Переходы по входным местам: сработать может только переход, у которого во входе (или во входах включающего слияния) есть токен.
+  // Кандидаты перебираются в исходном порядке — нумерация состояний и найденные пути те же, что при полном переборе, но на больших
+  // диаграммах это в разы быстрее (раньше каждое состояние проверяло все переходы сети).
+  const byPlace: number[][] = Array.from({ length: placeCount }, () => []);
+  transitions.forEach((t, ti) => {
+    for (const p of new Set([...t.consume, ...(t.orJoin ?? [])])) byPlace[p].push(ti);
+  });
+  const candidates = (m: number[]): number[] => {
+    const set = new Set<number>();
+    for (let p = 0; p < placeCount; p++) if (m[p] > 0) for (const ti of byPlace[p]) set.add(ti);
+    return [...set].sort((a, b) => a - b);
+  };
+
   // --- перебор достижимых состояний ---
   const initial = new Array<number>(placeCount).fill(0);
   initial[START] = 1;
@@ -203,7 +216,8 @@ export function analyzeSoundness(nodes: SoundNode[], flows: SoundFlow[]): Soundn
   for (let i = 0; i < states.length; i++) {
     if (states.length > MAX_STATES) return notAnalyzed();
     const m = states[i];
-    for (const t of transitions) {
+    for (const ti of candidates(m)) {
+      const t = transitions[ti];
       if (!enabled(m, t)) continue;
       let next: number[];
       if (t.clear) next = new Array<number>(placeCount).fill(0);

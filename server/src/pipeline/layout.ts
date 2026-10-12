@@ -133,6 +133,8 @@ const COLUMN_W = 170;
 const COLUMN_X0 = 60 - 25;
 /** До скольких стрелок подбор пробует перестановки, вставки и переносы фигур по столбцам (дальше — только сдвиги и порядок слоя). */
 const EXTRA_MOVES_MAX_FLOWS = 40;
+/** Больше узлов — без ELK, раскладкой по столбцам (на 500 узлах ELK занимал секунды и блокировал сервер). */
+const ELK_MAX_NODES = 150;
 
 /**
  * Раскладка по столбцам (shared/bpmnRank.ts): столбец — длиннейший путь от начала, строка — дорожка, в ячейке одна фигура. Ветки
@@ -329,18 +331,23 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     },
     children: nodes.map((n) => ({ id: n.id, width: n.width, height: n.height })),
     edges: edges
-      .filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to))
+      .filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to)) // до ELK_MAX_NODES узлов — дёшево
       .map((e) => ({ id: e.id, sources: [e.from], targets: [e.to] })),
   };
 
-  const result = await elk.layout(elkGraph as any);
-  const elkX = new Map<string, number>();
-  for (const child of result.children ?? []) {
-    elkX.set(child.id!, child.x ?? 0);
+  const ids = new Set(nodes.map((n) => n.id));
+  const edgeList = edges.filter((e) => ids.has(e.from) && ids.has(e.to));
+  let start: Placement;
+  if (nodes.length > ELK_MAX_NODES) {
+    // На больших схемах ELK (вертикаль которого всё равно заменяется дорожками) работает секунды и блокирует сервер,
+    // а подбор вариантов там уже выключен: берём раскладку по столбцам — тот же второй исходный вариант, только сразу.
+    start = columnPlacement(nodes, edgeList);
+  } else {
+    const result = await elk.layout(elkGraph as any);
+    const elkX = new Map<string, number>();
+    for (const child of result.children ?? []) elkX.set(child.id!, child.x ?? 0);
+    start = { rawX: elkX, rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
   }
-
-  const edgeList = edges.filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
-  const start: Placement = { rawX: elkX, rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
   const best = await improvePlacement(nodes, edgeList, start, lanes, extras);
   const boxes = placeBoxes(nodes, best.rawX, best.rank, lanes);
 

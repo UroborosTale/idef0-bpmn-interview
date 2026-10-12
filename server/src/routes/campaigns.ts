@@ -42,8 +42,22 @@ campaignsRouter.post("/sessions/:id/campaigns", (req, res) => {
     due_date?: string | null;
     respondents: { name: string; roleId?: string | null; weight?: number }[];
   };
-  if (!name || !respondents?.length) {
+  if (typeof name !== "string" || !name.trim() || name.length > 300 || !Array.isArray(respondents) || respondents.length === 0 || respondents.length > 200) {
     res.status(400).json({ error: "name and respondents[] are required" });
+    return;
+  }
+  // все респонденты проверяются заранее: записи в базу идут по одному, и неверный второй оставил бы «осиротевшую» строку первого
+  const badRespondent = respondents.findIndex(
+    (r) =>
+      !r || typeof r !== "object" || typeof r.name !== "string" || !r.name.trim() || r.name.length > 200 ||
+      (r.roleId !== undefined && r.roleId !== null && typeof r.roleId !== "string") || (r.weight !== undefined && (typeof r.weight !== "number" || !Number.isFinite(r.weight) || r.weight < 0))
+  );
+  if (badRespondent >= 0) {
+    res.status(400).json({ error: `Респондент №${badRespondent + 1}: нужно имя (строка), roleId — строка или null, weight — неотрицательное число` });
+    return;
+  }
+  if (due_date !== undefined && due_date !== null && typeof due_date !== "string") {
+    res.status(400).json({ error: "due_date — строка с датой или null" });
     return;
   }
 
@@ -219,7 +233,7 @@ campaignsRouter.post("/campaigns/:campaignId/respond/:token/turn", async (req, r
     return;
   }
   const { text } = req.body as { text: string };
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }

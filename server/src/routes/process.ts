@@ -101,7 +101,7 @@ processRouter.post("/sessions/:id/ingest-text", async (req, res) => {
     anonymize?: boolean;
     sourceLabel?: string;
   };
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }
@@ -121,7 +121,7 @@ processRouter.post("/sessions/:id/upload", async (req, res) => {
     append?: boolean;
     anonymize?: boolean;
   };
-  if (!filename || !contentBase64) {
+  if (typeof filename !== "string" || !filename || typeof contentBase64 !== "string" || !contentBase64) {
     res.status(400).json({ error: "filename and contentBase64 are required" });
     return;
   }

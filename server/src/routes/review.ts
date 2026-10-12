@@ -60,6 +60,15 @@ reviewRouter.post("/sessions/:id/review/start", (req, res) => {
     return;
   }
   const { steps: customSteps } = req.body as { steps?: { role: string; label: string; assignee?: string | null }[] };
+  if (
+    customSteps !== undefined &&
+    (!Array.isArray(customSteps) ||
+      customSteps.length > 20 ||
+      customSteps.some((s) => !s || typeof s.role !== "string" || typeof s.label !== "string" || !s.label.trim() || (s.assignee !== undefined && s.assignee !== null && typeof s.assignee !== "string")))
+  ) {
+    res.status(400).json({ error: "steps — массив шагов { role, label, assignee? } (строки), не больше 20" });
+    return;
+  }
   const stepDefs = customSteps && customSteps.length > 0 ? customSteps : DEFAULT_STEPS;
   const steps: ReviewStep[] = stepDefs.map((s) => ({ id: `rs_${nanoid(8)}`, role: s.role, label: s.label, assignee: s.assignee ?? null, status: "pending", comment: null, ts: null }));
 

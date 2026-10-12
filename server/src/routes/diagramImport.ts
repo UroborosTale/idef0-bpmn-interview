@@ -44,7 +44,7 @@ diagramImportRouter.post("/sessions/:id/diagram-import/bpmn", (req, res) => {
     return;
   }
   const { xml } = req.body as { xml: string };
-  if (!xml || !xml.trim()) {
+  if (typeof xml !== "string" || !xml.trim()) {
     res.status(400).json({ error: "xml обязателен" });
     return;
   }
@@ -68,7 +68,7 @@ diagramImportRouter.post("/sessions/:id/diagram-import/drawio-idef0", (req, res)
     return;
   }
   const { xml } = req.body as { xml: string };
-  if (!xml || !xml.trim()) {
+  if (typeof xml !== "string" || !xml.trim()) {
     res.status(400).json({ error: "xml обязателен" });
     return;
   }

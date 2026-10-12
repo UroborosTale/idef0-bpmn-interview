@@ -38,6 +38,20 @@ describe("вход", () => {
     expect((await app.call("GET", "/sessions")).status).toBe(401);
   });
 
+  it("пользователя убрали из AUTH_USERS — его вход сразу перестаёт действовать", async () => {
+    app.resetCookie();
+    expect((await app.call("POST", "/auth/login", { login: "owner", password: "plain" })).status).toBe(200);
+    expect((await app.call("GET", "/sessions")).status).toBe(200);
+    const before = process.env.AUTH_USERS;
+    process.env.AUTH_USERS = `analyst:${hashPassword("secret")}`;
+    try {
+      expect((await app.call("GET", "/sessions")).status).toBe(401);
+    } finally {
+      process.env.AUTH_USERS = before;
+    }
+    app.resetCookie();
+  });
+
   it("перебор паролей ограничен", async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 12; i++) statuses.push((await app.call("POST", "/auth/login", { login: "owner", password: "x" })).status);

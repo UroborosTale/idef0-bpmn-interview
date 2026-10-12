@@ -40,7 +40,7 @@ interviewRouter.post("/sessions/:id/interview/turn", async (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  if (!text || !text.trim()) {
+  if (typeof text !== "string" || !text.trim()) {
     res.status(400).json({ error: "text is required" });
     return;
   }
