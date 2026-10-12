@@ -5,10 +5,49 @@
  */
 
 import { functionCodes } from "./codes.js";
+import { orthogonalPath, type Side } from "./bpmnManual.js";
 
 export type Pt = [number, number];
 export type LabelSide = "left" | "right" | "top" | "bottom" | "mid";
 export type ArrowKind = "input" | "link" | "output" | "control" | "controlData" | "controlLink" | "role" | "system";
+
+/** Ручной маршрут стрелки (структурно совпадает с ArrowRoute модели): чего нет — выбирает автоматическая прокладка. */
+export interface ArrowRoute {
+  /** Положение конца у блока функции стрелки вдоль стороны: 0…1 слева направо (верх, низ) или сверху вниз (лево, право). */
+  pos?: number;
+  /** У связи между функциями — положение конца на правой стороне блока-источника. */
+  from_pos?: number;
+  /** Внутренние точки излома от начала стрелки к концу. */
+  points?: Pt[];
+  /** Свободный конец внешней стрелки. */
+  end?: Pt;
+  /** Сдвиг подписи от обычного места. */
+  label?: Pt;
+}
+
+/** Ключ маршрута в arrow_routes функции. */
+export const arrowRouteKey = (kind: ArrowKind, entityId: string) => `${kind}:${entityId}`;
+
+/**
+ * Стороны стрелки в направлении от начала к концу: из какой стороны выходит начало (куда идёт первый отрезок) и в какую сторону
+ * смотрит нормаль у конца (с какой стороны подходит последний отрезок). Для orthogonalPath и ручек редактора.
+ */
+export const ARROW_DIRS: Record<ArrowKind, { from: Side; to: Side }> = {
+  input: { from: "R", to: "L" },
+  link: { from: "R", to: "L" },
+  output: { from: "R", to: "L" },
+  control: { from: "B", to: "T" },
+  controlData: { from: "B", to: "T" },
+  controlLink: { from: "R", to: "T" },
+  role: { from: "T", to: "B" },
+  system: { from: "T", to: "B" },
+};
+/** Сторона блока функции стрелки, у которой лежит конец стрелки (вход — слева, управление — сверху, выход — справа, механизм — снизу). */
+export const PORT_SIDE: Record<ArrowKind, Side> = { input: "L", link: "L", output: "R", control: "T", controlData: "T", controlLink: "T", role: "B", system: "B" };
+/** Конец без блока (внешняя стрелка): у входа, управления и механизма — начало, у выхода — конец. */
+export const FREE_END: Partial<Record<ArrowKind, "start" | "end">> = { input: "start", control: "start", controlData: "start", role: "start", system: "start", output: "end" };
+/** Меньше этого расстояния свободный конец не подводят к блоку: не поместятся стрелка и её наконечник. */
+export const MIN_FREE = 48;
 
 export const BLOCK_W = 170;
 export const BLOCK_H = 90;
@@ -34,6 +73,7 @@ export interface NodeLike {
   idef0_parent?: string | null;
   bpmn_scope?: string | null;
   idef0_layout?: { x: number; y: number } | null;
+  arrow_routes?: Record<string, ArrowRoute> | null;
   role_id?: string | null;
   inputs: string[];
   outputs: string[];
@@ -80,6 +120,10 @@ export interface Arrow {
   side: LabelSide;
   /** Ряд подписи (0, 1, 2): соседние подписи сверху/снизу блока разносятся по высоте, чтобы не налезать. */
   labelRow?: number;
+  /** Сдвиг подписи от обычного места (ручной маршрут). */
+  labelOffset?: Pt;
+  /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
+  manual?: boolean;
 }
 
 export interface FunctionBlock<N extends NodeLike = NodeLike> {
@@ -152,6 +196,23 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     return { sy: pf.box.y + 14 + k * spread(pf.box.h, outs.length, 18, 14), k };
   };
 
+  const routeOf = (n: N, kind: ArrowKind, id: string): ArrowRoute | undefined => n.arrow_routes?.[arrowRouteKey(kind, id)] ?? undefined;
+  /** Ручной маршрут поверх автоматической ломаной: подпись сдвигается, а точки излома и свободный конец прокладываются заново (положения концов учтены при построении). */
+  const finish = (a: Arrow, route: ArrowRoute | undefined): Arrow => {
+    if (!route) return a;
+    const out: Arrow = { ...a };
+    if (route.label) out.labelOffset = [route.label[0], route.label[1]];
+    if (route.pos !== undefined || route.from_pos !== undefined || route.label) out.manual = true;
+    if (route.points || route.end) {
+      const free = FREE_END[a.kind];
+      const first = free === "start" && route.end ? route.end : a.points[0];
+      const last = free === "end" && route.end ? route.end : a.points[a.points.length - 1];
+      out.points = orthogonalPath(first, ARROW_DIRS[a.kind].from, route.points ?? [], last, ARROW_DIRS[a.kind].to);
+      out.manual = true;
+    }
+    return out;
+  };
+
   const arrows: Arrow[] = [];
   for (const { node: n, box: b } of functions) {
     // управление (сверху): регламенты — снаружи; данные-управление — от функции-источника, если она на диаграмме
@@ -161,18 +222,21 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     ];
     const cStep = spread(b.w, ctrls.length, 26, 20);
     ctrls.forEach((c, ci) => {
-      const cx = b.x + 20 + ci * cStep;
       const producer = c.data ? producedBy.get(c.id) : undefined;
-      if (producer && producer !== n.id && blockOf.has(producer)) {
-        const pf = blockOf.get(producer)!;
-        const { sy, k } = outSlot(pf, c.id);
+      const linked = !!producer && producer !== n.id && blockOf.has(producer);
+      const kind: ArrowKind = linked ? "controlLink" : c.data ? "controlData" : "control";
+      const route = routeOf(n, kind, c.id);
+      const cx = route?.pos !== undefined ? b.x + route.pos * b.w : b.x + 20 + ci * cStep;
+      if (linked) {
+        const pf = blockOf.get(producer!)!;
+        const slot = outSlot(pf, c.id);
+        const sy = route?.from_pos !== undefined ? pf.box.y + route.from_pos * pf.box.h : slot.sy;
         const sx = pf.box.x + pf.box.w;
-        const trunk = sx + 16 + 8 * k;
+        const trunk = sx + 16 + 8 * slot.k;
         const topY = b.y - 24;
-        arrows.push({ key: `controlLink:${n.id}:${c.id}`, kind: "controlLink", entityId: c.id, label: c.name, nodeId: n.id, fromId: producer, points: [[sx, sy], [trunk, sy], [trunk, topY], [cx, topY], [cx, b.y]], side: "mid" });
+        arrows.push(finish({ key: `controlLink:${n.id}:${c.id}`, kind, entityId: c.id, label: c.name, nodeId: n.id, fromId: producer, points: [[sx, sy], [trunk, sy], [trunk, topY], [cx, topY], [cx, b.y]], side: "mid" }, route));
       } else {
-        const kind = c.data ? "controlData" : "control";
-        arrows.push({ key: `${kind}:${n.id}:${c.id}`, kind, entityId: c.id, label: c.name, nodeId: n.id, points: [[cx, b.y - STUB_CTRL], [cx, b.y]], side: "top", labelRow: rowOf(ci, ctrls.length) });
+        arrows.push(finish({ key: `${kind}:${n.id}:${c.id}`, kind, entityId: c.id, label: c.name, nodeId: n.id, points: [[cx, b.y - STUB_CTRL], [cx, b.y]], side: "top", labelRow: rowOf(ci, ctrls.length) }, route));
       }
     });
 
@@ -180,13 +244,18 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     const ins = n.inputs.filter((id) => dataById.has(id));
     const iStep = spread(b.h, ins.length, 18, 14);
     ins.forEach((id, di) => {
-      const y = b.y + 14 + di * iStep;
       const label = dataById.get(id)!.name;
       const producer = producedBy.get(id);
-      if (producer && producer !== n.id && blockOf.has(producer)) {
-        const pf = blockOf.get(producer)!;
+      const linked = !!producer && producer !== n.id && blockOf.has(producer);
+      const kind: ArrowKind = linked ? "link" : "input";
+      const route = routeOf(n, kind, id);
+      const y = route?.pos !== undefined ? b.y + route.pos * b.h : b.y + 14 + di * iStep;
+      if (linked) {
+        const pf = blockOf.get(producer!)!;
         const pb = pf.box;
-        const { sy, k } = outSlot(pf, id);
+        const slot = outSlot(pf, id);
+        const sy = route?.from_pos !== undefined ? pb.y + route.from_pos * pb.h : slot.sy;
+        const k = slot.k;
         const sx = pb.x + pb.w;
         const trunk = sx + 16 + 8 * k;
         let points: Pt[];
@@ -198,9 +267,9 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
           const entry = b.x - 16 - 6 * di;
           points = [[sx, sy], [trunk, sy], [trunk, top], [entry, top], [entry, y], [b.x, y]];
         }
-        arrows.push({ key: `link:${n.id}:${id}`, kind: "link", entityId: id, label, nodeId: n.id, fromId: producer, points, side: "mid" });
+        arrows.push(finish({ key: `link:${n.id}:${id}`, kind, entityId: id, label, nodeId: n.id, fromId: producer, points, side: "mid" }, route));
       } else {
-        arrows.push({ key: `input:${n.id}:${id}`, kind: "input", entityId: id, label, nodeId: n.id, points: [[b.x - STUB_SIDE, y], [b.x, y]], side: "left" });
+        arrows.push(finish({ key: `input:${n.id}:${id}`, kind, entityId: id, label, nodeId: n.id, points: [[b.x - STUB_SIDE, y], [b.x, y]], side: "left" }, route));
       }
     });
 
@@ -210,8 +279,9 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     outs.forEach((id, i) => {
       const consumed = fnNodes.some((o) => o.id !== n.id && (o.inputs.includes(id) || (o.control_data_ids ?? []).includes(id)));
       if (consumed) return;
-      const y = b.y + 14 + i * oStep;
-      arrows.push({ key: `output:${n.id}:${id}`, kind: "output", entityId: id, label: dataById.get(id)!.name, nodeId: n.id, points: [[b.x + b.w, y], [b.x + b.w + STUB_SIDE, y]], side: "right" });
+      const route = routeOf(n, "output", id);
+      const y = route?.pos !== undefined ? b.y + route.pos * b.h : b.y + 14 + i * oStep;
+      arrows.push(finish({ key: `output:${n.id}:${id}`, kind: "output", entityId: id, label: dataById.get(id)!.name, nodeId: n.id, points: [[b.x + b.w, y], [b.x + b.w + STUB_SIDE, y]], side: "right" }, route));
     });
 
     // механизмы (снизу): должности (исполнитель и назначенные роли) и системы
@@ -220,23 +290,31 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     for (const sid of n.system_ids) if (systemById.has(sid)) mech.push({ kind: "system", id: sid, name: systemById.get(sid)!.name });
     const mStep = spread(b.w, mech.length, 40, 20);
     mech.forEach((mm, i) => {
-      const x = b.x + 20 + i * mStep;
-      arrows.push({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom", labelRow: rowOf(i, mech.length) });
+      const route = routeOf(n, mm.kind, mm.id);
+      const x = route?.pos !== undefined ? b.x + route.pos * b.w : b.x + 20 + i * mStep;
+      arrows.push(finish({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom", labelRow: rowOf(i, mech.length) }, route));
     });
-  }
-  return { functions, arrows };
+  }  return { functions, arrows };
 }
 
 /** Размер «мира» диаграммы. */
 export function idef0Extents(layout: Idef0Layout<NodeLike>): { w: number; h: number } {
+  // стрелки, уведённые вручную за пределы блоков, тоже должны поместиться (справа от конца — место для подписи)
+  const pts = layout.arrows.flatMap((a) => a.points);
   return {
-    w: Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w + 260)),
-    h: Math.max(420, ...layout.functions.map((f) => f.box.y + f.box.h + 220)),
+    w: Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w + 260), ...pts.map((p) => p[0] + 200)),
+    h: Math.max(420, ...layout.functions.map((f) => f.box.y + f.box.h + 220), ...pts.map((p) => p[1] + 60)),
   };
 }
 
-/** Положение подписи стрелки: у начала слева/сверху/снизу, у конца справа или над самым длинным горизонтальным отрезком. */
-export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+/** Положение подписи стрелки: у начала слева/сверху/снизу, у конца справа или над самым длинным горизонтальным отрезком; плюс ручной сдвиг. */
+export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number; labelOffset?: Pt }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+  const spec = baseLabelSpec(a);
+  if (!spec || !a.labelOffset) return spec;
+  return { ...spec, x: spec.x + a.labelOffset[0], y: spec.y + a.labelOffset[1] };
+}
+
+function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
   if (!a.label) return null;
   const text = a.label.length > 26 ? a.label.slice(0, 25) + "…" : a.label;
   const first = a.points[0];

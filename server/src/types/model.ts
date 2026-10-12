@@ -106,6 +106,23 @@ export const EventTriggerSchema = z.object({
   members: z.array(z.enum(TRIGGER_TYPES)).optional(),
 });
 
+// Ручной маршрут стрелки IDEF0 (хранится у функции, к которой привязана стрелка, по ключу «вид:сущность»; shared/idef0Layout.ts).
+// Чего нет — выбирает автоматическая прокладка. Координаты — в мире диаграммы.
+const Pt2 = z.tuple([z.number(), z.number()]);
+export const ArrowRoute = z.object({
+  // положение конца у блока этой функции вдоль стороны: 0…1 слева направо (верх, низ) или сверху вниз (лево, право)
+  pos: z.number().min(0).max(1).optional(),
+  // у связи между функциями — положение конца у блока-источника (на его правой стороне)
+  from_pos: z.number().min(0).max(1).optional(),
+  // внутренние точки излома от начала стрелки к концу: линия идёт через них, недостающие колена достраиваются
+  points: z.array(Pt2).max(32).optional(),
+  // свободный конец внешней стрелки (начало у входа, управления и механизма, конец у выхода)
+  end: Pt2.optional(),
+  // сдвиг подписи от обычного места
+  label: Pt2.optional(),
+});
+export type ArrowRoute = z.infer<typeof ArrowRoute>;
+
 export const ProcessNode = z.object({
   id: z.string(),
   type: NodeType,
@@ -137,6 +154,8 @@ export const ProcessNode = z.object({
   layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   // Позиция блока на диаграмме IDEF0 A0 (редактор IDEF0); без неё блоки идут по диагонали.
   idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  // Ручные маршруты стрелок IDEF0, привязанных к этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1, system:s1…).
+  arrow_routes: z.record(z.string(), ArrowRoute).optional(),
   status: z.enum(["confirmed", "hypothesis"]).default("hypothesis"),
   confidence: z.number().min(0).max(1).default(0.5),
   source: z.array(SourceRef).default([]),

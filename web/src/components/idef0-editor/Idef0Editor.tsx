@@ -6,24 +6,35 @@ import EditorToolbar from "../editor-core/EditorToolbar";
 import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
-import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, snap, withIdef0Layout } from "./geometry";
-import { addFunction, linkFunctions, moveFunction, removeArrow } from "./ops";
+import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
+import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
+import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
+import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, setArrowIcom } from "./ops";
 import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { ArrowShape, BlockShape, Idef0Defs } from "./shapes";
+import { ArrowHandles, ArrowShape, BlockShape, Idef0Defs } from "./shapes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
-type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string } | null;
+// стрелка выделена по ключу, а если ключ сменился (вход стал управлением) — находится по функции и сущности
+type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string; nodeId?: string; entityId?: string } | null;
+const arrowSelOf = (a: Pick<Arrow, "key" | "nodeId" | "entityId">): Sel => ({ kind: "arrow", id: a.key, nodeId: a.nodeId, entityId: a.entityId });
 type Zone = "input" | "control";
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "fn"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
-  | { kind: "connect"; from: string };
+  | { kind: "connect"; from: string }
+  // правка выбранной стрелки: a — стрелка в начале жеста (от её ломаной пересчитывается каждый шаг), start — модель до жеста
+  | { kind: "aseg"; a: Arrow; i: number; axis: "x" | "y"; start: M; x0: number; y0: number; moved: boolean }
+  | { kind: "acorner"; a: Arrow; i: number; start: M; x0: number; y0: number; v: Pt; moved: boolean }
+  | { kind: "aend"; a: Arrow; end: "block" | "producer" | "free"; start: M; x0: number; y0: number; moved: boolean }
+  | { kind: "alabel"; a: Arrow; start: M; x0: number; y0: number; off0: Pt; moved: boolean };
 
 /** Верхняя треть блока-цели при протягивании связи — управление, остальное — вход. */
 const CONTROL_ZONE = 0.3;
+const DATA_KINDS = new Set(["input", "link", "controlData", "controlLink"]);
+const CONTROL_KINDS = new Set(["control", "controlData", "controlLink"]);
 
 export default function Idef0Editor({
   model,
@@ -71,7 +82,13 @@ export default function Idef0Editor({
   const [showMap, setShowMap] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
-  const [connectHot, setConnectHot] = useState<{ id: string; zone: Zone } | null>(null);
+  // цель при переносе стрелки или протягивании связи; zone — только когда зона блока что-то решает (вход или управление)
+  const [connectHot, setConnectHot] = useState<{ id: string; zone: Zone | null } | null>(null);
+  const hotRef = useRef<{ id: string; zone: Zone | null } | null>(null);
+  /** Направляющие выравнивания при правке стрелки и «призрак» переносимого конца. */
+  const [guides, setGuides] = useState<Guide[]>([]);
+  const [ghost, setGhost] = useState<{ from: Pt; to: Pt } | null>(null);
+  const arrowHinted = useRef(false);
   const { hint, showHint } = useHint();
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -89,8 +106,12 @@ export default function Idef0Editor({
 
   const codes = idef0Codes(draft);
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
-  const curSel: Sel =
-    sel && ((sel.kind === "fn" && blocks.has(sel.id)) || (sel.kind === "arrow" && layout.arrows.some((a) => a.key === sel.id))) ? sel : null;
+  const arrowOf = (s: Extract<Sel, { kind: "arrow" }>) =>
+    layout.arrows.find((a) => a.key === s.id) ?? (s.nodeId ? layout.arrows.find((a) => a.nodeId === s.nodeId && a.entityId === s.entityId) : undefined);
+  const curSel: Sel = !sel ? null : sel.kind === "fn" ? (blocks.has(sel.id) ? sel : null) : ((a) => (a ? arrowSelOf(a) : null))(arrowOf(sel));
+
+  /** Выбранная стрелка в её сегодняшнем виде (с ручным маршрутом, если он есть). */
+  const arrowSel = curSel?.kind === "arrow" ? layout.arrows.find((a) => a.key === curSel.id) : undefined;
 
   const groupIds = multi.filter((id) => blocks.has(id));
   const inGroup = groupIds.length >= 2;
@@ -107,6 +128,10 @@ export default function Idef0Editor({
   const pick = (s: Sel) => {
     setSel(s);
     onSelectionChange?.(toSelection(s));
+    if (s?.kind === "arrow" && !arrowHinted.current) {
+      arrowHinted.current = true;
+      showHint("Ручки стрелки: ○ конец (потяните вдоль стороны или на другую функцию), ▭ отрезок, ■ излом; двойной щелчок по линии — излом");
+    }
   };
   // выделение изменилось не мышью (переход из навигатора, новая функция, удаление) — тоже сообщаем
   useEffect(() => {
@@ -162,6 +187,128 @@ export default function Idef0Editor({
     return wy < b.y + b.h * CONTROL_ZONE ? "control" : "input";
   };
 
+  // --- правка выбранной стрелки ---
+
+  /** Опорные линии для выравнивания: границы блоков и вершины других стрелок. */
+  const alignBoxes = () => layout.functions.map((f) => f.box);
+  const otherArrowLines = (key: string) => layout.arrows.filter((x) => x.key !== key).map((x) => x.points);
+
+  const arrowMove = (d: Extract<Drag, { kind: "aseg" | "acorner" | "aend" | "alabel" }>, e: React.PointerEvent) => {
+    const [wx, wy] = toWorld(e.clientX, e.clientY);
+    const free = e.altKey; // Alt — без сетки и направляющих
+    const tol = GUIDE_SNAP_PX / view.k;
+    const tooEarly = (dx: number, dy: number) => !d.moved && Math.hypot(dx, dy) * view.k < 4;
+
+    if (d.kind === "aseg") {
+      // отрезок сдвигается поперёк себя: к сетке или к направляющей (граница блока, вершина этой или другой стрелки)
+      const raw = d.axis === "y" ? wy - d.y0 : wx - d.x0;
+      if (tooEarly(raw, 0)) return;
+      d.moved = true;
+      const [p, q] = [d.a.points[d.i], d.a.points[d.i + 1]];
+      const base = d.axis === "y" ? p[1] : p[0];
+      let value = base + (free ? raw : Math.round(raw / ARROW_GRID) * ARROW_GRID);
+      let guide: Guide | null = null;
+      if (!free) {
+        const last = d.a.points.length - 1;
+        const s = snapAxis(base + raw, guideTargets(d.axis, alignBoxes(), d.a.points, [d.i, d.i + 1].filter((j) => j > 0 && j < last), otherArrowLines(d.a.key)), tol);
+        if (s.hit.length > 0) {
+          value = s.value;
+          guide = guideFor(d.axis, value, s.hit, d.axis === "y" ? [p[0], q[0]] : [p[1], q[1]]);
+        }
+      }
+      setGuides(guide ? [guide] : []);
+      setDraft(() => dragSegment(d.start, d.a, d.i, value - base));
+    } else if (d.kind === "acorner") {
+      if (tooEarly(wx - d.x0, wy - d.y0)) return;
+      d.moved = true;
+      const [rx, ry] = [d.v[0] + wx - d.x0, d.v[1] + wy - d.y0];
+      let [x, y] = free ? [rx, ry] : [Math.round(rx / ARROW_GRID) * ARROW_GRID, Math.round(ry / ARROW_GRID) * ARROW_GRID];
+      const found: { axis: "x" | "y"; hit: GuideTarget[] }[] = [];
+      if (!free) {
+        const sx = snapAxis(rx, guideTargets("x", alignBoxes(), d.a.points, [d.i], otherArrowLines(d.a.key)), tol);
+        const sy = snapAxis(ry, guideTargets("y", alignBoxes(), d.a.points, [d.i], otherArrowLines(d.a.key)), tol);
+        if (sx.hit.length > 0) (x = sx.value, found.push({ axis: "x", hit: sx.hit }));
+        if (sy.hit.length > 0) (y = sy.value, found.push({ axis: "y", hit: sy.hit }));
+      }
+      setGuides(found.map((f) => guideFor(f.axis, f.axis === "x" ? x : y, f.hit, f.axis === "x" ? [y - 12, y + 12] : [x - 12, x + 12])));
+      setDraft(() => dragCorner(d.start, d.a, d.i, [x, y]));
+    } else if (d.kind === "alabel") {
+      if (tooEarly(wx - d.x0, wy - d.y0)) return;
+      d.moved = true;
+      const g = (v: number) => (free ? v : Math.round(v / 5) * 5);
+      setDraft(() => setLabelOffset(d.start, d.a, g(d.off0[0] + wx - d.x0), g(d.off0[1] + wy - d.y0)));
+    } else {
+      if (tooEarly(wx - d.x0, wy - d.y0)) return;
+      d.moved = true;
+      const a = d.a;
+      const own = d.end === "producer" ? a.fromId : a.nodeId;
+      // куда указывает конец: другая функция — перенос стрелки; свой блок с другой зоной — вход становится управлением (и наоборот)
+      const over = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-fn-id]")?.getAttribute("data-fn-id") ?? null;
+      let hot: { id: string; zone: Zone | null } | null = null;
+      if (d.end !== "free" && over && blocks.has(over)) {
+        const data = d.end === "block" && DATA_KINDS.has(a.kind);
+        const zone = zoneAt(over, wy);
+        if (over !== own) hot = { id: over, zone: data ? zone : null };
+        else if (data && zone !== (CONTROL_KINDS.has(a.kind) ? "control" : "input")) hot = { id: over, zone };
+      }
+      hotRef.current = hot;
+      setConnectHot(hot);
+      if (hot) {
+        // неподвижный конец стрелки: у конца у блока (не у выхода) — её начало, в остальных случаях — конец
+        const fixed = d.end === "block" && a.kind !== "output" ? a.points[0] : a.points[a.points.length - 1];
+        setGhost({ from: fixed, to: [wx, wy] });
+        setGuides([]);
+        setDraft(() => d.start); // пока цель выбрана, стрелка стоит на месте
+        return;
+      }
+      setGhost(null);
+      if (d.end === "free") {
+        // свободный конец: к сетке и направляющим по обеим осям, не ближе MIN_FREE к блоку
+        let [x, y] = [wx, wy];
+        const found: { axis: "x" | "y"; hit: GuideTarget[] }[] = [];
+        if (!free) {
+          const sx = snapAxis(x, guideTargets("x", alignBoxes(), a.points, [], otherArrowLines(a.key)), tol);
+          const sy = snapAxis(y, guideTargets("y", alignBoxes(), a.points, [], otherArrowLines(a.key)), tol);
+          if (sx.hit.length > 0) (x = sx.value, found.push({ axis: "x", hit: sx.hit }));
+          if (sy.hit.length > 0) (y = sy.value, found.push({ axis: "y", hit: sy.hit }));
+        }
+        const box = blocks.get(a.nodeId)!.box;
+        const end = clampFreeEnd(box, a.kind, [x, y]);
+        setGuides(found.map((f) => guideFor(f.axis, f.axis === "x" ? end[0] : end[1], f.hit, f.axis === "x" ? [end[1] - 12, end[1] + 12] : [end[0] - 12, end[0] + 12])));
+        setDraft(() => setFreeEnd(d.start, a, end));
+      } else {
+        // конец у блока едет вдоль его стороны
+        const box = blocks.get(own!)?.box;
+        if (!box) return;
+        setGuides([]);
+        setDraft(() => slideEnd(d.start, a, fractionAlong(box, a, [wx, wy], d.end === "producer"), d.end === "producer"));
+      }
+    }
+  };
+
+  /** Отпускание ручки: перенос на другую функцию меняет связь в модели, остальное — шаг истории. */
+  const arrowUp = (d: Extract<Drag, { kind: "aseg" | "acorner" | "aend" | "alabel" }>) => {
+    setGuides([]);
+    setGhost(null);
+    const hot = hotRef.current;
+    hotRef.current = null;
+    setConnectHot(null);
+    if (d.kind === "aend" && hot) {
+      const r = reconnectArrow(d.start, d.a, d.end === "producer" ? "producer" : "block", hot.id, hot.zone ?? "input");
+      if (r.error) {
+        showHint(r.error);
+        setDraft(() => d.start);
+        return;
+      }
+      h.recordPast(d.start);
+      setDraft(() => r.model);
+      const next = buildIdef0(r.model, cur).arrows.find((x) => x.nodeId === r.nodeId && x.entityId === r.entityId);
+      if (next) setSel(arrowSelOf(next));
+      return;
+    }
+    if (d.moved) h.recordPast(d.start);
+  };
+
   // --- указатель ---
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -171,6 +318,29 @@ export default function Idef0Editor({
     const openEl = t.closest("[data-open]");
     if (openEl && e.button === 0) {
       openDiagram(openEl.getAttribute("data-open"));
+      return;
+    }
+    // ручки выбранной стрелки
+    const handleEl = t.closest("[data-ah]");
+    if (handleEl && e.button === 0 && arrowSel) {
+      const [what, idx] = handleEl.getAttribute("data-ah")!.split("|");
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      const start = draftRef.current;
+      const a = arrowSel;
+      if (what === "seg") {
+        const i = Number(idx);
+        const horizontal = Math.abs(a.points[i][1] - a.points[i + 1][1]) < 0.5;
+        dragRef.current = { kind: "aseg", a, i, axis: horizontal ? "y" : "x", start, x0: wx, y0: wy, moved: false };
+      } else if (what === "corner") {
+        const i = Number(idx);
+        dragRef.current = { kind: "acorner", a, i, start, x0: wx, y0: wy, v: a.points[i], moved: false };
+      } else if (what === "end") {
+        dragRef.current = { kind: "aend", a, end: idx as "block" | "producer" | "free", start, x0: wx, y0: wy, moved: false };
+      } else {
+        dragRef.current = { kind: "alabel", a, start, x0: wx, y0: wy, off0: a.labelOffset ?? [0, 0], moved: false };
+      }
+      e.preventDefault();
+      svgRef.current!.setPointerCapture(e.pointerId);
       return;
     }
     const connectEl = t.closest("[data-connect]");
@@ -224,7 +394,8 @@ export default function Idef0Editor({
       svgRef.current!.setPointerCapture(e.pointerId);
     } else if (arrowEl) {
       setMulti([]);
-      pick({ kind: "arrow", id: arrowEl.getAttribute("data-arrow-key")! });
+      const clicked = layout.arrows.find((a) => a.key === arrowEl.getAttribute("data-arrow-key"));
+      if (clicked) pick(arrowSelOf(clicked));
     }
   };
 
@@ -246,6 +417,8 @@ export default function Idef0Editor({
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
       d.moved = true;
       setDraft(() => moveGroup(d.base, cur, d.ids, wx - d.x0, wy - d.y0));
+    } else if (d.kind === "aseg" || d.kind === "acorner" || d.kind === "aend" || d.kind === "alabel") {
+      arrowMove(d, e);
     } else {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       setConnectTo([wx, wy]);
@@ -274,6 +447,8 @@ export default function Idef0Editor({
       if (!rect || (rect.w < 3 && rect.h < 3)) return;
       const hit = blocksInRect(draftRef.current, cur, rect);
       selectIds(d.add ? [...new Set([...pickedIds, ...hit])] : hit);
+    } else if (d.kind === "aseg" || d.kind === "acorner" || d.kind === "aend" || d.kind === "alabel") {
+      arrowUp(d);
     } else if (d.kind === "connect") {
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest("[data-fn-id]")?.getAttribute("data-fn-id");
       setConnectTo(null);
@@ -282,15 +457,34 @@ export default function Idef0Editor({
         const [, wy] = toWorld(e.clientX, e.clientY);
         const r = linkFunctions(draftRef.current, d.from, target, zoneAt(target, wy));
         if (r.error) showHint(r.error);
-        else commit(r.model, { kind: "arrow", id: r.key! });
+        else commit(r.model, { kind: "arrow", id: r.key!, nodeId: target, entityId: r.id });
       }
     }
   };
 
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const t = e.target as Element;
+    // пока указатель захвачен ручкой или блоком, событие приходит на сам svg: цель определяем по координатам
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
     const id = t.closest("[data-fn-id]")?.getAttribute("data-fn-id");
     if (t.closest("[data-open]")) return;
+    // двойной щелчок по излому убирает его, по линии стрелки — добавляет излом
+    const handle = t.closest("[data-ah]")?.getAttribute("data-ah") ?? "";
+    if (handle.startsWith("corner|") && arrowSel) {
+      commit(removeBend(draftRef.current, arrowSel, Number(handle.split("|")[1])));
+      return;
+    }
+    // ручка отрезка — часть линии: двойной щелчок по ней тоже добавляет излом
+    if (handle && !handle.startsWith("seg|")) return;
+    const arrowKey = handle ? arrowSel?.key : t.closest("[data-arrow-key]")?.getAttribute("data-arrow-key");
+    if (arrowKey) {
+      const a = layout.arrows.find((x) => x.key === arrowKey);
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      const next = a ? addBend(draftRef.current, a, [wx, wy]) : draftRef.current;
+      if (a && next === draftRef.current) showHint("Отрезок слишком короткий для излома");
+      else commit(next, a ? arrowSelOf(a) : undefined);
+      return;
+    }
     if (id) setEditing(id);
     else if (!t.closest("[data-arrow-key]") && !t.closest("[data-connect]")) addAt(toWorld(e.clientX, e.clientY));
   };
@@ -518,7 +712,24 @@ export default function Idef0Editor({
                 <BlockShape key={f.node.id} fn={f} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
               ))}
 
-              {connectHot && blocks.get(connectHot.id) && (
+              {arrowSel && !editing && <ArrowHandles arrow={arrowSel} labelAt={labelSpec(arrowSel)} k={view.k} />}
+              {guides.map((gd, i) => (
+                <line
+                  key={`guide${i}`}
+                  data-guide={gd.axis}
+                  x1={gd.axis === "y" ? gd.from : gd.at}
+                  y1={gd.axis === "y" ? gd.at : gd.from}
+                  x2={gd.axis === "y" ? gd.to : gd.at}
+                  y2={gd.axis === "y" ? gd.at : gd.to}
+                  stroke="#db2777"
+                  strokeWidth={1.2}
+                  strokeDasharray="6 3"
+                  pointerEvents="none"
+                />
+              ))}
+              {ghost && <path d={`M${ghost.from[0]} ${ghost.from[1]} L${ghost.to[0]} ${ghost.to[1]}`} stroke="#4338ca" strokeWidth={2} strokeDasharray="6 4" fill="none" pointerEvents="none" />}
+
+              {connectHot && blocks.get(connectHot.id) && connectHot.zone && (
                 // подсказка зоны: зелёная полоса сверху — управление, слева — вход
                 <rect
                   x={blocks.get(connectHot.id)!.box.x}
@@ -568,7 +779,35 @@ export default function Idef0Editor({
               onDone={() => setEditing(null)}
             />
           )}
-          {(pickedIds.length > 0 || hasClipboard()) && (
+          {arrowSel && !editing && (
+            <div className="bpe-selbar" role="toolbar" aria-label="Действия со стрелкой">
+              <span className="muted">
+                Стрелка «{arrowSel.label}»{arrowSel.manual ? " · маршрут вручную" : ""}
+              </span>
+              <button onClick={() => { const next = addBend(draftRef.current, arrowSel); if (next === draftRef.current) showHint("Отрезок слишком короткий для излома"); else commit(next); }} title="Добавить излом на самом длинном отрезке (или двойной щелчок по линии)">
+                Добавить излом
+              </button>
+              <button disabled={!hasManualRoute(draft, arrowSel)} onClick={() => commit(resetArrow(draftRef.current, arrowSel))} title="Вернуть автоматическую прокладку">
+                Сбросить маршрут
+              </button>
+              {DATA_KINDS.has(arrowSel.kind) && (
+                <button
+                  onClick={() => {
+                    const control = CONTROL_KINDS.has(arrowSel.kind);
+                    const r = setArrowIcom(draftRef.current, arrowSel, control ? "input" : "control");
+                    if (r.error) return showHint(r.error);
+                    h.commit(r.model);
+                    const next = buildIdef0(r.model, cur).arrows.find((x) => x.nodeId === r.nodeId && x.entityId === r.entityId);
+                    if (next) setSel(arrowSelOf(next));
+                  }}
+                  title="Тот же документ становится входом или управлением этой функции"
+                >
+                  {CONTROL_KINDS.has(arrowSel.kind) ? "Сделать входом" : "Сделать управлением"}
+                </button>
+              )}
+            </div>
+          )}
+          {!arrowSel && (pickedIds.length > 0 || hasClipboard()) && (
             <div className="bpe-selbar" role="toolbar" aria-label="Действия с выделением">
               {pickedIds.length > 0 && <span className="muted">Выделено: {pickedIds.length}</span>}
               <button disabled={pickedIds.length === 0} onClick={copySelected} title="Копировать (Ctrl+C)">

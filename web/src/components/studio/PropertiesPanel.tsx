@@ -1,11 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Fragment, ProcessLogicModel, ProcessMeta, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
 import { SIDE_LABELS, deleteFlow, reverseRoute, setFlowRoute, updateFlow, type FlowSide } from "../bpmn-editor/model-ops";
 import { parseProcessCode } from "@shared/codes";
 import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
-import { removeArrow } from "../idef0-editor/ops";
+import { removeArrow, setArrowIcom } from "../idef0-editor/ops";
+import { resetArrow, routeOf, setArrowRoute } from "../idef0-editor/arrow-edit";
 import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
 import NodeProperties from "./NodeProperties";
@@ -37,7 +38,7 @@ const HELP: Record<StudioDoc["kind"], string[]> = {
     "Добавьте функцию из палитры или двойным щелчком по пустому месту.",
     "Выберите функцию — здесь задайте входы, управление, выходы и механизмы.",
     "Потяните за ● у выбранной функции к другой: на верхнюю треть — «выход → управление», на остальное — «выход → вход».",
-    "Щёлкните по стрелке, чтобы открыть карточку её документа или регламента.",
+    "Щёлкните по стрелке, чтобы открыть карточку её документа или регламента. У выбранной стрелки есть ручки: конец, отрезок, излом, подпись.",
   ],
   dict: ["Выберите запись в таблице — здесь откроется её карточка: описание, ответственный, где используется, источник и история."],
   report: [],
@@ -97,9 +98,11 @@ export default function PropertiesPanel({
 
   // при переходе к другому объекту карточка открывается сверху
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [arrowMsg, setArrowMsg] = useState<string | null>(null);
   const selKey = sel ? (sel.kind === "arrow" ? `arrow:${sel.arrow.key}` : sel.kind === "entry" ? `entry:${sel.dict}:${sel.id}` : `${sel.kind}:${sel.id}`) : "process";
   useEffect(() => {
     bodyRef.current?.scrollTo(0, 0);
+    setArrowMsg(null);
   }, [selKey]);
 
   let body: React.ReactNode;
@@ -200,6 +203,9 @@ export default function PropertiesPanel({
     const a = sel.arrow;
     const target = arrowEntry(a);
     const isLink = a.kind === "link" || a.kind === "controlLink";
+    const isData = a.kind === "input" || a.kind === "link" || a.kind === "controlData" || a.kind === "controlLink";
+    const isControl = a.kind === "controlData" || a.kind === "controlLink";
+    const route = routeOf(model, a);
     const ownerCode = codes.get(a.nodeId) ?? "";
     const fromCode = a.fromId ? codes.get(a.fromId) ?? "" : "";
     body = (
@@ -233,6 +239,60 @@ export default function PropertiesPanel({
             {isLink ? "Разорвать связь" : "Убрать стрелку"}
           </button>
         </div>
+        <Section title="Тип и маршрут" open={!!route || isData}>
+          {isData && (
+            <Field label="Тип стрелки">
+              <select
+                value={isControl ? "control" : "input"}
+                onChange={(e) => {
+                  const r = setArrowIcom(model, a, e.target.value as "input" | "control");
+                  setArrowMsg(r.error ?? null);
+                  if (!r.error) onChange(r.model);
+                }}
+              >
+                <option value="input">Вход (слева)</option>
+                <option value="control">Управление (сверху)</option>
+              </select>
+            </Field>
+          )}
+          {arrowMsg && <p className="prop-note prop-warn">{arrowMsg}</p>}
+          <p className="muted prop-note">{route ? "Маршрут правился вручную." : "Маршрут подбирается автоматически."} На диаграмме у выбранной стрелки есть ручки: конец (вдоль стороны блока или на другую функцию), отрезок, излом, подпись.</p>
+          <Field label={isLink ? "Положение конца у получателя, %" : "Положение конца у блока, %"}>
+            <input
+              type="number"
+              min={5}
+              max={95}
+              step={5}
+              placeholder="автоматически"
+              value={route?.pos !== undefined ? Math.round(route.pos * 100) : ""}
+              onChange={(e) => onChange(setArrowRoute(model, a, { pos: e.target.value === "" ? undefined : Math.min(95, Math.max(5, Number(e.target.value))) / 100 }))}
+            />
+          </Field>
+          {isLink && (
+            <Field label="Положение конца у источника, %">
+              <input
+                type="number"
+                min={5}
+                max={95}
+                step={5}
+                placeholder="автоматически"
+                value={route?.from_pos !== undefined ? Math.round(route.from_pos * 100) : ""}
+                onChange={(e) => onChange(setArrowRoute(model, a, { from_pos: e.target.value === "" ? undefined : Math.min(95, Math.max(5, Number(e.target.value))) / 100 }))}
+              />
+            </Field>
+          )}
+          {(route?.points?.length ?? 0) > 0 && (
+            <p className="muted prop-note">
+              Точек излома: {route!.points!.length}.{" "}
+              <button className="link-button" onClick={() => onChange(setArrowRoute(model, a, { points: undefined }))}>
+                Убрать точки
+              </button>
+            </p>
+          )}
+          <button disabled={!route} onClick={() => onChange(resetArrow(model, a))}>
+            Сбросить маршрут
+          </button>
+        </Section>
         <EntryCard model={model} dict={target.dict} id={target.id} sessionId={session.id} fragments={session.fragments} stamp={stamp} onChange={onChange} onGoto={onGoto} />
       </div>
     );

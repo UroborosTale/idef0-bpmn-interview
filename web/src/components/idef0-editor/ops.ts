@@ -1,6 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { nextId, setNodeRole, updateNode, type OpResult } from "../bpmn-editor/model-ops";
-import { BLOCK_H, BLOCK_W, functionsOf, snap, MIN_POS } from "./geometry";
+import { BLOCK_H, BLOCK_W, functionsOf, snap, MIN_POS, type Arrow } from "./geometry";
+import { setArrowRoute } from "./arrow-edit";
 
 type M = ProcessLogicModel;
 
@@ -93,6 +94,13 @@ export function addFunction(m: M, parentId: string | null, cx: number, cy: numbe
  * в справочнике модели.
  */
 export function removeArrow(m: M, a: { kind: string; nodeId: string; entityId: string }): M {
+  // маршрут стрелки уходит вместе с ней (иначе он ожил бы при повторном создании такой же связи)
+  return withoutRoute(removeRelation(m, a), a);
+}
+
+const withoutRoute = (m: M, a: { kind: string; nodeId: string; entityId: string }): M => setArrowRoute(m, a as Arrow, null);
+
+function removeRelation(m: M, a: { kind: string; nodeId: string; entityId: string }): M {
   switch (a.kind) {
     case "input":
     case "link":
@@ -153,3 +161,54 @@ export function linkFunctions(m: M, from: string, to: string, as: "input" | "con
   next = attach(next, to, as === "control" ? "control_data_ids" : "inputs", dataId);
   return { model: next, id: dataId, key: `${as === "control" ? "controlLink" : "link"}:${to}:${dataId}` };
 }
+
+/**
+ * Перенос конца стрелки на другую функцию (меняет связь в модели). Какой конец:
+ *  - "block" — конец у блока самой стрелки (у входа, управления, механизма — получатель, у выхода — источник);
+ *  - "producer" — у связи между функциями конец у блока-источника.
+ * zone — куда на целевом блоке отпустили: управление — верхняя часть, вход — остальное. Данные (документ) могут быть и входом,
+ * и управлением; регламент всегда управление, система — механизм, исполнитель переносится в панели свойств.
+ * Возвращает id функции и сущности, по которым редактор находит новую стрелку.
+ */
+export function reconnectArrow(
+  m: M,
+  a: Pick<Arrow, "kind" | "nodeId" | "entityId" | "fromId">,
+  end: "block" | "producer",
+  target: string,
+  zone: "input" | "control"
+): OpResult & { nodeId?: string; entityId?: string } {
+  const to = m.nodes.find((n) => n.id === target);
+  if (!to || (to.type !== "task" && to.type !== "subprocess") || to.bpmn_scope) return { model: m, error: "Выберите функцию на этой диаграмме" };
+  const id = a.entityId;
+  const name = (kind: EntityKind) => (kind === "data" ? m.data : kind === "control" ? m.controls : kind === "system" ? m.systems : m.roles).find((e) => e.id === id)?.name ?? "";
+
+  if (end === "producer") {
+    // источник связи: выход переходит к другой функции
+    if (!a.fromId || (a.kind !== "link" && a.kind !== "controlLink")) return { model: m, error: "У этой стрелки нет источника" };
+    if (target === a.fromId) return { model: m, error: "Выход уже у этой функции" };
+    if (target === a.nodeId) return { model: m, error: "Функция не может управлять сама собой или брать на вход собственный выход" };
+    if (to.outputs.includes(id)) return { model: m, error: `Функция «${to.name}» уже выпускает «${name("data")}»` };
+    const moved = attach(detach(m, a.fromId, "outputs", id), target, "outputs", id);
+    return { model: setArrowRoute(moved, a, null), nodeId: a.nodeId, entityId: id };
+  }
+
+  if (a.kind === "role") return { model: m, error: "Исполнителя функции меняют в панели свойств функции" };
+  if (a.kind === "output") {
+    if (target === a.nodeId) return { model: m, error: "Выход уже у этой функции" };
+    if (to.outputs.includes(id)) return { model: m, error: `Функция «${to.name}» уже выпускает «${name("data")}»` };
+    const moved = attach(detach(m, a.nodeId, "outputs", id), target, "outputs", id);
+    return { model: setArrowRoute(moved, a, null), nodeId: target, entityId: id };
+  }
+
+  const from: Slot = a.kind === "input" || a.kind === "link" ? "inputs" : a.kind === "controlData" || a.kind === "controlLink" ? "control_data_ids" : a.kind === "control" ? "controls" : "system_ids";
+  const dataKind = from === "inputs" || from === "control_data_ids";
+  const into: Slot = dataKind ? (zone === "control" ? "control_data_ids" : "inputs") : from;
+  if (target === a.nodeId && into === from) return { model: m, error: "Стрелка уже здесь" };
+  if (a.fromId && target === a.fromId) return { model: m, error: "Функция не может брать на вход или управление собственный выход" };
+  if ((to[into] ?? []).includes(id)) return { model: m, error: `Функция «${to.name}» уже ${into === "inputs" ? "получает" : into === "control_data_ids" ? "управляется" : "использует"} «${name(SLOT_ENTITY[into])}»` };
+  const moved = attach(detach(m, a.nodeId, from, id), target, into, id);
+  return { model: setArrowRoute(moved, a, null), nodeId: target, entityId: id };
+}
+
+/** Вход ⇄ управление для стрелки-данных той же функции (документ может быть и тем, и другим). */
+export const setArrowIcom = (m: M, a: Pick<Arrow, "kind" | "nodeId" | "entityId" | "fromId">, as: "input" | "control") => reconnectArrow(m, a, "block", a.nodeId, as);

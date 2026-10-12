@@ -1,3 +1,4 @@
+import { FREE_END } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 
@@ -44,6 +45,78 @@ export function BlockShape({ fn, selected, hot }: { fn: FunctionBlock; selected:
       )}
     </g>
   );
+}
+
+/** Кратчайший отрезок, на котором показывается ручка сдвига (короче — ручку не поставить). */
+const MIN_SEG = 28;
+const BASE_HANDLE = 5; // половина стороны квадратной ручки на экране, px (в единицах диаграммы пересчитывается по масштабу)
+
+/**
+ * Ручки выбранной стрелки: ● конец у блока (на другой блок — перенести стрелку, вдоль стороны — сдвинуть), ◆ свободный конец внешней
+ * стрелки, ▮ отрезок (сдвиг поперёк), ■ излом, ◇ подпись. Какое действие — в атрибуте data-ah: «вид|номер».
+ */
+export function ArrowHandles({ arrow, labelAt, k }: { arrow: Arrow; labelAt: { x: number; y: number } | null; /** Масштаб диаграммы: ручки сохраняют размер на экране, но не больше трёх крат и не меньше 70%. */ k: number }) {
+  const u = Math.min(3, Math.max(0.7, 1 / k));
+  const HANDLE = BASE_HANDLE * u;
+  const pts = arrow.points;
+  const free = FREE_END[arrow.kind];
+  const freeIdx = free === "start" ? 0 : free === "end" ? pts.length - 1 : -1;
+  const linked = arrow.kind === "link" || arrow.kind === "controlLink";
+  const blockIdx = arrow.kind === "output" ? 0 : pts.length - 1;
+  const stroke = ACCENT;
+  const out: React.ReactNode[] = [];
+
+  // отрезки (у внешней стрелки — кроме того, что упирается в свободный конец: им управляет сам конец)
+  if (pts.length > 2) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      if (free !== undefined && (i === freeIdx || i + 1 === freeIdx)) continue;
+      const [a, b] = [pts[i], pts[i + 1]];
+      const horizontal = Math.abs(a[1] - b[1]) < 0.5;
+      if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) < MIN_SEG) continue;
+      const [mx, my] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      out.push(
+        <rect key={`s${i}`} data-ah={`seg|${i}`} x={mx - (horizontal ? HANDLE * 1.3 : HANDLE / 1.6)} y={my - (horizontal ? HANDLE / 1.6 : HANDLE * 1.3)} width={horizontal ? HANDLE * 2.6 : HANDLE / 0.8} height={horizontal ? HANDLE / 0.8 : HANDLE * 2.6} rx={2} fill="#fff" stroke={stroke} strokeWidth={1.4 * u} style={{ cursor: horizontal ? "ns-resize" : "ew-resize" }}>
+          <title>Потяните отрезок поперёк</title>
+        </rect>
+      );
+    }
+    for (let i = 1; i + 1 < pts.length; i++) {
+      out.push(
+        <rect key={`c${i}`} data-ah={`corner|${i}`} x={pts[i][0] - HANDLE} y={pts[i][1] - HANDLE} width={HANDLE * 2} height={HANDLE * 2} fill={stroke} stroke="#fff" strokeWidth={u} style={{ cursor: "move" }}>
+          <title>Потяните излом; двойной щелчок — убрать</title>
+        </rect>
+      );
+    }
+  }
+
+  if (linked) {
+    out.push(
+      <circle key="eP" data-ah="end|producer" cx={pts[0][0]} cy={pts[0][1]} r={HANDLE + 1.5 * u} fill="#fff" stroke={stroke} strokeWidth={2 * u} style={{ cursor: "grab" }}>
+        <title>Источник: потяните вдоль стороны или на другую функцию</title>
+      </circle>
+    );
+  }
+  out.push(
+    <circle key="eB" data-ah="end|block" cx={pts[blockIdx][0]} cy={pts[blockIdx][1]} r={HANDLE + 1.5 * u} fill="#fff" stroke={stroke} strokeWidth={2 * u} style={{ cursor: "grab" }}>
+      <title>{linked ? "Получатель" : "Конец у блока"}: потяните вдоль стороны или на другую функцию (верхняя часть блока — управление)</title>
+    </circle>
+  );
+  if (freeIdx >= 0) {
+    const [fx, fy] = pts[freeIdx];
+    out.push(
+      <path key="eF" data-ah="end|free" d={`M${fx},${fy - HANDLE - 2 * u} L${fx + HANDLE + 2 * u},${fy} L${fx},${fy + HANDLE + 2 * u} L${fx - HANDLE - 2 * u},${fy} Z`} fill="#fff" stroke={stroke} strokeWidth={2 * u} style={{ cursor: "move" }}>
+        <title>Свободный конец: потяните, куда нужно</title>
+      </path>
+    );
+  }
+  if (labelAt && arrow.label) {
+    out.push(
+      <path key="lab" data-ah="label|" d={`M${labelAt.x},${labelAt.y - 18 * u} l${4 * u},${4 * u} l${-4 * u},${4 * u} l${-4 * u},${-4 * u} Z`} fill="#fff" stroke={stroke} strokeWidth={1.4 * u} style={{ cursor: "move" }}>
+        <title>Потяните подпись</title>
+      </path>
+    );
+  }
+  return <g data-arrow-handles>{out}</g>;
 }
 
 export function ArrowShape({ arrow, selected }: { arrow: Arrow; selected: boolean }) {

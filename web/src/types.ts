@@ -29,6 +29,20 @@ export interface Role {
   repo_id?: string | null;
 }
 
+/** Ручной маршрут стрелки IDEF0; чего нет — выбирает автоматическая прокладка (@shared/idef0Layout). */
+export interface ArrowRoute {
+  /** Положение конца у блока вдоль стороны, 0…1. */
+  pos?: number;
+  /** У связи между функциями — положение конца у блока-источника. */
+  from_pos?: number;
+  /** Внутренние точки излома от начала стрелки к концу. */
+  points?: [number, number][];
+  /** Свободный конец внешней стрелки. */
+  end?: [number, number];
+  /** Сдвиг подписи. */
+  label?: [number, number];
+}
+
 export interface SystemEntity {
   id: string;
   name: string;
@@ -87,6 +101,8 @@ export interface ProcessNode {
   interrupting?: boolean;
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
+  /** Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность». */
+  arrow_routes?: Record<string, ArrowRoute>;
   note?: string;
   status: "confirmed" | "hypothesis";
   confidence: number;

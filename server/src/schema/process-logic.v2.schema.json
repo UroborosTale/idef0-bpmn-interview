@@ -136,6 +136,20 @@
           "attached_to": { "type": ["string", "null"], "description": "Граничное событие: id задачи или подпроцесса, к границе которых оно прикреплено" },
           "interrupting": { "type": "boolean", "description": "Граничное событие прерывает задачу (по умолчанию да)" },
           "idef0_parent": { "type": ["string", "null"] },
+          "arrow_routes": {
+            "type": "object",
+            "description": "Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1…)",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "pos": { "type": "number", "minimum": 0, "maximum": 1, "description": "Положение конца у блока вдоль стороны" },
+                "from_pos": { "type": "number", "minimum": 0, "maximum": 1, "description": "Положение конца у блока-источника связи" },
+                "points": { "type": "array", "items": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 }, "description": "Внутренние точки излома" },
+                "end": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "description": "Свободный конец внешней стрелки" },
+                "label": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2, "description": "Сдвиг подписи" }
+              }
+            }
+          },
           "status": { "enum": ["confirmed", "hypothesis"] },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
           "source": { "$ref": "#/definitions/sourceList" },
