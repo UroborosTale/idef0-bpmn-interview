@@ -74,3 +74,36 @@ describe("рамка листа IDEF0", () => {
     expect(bare).toContain("<svg");
   });
 });
+
+describe("рамка листа в других выгрузках", () => {
+  it("draw.io: рамка и штамп — отдельные ячейки, id узлов PLM остаются только у функций; скрытая рамка не выгружается", async () => {
+    const { idef0ToDrawio } = await import("../src/pipeline/idef0.js");
+    const m = purchaseModel();
+    const xml = idef0ToDrawio(m, generateIdef0(m));
+    expect(xml).toContain('id="FRAME_sheet"');
+    expect(xml).toContain('id="FRAME_stamp"');
+    expect(xml).toContain('id="FRAME_nodeLabel" value="NODE:"');
+    expect(xml).toContain('id="FRAME_node" value="A2"'); // страница вложенной диаграммы A2
+    expect(xml.match(/id="IDEF0_/g)!.length).toBeGreaterThan(0);
+    m.idef0_frames = { "": { show: false }, b: { texts: { title: "Лист <2>" } } };
+    const custom = idef0ToDrawio(m, generateIdef0(m));
+    expect(custom.match(/id="FRAME_sheet"/g)).toHaveLength(1); // осталась только у диаграммы A2
+    expect(custom).toContain('value="Лист &lt;2&gt;"');
+  });
+
+  it("VSDX: на страницах IDEF0 есть штамп с надписями, на BPMN нет; рамка есть и при ручном листе; скрытая — убирается", async () => {
+    const JSZip = (await import("jszip")).default;
+    const { buildVsdx } = await import("../src/export/vsdx.js");
+    const pageXml = async (model: ReturnType<typeof purchaseModel>, n: number) => {
+      const zip = await JSZip.loadAsync(await buildVsdx(model));
+      return zip.file(`visio/pages/page${n}.xml`)!.async("string");
+    };
+    const m = purchaseModel();
+    expect(await pageXml(m, 3)).toContain("NODE:"); // IDEF0 A0
+    expect(await pageXml(m, 1)).not.toContain("NODE:"); // BPMN
+    m.idef0_frames = { "": { x: 20, y: 20, w: 1200, h: 800, texts: { title: "Мой лист" } } };
+    expect(await pageXml(m, 3)).toContain("Мой лист");
+    m.idef0_frames = { "": { show: false } };
+    expect(await pageXml(m, 3)).not.toContain("NODE:");
+  });
+});

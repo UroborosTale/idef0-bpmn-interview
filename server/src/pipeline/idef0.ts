@@ -243,7 +243,7 @@ function frameSvg(geo: FrameGeometry, grid: boolean): string {
 }
 
 /** Ключ рамки и надписи штампа по умолчанию для диаграммы (A-0, A0 или вложенной функции). */
-function frameInfo(d: Idef0DiagramData, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): { key: string; defaults: FrameDefaults } {
+export function frameInfo(d: Pick<Idef0DiagramData, "code" | "title">, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): { key: string; defaults: FrameDefaults } {
   if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: d.title.replace(/ — /, " ").replace(" (контекстная диаграмма)", ""), no: "1.0" } };
   if (kind === "root") return { key: frameKey(null), defaults: { node: "A0", title: `${processCodeOf(model)} ${model.process.name}`.trim(), no: "1.0" } };
   return { key: frameKey(parentNodeId ?? null), defaults: { node: d.code, title: d.title.replace(/ — /, " "), no: "1.0" } };
@@ -353,7 +353,22 @@ export function generateIdef0(model: ProcessLogicModel): Idef0Result {
 
 /** Экспорт диаграмм декомпозиции в упрощённый draw.io (mxGraph) XML: страница на A0 и на каждую вложенную диаграмму. */
 export function idef0ToDrawio(model: ProcessLogicModel, result: Idef0Result): string {
-  const page = (name: string, id: string, blocks: Idef0Block[], width: number, height: number) => {
+  const page = (name: string, id: string, blocks: Idef0Block[], width: number, height: number, frame: { settings: IdefFrame | undefined; defaults: FrameDefaults }) => {
+    const geo = frameShown(frame.settings) ? frameGeometry({ w: width, h: height }, frame.settings, frame.defaults) : null;
+    // рамка листа и штамп — обычные фигуры без id узлов PLM, поэтому обратный импорт их не трогает
+    const frameCells = geo
+      ? [
+          `<mxCell id="FRAME_sheet" value="" style="fillColor=none;strokeColor=#1f2937;strokeWidth=1.2;connectable=0;" vertex="1" parent="1"><mxGeometry x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" as="geometry" /></mxCell>`,
+          `<mxCell id="FRAME_stamp" value="" style="fillColor=#e8eef9;strokeColor=#1f2937;connectable=0;" vertex="1" parent="1"><mxGeometry x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" as="geometry" /></mxCell>`,
+          ...geo.cells.map(
+            (c) =>
+              `<mxCell id="FRAME_${c.field}" value="${escXml(c.text)}" style="text;html=1;strokeColor=none;fillColor=none;align=${c.anchor === "middle" ? "center" : "left"};verticalAlign=middle;spacingLeft=4;fontSize=14;connectable=0;" vertex="1" parent="1"><mxGeometry x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" as="geometry" /></mxCell>`
+          ),
+        ]
+      : [];
+    const [pw, ph] = geo ? [Math.max(width, geo.sheet.x + geo.sheet.w), Math.max(height, geo.sheet.y + geo.sheet.h)] : [width, height];
+    width = pw;
+    height = ph;
     const cells = blocks.map(
       // ФТ-М9.4.2: id ячейки несёт id узла PLM ("IDEF0_<nodeId>") — это делает возможным
       // round-trip импорт правок из draw.io обратно в модель (routes/diagramImport.ts).
@@ -365,14 +380,18 @@ export function idef0ToDrawio(model: ProcessLogicModel, result: Idef0Result): st
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        ${cells.join("\n        ")}
+        ${[...frameCells, ...cells].join("\n        ")}
       </root>
     </mxGraphModel>
   </diagram>`;
   };
+  const drawioFrame = (d: Pick<Idef0DiagramData, "code" | "title">, kind: "root" | "child", parentNodeId?: string) => {
+    const f = frameInfo(d, model, kind, parentNodeId);
+    return { settings: model.idef0_frames?.[f.key], defaults: f.defaults };
+  };
   const pages = [
-    page("IDEF0 A0", "idef0-a0", result.blocks, result.width, result.height),
-    ...(result.children ?? []).map((c) => page(`IDEF0 ${c.code}`, `idef0-${c.code}`, c.blocks, c.width, c.height)),
+    page("IDEF0 A0", "idef0-a0", result.blocks, result.width, result.height, drawioFrame({ code: "A0", title: "" }, "root")),
+    ...(result.children ?? []).map((c) => page(`IDEF0 ${c.code}`, `idef0-${c.code}`, c.blocks, c.width, c.height, drawioFrame({ code: c.code, title: `${c.code} — ${c.name}` }, "child", c.parentNodeId))),
   ];
   return `<mxfile host="app">
 ${pages.join("\n")}

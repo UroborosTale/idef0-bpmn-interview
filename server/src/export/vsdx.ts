@@ -1,7 +1,8 @@
 import JSZip from "jszip";
 import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
-import { arrowLabelPlacement, buildIdef0Diagrams, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
+import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
+import { frameGeometry, frameShown } from "../shared/idef0Frame.js";
 import { isStructured } from "../shared/codes.js";
 import { flowLabelPoint } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
@@ -415,10 +416,24 @@ function blockPorts(b: Idef0Block, d: Idef0DiagramData): { ports: Port[]; indexO
   return { ports, indexOf: (p) => index.get(`${p[0]},${p[1]}`) ?? 0 };
 }
 
-function idef0Page(d: Idef0DiagramData, name: string, parentNodeId?: string): Page {
+function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): Page {
   const editable = d.code !== "A-0";
-  const page = new Page(name, d.width, d.height, { pm_page: `idef0:${d.code}`, ...(parentNodeId ? { pm_parent: parentNodeId } : {}), ...(editable ? {} : { pm_ro: "1" }) });
-  page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
+  // рамка листа и штамп (shared/idef0Frame.ts): лист в отрицательных координатах Visio не показывает, такая рамка в Visio не рисуется
+  const fi = frameInfo(d, model, kind, parentNodeId);
+  const geo = (() => {
+    const settings = model.idef0_frames?.[fi.key];
+    if (!frameShown(settings)) return null;
+    const g = frameGeometry({ w: d.width, h: d.height }, settings, fi.defaults);
+    return g.sheet.x >= 0 && g.sheet.y >= 0 ? g : null;
+  })();
+  const [pw, ph] = geo ? [Math.max(d.width, geo.sheet.x + geo.sheet.w), Math.max(d.height, geo.sheet.y + geo.sheet.h)] : [d.width, d.height];
+  const page = new Page(name, pw, ph, { pm_page: `idef0:${d.code}`, ...(parentNodeId ? { pm_parent: parentNodeId } : {}), ...(editable ? {} : { pm_ro: "1" }) });
+  if (geo) {
+    page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef9", weightPt: 1 });
+    page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 1.2 });
+    for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 1 });
+    for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 14, color: "#111827" });
+  } else page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
 
   const portsOf = new Map<string, ReturnType<typeof blockPorts>>();
   for (const b of d.blocks) {
@@ -713,9 +728,9 @@ export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string
   const scoped = await Promise.all(scopes.map(async (s) => ({ scope: s, code: codes.get(s) ?? s, d: (await generateBpmn(model, s)).diagram })));
   const rootName = isStructured(model) ? `IDEF0 ${idef0.root.code}` : "IDEF0 A0";
 
-  const contextPage = idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0");
-  const rootPage = idef0Page(idef0.root, rootName);
-  const childPages = idef0.children.map((c) => ({ parentNodeId: c.parentNodeId, page: idef0Page(c, `IDEF0 ${c.code}`, c.parentNodeId) }));
+  const contextPage = idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0", model, "context");
+  const rootPage = idef0Page(idef0.root, rootName, model, "root");
+  const childPages = idef0.children.map((c) => ({ parentNodeId: c.parentNodeId, page: idef0Page(c, `IDEF0 ${c.code}`, model, "child", c.parentNodeId) }));
   const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`) }));
   const schemePage = bpmnPage(bpmn.diagram, "BPMN");
 
