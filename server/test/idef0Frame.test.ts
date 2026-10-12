@@ -31,7 +31,9 @@ describe("рамка листа IDEF0", () => {
     expect(g.cells[0].x).toBe(100);
     expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(1400);
     const small = frameGeometry({ w: 900, h: 500 }, { w: 50, h: 60 }, defaults);
-    expect([small.sheet.w, small.sheet.h]).toEqual([200, 230]); // меньше минимума не бывает
+    expect([small.sheet.w, small.sheet.h]).toEqual([440, 230]); // меньше минимума не бывает: по ширине помещается штамп
+    for (const c of small.cells) expect(c.w).toBeGreaterThan(0); // ячейки штампа не схлопываются и не налезают
+    expect([...small.cells].every((c, i, a) => i === 0 || c.x >= a[i - 1].x + a[i - 1].w - 0.5)).toBe(true);
     expect("guideX" in g).toBe(false);
     expect(withFrameHeight({ w: 900, h: 500 }, { x: 800, w: 600, h: 400 })).toEqual({ w: 1400, h: 500 }); // «мир» охватывает и диаграмму, и лист
     expect(generateIdef0(purchaseModel()).decompositionSvg).not.toContain("stroke-dasharray");

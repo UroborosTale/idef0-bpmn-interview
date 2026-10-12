@@ -7,7 +7,7 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
-import { frameGeometry, FRAME_GRID, FRAME_MIN, SHEET_FORMATS, sheetFormatOf, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { frameGeometry, FRAME_GRID, FRAME_MIN_H, FRAME_MIN_W, SHEET_FORMATS, sheetFormatOf, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
@@ -436,15 +436,15 @@ export default function Idef0Editor({
       let r = { x, y, w, h };
       if (d.edge === "move") r = { x: grid(x + dx), y: grid(y + dy), w, h };
       else {
-        // сторона, за которую тянут, двигается; противоположная стоит на месте, размер не меньше FRAME_MIN
-        if (d.edge.includes("e")) r.w = Math.max(FRAME_MIN, grid(w + dx));
-        if (d.edge.includes("s")) r.h = Math.max(FRAME_MIN, grid(h + dy));
+        // сторона, за которую тянут, двигается; противоположная стоит на месте, размер не меньше FRAME_MIN_W × FRAME_MIN_H (по ширине помещается штамп)
+        if (d.edge.includes("e")) r.w = Math.max(FRAME_MIN_W, grid(w + dx));
+        if (d.edge.includes("s")) r.h = Math.max(FRAME_MIN_H, grid(h + dy));
         if (d.edge.includes("w")) {
-          const nx = Math.min(grid(x + dx), x + w - FRAME_MIN);
+          const nx = Math.min(grid(x + dx), x + w - FRAME_MIN_W);
           r = { ...r, x: nx, w: x + w - nx };
         }
         if (d.edge.includes("n")) {
-          const ny = Math.min(grid(y + dy), y + h - FRAME_MIN);
+          const ny = Math.min(grid(y + dy), y + h - FRAME_MIN_H);
           r = { ...r, y: ny, h: y + h - ny };
         }
       }

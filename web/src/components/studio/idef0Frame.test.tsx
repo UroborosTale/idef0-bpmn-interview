@@ -165,7 +165,7 @@ describe("IDEF0: рамка листа и сетка", () => {
     fireEvent.pointerMove(svg, { pointerId: 6, clientX: -9000, clientY: -9000 });
     fireEvent.pointerUp(svg, { pointerId: 6, clientX: -9000, clientY: -9000 });
     const outer = [...document.querySelectorAll(".studio [data-frame] > rect")].find((r) => r.getAttribute("fill") === "none")!;
-    expect(Number(outer.getAttribute("width"))).toBe(200);
+    expect(Number(outer.getAttribute("width"))).toBe(440); // по ширине помещается штамп
     expect(Number(outer.getAttribute("height"))).toBe(230);
   });
 

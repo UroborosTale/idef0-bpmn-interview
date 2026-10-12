@@ -92,8 +92,9 @@ export function sheetFormatOf(w: number, h: number): { id: string; portrait: boo
   return null;
 }
 
-/** Меньше этого размера поле листа не делают. */
-export const FRAME_MIN = 200;
+/** Меньше этого размера поле листа не делают: по ширине должен поместиться штамп (NODE, TITLE хотя бы на 60 px, NO.), по высоте — 200 px. */
+export const FRAME_MIN_W = 440;
+export const FRAME_MIN_H = 200;
 
 const snapUp = (v: number) => Math.ceil(v / FRAME_GRID) * FRAME_GRID;
 
@@ -103,7 +104,7 @@ const snapUp = (v: number) => Math.ceil(v / FRAME_GRID) * FRAME_GRID;
  */
 export function frameBody(world: { w: number; h: number }, frame: IdefFrame | undefined): { x: number; y: number; w: number; h: number } {
   if (frame && typeof frame.w === "number" && typeof frame.h === "number") {
-    return { x: frame.x ?? 0, y: frame.y ?? 0, w: Math.max(FRAME_MIN, frame.w), h: Math.max(FRAME_MIN, frame.h) };
+    return { x: frame.x ?? 0, y: frame.y ?? 0, w: Math.max(FRAME_MIN_W, frame.w), h: Math.max(FRAME_MIN_H, frame.h) };
   }
   return { x: 0, y: 0, w: snapUp(world.w), h: snapUp(world.h) };
 }
