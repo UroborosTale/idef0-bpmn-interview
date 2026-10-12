@@ -205,13 +205,13 @@ export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; s
 }
 
 /** Свёрнутый внешний пул — другой процесс или внешний участник; потоки сообщений ведут к нему от шагов. */
-export function PoolShape({ pool, box }: { pool: { id: string; name: string; code?: string | null }; box: Box }) {
+export function PoolShape({ pool, box, selected }: { pool: { id: string; name: string; code?: string | null }; box: Box; selected?: boolean }) {
   const text = `${pool.code ? `${pool.code} ` : ""}${pool.name}`;
   const lines = wrapText(text, 26, 2);
   return (
-    <g data-pool-id={pool.id}>
+    <g data-pool-id={pool.id} style={{ cursor: "pointer" }}>
       <title>{text}</title>
-      <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="#f8fafc" stroke={INK} strokeWidth={1.5} />
+      <rect x={box.x} y={box.y} width={box.w} height={box.h} fill="#f8fafc" stroke={selected ? "#2563eb" : INK} strokeWidth={selected ? 2.5 : 1.5} />
       <rect x={box.x} y={box.y} width={22} height={box.h} fill="#e2e8f0" stroke={INK} strokeWidth={1.5} />
       <text textAnchor="middle" fontSize={10.5} fill={INK} pointerEvents="none">
         {lines.map((l, i) => (
@@ -225,15 +225,16 @@ export function PoolShape({ pool, box }: { pool: { id: string; name: string; cod
 }
 
 /** Поток сообщений: пунктирная линия, кружок у отправителя и открытая стрелка у получателя. */
-export function MessageShape({ points, label }: { points: [number, number][]; label?: string | null }) {
+export function MessageShape({ id, points, label, selected }: { id?: string; points: [number, number][]; label?: string | null; selected?: boolean }) {
   const d = points.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const [sx, sy] = points[0];
   const i = Math.floor((points.length - 1) / 2);
   const mx = (points[i][0] + points[i + 1][0]) / 2;
   const my = (points[i][1] + points[i + 1][1]) / 2;
   return (
-    <g>
-      <path d={d} fill="none" stroke={INK} strokeWidth={1.3} strokeDasharray="6 4" markerEnd="url(#bpe-arrow-open)" />
+    <g data-message-id={id} style={id ? { cursor: "pointer" } : undefined}>
+      {id && <path d={d} fill="none" stroke="transparent" strokeWidth={12} />}
+      <path d={d} fill="none" stroke={selected ? "#2563eb" : INK} strokeWidth={selected ? 2 : 1.3} strokeDasharray="6 4" markerEnd="url(#bpe-arrow-open)" />
       <circle cx={sx} cy={sy} r={3.5} fill="#fff" stroke={INK} strokeWidth={1.2} />
       {label && (
         <text x={mx + 5} y={my - 3} fontSize={9.5} fill={INK} pointerEvents="none">

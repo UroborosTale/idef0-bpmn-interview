@@ -9,6 +9,7 @@ import { removeArrow, setArrowIcom } from "../idef0-editor/ops";
 import { resetArrow, routeOf, setArrowRoute } from "../idef0-editor/arrow-edit";
 import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
+import { MessageCard, PoolCard } from "./PoolCards";
 import NodeProperties from "./NodeProperties";
 import { Section, SourceList } from "./PanelParts";
 import { reportDoc, type StudioDoc } from "./docs";
@@ -296,6 +297,12 @@ export default function PropertiesPanel({
         <EntryCard model={model} dict={target.dict} id={target.id} sessionId={session.id} fragments={session.fragments} stamp={stamp} onChange={onChange} onGoto={onGoto} />
       </div>
     );
+  } else if (sel?.kind === "pool") {
+    title = "Свойства пула";
+    body = <PoolCard key={sel.id} model={model} id={sel.id} onChange={onChange} onSelect={(s) => onSelect({ ...s, back: sel })} onGoto={onGoto} />;
+  } else if (sel?.kind === "message") {
+    title = "Свойства потока сообщений";
+    body = <MessageCard key={sel.id} model={model} id={sel.id} onChange={onChange} onSelect={(s) => onSelect({ ...s, back: sel })} onGoto={onGoto} />;
   } else if (sel?.kind === "entry") {
     title = "Карточка записи";
     body = <EntryCard key={`${sel.dict}:${sel.id}`} model={model} dict={sel.dict} id={sel.id} sessionId={session.id} fragments={session.fragments} stamp={stamp} onChange={onChange} onGoto={onGoto} />;

@@ -297,7 +297,7 @@ export default function Studio({ session, busy, onSave }: { session: SessionReco
       if (s && prev && s.kind === prev.kind && !prev.back) {
         if (s.kind === "arrow" && prev.kind === "arrow" && s.arrow.key === prev.arrow.key) return prev;
         if (s.kind === "entry" && prev.kind === "entry" && s.dict === prev.dict && s.id === prev.id) return prev;
-        if ((s.kind === "node" || s.kind === "flow") && "id" in prev && s.id === prev.id) return prev;
+        if ((s.kind === "node" || s.kind === "flow" || s.kind === "pool" || s.kind === "message") && "id" in prev && s.id === prev.id) return prev;
       }
       return s;
     });

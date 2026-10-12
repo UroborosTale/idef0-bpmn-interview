@@ -10,6 +10,8 @@ import type { DictKind } from "./docs";
 export type Selection =
   | { kind: "node"; id: string; back?: Selection }
   | { kind: "flow"; id: string; back?: Selection }
+  | { kind: "pool"; id: string; back?: Selection }
+  | { kind: "message"; id: string; back?: Selection }
   | { kind: "arrow"; arrow: Arrow; back?: Selection }
   | { kind: "entry"; dict: DictKind; id: string; back?: Selection }
   | null;
@@ -25,6 +27,10 @@ export function selectionExists(m: ProcessLogicModel, s: Selection): boolean {
       return m.nodes.some((n) => n.id === s.id);
     case "flow":
       return m.flows.some((f) => f.id === s.id);
+    case "pool":
+      return (m.pools ?? []).some((p) => p.id === s.id);
+    case "message":
+      return (m.messages ?? []).some((x) => x.id === s.id);
     case "arrow":
       return arrowExists(m, s.arrow);
     case "entry":

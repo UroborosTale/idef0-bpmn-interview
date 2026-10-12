@@ -299,6 +299,42 @@ describe("студия: новые элементы на диаграмме оп
     expect(document.querySelector(".studio")!.textContent).toContain("Заявка v2");
   });
 
+  describe("внешний пул и поток сообщений правятся на диаграмме", () => {
+    const withPool = () => {
+      const pool = addPool(structuredModel(), "Поставщики");
+      return addMessage(pool.model, "b2", pool.id!, "Запрос предложений").model;
+    };
+    const svgEl = () => document.querySelector(".studio svg.bpe-svg")!;
+
+    it("щелчок открывает карточку пула или потока, двойной щелчок переименовывает, Delete удаляет", () => {
+      studio(withPool());
+      fireEvent.pointerDown(document.querySelector("[data-pool-id]")!, { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 1 });
+      expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Внешний пул/);
+      fireEvent.doubleClick(document.querySelector("[data-pool-id]")!);
+      const input = document.querySelector(".studio input.bpe-rename") as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "Новые поставщики" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(document.querySelector("[data-pool-id]")!.textContent).toContain("Новые поставщики");
+
+      fireEvent.pointerDown(document.querySelector("[data-message-id]")!, { button: 0, pointerId: 1 });
+      fireEvent.pointerUp(svgEl(), { pointerId: 1 });
+      expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Поток сообщений/);
+      fireEvent.keyDown(document.querySelector(".bpe-root") ?? svgEl(), { key: "Delete" });
+      expect(document.querySelector("[data-message-id]")).toBeNull();
+    });
+
+    it("поток сообщений переименовывается двойным щелчком по линии", () => {
+      studio(withPool());
+      fireEvent.doubleClick(document.querySelector("[data-message-id]")!);
+      const input = document.querySelector(".studio input.bpe-rename") as HTMLInputElement;
+      expect(input.value).toBe("Запрос предложений");
+      fireEvent.change(input, { target: { value: "Запрос цен" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(svgEl().textContent).toContain("Запрос цен");
+    });
+  });
+
   it("значок документа можно перетащить: он смещается, задача остаётся на месте, отмена возвращает значок", () => {
     const m = structuredModel();
     m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
