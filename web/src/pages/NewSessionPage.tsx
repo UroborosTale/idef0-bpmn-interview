@@ -21,7 +21,7 @@ function fileToText(file: File): Promise<string> {
 
 export default function NewSessionPage({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<"A" | "B" | "diagram" | "blank">("A");
-  const [diagramFormat, setDiagramFormat] = useState<"bpmn" | "drawio" | "image">("bpmn");
+  const [diagramFormat, setDiagramFormat] = useState<"bpmn" | "drawio" | "vsdx" | "image">("bpmn");
   const [diagramFile, setDiagramFile] = useState<File | null>(null);
   const [processName, setProcessName] = useState("");
   const [owner, setOwner] = useState("");
@@ -60,7 +60,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         confidential,
       };
       if (mode === "diagram" && diagramFile) {
-        const content = diagramFormat === "image" ? await fileToBase64(diagramFile) : await fileToText(diagramFile);
+        const content = diagramFormat === "image" || diagramFormat === "vsdx" ? await fileToBase64(diagramFile) : await fileToText(diagramFile);
         const result = await api.importDiagramNew({ format: diagramFormat, content, mimeType: diagramFile.type || undefined, meta });
         onCreated(result.session.id);
         return;
@@ -145,20 +145,21 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         {mode === "diagram" && (
           <div className="form-row">
             <label>Формат диаграммы</label>
-            <select value={diagramFormat} onChange={(e) => setDiagramFormat(e.target.value as "bpmn" | "drawio" | "image")}>
+            <select value={diagramFormat} onChange={(e) => setDiagramFormat(e.target.value as "bpmn" | "drawio" | "vsdx" | "image")}>
               <option value="bpmn">BPMN (.bpmn/.xml из bpmn.io, Camunda Modeler)</option>
               <option value="drawio">draw.io (.drawio/.xml)</option>
+              <option value="vsdx">Microsoft Visio (.vsdx)</option>
               <option value="image">Фото/скан схемы (изображение)</option>
             </select>
             <input
               type="file"
-              accept={diagramFormat === "image" ? "image/*" : ".bpmn,.drawio,.xml,text/xml"}
+              accept={diagramFormat === "image" ? "image/*" : diagramFormat === "vsdx" ? ".vsdx" : ".bpmn,.drawio,.xml,text/xml"}
               style={{ marginTop: 6 }}
               onChange={(e) => setDiagramFile(e.target.files?.[0] ?? null)}
             />
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Структурированные форматы (.bpmn/.drawio) разбираются напрямую. Изображение распознаётся мультимодальной LLM — требует
-              настроенного внешнего провайдера (недоступно в офлайн-режиме). Импорт .vsdx (Visio) не поддерживается.
+              Структурированные форматы (.bpmn, .drawio, .vsdx) разбираются напрямую, без LLM. Из Visio читаются шаги, события, шлюзы, соединители и дорожки (дорожка становится исполнителем); страницы IDEF0 пропускаются. Изображение распознаётся мультимодальной LLM — требует
+              настроенного внешнего провайдера (недоступно в офлайн-режиме).
             </div>
             {diagramFormat === "image" && <div className="validation-item" style={{ marginTop: 6, fontSize: 12 }}>В офлайн-режиме (без ANTHROPIC_API_KEY) распознавание изображений вернёт ошибку.</div>}
           </div>

@@ -9,6 +9,7 @@ import {
   reconcileDrawioIdef0Edit,
   buildModelFromParsedDrawio,
 } from "../pipeline/diagramImport.js";
+import { parseVsdx, buildModelFromParsedVsdx } from "../pipeline/vsdxImport.js";
 import { detectGaps } from "../pipeline/gaps.js";
 import { validateModel } from "../pipeline/validate.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
@@ -78,7 +79,7 @@ diagramImportRouter.post("/sessions/:id/diagram-import/drawio-idef0", (req, res)
   res.json({ session: updated, changes, warnings: parsed.warnings });
 });
 
-/** ФТ-М9.5.1/9.5.2: распознавание диаграммы на входе — .bpmn/.drawio разбираются напрямую, .vsdx не реализован. */
+/** ФТ-М9.5.1/9.5.2: распознавание диаграммы на входе — .bpmn/.drawio (текст) и .vsdx (base64) разбираются напрямую, изображение — через LLM. */
 diagramImportRouter.post("/diagram-import/new", async (req, res) => {
   const { format, content, meta } = req.body as { format: string; content: string; meta: SessionMeta };
   if (!format || !content) {
@@ -90,16 +91,17 @@ diagramImportRouter.post("/diagram-import/new", async (req, res) => {
     return;
   }
 
-  if (format === "vsdx") {
-    res.status(501).json({
-      error: "Импорт .vsdx (Visio) не реализован — это закрытый OOXML/ZIP-формат, требующий отдельной библиотеки. Экспортируйте схему в .bpmn или .drawio, либо используйте фото/скан.",
-    });
-    return;
-  }
-
   let built: { model: ReturnType<typeof buildModelFromParsedBpmn>["model"]; warnings: string[] };
   try {
-    if (format === "bpmn") {
+    if (format === "vsdx") {
+      // двоичный файл приходит в base64
+      const parsed = await parseVsdx(Buffer.from(content, "base64"));
+      built = buildModelFromParsedVsdx(parsed, meta);
+      if (built.model.nodes.length === 0) {
+        res.status(400).json({ error: `В файле не найдено ни одной фигуры процесса. ${parsed.warnings.join(" ")}`.trim() });
+        return;
+      }
+    } else if (format === "bpmn") {
       const parsed = parseBpmnXml(content);
       built = buildModelFromParsedBpmn(parsed, meta);
     } else if (format === "drawio") {

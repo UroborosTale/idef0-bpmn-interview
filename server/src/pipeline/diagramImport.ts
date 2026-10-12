@@ -12,10 +12,8 @@ import type { EventTrigger, TriggerType } from "../shared/events.js";
  * хорошо сформированных файлов, экспортированных bpmn.io, Camunda Modeler,
  * draw.io или этой же системой, этого достаточно: разбираются открывающие
  * теги элементов и их атрибуты, без учёта пространств имён и вложенности
- * содержимого. Импорт .vsdx (Visio) НЕ реализован — это закрытый
- * ZIP/OOXML-формат, разбор которого потребовал бы отдельной библиотеки и
- * существенного объёма работы несоразмерно ценности для демонстрации
- * конвейера; при попытке загрузить .vsdx роут возвращает понятную ошибку.
+ * содержимого. Импорт .vsdx (Visio) — отдельно, pipeline/vsdxImport.ts
+ * (ZIP/OOXML, настоящий XML-разбор); таблицы .xlsx — pipeline/xlsxImport.ts.
  */
 
 function unescapeXml(s: string): string {
@@ -250,6 +248,43 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
   };
   void roleByLaneId; // роли из lane заведены в реестр ролей; привязка узел↔lane в bpmn.io не гарантированно парсится regex-разбором — оставлено на доработку аналитиком через панель модели
   return { model, warnings };
+}
+
+/** Модель-заготовка для импорта из файла: переданные элементы и исполнители, остальное пусто; процесс — черновик AS-IS/TO-BE из meta. */
+export function importedModel(meta: SessionMeta, parts: { nodes: ProcessNode[]; flows: ProcessFlow[]; roles?: Role[] }): ProcessLogicModel {
+  return {
+    schema_version: SCHEMA_VERSION,
+    process: {
+      id: `proc_${nanoid(8)}`,
+      name: meta.processName,
+      owner: meta.owner,
+      department: meta.department,
+      type: meta.modelType,
+      decomposition_depth: meta.decompositionDepth ?? 2,
+      notations: ["IDEF0", "BPMN"],
+      version: "0.1",
+      status: "draft",
+      kpi: [],
+      risks: [],
+    },
+    roles: parts.roles ?? [],
+    systems: [],
+    data: [],
+    controls: [],
+    nodes: parts.nodes,
+    flows: parts.flows,
+    gaps: [],
+    statements: [],
+    interfaces: [],
+    requirements_links: [],
+    raci: [],
+    assignments: [],
+    pools: [],
+    messages: [],
+    accepted_issues: [],
+    respondents: [],
+    discrepancies: [],
+  };
 }
 
 export interface ReconcileChanges {
