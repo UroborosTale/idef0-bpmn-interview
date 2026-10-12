@@ -357,7 +357,8 @@ export const api = {
     req<{ session: SessionRecord; changes: DrawioReconcileChange[]; warnings: string[] }>("POST", `/sessions/${id}/diagram-import/drawio-idef0`, { xml }),
 
   // --- М9.5 Распознавание диаграмм на входе ---
-  importDiagramNew: (input: { format: "bpmn" | "drawio" | "image" | "vsdx"; content: string; mimeType?: string; meta: SessionMeta }) =>
+  diagramTemplateUrl: () => `${BASE}/diagram-import/template.xlsx`,
+  importDiagramNew: (input: { format: "bpmn" | "drawio" | "image" | "vsdx" | "xlsx"; content: string; mimeType?: string; meta: SessionMeta }) =>
     req<DiagramImportResult>("POST", "/diagram-import/new", input),
 
   // --- М6.4 Пакет к аудиту ---

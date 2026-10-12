@@ -10,6 +10,8 @@ import {
   buildModelFromParsedDrawio,
 } from "../pipeline/diagramImport.js";
 import { parseVsdx, buildModelFromParsedVsdx } from "../pipeline/vsdxImport.js";
+import { parseXlsx, buildModelFromTable } from "../pipeline/xlsxImport.js";
+import { stepsTemplateXlsx } from "../pipeline/xlsxTemplate.js";
 import { detectGaps } from "../pipeline/gaps.js";
 import { validateModel } from "../pipeline/validate.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
@@ -79,6 +81,13 @@ diagramImportRouter.post("/sessions/:id/diagram-import/drawio-idef0", (req, res)
   res.json({ session: updated, changes, warnings: parsed.warnings });
 });
 
+/** Образец таблицы шагов для импорта из Excel (формат — в pipeline/xlsxImport.ts). */
+diagramImportRouter.get("/diagram-import/template.xlsx", (_req, res) => {
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="process-steps-template.xlsx"`);
+  res.send(stepsTemplateXlsx());
+});
+
 /** ФТ-М9.5.1/9.5.2: распознавание диаграммы на входе — .bpmn/.drawio (текст) и .vsdx (base64) разбираются напрямую, изображение — через LLM. */
 diagramImportRouter.post("/diagram-import/new", async (req, res) => {
   const { format, content, meta } = req.body as { format: string; content: string; meta: SessionMeta };
@@ -101,6 +110,8 @@ diagramImportRouter.post("/diagram-import/new", async (req, res) => {
         res.status(400).json({ error: `В файле не найдено ни одной фигуры процесса. ${parsed.warnings.join(" ")}`.trim() });
         return;
       }
+    } else if (format === "xlsx") {
+      built = buildModelFromTable(await parseXlsx(Buffer.from(content, "base64")), meta);
     } else if (format === "bpmn") {
       const parsed = parseBpmnXml(content);
       built = buildModelFromParsedBpmn(parsed, meta);

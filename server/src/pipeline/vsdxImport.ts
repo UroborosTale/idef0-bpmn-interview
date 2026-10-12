@@ -196,8 +196,8 @@ function geometryOf(shape: X): Geometry {
 type Kind = "task" | "subprocess" | "gateway" | "event" | "lane" | "data" | "ignore";
 
 const RE = {
-  lane: /swim ?lane|\blane\b|\bpool\b|дорожк|\bпул\b|cross.?functional|кросс.?функц/,
-  skip: /annotation|callout|\bnote\b|\blabel\b|заметк|аннотац|подпись|заголовок|\btitle\b|phase|separator|фаза|разделител|legend|легенд|\bgroup\b|\bгруппа\b|dynamic connector|connector|соединител|\bflow\b|поток|arrow|стрелк|sheet|лист|border|рамк/,
+  lane: /swim ?lane|\blane\b|\bpool\b|дорожк|(?<![а-я])пул(?![а-я])|cross.?functional|кросс.?функц/,
+  skip: /annotation|callout|\bnote\b|\blabel\b|заметк|аннотац|подпись|заголовок|\btitle\b|phase|separator|фаза|разделител|legend|легенд|\bgroup\b|(?<![а-я])группа(?![а-я])|dynamic connector|connector|соединител|\bflow\b|поток|arrow|стрелк|sheet|лист|border|рамк/,
   data: /database|datastore|data store|data object|\bdata\b|document|документ|данн|хранилищ|база/,
   gateway: /gateway|decision|шлюз|решени|ветвлени|развилк/,
   event: /event|событ|terminator|терминатор|start\/end|начал|конец|старт|финиш|заверш/,

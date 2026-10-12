@@ -19,9 +19,13 @@ function fileToText(file: File): Promise<string> {
   });
 }
 
+/** Форматы режима «импорт из готовой диаграммы»; двоичные (изображение, Visio, Excel) отправляются в base64. */
+type DiagramFormat = "bpmn" | "drawio" | "vsdx" | "xlsx" | "image";
+const BINARY_FORMATS: DiagramFormat[] = ["image", "vsdx", "xlsx"];
+
 export default function NewSessionPage({ onCreated }: { onCreated: (id: string) => void }) {
   const [mode, setMode] = useState<"A" | "B" | "diagram" | "blank">("A");
-  const [diagramFormat, setDiagramFormat] = useState<"bpmn" | "drawio" | "vsdx" | "image">("bpmn");
+  const [diagramFormat, setDiagramFormat] = useState<DiagramFormat>("bpmn");
   const [diagramFile, setDiagramFile] = useState<File | null>(null);
   const [processName, setProcessName] = useState("");
   const [owner, setOwner] = useState("");
@@ -60,7 +64,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         confidential,
       };
       if (mode === "diagram" && diagramFile) {
-        const content = diagramFormat === "image" || diagramFormat === "vsdx" ? await fileToBase64(diagramFile) : await fileToText(diagramFile);
+        const content = BINARY_FORMATS.includes(diagramFormat) ? await fileToBase64(diagramFile) : await fileToText(diagramFile);
         const result = await api.importDiagramNew({ format: diagramFormat, content, mimeType: diagramFile.type || undefined, meta });
         onCreated(result.session.id);
         return;
@@ -145,22 +149,29 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         {mode === "diagram" && (
           <div className="form-row">
             <label>Формат диаграммы</label>
-            <select value={diagramFormat} onChange={(e) => setDiagramFormat(e.target.value as "bpmn" | "drawio" | "vsdx" | "image")}>
+            <select value={diagramFormat} onChange={(e) => setDiagramFormat(e.target.value as DiagramFormat)}>
               <option value="bpmn">BPMN (.bpmn/.xml из bpmn.io, Camunda Modeler)</option>
               <option value="drawio">draw.io (.drawio/.xml)</option>
               <option value="vsdx">Microsoft Visio (.vsdx)</option>
+              <option value="xlsx">Таблица Excel со списком шагов (.xlsx)</option>
               <option value="image">Фото/скан схемы (изображение)</option>
             </select>
             <input
               type="file"
-              accept={diagramFormat === "image" ? "image/*" : diagramFormat === "vsdx" ? ".vsdx" : ".bpmn,.drawio,.xml,text/xml"}
+              accept={diagramFormat === "image" ? "image/*" : diagramFormat === "vsdx" ? ".vsdx" : diagramFormat === "xlsx" ? ".xlsx" : ".bpmn,.drawio,.xml,text/xml"}
               style={{ marginTop: 6 }}
               onChange={(e) => setDiagramFile(e.target.files?.[0] ?? null)}
             />
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Структурированные форматы (.bpmn, .drawio, .vsdx) разбираются напрямую, без LLM. Из Visio читаются шаги, события, шлюзы, соединители и дорожки (дорожка становится исполнителем); страницы IDEF0 пропускаются. Изображение распознаётся мультимодальной LLM — требует
+              Структурированные форматы (.bpmn, .drawio, .vsdx, .xlsx) разбираются напрямую, без LLM. Из Visio читаются шаги, события, шлюзы, соединители и дорожки (дорожка становится исполнителем); страницы IDEF0 пропускаются. Изображение распознаётся мультимодальной LLM — требует
               настроенного внешнего провайдера (недоступно в офлайн-режиме).
             </div>
+            {diagramFormat === "xlsx" && (
+              <div className="validation-item" style={{ marginTop: 6, fontSize: 12 }}>
+                Одна строка — один шаг. Столбцы: № · Название · Тип · Исполнитель · Следующий шаг (например, «5 (да); 2 (нет)») · Система · Вход · Выход · Срок · Комментарий; обязателен только «Название».{" "}
+                <a href={api.diagramTemplateUrl()}>Скачать образец</a>
+              </div>
+            )}
             {diagramFormat === "image" && <div className="validation-item" style={{ marginTop: 6, fontSize: 12 }}>В офлайн-режиме (без ANTHROPIC_API_KEY) распознавание изображений вернёт ошибку.</div>}
           </div>
         )}
