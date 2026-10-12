@@ -734,6 +734,9 @@ export default function Idef0Editor({
             <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">
               Миникарта
             </button>
+            <details className="bpe-menu">
+              <summary title="Рамка листа: рамка и сетка, формат, поворот, авторазмер">Лист{outside > 0 ? " ⚠" : ""}</summary>
+              <div className="bpe-menu-body">
             <button className={frameOn ? "on" : ""} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { show: !frameOn }))} title="Рамка листа со штампом: NODE, TITLE, NO. (надписи правятся двойным щелчком)">
               Рамка
             </button>
@@ -769,17 +772,19 @@ export default function Idef0Editor({
             >
               ⟳
             </button>
-            {outside > 0 && (
-              <span className="bpe-warn" role="status" title="Часть функций лежит за пределами листа: растяните или подвиньте лист, либо нажмите «Лист: авто»">
-                ⚠ Вне листа: {outside}
-              </span>
-            )}
             <button disabled={!frameOn || frame?.w === undefined} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: null }))} title="Вернуть лист на всю диаграмму: размер и положение снова автоматические">
               Авторазмер
             </button>
             <button className={frameOn && gridShown(frame) ? "on" : ""} disabled={!frameOn} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { grid: !gridShown(frame) }))} title="Клетчатая разметка листа">
               Сетка
             </button>
+              </div>
+            </details>
+            {outside > 0 && (
+              <span className="bpe-warn" role="status" title="Часть функций лежит за пределами листа: растяните или подвиньте лист, либо нажмите «Лист: авто»">
+                ⚠ Вне листа: {outside}
+              </span>
+            )}
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
             </button>
