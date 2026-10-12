@@ -168,6 +168,48 @@ const spread = (len: number, n: number, max: number, pad: number) => (n > 1 ? Ma
 const rowOf = (i: number, n: number) => (n > 1 ? i % Math.min(3, n) : 0);
 const LABEL_ROW_H = 12;
 
+/** Ширина подписи стрелки в пикселях (кегль 10,5; подписи обрезаются до 26 знаков, как в labelSpec). */
+export const labelWidth = (text: string): number => Math.min(text.length, 26) * 6 + 4;
+/** Зазор между подписями в одной строке. */
+const LABEL_GAP = 6;
+/** Строк подписей над блоком или под ним — не больше: дальше они уходят слишком далеко от стрелки. */
+const MAX_LABEL_ROWS = 8;
+
+export interface LabelRect {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+const rectsHit = (a: LabelRect, b: LabelRect) => a.x0 < b.x1 + LABEL_GAP && b.x0 < a.x1 + LABEL_GAP && a.y0 < b.y1 && b.y0 < a.y1;
+
+/**
+ * Строки подписей стрелок, стоящих в ряд (управление сверху, механизмы снизу): подпись садится в первую строку, где она не
+ * налезает на уже поставленные по ширине (по x), а если задана высота строки `y` — ещё и на чужие подписи `obstacles` (подписи
+ * связей между блоками и внешних стрелок), иначе — в следующую. Раньше строки шли по кругу «0, 1, 2, 0…», и подписи шире шага между
+ * стрелками налезали друг на друга через две.
+ */
+export function assignLabelRows(items: { x: number; label: string }[], opts: { obstacles?: LabelRect[]; y?: (item: number, row: number) => number } = {}): number[] {
+  const order = items.map((_, i) => i).sort((i, j) => items[i].x - items[j].x);
+  const rows: { x: number; w: number }[][] = [];
+  const out: number[] = new Array(items.length).fill(0);
+  for (const i of order) {
+    const w = labelWidth(items[i].label);
+    let r = 0;
+    const blocked = (row: number) => {
+      if ((rows[row] ?? []).some((q) => Math.abs(items[i].x - q.x) < (w + q.w) / 2 + LABEL_GAP)) return true;
+      if (!opts.y || !opts.obstacles) return false;
+      const y = opts.y(i, row);
+      const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 };
+      return opts.obstacles.some((o) => rectsHit(mine, o));
+    };
+    while (r < MAX_LABEL_ROWS - 1 && blocked(r)) r++;
+    (rows[r] ??= []).push({ x: items[i].x, w });
+    out[i] = r;
+  }
+  return out;
+}
+
 /** Блоки и ICOM-стрелки диаграммы (parentId = null — A0). */
 export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: string | null = null): Idef0Layout<N> {
   const dataById = new Map(m.data.map((d) => [d.id, d] as const));
@@ -294,7 +336,30 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       const x = route?.pos !== undefined ? b.x + route.pos * b.w : b.x + 20 + i * mStep;
       arrows.push(finish({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom", labelRow: rowOf(i, mech.length) }, route));
     });
-  }  return { functions, arrows };
+  }
+  // строки подписей управления и механизмов — по ширине подписей, отдельно для каждого блока и стороны
+  // чужие подписи, которые строка не должна задевать: связи между блоками, внешние входы и выходы (их места не зависят от строк)
+  const obstacles: LabelRect[] = [];
+  for (const a of arrows) {
+    if (a.side === "top" || a.side === "bottom") continue;
+    const sp = labelSpec(a);
+    if (!sp) continue;
+    const w = labelWidth(sp.text);
+    const x0 = sp.anchor === "middle" ? sp.x - w / 2 : sp.anchor === "end" ? sp.x - w : sp.x;
+    obstacles.push({ x0, x1: x0 + w, y0: sp.y - 10, y1: sp.y + 2 });
+  }
+  for (const side of ["top", "bottom"] as const) {
+    const groups = new Map<string, typeof arrows>();
+    for (const a of arrows) if (a.side === side && a.label) (groups.get(a.nodeId) ?? groups.set(a.nodeId, []).get(a.nodeId)!).push(a);
+    for (const list of groups.values()) {
+      const rows = assignLabelRows(
+        list.map((a) => ({ x: a.points[0][0], label: a.label })),
+        { obstacles, y: (i, row) => (side === "top" ? list[i].points[0][1] - 4 - row * LABEL_ROW_H : list[i].points[0][1] + 14 + row * LABEL_ROW_H) }
+      );
+      list.forEach((a, i) => (a.labelRow = rows[i]));
+    }
+  }
+  return { functions, arrows };
 }
 
 /** Размер «мира» диаграммы. */
