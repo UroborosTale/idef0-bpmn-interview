@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type RepoClass, type RepoListItem, type RepoUsage } from "../api/client";
 import { routePath } from "../router";
+import ChoiceDialog, { type Choice } from "../components/ChoiceDialog";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 const CLASSES: { cls: RepoClass; title: string; one: string }[] = [
   { cls: "role", title: "Роли", one: "роль" },
@@ -75,36 +77,23 @@ export default function RepositoryPage() {
     }
   };
 
-  const remove = (o: RepoListItem) =>
-    run(async () => {
-      if (o.entries === 0) {
-        if (!window.confirm(`Удалить «${o.name}» из репозитория?`)) return;
-        await api.deleteRepositoryObject(o.id);
-        return "Объект удалён.";
-      }
-      const choices = others.filter((x) => x.id !== o.id);
-      if (choices.length === 0) throw new Error(`«${o.name}» используется в ${o.sessions} проц. — заменить её нечем: сначала заведите другой объект.`);
-      const answer = window.prompt(
-        `«${o.name}» используется в ${o.sessions} проц. Чтобы удалить, укажите замену — номер из списка:\n` + choices.map((x, i) => `${i + 1}. ${x.name}`).join("\n")
-      );
-      const target = choices[Number(answer) - 1];
-      if (!target) return;
-      const r = await api.deleteRepositoryObject(o.id, target.id);
-      void r;
-      return `Объект заменён на «${target.name}».`;
-    });
+  /** Открытое окно: слияние дублей, удаление используемого объекта (с заменой) или неиспользуемого (подтверждение). */
+  const [dialog, setDialog] = useState<{ mode: "merge" | "replace" | "delete"; object: RepoListItem } | null>(null);
+  const close = () => setDialog(null);
 
-  const merge = (o: RepoListItem) =>
-    run(async () => {
-      const choices = others.filter((x) => x.id !== o.id);
-      if (choices.length === 0) throw new Error("Нет другого объекта этого класса, с которым можно объединить.");
-      const answer = window.prompt(`Объединить «${o.name}» с объектом (номер). «${o.name}» станет синонимом, записи моделей перейдут на выбранный объект:\n` + choices.map((x, i) => `${i + 1}. ${x.name}`).join("\n"));
-      const target = choices[Number(answer) - 1];
-      if (!target) return;
-      const r = await api.mergeRepositoryObject(o.id, target.id);
-      return `Объединено с «${r.object.name}»: записей перенесено — ${r.relinked}.`;
-    });
+  const remove = (o: RepoListItem) => setDialog({ mode: o.entries === 0 ? "delete" : "replace", object: o });
+  const merge = (o: RepoListItem) => setDialog({ mode: "merge", object: o });
 
+  const choicesFor = (o: RepoListItem): Choice[] =>
+    others
+      .filter((x) => x.id !== o.id)
+      .map((x) => ({
+        id: x.id,
+        title: x.name,
+        details: [x.synonyms.length ? `синонимы: ${x.synonyms.join(", ")}` : "", x.entries ? `используется в ${x.sessions} проц.` : "не используется"].filter(Boolean).join(" · "),
+      }));
+
+  const sessionsText = (n: number) => `${n} проц.`;
   const add = () =>
     run(async () => {
       await api.createRepositoryObject({ class: cls, name: name.trim(), kind: kind || null });
@@ -245,6 +234,54 @@ export default function RepositoryPage() {
           ))}
         </tbody>
       </table>
+
+      {dialog?.mode === "delete" && (
+        <ConfirmDialog
+          title="Удалить объект"
+          text={<>Удалить «{dialog.object.name}» из репозитория? Объект нигде не используется.</>}
+          confirmLabel="Удалить"
+          danger
+          onClose={close}
+          onConfirm={() => {
+            close();
+            run(async () => {
+              await api.deleteRepositoryObject(dialog.object.id);
+              return "Объект удалён.";
+            });
+          }}
+        />
+      )}
+      {dialog && dialog.mode !== "delete" && (
+        <ChoiceDialog
+          title={dialog.mode === "merge" ? `Объединить «${dialog.object.name}» с…` : `Заменить «${dialog.object.name}» на…`}
+          description={
+            dialog.mode === "merge"
+              ? "Выберите объект, который останется. Название и синонимы этого объекта станут синонимами выбранного, а записи во всех процессах перейдут на выбранный."
+              : `«${dialog.object.name}» используется в ${sessionsText(dialog.object.sessions)}, поэтому удалить его можно только с заменой: во всех процессах записи перейдут на выбранный объект.`
+          }
+          choices={choicesFor(dialog.object)}
+          emptyText="Нет другого объекта этого класса. Сначала заведите объект, на который можно перейти."
+          confirmLabel={dialog.mode === "merge" ? "Объединить" : "Заменить и удалить"}
+          danger={dialog.mode === "replace"}
+          preview={(c) => (
+            <>
+              «{dialog.object.name}» {dialog.mode === "merge" ? "станет синонимом" : "будет удалён, его название станет синонимом"} «{c.title}». Записи в {sessionsText(dialog.object.sessions)} получат название и карточку «{c.title}»; в утверждённых версиях меняется только ссылка.
+            </>
+          )}
+          onClose={close}
+          onConfirm={(c) => {
+            const o = dialog.object;
+            const mode = dialog.mode;
+            close();
+            run(async () => {
+              const r = mode === "merge" ? await api.mergeRepositoryObject(o.id, c.id) : await api.deleteRepositoryObject(o.id, c.id);
+              const done = r as { relinked?: number; skipped?: number } | undefined;
+              const detail = done && typeof done === "object" && done.relinked !== undefined ? ` Записей перенесено: ${done.relinked}${done.skipped ? `; утверждённых версий не менялось: ${done.skipped}` : ""}.` : "";
+              return mode === "merge" ? `Объединено с «${c.title}».${detail}` : `Объект заменён на «${c.title}» и удалён.${detail}`;
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

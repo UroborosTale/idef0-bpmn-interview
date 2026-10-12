@@ -340,6 +340,22 @@ button.danger:hover { background: #fef2f2; }
 .dict-usage td { background: #f6f9fe; }
 .usage-chip { margin: 2px 6px 2px 0; font-size: 12px; border-radius: 12px; padding: 2px 10px; }
 
+/* модальное окно выбора */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { background: #fff; border-radius: 10px; box-shadow: 0 12px 40px rgba(15, 23, 42, .3); width: min(560px, 100%); max-height: calc(100vh - 32px); display: flex; flex-direction: column; padding: 16px 20px; gap: 10px; }
+.modal h3 { margin: 0; }
+.modal-text { font-size: 13px; color: #334155; }
+.modal-search { width: 100%; }
+.modal-list { list-style: none; margin: 0; padding: 0; overflow: auto; min-height: 80px; max-height: 300px; border: 1px solid var(--border); border-radius: 6px; }
+.modal-list li { padding: 7px 10px; cursor: pointer; font-size: 13px; border-top: 1px solid #eef1f6; }
+.modal-list li:first-child { border-top: 0; }
+.modal-list li:hover { background: #f1f5f9; }
+.modal-list li.selected { background: var(--bs-light); outline: 1px solid var(--bs-blue); outline-offset: -1px; }
+.modal-preview { font-size: 12.5px; background: #f8fafc; border-radius: 6px; padding: 8px 10px; color: #334155; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+button.danger-fill { background: #b91c1c; border-color: #b91c1c; }
+button.danger-fill:hover { background: #991b1b; }
+
 /* общий репозиторий объектов */
 .repo-add { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
 .repo-add .repo-name { flex: 1 1 260px; max-width: 460px; min-width: 160px; }
