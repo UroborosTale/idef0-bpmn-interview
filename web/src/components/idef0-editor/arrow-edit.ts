@@ -133,9 +133,12 @@ export const slideEnd = (m: M, a: RouteArrow, frac01: number, producer = false):
  * Свободный конец внешней стрелки в точке pt: по сетке и не ближе MIN_FREE к блоку по направлению стрелки
  * (вход — левее блока, управление — выше, выход — правее, механизм — ниже).
  */
-export function clampFreeEnd(box: Box, kind: Arrow["kind"], pt: Pt): Pt {
-  const g = (v: number) => Math.round(v / ARROW_GRID) * ARROW_GRID;
-  const [x, y] = [g(pt[0]), g(pt[1])];
+export function clampFreeEnd(box: Box, kind: Arrow["kind"], pt: Pt, exact: { x?: boolean; y?: boolean } = {}): Pt {
+  // exact — оси, где положение уже точное (конец встал на направляющую или зажат Alt): к сетке не округляем, иначе выравнивание
+  // с портом или другой стрелкой пропадает и линия получает излом
+  const gx = (v: number) => (exact.x ? v : Math.round(v / ARROW_GRID) * ARROW_GRID);
+  const gy = (v: number) => (exact.y ? v : Math.round(v / ARROW_GRID) * ARROW_GRID);
+  const [x, y] = [gx(pt[0]), gy(pt[1])];
   switch (PORT_SIDE[kind]) {
     case "L":
       return [Math.min(x, box.x - MIN_FREE), y];

@@ -272,14 +272,16 @@ export default function Idef0Editor({
         // свободный конец: к сетке и направляющим по обеим осям, не ближе MIN_FREE к блоку
         let [x, y] = [wx, wy];
         const found: { axis: "x" | "y"; hit: GuideTarget[] }[] = [];
+        // оси, где положение уже точное: встало на направляющую (порт, блок, другая стрелка) или зажат Alt — к сетке не округляется
+        const exact = { x: free, y: free };
         if (!free) {
           const sx = snapAxis(x, guideTargets("x", alignBoxes(), a.points, [], otherArrowLines(a.key)), tol);
           const sy = snapAxis(y, guideTargets("y", alignBoxes(), a.points, [], otherArrowLines(a.key)), tol);
-          if (sx.hit.length > 0) (x = sx.value, found.push({ axis: "x", hit: sx.hit }));
-          if (sy.hit.length > 0) (y = sy.value, found.push({ axis: "y", hit: sy.hit }));
+          if (sx.hit.length > 0) (x = sx.value, (exact.x = true), found.push({ axis: "x", hit: sx.hit }));
+          if (sy.hit.length > 0) (y = sy.value, (exact.y = true), found.push({ axis: "y", hit: sy.hit }));
         }
         const box = blocks.get(a.nodeId)!.box;
-        const end = clampFreeEnd(box, a.kind, [x, y]);
+        const end = clampFreeEnd(box, a.kind, [x, y], exact);
         setGuides(found.map((f) => guideFor(f.axis, f.axis === "x" ? end[0] : end[1], f.hit, f.axis === "x" ? [end[1] - 12, end[1] + 12] : [end[0] - 12, end[0] + 12])));
         setDraft(() => setFreeEnd(d.start, a, end));
       } else {

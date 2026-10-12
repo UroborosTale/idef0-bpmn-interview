@@ -88,6 +88,22 @@ describe("раскладка применяет маршрут", () => {
     expect(orthogonal(movedOut.points)).toBe(true);
   });
 
+  it("свободный конец, выровненный по порту, не округляется к сетке: линия остаётся прямой, без излома", () => {
+    const m = purchaseModel();
+    const a = arrow(m, "input:c:d2");
+    const bC = block(m, "c");
+    const port = a.points[a.points.length - 1]; // конец у блока
+    // порт стоит на 5 px от сетки: любое округление до 10 px сбило бы выравнивание
+    const target: [number, number] = [bC.x - 120, port[1]];
+    expect(clampFreeEnd(bC, a.kind, target, { y: true })[1]).toBe(port[1]);
+    expect(clampFreeEnd(bC, a.kind, [target[0], port[1] + 3.5], { y: true })[1]).toBe(port[1] + 3.5); // Alt или направляющая — точное значение
+    expect(clampFreeEnd(bC, a.kind, [target[0] + 3, port[1] + 3.5])[1] % 10).toBe(0); // без привязки — сетка, как раньше
+    const end = clampFreeEnd(bC, a.kind, target, { y: true });
+    const straight = arrow(setFreeEnd(m, a, end), "input:c:d2");
+    expect(straight.points).toHaveLength(2); // одна прямая, без излома
+    expect(straight.points[0][1]).toBeCloseTo(straight.points[1][1], 5);
+  });
+
   it("подпись сдвигается; размер диаграммы растёт, если стрелку увели далеко", () => {
     const m = purchaseModel();
     const a = arrow(m, "input:c:d2");
