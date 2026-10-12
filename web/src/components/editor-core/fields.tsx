@@ -96,18 +96,24 @@ export function RenameOverlay({
   view,
   onCommit,
   onDone,
+  allowEmpty,
+  placeholder,
 }: {
   name: string;
   box: { x: number; y: number; w: number; h: number };
   view: View;
   onCommit: (value: string) => void;
   onDone: () => void;
+  /** Пустое значение тоже сохраняется (условие ветки можно стереть); по умолчанию пустой ввод отменяет правку. */
+  allowEmpty?: boolean;
+  placeholder?: string;
 }) {
   return (
     <input
       className="bpe-rename"
       autoFocus
       defaultValue={name}
+      placeholder={placeholder}
       onFocus={(e) => e.currentTarget.select()}
       style={{
         left: view.tx + (box.x + box.w / 2) * view.k,
@@ -116,7 +122,7 @@ export function RenameOverlay({
       }}
       onBlur={(e) => {
         const v = e.currentTarget.value.trim();
-        if (v && v !== name) onCommit(v);
+        if ((v || allowEmpty) && v !== name) onCommit(v);
         onDone();
       }}
       onKeyDown={(e) => {

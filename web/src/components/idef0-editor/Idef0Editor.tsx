@@ -9,7 +9,7 @@ import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
-import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, setArrowIcom } from "./ops";
+import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom } from "./ops";
 import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { ArrowHandles, ArrowShape, BlockShape, Idef0Defs } from "./shapes";
 import type { Selection } from "../studio/selection";
@@ -130,7 +130,7 @@ export default function Idef0Editor({
     onSelectionChange?.(toSelection(s));
     if (s?.kind === "arrow" && !arrowHinted.current) {
       arrowHinted.current = true;
-      showHint("Ручки стрелки: ○ конец (потяните вдоль стороны или на другую функцию), ▭ отрезок, ■ излом; двойной щелчок по линии — излом");
+      showHint("Ручки стрелки: ○ конец (потяните вдоль стороны или на другую функцию), ▭ отрезок, ■ излом; двойной щелчок по линии — править название, Ctrl + двойной щелчок — излом");
     }
   };
   // выделение изменилось не мышью (переход из навигатора, новая функция, удаление) — тоже сообщаем
@@ -464,29 +464,42 @@ export default function Idef0Editor({
 
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
     // пока указатель захвачен ручкой или блоком, событие приходит на сам svg: цель определяем по координатам
-    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const under = document.elementFromPoint?.(e.clientX, e.clientY) ?? null;
     const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
     const id = t.closest("[data-fn-id]")?.getAttribute("data-fn-id");
     if (t.closest("[data-open]")) return;
-    // двойной щелчок по излому убирает его, по линии стрелки — добавляет излом
+    // двойной щелчок: по излому — убрать его; по стрелке — править название (с Ctrl — добавить излом); по функции — править название;
+    // по пустому месту ничего не происходит, а с Ctrl — создаётся функция
+    const ctrl = e.ctrlKey || e.metaKey;
     const handle = t.closest("[data-ah]")?.getAttribute("data-ah") ?? "";
     if (handle.startsWith("corner|") && arrowSel) {
       commit(removeBend(draftRef.current, arrowSel, Number(handle.split("|")[1])));
       return;
     }
-    // ручка отрезка — часть линии: двойной щелчок по ней тоже добавляет излом
+    // ручка отрезка — часть линии: двойной щелчок по ней то же, что по самой стрелке
     if (handle && !handle.startsWith("seg|")) return;
     const arrowKey = handle ? arrowSel?.key : t.closest("[data-arrow-key]")?.getAttribute("data-arrow-key");
     if (arrowKey) {
       const a = layout.arrows.find((x) => x.key === arrowKey);
-      const [wx, wy] = toWorld(e.clientX, e.clientY);
-      const next = a ? addBend(draftRef.current, a, [wx, wy]) : draftRef.current;
-      if (a && next === draftRef.current) showHint("Отрезок слишком короткий для излома");
-      else commit(next, a ? arrowSelOf(a) : undefined);
+      if (!a) return;
+      if (ctrl) {
+        const [wx, wy] = toWorld(e.clientX, e.clientY);
+        const next = addBend(draftRef.current, a, [wx, wy]);
+        if (next === draftRef.current) showHint("Отрезок слишком короткий для излома");
+        else commit(next, arrowSelOf(a));
+      } else {
+        setSel(arrowSelOf(a));
+        setEditing(`arrow:${a.key}`);
+      }
       return;
     }
-    if (id) setEditing(id);
-    else if (!t.closest("[data-arrow-key]") && !t.closest("[data-connect]")) addAt(toWorld(e.clientX, e.clientY));
+    if (id) {
+      setEditing(id);
+      return;
+    }
+    if (t.closest("[data-connect]")) return;
+    if (ctrl) addAt(toWorld(e.clientX, e.clientY));
+    else showHint("Функция создаётся по Ctrl + двойной щелчок или перетаскиванием «Функции» из палитры");
   };
 
   const addFromPalette = () => {
@@ -615,6 +628,8 @@ export default function Idef0Editor({
 
   const selectedFn = curSel?.kind === "fn" ? blocks.get(curSel.id) : undefined;
   const editingFn = editing ? blocks.get(editing) : undefined;
+  /** Правка названия стрелки (редактируется запись документа, регламента, системы или исполнителя: подпись меняется у всех стрелок). */
+  const editingArrow = editing?.startsWith("arrow:") ? layout.arrows.find((a) => a.key === editing.slice(6)) : undefined;
   const { w: worldW, h: worldH } = idef0Extents(layout);
   const parentNode = cur ? draft.nodes.find((n) => n.id === cur) : undefined;
   const crumbs: { id: string | null; label: string }[] = [
@@ -702,7 +717,7 @@ export default function Idef0Editor({
               </text>
               {layout.functions.length === 0 && (
                 <text x={16} y={60} fontSize={13} fontFamily="Arial, sans-serif" fill="#64748b" pointerEvents="none">
-                  Диаграмма пуста: добавьте функцию — двойным щелчком или из палитры слева.
+                  Диаграмма пуста: добавьте функцию — Ctrl + двойной щелчок или перетащите её из палитры слева.
                 </text>
               )}
               {layout.arrows.map((a) => (
@@ -779,12 +794,30 @@ export default function Idef0Editor({
               onDone={() => setEditing(null)}
             />
           )}
+          {editingArrow &&
+            (() => {
+              const lab = labelSpec(editingArrow);
+              const cx = lab.anchor === "start" ? lab.x + 60 : lab.anchor === "end" ? lab.x - 60 : lab.x;
+              return (
+                <RenameOverlay
+                  key={editingArrow.key}
+                  name={editingArrow.label}
+                  box={{ x: cx - 80, y: lab.y - 14, w: 160, h: 20 }}
+                  view={view}
+                  onCommit={(v) => {
+                    commit(renameEntity(draftRef.current, editingArrow.kind === "control" ? "control" : editingArrow.kind === "system" ? "system" : editingArrow.kind === "role" ? "role" : "data", editingArrow.entityId, v));
+                    showHint("Название общее для всех стрелок этой записи справочника");
+                  }}
+                  onDone={() => setEditing(null)}
+                />
+              );
+            })()}
           {arrowSel && !editing && (
             <div className="bpe-selbar" role="toolbar" aria-label="Действия со стрелкой">
               <span className="muted">
                 Стрелка «{arrowSel.label}»{arrowSel.manual ? " · маршрут вручную" : ""}
               </span>
-              <button onClick={() => { const next = addBend(draftRef.current, arrowSel); if (next === draftRef.current) showHint("Отрезок слишком короткий для излома"); else commit(next); }} title="Добавить излом на самом длинном отрезке (или двойной щелчок по линии)">
+              <button onClick={() => { const next = addBend(draftRef.current, arrowSel); if (next === draftRef.current) showHint("Отрезок слишком короткий для излома"); else commit(next); }} title="Добавить излом на самом длинном отрезке (или Ctrl + двойной щелчок по линии)">
                 Добавить излом
               </button>
               <button disabled={!hasManualRoute(draft, arrowSel)} onClick={() => commit(resetArrow(draftRef.current, arrowSel))} title="Вернуть автоматическую прокладку">

@@ -10,7 +10,7 @@ import { positionOnSide } from "@shared/bpmnManual";
 import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, snapShape, type Guide, type GuideTarget } from "./guides";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateNode, type NewNodeSpec } from "./model-ops";
+import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 
@@ -82,6 +82,8 @@ export default function BpmnEditor({
   /** Правый край дорожек тянут: он подсвечен. */
   const [stretching, setStretching] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /** Правка текста стрелки (условие ветки) или значка-триггера на блоке; at — где открыть поле, в координатах диаграммы. */
+  const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker"; id: string; at: Pt } | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
   const [connectHot, setConnectHot] = useState<string | null>(null);
@@ -457,23 +459,37 @@ export default function BpmnEditor({
     }
   };
 
+  /**
+   * Двойной щелчок правит текст того, по чему попали: фигура (задача, событие, шлюз) — название, значок-триггер на блоке — его
+   * название, стрелка — условие ветки (с Ctrl — добавить излом), излом — убирает его.
+   */
   const onDoubleClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const t = e.target as Element;
-    if (curSel?.kind === "flow") {
+    // пока указатель захвачен ручкой или фигурой, событие приходит на сам svg: цель определяем по координатам
+    const under = document.elementFromPoint?.(e.clientX, e.clientY) ?? null;
+    const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
+    const at = toWorld(e.clientX, e.clientY);
+    const handle = t.closest("[data-flow-handle]")?.getAttribute("data-flow-handle");
+    if (curSel?.kind === "flow" && handle?.startsWith("corner:")) {
       const g = flowGeometry(curSel.id);
-      const handle = t.closest("[data-flow-handle]")?.getAttribute("data-flow-handle");
-      if (g && handle?.startsWith("corner:")) {
-        // двойной щелчок по излому — убрать его
-        commit(removeBend(viewRef.current, curSel.id, g, Number(handle.slice(7))));
-        return;
-      }
-      if (g && t.closest("[data-flow-id]")?.getAttribute("data-flow-id") === curSel.id) {
-        // двойной щелчок по выбранной стрелке — добавить излом в этом месте
-        const next = addBend(viewRef.current, curSel.id, g, toWorld(e.clientX, e.clientY));
+      if (g) commit(removeBend(viewRef.current, curSel.id, g, Number(handle.slice(7))));
+      return;
+    }
+    // ручка отрезка — часть линии: двойной щелчок по ней то же, что по самой выбранной стрелке
+    if (handle && !handle.startsWith("seg:")) return;
+    const marker = handle ? null : t.closest("[data-marker]")?.getAttribute("data-marker");
+    if (marker) {
+      setEditSpot({ kind: "marker", id: marker, at });
+      return;
+    }
+    const flowId = handle ? (curSel?.kind === "flow" ? curSel.id : undefined) : t.closest("[data-flow-id]")?.getAttribute("data-flow-id");
+    if (flowId) {
+      if (e.ctrlKey || e.metaKey) {
+        const g = flowGeometry(flowId);
+        const next = g ? addBend(viewRef.current, flowId, g, at) : viewRef.current;
         if (next === viewRef.current) showHint("Здесь не получится: отрезок слишком короткий для излома");
         else commit(next);
-        return;
-      }
+      } else setEditSpot({ kind: "flow", id: flowId, at });
+      return;
     }
     const id = t.closest("[data-node-id]")?.getAttribute("data-node-id");
     if (id) setEditing(id);
@@ -871,6 +887,30 @@ export default function BpmnEditor({
               onDone={() => setEditing(null)}
             />
           )}
+          {editSpot &&
+            (() => {
+              const box = { x: editSpot.at[0] - 90, y: editSpot.at[1] - 12, w: 180, h: 24 };
+              if (editSpot.kind === "marker") {
+                const ev = viewRef.current.nodes.find((n) => n.id === editSpot.id);
+                if (!ev) return null;
+                return <RenameOverlay key={`m${ev.id}`} name={ev.name} box={box} view={view} onCommit={(v) => commit(updateNode(viewRef.current, ev.id, { name: v }))} onDone={() => setEditSpot(null)} />;
+              }
+              const fl = viewRef.current.flows.find((f) => f.id === editSpot.id);
+              if (!fl) return null;
+              const fromGateway = viewRef.current.nodes.find((n) => n.id === fl.from)?.type === "gateway";
+              return (
+                <RenameOverlay
+                  key={`f${fl.id}`}
+                  name={fl.condition ?? ""}
+                  box={box}
+                  view={view}
+                  allowEmpty
+                  placeholder={fromGateway ? "Условие ветки" : "Условие (необязательно)"}
+                  onCommit={(v) => commit(updateFlow(viewRef.current, fl.id, { condition: v || null }))}
+                  onDone={() => setEditSpot(null)}
+                />
+              );
+            })()}
           {shown.length === 0 && (
             <div className="bpe-empty">
               <b>Диаграмма пуста</b>
@@ -966,7 +1006,7 @@ export default function BpmnEditor({
                       if (next === draft) showHint("Нет отрезка, на котором можно добавить излом");
                       else commit(next);
                     }}
-                    title="Добавить ступеньку на самом длинном отрезке — её можно потянуть куда нужно (то же: двойной щелчок по стрелке)"
+                    title="Добавить ступеньку на самом длинном отрезке — её можно потянуть куда нужно (то же: Ctrl + двойной щелчок по стрелке)"
                   >
                     Добавить излом
                   </button>
@@ -976,7 +1016,7 @@ export default function BpmnEditor({
                   <button onClick={() => commit(deleteFlow(draft, flow.id), null)} title="Удалить стрелку (Delete)">
                     Удалить
                   </button>
-                  <span className="muted">● — конец (на другую сторону, фигуру или вдоль стороны) · ▮ — сдвинуть участок · ■ — перенести излом · двойной щелчок по линии — новый излом, по излому — убрать · розовая линия — выравнивание, к ней прилипает (Alt — без привязки)</span>
+                  <span className="muted">● — конец (на другую сторону, фигуру или вдоль стороны) · ▮ — сдвинуть участок · ■ — перенести излом · Ctrl + двойной щелчок по линии — новый излом, двойной щелчок по излому — убрать, по линии без Ctrl — править условие · розовая линия — выравнивание, к ней прилипает (Alt — без привязки)</span>
                 </div>
               );
             })()}

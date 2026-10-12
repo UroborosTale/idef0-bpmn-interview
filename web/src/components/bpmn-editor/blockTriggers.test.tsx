@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { scopeView } from "@shared/scope";
 import { session, structuredModel } from "../../test/fixtures";
@@ -228,6 +228,19 @@ describe("редактор: значки на блоках и ручки выб�
     expect(screen.getByText("Событие и триггер")).toBeTruthy();
   });
 
+  it("двойной щелчок по значку триггера правит название события, а не блока", async () => {
+    const { onSave } = studio(withStartTrigger());
+    fireEvent.doubleClick(document.querySelector('[data-marker="b0"]')!);
+    const input = document.querySelector<HTMLInputElement>("input.bpe-rename")!;
+    expect(input.value).toBe("Заявка получена");
+    fireEvent.change(input, { target: { value: "Заказ принят" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await act(async () => fireEvent.click(screen.getByTitle("Сохранить (Ctrl+S)")));
+    const saved = onSave.mock.calls[0][0];
+    expect(saved.nodes.find((n) => n.id === "b0")!.name).toBe("Заказ принят");
+    // блок, на котором стоит значок, не переименован
+    expect(saved.nodes.find((n) => n.id === "b1")!.name).toBe(withStartTrigger().nodes.find((n) => n.id === "b1")!.name);
+  });
   it("у выбранной стрелки появляются ручки: оба конца и средний участок; панель действий позволяет сбросить маршрут", () => {
     studio(structuredModel());
     expect(document.querySelector("[data-flow-handle]")).toBeNull();
