@@ -40,6 +40,21 @@ describe("общий репозиторий объектов", () => {
     expect((await app.call("POST", "/repository", { class: "role", name: "X", kind: "document" })).status).toBe(400);
   });
 
+  it("except: правка из открытого окна процесса не трогает его сохранённую модель (иначе сохранение черновика даст конфликт), остальные процессы обновляются", async () => {
+    const sys = await create({ class: "system", name: "Учётка", description: null });
+    const mine = await makeProcess("Мой процесс", { system: sys.id });
+    const other = await makeProcess("Чужой процесс", { system: sys.id });
+    const before = (await get(mine.id)).updatedAt;
+    const r = await app.call("PATCH", `/repository/${sys.id}?except=${mine.id}`, { name: "Учётка 2.0", description: "новая" });
+    expect(r.status).toBe(200);
+    expect(r.body.updated).toBe(1);
+    expect((await get(other.id)).model.systems[0]).toMatchObject({ name: "Учётка 2.0", description: "новая" });
+    const own = await get(mine.id);
+    expect(own.model.systems[0].name).toBe("1С"); // не тронута
+    expect(own.updatedAt).toBe(before); // версия не сдвинулась — сохранение черновика пройдёт без конфликта
+    expect((await app.call("GET", `/repository/${sys.id}`)).body.name).toBe("Учётка 2.0");
+  });
+
   it("список ищет по названию и синониму и считает, где объект используется", async () => {
     const role = await create({ class: "role", name: "Аналитик закупок", synonyms: ["Закупочный аналитик"] });
     const a = await makeProcess("Закупка А", { role: role.id });

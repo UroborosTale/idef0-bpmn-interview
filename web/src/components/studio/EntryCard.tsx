@@ -1,6 +1,7 @@
 import type { Fragment, ProcessLogicModel, SourceRef } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
 import { HistoryList, Section, SourceList } from "./PanelParts";
+import RepoSync from "./RepoSync";
 import { idef0Codes } from "../idef0-editor/geometry";
 import { DICT_TITLES, type DictKind } from "./docs";
 import { ENTRY_TITLES, KIND_OPTIONS, LEVEL_OPTIONS, entryOf, removeEntry, updateEntry, usageOf } from "./dict-ops";
@@ -140,6 +141,17 @@ export default function EntryCard({
             <CommitInput multiline rows={3} value={f.quality_standard ?? ""} onCommit={(v) => set({ quality_standard: v.trim() || null })} />
           </Field>
         </Section>
+      )}
+
+      {(dict === "roles" || dict === "systems" || dict === "data") && f.repo_id && (
+        <RepoSync
+          key={f.repo_id}
+          sessionId={sessionId}
+          repoId={f.repo_id}
+          entry={{ name: rec.name, description: f.description, owner: f.owner, kind: dict === "systems" ? undefined : f.kind ?? null }}
+          stamp={stamp}
+          onTake={(patch) => set(patch)}
+        />
       )}
 
       {withUsage ? (

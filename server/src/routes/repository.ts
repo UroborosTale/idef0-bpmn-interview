@@ -134,7 +134,9 @@ repositoryRouter.patch("/repository/:id", (req, res) => {
   if (p.owner !== undefined) next.owner = p.owner || null;
   if (p.kind !== undefined) next.kind = p.kind;
   const saved = saveObject(next);
-  const sync = req.query.propagate === "0" ? { updated: 0, skipped: 0 } : syncLinkedEntries(saved);
+  // except — сессия, из открытого окна которой пришла правка: её модель обновится сохранением черновика, поэтому здесь её не трогаем (иначе сохранение даст конфликт версий)
+  const except = typeof req.query.except === "string" && req.query.except ? req.query.except : undefined;
+  const sync = req.query.propagate === "0" ? { updated: 0, skipped: 0 } : syncLinkedEntries(saved, except);
   logAudit(null, "analyst", "repository_update", { id: saved.id, name: saved.name, ...sync });
   res.json({ object: saved, ...sync });
 });

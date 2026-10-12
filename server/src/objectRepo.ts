@@ -179,11 +179,12 @@ export function linkedEntries(repoId?: string): Map<string, LinkedEntry[]> {
 export function updateLinkedEntries(
   repoId: string,
   edit: (entry: Record<string, any>, cls: RepoClass) => boolean,
-  opts: { includeApproved?: boolean; markDiagramsStale?: boolean } = {}
+  opts: { includeApproved?: boolean; markDiagramsStale?: boolean; /** Сессия, которую не трогаем: правка пришла из её открытого окна и сохранится вместе с её черновиком. */ exceptSession?: string } = {}
 ): { updated: number; skipped: number } {
   let updated = 0;
   let skipped = 0;
   for (const { row, model } of sessionsLinkedTo(repoId)) {
+    if (opts.exceptSession && row.id === opts.exceptSession) continue;
     const approved = model.process.status === "approved";
     if (approved && !opts.includeApproved) {
       skipped++;
@@ -204,7 +205,7 @@ export function updateLinkedEntries(
 }
 
 /** Переносит значения объекта (название, описание, ответственного, вид) в связанные записи моделей. */
-export function syncLinkedEntries(obj: RepoObject): { updated: number; skipped: number } {
+export function syncLinkedEntries(obj: RepoObject, exceptSession?: string): { updated: number; skipped: number } {
   return updateLinkedEntries(
     obj.id,
     (e) => {
@@ -220,7 +221,7 @@ export function syncLinkedEntries(obj: RepoObject): { updated: number; skipped: 
       if (obj.kind) set("kind", obj.kind);
       return changed;
     },
-    { markDiagramsStale: true }
+    { markDiagramsStale: true, exceptSession }
   );
 }
 

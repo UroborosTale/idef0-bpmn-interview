@@ -112,8 +112,8 @@ export const api = {
   createRepositoryObject: (input: { class: RepoClass; name: string; synonyms?: string[]; description?: string | null; owner?: string | null; kind?: string | null }) =>
     req<RepoObject>("POST", "/repository", input),
   /** propagate=false — менять только репозиторий, не записи моделей. */
-  patchRepositoryObject: (id: string, patch: Partial<Pick<RepoObject, "name" | "synonyms" | "description" | "owner" | "kind">>, propagate = true) =>
-    req<{ object: RepoObject; updated: number; skipped: number }>("PATCH", `/repository/${id}${propagate ? "" : "?propagate=0"}`, patch),
+  patchRepositoryObject: (id: string, patch: Partial<Pick<RepoObject, "name" | "synonyms" | "description" | "owner" | "kind">>, propagate = true, exceptSession?: string) =>
+    req<{ object: RepoObject; updated: number; skipped: number }>("PATCH", `/repository/${id}${propagate ? (exceptSession ? `?except=${encodeURIComponent(exceptSession)}` : "") : "?propagate=0"}`, patch),
   mergeRepositoryObject: (id: string, intoId: string) =>
     req<{ object: RepoObject; relinked: number; skipped: number; duplicated: number }>("POST", `/repository/${id}/merge`, { intoId }),
   /** Без replaceWith используемый объект не удаляется (409). */
