@@ -1,4 +1,6 @@
 import { lookup } from "node:dns/promises";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
 /**
@@ -68,14 +70,66 @@ export function isPrivateAddress(ip: string): boolean {
   return (g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0 || (g[0] & 0xff00) === 0xff00; // ULA, link-/site-local, multicast
 }
 
-/** Отправка вебхука: только на публичные адреса, без перенаправлений, с таймаутом. */
-export async function safeWebhookFetch(url: string, init: RequestInit): Promise<Response> {
-  const check = validateWebhookUrl(url);
-  if (!check.ok) throw new Error(check.error);
-  const host = check.parsed.hostname.replace(/^\[|\]$/g, "");
-  const addresses = isIP(host) ? [host] : (await lookup(host, { all: true })).map((a) => a.address);
-  if (addresses.length === 0 || addresses.some(isPrivateAddress)) {
+type Resolver = (host: string) => Promise<{ address: string; family: number }[]>;
+const systemResolver: Resolver = (host) => lookup(host, { all: true });
+
+/** Адреса имени хоста; если хоть один внутренний или служебный — отказ. IP-литерал проверяется без обращения к DNS. */
+export async function resolvePublic(host: string, resolver: Resolver = systemResolver): Promise<{ address: string; family: number }[]> {
+  const clean = host.replace(/^\[|\]$/g, "");
+  const kind = isIP(clean);
+  const addresses = kind ? [{ address: clean, family: kind }] : await resolver(clean);
+  if (addresses.length === 0 || addresses.some((a) => isPrivateAddress(a.address))) {
     throw new Error("webhook_url разрешается во внутренний/служебный адрес — запрещено");
   }
-  return fetch(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(10_000) });
+  return addresses;
 }
+
+type Validate = (url: string) => { ok: true; parsed: URL } | { ok: false; error: string };
+
+/**
+ * Отправитель вебхуков с подставляемыми проверкой адреса и разрешением имён (в приложении — safeWebhookFetch; подмена нужна
+ * тестам, чтобы проверить саму передачу без выхода в сеть). Адреса проверяются в разрешении имени при соединении: сокет
+ * открывается по тому IP, который прошёл проверку, поэтому подменить ответ DNS между проверкой и соединением (DNS rebinding)
+ * нельзя. TLS проверяется по исходному имени хоста. Перенаправления не выполняются, ответ не читается.
+ */
+export function makeWebhookFetch(validate: Validate, resolve: (host: string) => Promise<{ address: string; family: number }[]>) {
+  return async function webhookFetch(url: string, init: RequestInit): Promise<Response> {
+    const check = validate(url);
+    if (!check.ok) throw new Error(check.error);
+    const target = check.parsed;
+    await resolve(target.hostname); // быстрый отказ с понятной ошибкой до соединения
+    const headers = Object.fromEntries(new Headers(init.headers).entries());
+    const body = typeof init.body === "string" ? init.body : init.body == null ? undefined : String(init.body);
+    if (body !== undefined && !("content-length" in headers)) headers["content-length"] = String(Buffer.byteLength(body));
+    const signal = init.signal ?? AbortSignal.timeout(10_000);
+    const send = target.protocol === "https:" ? httpsRequest : httpRequest;
+    return new Promise<Response>((done, fail) => {
+      const req = send(
+        target,
+        {
+          method: init.method ?? "GET",
+          headers,
+          signal,
+          // единственный источник адреса для сокета: проверенный набор, а не повторный запрос к DNS
+          lookup: (hostname: string, options: { all?: boolean }, cb: (err: Error | null, address: any, family?: number) => void) => {
+            resolve(hostname).then(
+              (list) => (options?.all ? cb(null, list) : cb(null, list[0].address, list[0].family)),
+              (e) => cb(e as Error, "", 0)
+            );
+          },
+        },
+        (res) => {
+          res.resume();
+          done(new Response(null, { status: res.statusCode && res.statusCode >= 200 ? res.statusCode : 502 }));
+          req.destroy();
+        }
+      );
+      req.on("error", fail);
+      if (body !== undefined) req.write(body);
+      req.end();
+    });
+  };
+}
+
+/** Отправка вебхука: только на публичные адреса, без перенаправлений, с таймаутом. */
+export const safeWebhookFetch = makeWebhookFetch(validateWebhookUrl, (host) => resolvePublic(host));
