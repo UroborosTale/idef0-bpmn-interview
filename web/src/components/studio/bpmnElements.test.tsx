@@ -269,7 +269,7 @@ describe("студия: новые элементы на диаграмме оп
     expect(onSave.mock.calls[0][0].nodes.find((n) => n.id === bid)).toMatchObject({ attached_to: "b1", subtype: "intermediate", trigger: { type: "timer" }, bpmn_scope: "o1" });
   });
 
-  it("значки документов и хранилищ, внешний пул и поток сообщений рисуются; клик по значку выбирает задачу", () => {
+  it("значки документов и хранилищ, внешний пул и поток сообщений рисуются; клик по значку открывает карточку документа или системы", () => {
     const m = structuredModel();
     m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
     m.nodes.find((n) => n.id === "b1")!.outputs = ["d2"];
@@ -280,7 +280,23 @@ describe("студия: новые элементы на диаграмме оп
     expect(document.querySelector("[data-pool-id]")!.textContent).toContain("B002.02.01 Анализ эффективности");
     expect(document.querySelector(".studio svg.bpe-svg")!.textContent).toContain("Запрос на анализ");
     fireEvent.pointerDown(document.querySelector('[data-artifact-kind="input"]')!, { button: 0, pointerId: 1 });
-    expect(document.querySelector(".prop-kind")!.textContent).toMatch(/B002\.01\.01\/001/);
+    expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Документ \/ данные/);
+    fireEvent.pointerDown(document.querySelector('[data-artifact-kind="store"]')!, { button: 0, pointerId: 1 });
+    expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Информационная система/);
+  });
+
+  it("двойной щелчок по значку документа переименовывает его во всей модели", () => {
+    const m = structuredModel();
+    m.nodes.find((n) => n.id === "b1")!.inputs = ["d1"];
+    studio(m);
+    const icon = document.querySelector('[data-artifact-kind="input"]')!;
+    fireEvent.pointerDown(icon, { button: 0, pointerId: 1 });
+    fireEvent.doubleClick(icon);
+    const input = document.querySelector(".studio input.bpe-rename, .studio .bpe-overlay input, .studio foreignObject input") as HTMLInputElement | null;
+    expect(input).not.toBeNull();
+    fireEvent.change(input!, { target: { value: "Заявка v2" } });
+    fireEvent.keyDown(input!, { key: "Enter" });
+    expect(document.querySelector(".studio")!.textContent).toContain("Заявка v2");
   });
 
   it("ArtifactShape: подсказка с названием и видом, у хранилища нет стрелки", () => {

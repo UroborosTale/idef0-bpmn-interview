@@ -13,9 +13,10 @@ import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distribute
 import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteNode, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
+import { entryOf, updateEntry } from "../studio/dict-ops";
 
 type M = ProcessLogicModel;
-type Sel = { kind: "node" | "flow" | "lane"; id: string } | null;
+type Sel = { kind: "node" | "flow" | "lane"; id: string } | { kind: "artifact"; dict: "data" | "systems"; id: string } | null;
 type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "node"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number; keep: { x: boolean; y: boolean } }
@@ -83,7 +84,7 @@ export default function BpmnEditor({
   const [stretching, setStretching] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   /** Правка текста стрелки (условие ветки) или значка-триггера на блоке; at — где открыть поле, в координатах диаграммы. */
-  const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker"; id: string; at: Pt } | null>(null);
+  const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker" | "artifact"; id: string; dict?: "data" | "systems"; at: Pt } | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
   const [connectHot, setConnectHot] = useState<string | null>(null);
@@ -108,7 +109,7 @@ export default function BpmnEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.nonce]);
 
-  const toSelection = (s: Sel): Selection => (!s ? null : s.kind === "lane" ? { kind: "entry", dict: "roles", id: s.id } : { kind: s.kind, id: s.id });
+  const toSelection = (s: Sel): Selection => (!s ? null : s.kind === "lane" ? { kind: "entry", dict: "roles", id: s.id } : s.kind === "artifact" ? { kind: "entry", dict: s.dict, id: s.id } : { kind: s.kind, id: s.id });
   /** Выбор мышью: сообщаем студии всегда, даже если выделен тот же элемент (панель могла уйти к другой записи). */
   const pick = (s: Sel) => {
     setSel(s);
@@ -120,7 +121,8 @@ export default function BpmnEditor({
     sel &&
     ((sel.kind === "node" && nodeExists(sel.id)) ||
       (sel.kind === "flow" && draft.flows.some((f) => f.id === sel.id)) ||
-      (sel.kind === "lane" && draft.roles.some((r) => r.id === sel.id)))
+      (sel.kind === "lane" && draft.roles.some((r) => r.id === sel.id)) ||
+      (sel.kind === "artifact" && !!entryOf(draft, sel.dict, sel.id)))
       ? sel
       : null;
 
@@ -258,8 +260,9 @@ export default function BpmnEditor({
       setMulti([]);
       pick({ kind: "node", id: markerEl.getAttribute("data-marker")! });
     } else if (artifactEl) {
+      // значок документа или хранилища: выбирает запись справочника — её карточка открывается в «Свойствах»
       setMulti([]);
-      pick({ kind: "node", id: artifactEl.getAttribute("data-artifact")! });
+      pick({ kind: "artifact", dict: artifactEl.getAttribute("data-artifact-kind") === "store" ? "systems" : "data", id: artifactEl.getAttribute("data-artifact-entity")! });
     } else if (flowEl) {
       setMulti([]);
       pick({ kind: "flow", id: flowEl.getAttribute("data-flow-id")! });
@@ -476,6 +479,11 @@ export default function BpmnEditor({
     }
     // ручка отрезка — часть линии: двойной щелчок по ней то же, что по самой выбранной стрелке
     if (handle && !handle.startsWith("seg:")) return;
+    const artifactEl = handle ? null : t.closest("[data-artifact]");
+    if (artifactEl) {
+      setEditSpot({ kind: "artifact", dict: artifactEl.getAttribute("data-artifact-kind") === "store" ? "systems" : "data", id: artifactEl.getAttribute("data-artifact-entity")!, at });
+      return;
+    }
     const marker = handle ? null : t.closest("[data-marker]")?.getAttribute("data-marker");
     if (marker) {
       setEditSpot({ kind: "marker", id: marker, at });
@@ -775,7 +783,7 @@ export default function BpmnEditor({
                 <PoolShape key={pool.id} pool={pool} box={box} />
               ))}
               {extras.artifacts.map((a) => (
-                <ArtifactShape key={a.key} artifact={a} />
+                <ArtifactShape key={a.key} artifact={a} selected={curSel?.kind === "artifact" && curSel.id === a.entityId && curSel.dict === (a.kind === "store" ? "systems" : "data")} />
               ))}
 
               {shown.map((n) => (
@@ -890,6 +898,13 @@ export default function BpmnEditor({
           {editSpot &&
             (() => {
               const box = { x: editSpot.at[0] - 90, y: editSpot.at[1] - 12, w: 180, h: 24 };
+              if (editSpot.kind === "artifact") {
+                // справочник общий для всех диаграмм: правим полную модель, а не вид операции
+                const dict = editSpot.dict!;
+                const rec = entryOf(draftRef.current, dict, editSpot.id);
+                if (!rec) return null;
+                return <RenameOverlay key={`a${rec.id}`} name={rec.name} box={box} view={view} onCommit={(v) => h.commit(updateEntry(draftRef.current, dict, rec.id, { name: v }))} onDone={() => setEditSpot(null)} />;
+              }
               if (editSpot.kind === "marker") {
                 const ev = viewRef.current.nodes.find((n) => n.id === editSpot.id);
                 if (!ev) return null;
