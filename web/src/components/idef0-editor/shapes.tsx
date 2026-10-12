@@ -6,6 +6,18 @@ import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 const clip = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s);
 
 /** Рамка листа: клетчатое поле, контур, штамп (NODE / TITLE / NO.). Надписи штампа правятся двойным щелчком. */
+/** Края и углы листа: id, курсор, доля положения по x и y (0 — левый/верхний, 1 — правый/нижний, 0.5 — вдоль края), занимает ли край всю сторону. */
+const EDGES: [string, string, number, number][] = [
+  ["n", "ns-resize", 0.5, 0],
+  ["s", "ns-resize", 0.5, 1],
+  ["w", "ew-resize", 0, 0.5],
+  ["e", "ew-resize", 1, 0.5],
+  ["nw", "nwse-resize", 0, 0],
+  ["ne", "nesw-resize", 1, 0],
+  ["sw", "nesw-resize", 0, 1],
+  ["se", "nwse-resize", 1, 1],
+];
+
 export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean }) {
   const { sheet, footer } = geo;
   return (
@@ -26,16 +38,25 @@ export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean })
         <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
       ))}
       <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#1f2937" strokeWidth={1.2} pointerEvents="none" />
-      {/* края листа тянут мышью: правый — ширину, нижний — высоту, угол — обе */}
-      <rect data-frame-resize="w" x={sheet.w - 5} y={0} width={10} height={sheet.h - 10} fill="transparent" style={{ cursor: "ew-resize" }}>
-        <title>Потяните, чтобы изменить ширину листа</title>
+      {/* лист двигают за штамп, а растягивают за любой край и угол */}
+      <rect data-frame-move x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="transparent" style={{ cursor: "move" }}>
+        <title>Потяните штамп, чтобы подвинуть лист</title>
       </rect>
-      <rect data-frame-resize="h" x={0} y={sheet.h - 5} width={sheet.w - 10} height={10} fill="transparent" style={{ cursor: "ns-resize" }}>
-        <title>Потяните, чтобы изменить высоту листа</title>
-      </rect>
-      <rect data-frame-resize="wh" x={sheet.w - 10} y={sheet.h - 10} width={14} height={14} fill="#94a3b8" opacity={0.55} style={{ cursor: "nwse-resize" }}>
-        <title>Потяните, чтобы изменить размер листа</title>
-      </rect>
+      {EDGES.map(([id, cursor, fx, fy]) => (
+        <rect
+          key={id}
+          data-frame-resize={id}
+          x={fx === 0.5 ? sheet.x + 6 : sheet.x + fx * sheet.w - 5}
+          y={fy === 0.5 ? sheet.y + 6 : sheet.y + fy * sheet.h - 5}
+          width={fx === 0.5 ? sheet.w - 12 : 10}
+          height={fy === 0.5 ? sheet.h - 12 : 10}
+          fill={id.length === 2 ? "#94a3b8" : "transparent"}
+          opacity={id.length === 2 ? 0.55 : 1}
+          style={{ cursor }}
+        >
+          <title>Потяните, чтобы изменить размер листа</title>
+        </rect>
+      ))}
       {geo.cells.map((c) => (
         <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
           <title>Двойной щелчок — изменить надпись</title>

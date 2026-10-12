@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frameGeometry, frameTexts } from "../src/shared/idef0Frame.js";
+import { frameGeometry, frameTexts, withFrameHeight } from "../src/shared/idef0Frame.js";
 import { generateIdef0 } from "../src/pipeline/idef0.js";
 import { purchaseModel } from "./fixtures.js";
 
@@ -22,14 +22,30 @@ describe("рамка листа IDEF0", () => {
     expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(g.sheet.w);
   });
 
-  it("размер листа можно задать вручную, но меньше содержимого он не бывает; пунктира нет", () => {
-    const g = frameGeometry({ w: 900, h: 500 }, { w: 1300, h: 700 }, defaults);
-    expect(g.sheet).toEqual({ x: 0, y: 0, w: 1300, h: 730 });
-    expect(g.footer.y).toBe(700);
-    const small = frameGeometry({ w: 900, h: 500 }, { w: 300, h: 300 }, defaults);
-    expect(small.sheet).toEqual({ x: 0, y: 0, w: 900, h: 530 });
+  it("лист, заданный вручную, стоит где поставили и не зависит от содержимого; сетка и штамп смещаются вместе с ним; пунктира нет", () => {
+    const g = frameGeometry({ w: 900, h: 500 }, { x: 100, y: -40, w: 1300, h: 700 }, defaults);
+    expect(g.sheet).toEqual({ x: 100, y: -40, w: 1300, h: 730 });
+    expect(g.footer).toEqual({ x: 100, y: 660, w: 1300, h: 30 });
+    expect(g.gridXs[0].at).toBe(120);
+    expect(g.gridYs[0].at).toBe(-20);
+    expect(g.cells[0].x).toBe(100);
+    expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(1400);
+    const small = frameGeometry({ w: 900, h: 500 }, { w: 50, h: 60 }, defaults);
+    expect([small.sheet.w, small.sheet.h]).toEqual([200, 230]); // меньше минимума не бывает
     expect("guideX" in g).toBe(false);
+    expect(withFrameHeight({ w: 900, h: 500 }, { x: 800, w: 600, h: 400 })).toEqual({ w: 1400, h: 500 }); // «мир» охватывает и диаграмму, и лист
     expect(generateIdef0(purchaseModel()).decompositionSvg).not.toContain("stroke-dasharray");
+  });
+
+  it("SVG сдвинутого листа охватывает и лист, и содержимое", () => {
+    const m = purchaseModel();
+    m.idef0_frames = { "": { x: -60, y: -80, w: 1400, h: 900 } };
+    const svg = generateIdef0(m).decompositionSvg;
+    const [vx, vy, vw, vh] = svg.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
+    expect([vx, vy]).toEqual([-60, -80]);
+    expect(vw).toBeGreaterThanOrEqual(1400); // правый край листа 1340 (+60 слева)
+    expect(vh).toBeGreaterThanOrEqual(930); // нижний край штампа 850 (+80 сверху)
+    expect(svg).toContain('x="-60" y="-80" width="1400" height="930"');
   });
 
   it("лист с очень далёкими блоками не плодит миллионы линий сетки", () => {

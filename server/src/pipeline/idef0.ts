@@ -228,12 +228,12 @@ export const arrowLabelPlacement = (a: Idef0Arrow) => labelSpec(a);
 function frameSvg(geo: FrameGeometry, grid: boolean): string {
   const out: string[] = [];
   if (grid) {
-    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="0" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
-    for (const l of geo.gridYs) out.push(`<line x1="0" y1="${l.at}" x2="${geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
+    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
+    for (const l of geo.gridYs) out.push(`<line x1="${geo.sheet.x}" y1="${l.at}" x2="${geo.sheet.x + geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
   }
   out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef9" stroke="#1f2937" />`);
   for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" />`);
-  out.push(`<rect x="0" y="0" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
+  out.push(`<rect x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
   for (const c of geo.cells) {
     const max = Math.floor(c.w / 8);
     const text = c.text.length > max ? c.text.slice(0, Math.max(1, max - 1)) + "…" : c.text;
@@ -275,8 +275,11 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   });
   if (frame && frameShown(frame.settings)) {
     const geo = frameGeometry({ w: d.width, h: d.height }, frame.settings, frame.defaults);
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${geo.sheet.w} ${geo.sheet.h}" width="${geo.sheet.w}" height="${geo.sheet.h}">
-    <rect x="0" y="0" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="#ffffff" />
+    // полотно охватывает и содержимое, и лист (он мог быть сдвинут или растянут вручную)
+    const [vx, vy] = [Math.min(0, geo.sheet.x), Math.min(0, geo.sheet.y)];
+    const [vw, vh] = [Math.max(d.width, geo.sheet.x + geo.sheet.w) - vx, Math.max(d.height, geo.sheet.y + geo.sheet.h) - vy];
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}">
+    <rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#ffffff" />
     ${frameSvg(geo, gridShown(frame.settings))}
     ${parts.join("\n    ")}
   </svg>`;

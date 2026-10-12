@@ -7,7 +7,7 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
-import { frameGeometry, minSheet, FRAME_GRID, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { frameGeometry, FRAME_GRID, FRAME_MIN, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
@@ -24,8 +24,8 @@ type Drag =
   | { kind: "pan"; sx: number; sy: number; tx: number; ty: number }
   | { kind: "fn"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
-  // размер листа тянут за край: w0/h0 — размер в начале жеста, min — размер содержимого (меньше нельзя)
-  | { kind: "frame"; axis: "w" | "h" | "wh"; w0: number; h0: number; min: { w: number; h: number }; x0: number; y0: number; startModel: M; moved: boolean }
+  // лист двигают (edge = "move") или растягивают за край и угол (n, s, e, w, ne…): r0 — лист в начале жеста (x, y, w, h поля без штампа)
+  | { kind: "frame"; edge: string; r0: { x: number; y: number; w: number; h: number }; x0: number; y0: number; startModel: M; moved: boolean }
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
   | { kind: "connect"; from: string }
   // правка выбранной стрелки: a — стрелка в начале жеста (от её ломаной пересчитывается каждый шаг), start — модель до жеста
@@ -326,15 +326,14 @@ export default function Idef0Editor({
       openDiagram(openEl.getAttribute("data-open"));
       return;
     }
-    const resizeEl = t.closest("[data-frame-resize]");
-    if (resizeEl && e.button === 0) {
+    // лист: край или угол растягивают, штамп двигает (щелчок по надписи без движения — только выбор для двойного щелчка)
+    const frameEl = t.closest("[data-frame-resize], [data-frame-move], [data-frame-field]");
+    if (frameEl && e.button === 0) {
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       dragRef.current = {
         kind: "frame",
-        axis: resizeEl.getAttribute("data-frame-resize") as "w" | "h" | "wh",
-        w0: frameGeo.sheet.w,
-        h0: frameGeo.footer.y,
-        min: minSheet({ w: worldW, h: worldH }),
+        edge: frameEl.getAttribute("data-frame-resize") ?? "move",
+        r0: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: frameGeo.sheet.w, h: frameGeo.footer.y - frameGeo.sheet.y },
         x0: wx,
         y0: wy,
         startModel: draftRef.current,
@@ -430,11 +429,24 @@ export default function Idef0Editor({
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 3) return;
       d.moved = true;
       const grid = (v: number) => Math.round(v / FRAME_GRID) * FRAME_GRID;
-      const size: { w?: number | null; h?: number | null } = {};
-      // не меньше содержимого: достигнув его, размер снова автоматический
-      if (d.axis !== "h") size.w = Math.max(d.min.w, grid(d.w0 + wx - d.x0)) > d.min.w ? Math.max(d.min.w, grid(d.w0 + wx - d.x0)) : null;
-      if (d.axis !== "w") size.h = Math.max(d.min.h, grid(d.h0 + wy - d.y0)) > d.min.h ? Math.max(d.min.h, grid(d.h0 + wy - d.y0)) : null;
-      setDraft((m) => setFrame(m, frameKey(cur), { size }));
+      const [dx, dy] = [wx - d.x0, wy - d.y0];
+      const { x, y, w, h } = d.r0;
+      let r = { x, y, w, h };
+      if (d.edge === "move") r = { x: grid(x + dx), y: grid(y + dy), w, h };
+      else {
+        // сторона, за которую тянут, двигается; противоположная стоит на месте, размер не меньше FRAME_MIN
+        if (d.edge.includes("e")) r.w = Math.max(FRAME_MIN, grid(w + dx));
+        if (d.edge.includes("s")) r.h = Math.max(FRAME_MIN, grid(h + dy));
+        if (d.edge.includes("w")) {
+          const nx = Math.min(grid(x + dx), x + w - FRAME_MIN);
+          r = { ...r, x: nx, w: x + w - nx };
+        }
+        if (d.edge.includes("n")) {
+          const ny = Math.min(grid(y + dy), y + h - FRAME_MIN);
+          r = { ...r, y: ny, h: y + h - ny };
+        }
+      }
+      setDraft((m) => setFrame(m, frameKey(cur), { rect: r }));
       return;
     }
     if (d.kind === "pan") {
@@ -721,6 +733,9 @@ export default function Idef0Editor({
             </button>
             <button className={frameOn ? "on" : ""} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { show: !frameOn }))} title="Рамка листа со штампом: NODE, TITLE, NO. (надписи правятся двойным щелчком)">
               Рамка
+            </button>
+            <button disabled={!frameOn || frame?.w === undefined} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: null }))} title="Вернуть лист на всю диаграмму: размер и положение снова автоматические">
+              Авторазмер
             </button>
             <button className={frameOn && gridShown(frame) ? "on" : ""} disabled={!frameOn} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { grid: !gridShown(frame) }))} title="Клетчатая разметка листа">
               Сетка

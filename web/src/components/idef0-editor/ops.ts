@@ -7,17 +7,16 @@ import { setArrowRoute, shiftRoutes } from "./arrow-edit";
 type M = ProcessLogicModel;
 
 /** Настройки рамки листа диаграммы: показать или скрыть рамку и сетку, переопределить надпись штампа (пустая — вернуть автоматическую). */
-export function setFrame(m: M, key: string, patch: { show?: boolean; grid?: boolean; size?: { w?: number | null; h?: number | null }; text?: { field: FrameField; value: string } }): M {
+export function setFrame(m: M, key: string, patch: { show?: boolean; grid?: boolean; rect?: { x: number; y: number; w: number; h: number } | null; text?: { field: FrameField; value: string } }): M {
   const cur: IdefFrame = m.idef0_frames?.[key] ?? {};
   const next: IdefFrame = { ...cur };
   if (patch.show !== undefined) next.show = patch.show;
   if (patch.grid !== undefined) next.grid = patch.grid;
-  if (patch.size) {
-    // null — вернуть автоматический размер (по содержимому)
-    for (const k of ["w", "h"] as const) {
-      const v = patch.size[k];
-      if (v === null) delete next[k];
-      else if (v !== undefined) next[k] = Math.round(v);
+  if (patch.rect !== undefined) {
+    // null — вернуть автоматический лист (по содержимому диаграммы)
+    for (const k of ["x", "y", "w", "h"] as const) {
+      if (patch.rect === null) delete next[k];
+      else next[k] = Math.round(patch.rect[k]);
     }
   }
   if (patch.text) {

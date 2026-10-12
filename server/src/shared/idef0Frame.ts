@@ -12,7 +12,9 @@ export const FRAME_FIELDS: FrameField[] = ["nodeLabel", "node", "titleLabel", "t
 export interface IdefFrame {
   show?: boolean;
   grid?: boolean;
-  /** Ширина листа и высота его поля (без штампа), заданные вручную; меньше содержимого диаграммы не бывает. */
+  /** Лист, заданный вручную: положение левого верхнего угла и размер поля (без штампа). Без w и h лист занимает диаграмму. */
+  x?: number;
+  y?: number;
   w?: number;
   h?: number;
   texts?: Partial<Record<FrameField, string>>;
@@ -74,38 +76,51 @@ export interface FrameGeometry {
   cells: FrameCell[];
 }
 
-/** Геометрия листа для «мира» диаграммы w × h: размеры округляются до клетки, штамп добавляется снизу. */
+/** Меньше этого размера поле листа не делают. */
+export const FRAME_MIN = 200;
+
+const snapUp = (v: number) => Math.ceil(v / FRAME_GRID) * FRAME_GRID;
+
+/**
+ * Поле листа (без штампа). Пока размер не задан вручную, лист занимает диаграмму от нуля (округлено до клетки) и растёт вместе
+ * с ней; заданный вручную лист (x, y, w, h) стоит где поставили и не зависит от содержимого.
+ */
+export function frameBody(world: { w: number; h: number }, frame: IdefFrame | undefined): { x: number; y: number; w: number; h: number } {
+  if (frame && typeof frame.w === "number" && typeof frame.h === "number") {
+    return { x: frame.x ?? 0, y: frame.y ?? 0, w: Math.max(FRAME_MIN, frame.w), h: Math.max(FRAME_MIN, frame.h) };
+  }
+  return { x: 0, y: 0, w: snapUp(world.w), h: snapUp(world.h) };
+}
+
+/** Геометрия листа для «мира» диаграммы w × h; штамп добавляется под полем листа. */
 export function frameGeometry(world: { w: number; h: number }, frame: IdefFrame | undefined, d: FrameDefaults): FrameGeometry {
-  const snapUp = (v: number) => Math.ceil(v / FRAME_GRID) * FRAME_GRID;
-  const w = Math.max(snapUp(world.w), snapUp(frame?.w ?? 0));
-  const bodyH = Math.max(snapUp(world.h), snapUp(frame?.h ?? 0));
-  const sheet = { x: 0, y: 0, w, h: bodyH + FRAME_H };
-  const footer = { x: 0, y: bodyH, w, h: FRAME_H };
+  const body = frameBody(world, frame);
+  const { x: ox, y: oy, w, h: bodyH } = body;
+  const sheet = { x: ox, y: oy, w, h: bodyH + FRAME_H };
+  const footer = { x: ox, y: oy + bodyH, w, h: FRAME_H };
   const t = frameTexts(frame, d);
-  const noX = w - NO_W;
-  // на очень больших листах (блоки унесены далеко) шаг клеток растёт, чтобы линий было не больше MAX_LINES на сторону
-  const lines = (len: number) => {
+  const noX = ox + w - NO_W;
+  // на очень больших листах шаг клеток растёт, чтобы линий было не больше MAX_LINES на сторону
+  const lines = (origin: number, len: number) => {
     const step = FRAME_GRID * Math.max(1, Math.ceil(len / FRAME_GRID / MAX_LINES));
-    return Array.from({ length: Math.max(0, Math.ceil(len / step) - 1) }, (_, i) => ({ at: (i + 1) * step, major: (i + 1) % FRAME_MAJOR === 0 }));
+    return Array.from({ length: Math.max(0, Math.ceil(len / step) - 1) }, (_, i) => ({ at: origin + (i + 1) * step, major: (i + 1) % FRAME_MAJOR === 0 }));
   };
   const y = footer.y;
+  const nx = ox + NODE_W;
   const cells: FrameCell[] = [
-    { field: "nodeLabel", x: 0, y, w: 70, h: FRAME_H, text: t.nodeLabel, tx: 6, anchor: "start" },
-    { field: "node", x: 70, y, w: NODE_W - 70, h: FRAME_H, text: t.node, tx: 80, anchor: "start" },
-    { field: "titleLabel", x: NODE_W, y, w: 70, h: FRAME_H, text: t.titleLabel, tx: NODE_W + 6, anchor: "start" },
-    { field: "title", x: NODE_W + 70, y, w: noX - NODE_W - 70, h: FRAME_H, text: t.title, tx: (NODE_W + 70 + noX) / 2, anchor: "middle" },
+    { field: "nodeLabel", x: ox, y, w: 70, h: FRAME_H, text: t.nodeLabel, tx: ox + 6, anchor: "start" },
+    { field: "node", x: ox + 70, y, w: NODE_W - 70, h: FRAME_H, text: t.node, tx: ox + 80, anchor: "start" },
+    { field: "titleLabel", x: nx, y, w: 70, h: FRAME_H, text: t.titleLabel, tx: nx + 6, anchor: "start" },
+    { field: "title", x: nx + 70, y, w: noX - nx - 70, h: FRAME_H, text: t.title, tx: (nx + 70 + noX) / 2, anchor: "middle" },
     { field: "noLabel", x: noX, y, w: 60, h: FRAME_H, text: t.noLabel, tx: noX + 6, anchor: "start" },
     { field: "no", x: noX + 60, y, w: NO_W - 60, h: FRAME_H, text: t.no, tx: noX + 66, anchor: "start" },
   ];
-  return { sheet, footer, dividers: [NODE_W, noX], gridXs: lines(w), gridYs: lines(bodyH), cells };
+  return { sheet, footer, dividers: [nx, noX], gridXs: lines(ox, w), gridYs: lines(oy, bodyH), cells };
 }
 
-/** Размер «мира» вместе с листом (заданные вручную размеры и штамп) — для вписывания диаграммы в окно. */
+/** Размер «мира» — всё, что нужно показать: содержимое диаграммы и лист со штампом (где бы он ни стоял). */
 export function withFrameHeight(world: { w: number; h: number }, frame: IdefFrame | undefined): { w: number; h: number } {
   if (!frameShown(frame)) return world;
   const g = frameGeometry(world, frame, { node: "", title: "", no: "" }).sheet;
-  return { w: g.w, h: g.h };
+  return { w: Math.max(world.w, g.x + g.w), h: Math.max(world.h, g.y + g.h) };
 }
-
-/** Размер листа, меньше которого его не сделать: содержимое диаграммы (округлено до клетки). */
-export const minSheet = (world: { w: number; h: number }) => ({ w: Math.ceil(world.w / FRAME_GRID) * FRAME_GRID, h: Math.ceil(world.h / FRAME_GRID) * FRAME_GRID });
