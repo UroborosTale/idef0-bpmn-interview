@@ -8,8 +8,9 @@ export type Pt = [number, number];
  * Черновик модели с историей: commit — один шаг undo; setDraft без истории нужен для
  * промежуточных состояний жеста (перетаскивание), а recordPast фиксирует его начало.
  * dirty сравнивает ссылки, поэтому откат к сохранённой версии снимает пометку.
+ * readOnly (утверждённая версия): commit, undo и redo ничего не делают; setDraft остаётся — им студия подхватывает модель с сервера.
  */
-export function useModelHistory<M>(initial: () => M) {
+export function useModelHistory<M>(initial: () => M, readOnly = false) {
   const [init] = useState(initial);
   const [draft, setDraft] = useState<M>(init);
   const [baseline, setBaseline] = useState<M>(init);
@@ -17,6 +18,8 @@ export function useModelHistory<M>(initial: () => M) {
   const [future, setFuture] = useState<M[]>([]);
   const draftRef = useRef(draft);
   draftRef.current = draft;
+  const readOnlyRef = useRef(readOnly);
+  readOnlyRef.current = readOnly;
 
   const recordPast = useCallback((m: M) => {
     setPast((p) => [...p.slice(-(HISTORY_LIMIT - 1)), m]);
@@ -26,7 +29,7 @@ export function useModelHistory<M>(initial: () => M) {
   /** Возвращает false, если модель не изменилась. */
   const commit = useCallback(
     (next: M): boolean => {
-      if (next === draftRef.current) return false;
+      if (readOnlyRef.current || next === draftRef.current) return false;
       recordPast(draftRef.current);
       setDraft(next);
       return true;
@@ -35,13 +38,13 @@ export function useModelHistory<M>(initial: () => M) {
   );
 
   const undo = () => {
-    if (past.length === 0) return;
+    if (readOnlyRef.current || past.length === 0) return;
     setFuture((f) => [draft, ...f]);
     setDraft(past[past.length - 1]);
     setPast((p) => p.slice(0, -1));
   };
   const redo = () => {
-    if (future.length === 0) return;
+    if (readOnlyRef.current || future.length === 0) return;
     setPast((p) => [...p, draft]);
     setDraft(future[0]);
     setFuture((f) => f.slice(1));
@@ -63,8 +66,9 @@ export function useModelHistory<M>(initial: () => M) {
     undo,
     redo,
     discard,
-    canUndo: past.length > 0,
-    canRedo: future.length > 0,
+    canUndo: !readOnly && past.length > 0,
+    canRedo: !readOnly && future.length > 0,
+    readOnly,
     dirty: draft !== baseline,
     markSaved: setBaseline,
   };

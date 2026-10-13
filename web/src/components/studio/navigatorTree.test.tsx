@@ -157,3 +157,130 @@ describe("навигатор: модель без кода процесса — 
     expect(document.querySelector("[data-nav-scheme]")).toBeNull();
   });
 });
+
+describe("навигатор: показать выбранное в дереве", () => {
+  const props = (selectedId: string | null, reveal?: { id: string | null; n: number }, activeKey = "bpmn") => (
+    <Navigator model={structuredModel()} activeKey={activeKey} selectedId={selectedId} onOpenDoc={vi.fn()} onSelectFn={vi.fn()} onAddFunction={vi.fn()} reveal={reveal} />
+  );
+  const twisty = (id: string) => document.querySelector(`[data-nav-fn="${id}"] .nav-twisty`)!;
+  const visible = (id: string) => !!document.querySelector(`[data-nav-fn="${id}"]`);
+
+  it("выбор операции раскрывает свёрнутый подпроцесс и прокручивает к строке", () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const { rerender } = render(props(null));
+    fireEvent.click(twisty("s1"));
+    expect(visible("o1")).toBe(false);
+    rerender(props("o1"));
+    expect(visible("o1")).toBe(true);
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    expect(document.querySelector('[data-nav-fn="o1"]')!.className).toMatch(/selected/);
+  });
+
+  it("шаг диаграммы операции показывает в дереве саму операцию", () => {
+    const { rerender } = render(props(null));
+    fireEvent.click(twisty("s1"));
+    rerender(props("b1")); // «Открыть реестр» — шаг операции o1
+    expect(visible("o1")).toBe(true);
+  });
+
+  it("«Найти в навигаторе»: сбрасывает поиск, раскрывает свёрнутые разделы и ветки", () => {
+    const { rerender } = render(props(null));
+    fireEvent.click(twisty("s2"));
+    fireEvent.click(document.querySelector(".nav-section-head")!); // свернуть «Процессы»
+    fireEvent.change(document.querySelector('input[type="search"]')!, { target: { value: "реестр" } });
+    expect(document.querySelector(".nav-results")).not.toBeNull();
+    rerender(props(null, { id: "o3", n: 1 }));
+    expect(document.querySelector(".nav-results")).toBeNull();
+    expect(visible("o3")).toBe(true);
+  });
+
+  it("без объекта прокручивает к строке текущей диаграммы", () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const { rerender } = render(props(null, undefined, "idef0:root"));
+    scroll.mockClear();
+    rerender(props(null, { id: null, n: 1 }, "idef0:root"));
+    expect(scroll).toHaveBeenCalled();
+  });
+});
+
+describe("навигатор: клавиши и запоминание состояния", () => {
+  const setup = (selectedId: string | null, over: Partial<React.ComponentProps<typeof Navigator>> = {}) => {
+    const h = { onMoveFunction: vi.fn(), onFunctionAction: vi.fn(), onRenameFunction: vi.fn() };
+    const r = render(<Navigator model={structuredModel()} activeKey="bpmn" selectedId={selectedId} onOpenDoc={vi.fn()} onSelectFn={vi.fn()} onAddFunction={vi.fn()} {...h} {...over} />);
+    const row = (id: string) => document.querySelector(`[data-nav-fn="${id}"]`) as HTMLElement;
+    return { ...r, ...h, row };
+  };
+
+  it("F2 переименовывает на месте: Enter сохраняет, Escape отменяет", () => {
+    const s = setup("o1");
+    fireEvent.keyDown(s.row("o1"), { key: "F2" });
+    const input = document.querySelector(".nav-rename") as HTMLInputElement;
+    expect(input.value).toBe("Актуализация реестра");
+    fireEvent.change(input, { target: { value: "  Обновление реестра " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(s.onRenameFunction).toHaveBeenCalledWith("o1", "Обновление реестра");
+    expect(document.querySelector(".nav-rename")).toBeNull();
+
+    fireEvent.keyDown(s.row("o1"), { key: "F2" });
+    const second = document.querySelector(".nav-rename") as HTMLInputElement;
+    fireEvent.change(second, { target: { value: "Другое" } });
+    fireEvent.keyDown(second, { key: "Escape" });
+    expect(s.onRenameFunction).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".nav-rename")).toBeNull();
+  });
+
+  it("потеря фокуса сохраняет новое название, пустое и прежнее — нет", () => {
+    const s = setup("o1");
+    fireEvent.keyDown(s.row("o1"), { key: "F2" });
+    fireEvent.blur(document.querySelector(".nav-rename")!);
+    expect(s.onRenameFunction).not.toHaveBeenCalled();
+    fireEvent.keyDown(s.row("o1"), { key: "F2" });
+    const input = document.querySelector(".nav-rename") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Новое" } });
+    fireEvent.blur(input);
+    expect(s.onRenameFunction).toHaveBeenCalledWith("o1", "Новое");
+  });
+
+  it("Delete удаляет выбранную функцию, Ctrl+↑ и Ctrl+↓ переставляют среди равных", () => {
+    const s = setup("o2");
+    fireEvent.keyDown(s.row("o2"), { key: "Delete" });
+    expect(s.onFunctionAction).toHaveBeenCalledWith("delete", "o2");
+    fireEvent.keyDown(s.row("o2"), { key: "ArrowUp", ctrlKey: true });
+    expect(s.onMoveFunction).toHaveBeenCalledWith("o2", { kind: "before", id: "o1" });
+    fireEvent.keyDown(s.row("o2"), { key: "ArrowDown", ctrlKey: true }); // o2 последняя в подпроцессе — вниз некуда
+    expect(s.onMoveFunction).toHaveBeenCalledTimes(1);
+  });
+
+  it("без выбранной функции, в поле ввода и без обработчика клавиши ничего не делают", () => {
+    const s = setup(null);
+    fireEvent.keyDown(s.row("o1"), { key: "Delete" });
+    expect(s.onFunctionAction).not.toHaveBeenCalled();
+    const t = setup("o1", { onFunctionAction: undefined });
+    fireEvent.keyDown(t.row("o1"), { key: "Delete" });
+    expect(t.onFunctionAction).not.toHaveBeenCalled();
+    const search = document.querySelector('input[type="search"]')!;
+    fireEvent.keyDown(search, { key: "Delete" });
+    expect(t.onFunctionAction).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+F переводит фокус в строку поиска", () => {
+    const s = setup("o1");
+    fireEvent.keyDown(s.row("o1"), { key: "f", ctrlKey: true });
+    expect(document.activeElement).toBe(document.querySelector('input[type="search"]'));
+  });
+
+  it("свёрнутые ветки и закрытые разделы запоминаются по ключу", () => {
+    const a = setup(null, { storageKey: "sess-1" });
+    fireEvent.click(a.row("s1").querySelector(".nav-twisty")!);
+    fireEvent.click(document.querySelector(".nav-section-head")!); // закрыть «Процессы»
+    a.unmount();
+    const b = setup(null, { storageKey: "sess-1" });
+    expect(document.querySelector('[data-nav-fn="s1"]')).toBeNull(); // раздел «Процессы» остался закрытым
+    b.unmount();
+    const c = setup(null, { storageKey: "sess-2" }); // другая сессия — своё состояние
+    expect(c.row("s1")).not.toBeNull();
+    expect(c.row("o1")).not.toBeNull();
+  });
+});

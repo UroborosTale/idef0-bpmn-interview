@@ -1,6 +1,8 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import type { Artifact } from "@shared/bpmnArtifacts";
 import { eventSpec, scaleGlyphs, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
+import { LOOP_LABELS, type LoopKind } from "@shared/loops";
+import { styleKindOf, styleOf, type ResolvedStyle, type StyledModel } from "@shared/shapeStyles";
 import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
 import { LANE_X, LABEL_W, LABEL_CHARS, LABEL_LINES, flowLabelPoint, laneCount, laneHeights, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
@@ -42,14 +44,20 @@ function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: s
   }
 }
 
+/** Оформление шага из модели (shape_styles) с учётом вида; для вида без оформления (не шаг) — undefined. */
+export function nodeStyle(m: StyledModel | undefined, node: ProcessNode, boundary = false): ResolvedStyle | undefined {
+  const kind = styleKindOf(node, boundary);
+  return kind ? styleOf(m, kind) : undefined;
+}
+
 /** Подпись под фигурой; left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
-function Label({ cx, y, text, left = false }: { cx: number; y: number; text: string; left?: boolean }) {
+function Label({ cx, y, text, left = false, color = INK, size = 11 }: { cx: number; y: number; text: string; left?: boolean; color?: string; size?: number }) {
   const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
   const x = left ? cx - 8 : cx;
   return (
-    <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={11} fill={INK} pointerEvents="none">
+    <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={size} fill={color} pointerEvents="none">
       {lines.map((l, i) => (
-        <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>
+        <tspan key={i} x={x} dy={i === 0 ? 0 : Math.round((size * 13) / 11)}>
           {l}
         </tspan>
       ))}
@@ -57,11 +65,13 @@ function Label({ cx, y, text, left = false }: { cx: number; y: number; text: str
   );
 }
 
-export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false, hasMarkers = false }: { node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean; hasMarkers?: boolean }) {
+export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false, hasMarkers = false, style, showLabel = true, code }: { style?: ResolvedStyle; showLabel?: boolean; code?: string; node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean; hasMarkers?: boolean }) {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
-  const stroke = selected ? ACCENT : hot ? "#16a34a" : INK;
+  const stroke = selected ? ACCENT : hot ? "#16a34a" : style?.line ?? INK;
+  const ink = style?.text ?? INK;
+  const size = style?.font_size;
   const sw = selected || hot ? 2.5 : 1.5;
   const dash = node.status === "hypothesis" ? "5 3" : undefined;
   const common = { stroke, strokeWidth: sw, strokeDasharray: dash };
@@ -74,40 +84,47 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
     body = (
       <g data-event-position={spec.position}>
         <title>{`${spec.trigger === "none" ? "Событие" : triggerSummary(spec)}${spec.position === "intermediate" ? (spec.throwing ? " (выбрасывает)" : " (ждёт)") : ""}`}</title>
-        <circle cx={cx} cy={cy} r={w / 2} fill={isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff"} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
+        <circle cx={cx} cy={cy} r={w / 2} fill={style?.fill ?? (isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff")} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
         {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
         <EventGlyph cx={cx} cy={cy} trigger={spec.trigger} throwing={spec.throwing} />
-        <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} />
+        {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
       </g>
     );
   } else if (node.type === "gateway") {
     body = (
       <g>
-        <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill="#fff" {...common} strokeLinejoin="round" />
+        <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill={style?.fill ?? "#fff"} {...common} strokeLinejoin="round" />
         <GatewayGlyph cx={cx} cy={cy} subtype={node.subtype} />
-        <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} />
+        {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
       </g>
     );
   } else {
     const lines = wrapText(node.name || "", 15, 4);
-    const top = cy - ((lines.length - 1) * 14) / 2 + 4;
+    const lh = Math.round(((size ?? 12) * 7) / 6);
+    const top = cy - ((lines.length - 1) * lh) / 2 + 4;
     body = (
       <g>
-        <rect x={x} y={y} width={w} height={h} rx={10} fill="#fff" {...common} />
+        <rect x={x} y={y} width={w} height={h} rx={10} fill={style?.fill ?? "#fff"} {...common} />
         {node.type === "subprocess" && (
           <g stroke={INK} strokeWidth={1.2} fill="#fff">
             <rect x={cx - 7} y={y + h - 16} width={14} height={14} />
             <path d={`M${cx - 4} ${y + h - 9} H${cx + 4} M${cx} ${y + h - 13} V${y + h - 5}`} fill="none" />
           </g>
         )}
+        {(node.type === "task" || node.type === "subprocess") && node.loop && <LoopMark loop={node.loop} cx={cx - (node.type === "subprocess" ? 24 : 0)} cy={y + h - 10} />}
+        {code && (
+          <text x={x + w - 6} y={y + 13} textAnchor="end" fontSize={9} fill="#64748b" pointerEvents="none" data-step-code>
+            {code}
+          </text>
+        )}
         {node.type === "task" && node.subtype && (
           <text x={x + (hasMarkers ? 20 : 8)} y={y + 14} fontSize={9} fill="#64748b" pointerEvents="none">
             {{ user: "Польз.", service: "Сервис", manual: "Ручн.", send: "Отпр.", receive: "Получ.", script: "Скрипт", business_rule: "Правила" }[node.subtype] ?? ""}
           </text>
         )}
-        <text textAnchor="middle" fontSize={12} fill={INK} pointerEvents="none">
+        <text textAnchor="middle" fontSize={size ?? 12} fill={ink} pointerEvents="none">
           {lines.map((l, i) => (
-            <tspan key={i} x={cx} y={top + i * 14}>
+            <tspan key={i} x={cx} y={top + i * lh}>
               {l}
             </tspan>
           ))}
@@ -150,8 +167,24 @@ export function TriggerMarkers({ box, markers, selectedId }: { box: Box; markers
     </g>
   );
 }
+/** Маркер цикличности внизу блока: круговая стрелка (цикл), три вертикальные (параллельно) или горизонтальные черты (по очереди). */
+function LoopMark({ loop, cx, cy }: { loop: LoopKind; cx: number; cy: number }) {
+  const title = <title>{LOOP_LABELS[loop]}</title>;
+  if (loop === "parallel") return <path d={[-4, 0, 4].map((dx) => `M${cx + dx} ${cy - 5} V${cy + 5}`).join(" ")} stroke={INK} strokeWidth={1.4} fill="none">{title}</path>;
+  if (loop === "sequential") return <path d={[-4, 0, 4].map((dy) => `M${cx - 5} ${cy + dy} H${cx + 5}`).join(" ")} stroke={INK} strokeWidth={1.4} fill="none">{title}</path>;
+  const r = 5;
+  const at = (deg: number) => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+  const [sx, sy] = at(120);
+  const [ex, ey] = at(400);
+  return (
+    <path d={`M${sx} ${sy} A${r} ${r} 0 1 1 ${ex} ${ey} M${ex - 3} ${ey - 3} L${ex} ${ey} L${ex + 3} ${ey - 3}`} stroke={INK} strokeWidth={1.3} fill="none">
+      {title}
+    </path>
+  );
+}
+
 /** Стрелка последовательности; points — готовый маршрут всей диаграммы (routeFlows), иначе маршрут между двумя фигурами. */
-export function FlowShape({ flow, points, from, to, obstacles = [], selected, kinds }: { flow: ProcessFlow; points?: Pt[]; from?: Box; to?: Box; obstacles?: Box[]; selected: boolean; kinds?: EndKinds }) {
+export function FlowShape({ flow, points, from, to, obstacles = [], selected, kinds, showLabel = true }: { flow: ProcessFlow; points?: Pt[]; from?: Box; to?: Box; obstacles?: Box[]; selected: boolean; kinds?: EndKinds; showLabel?: boolean }) {
   const pts = points ?? waypoints(from!, to!, obstacles, kinds);
   const d = pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const color = selected ? ACCENT : INK;
@@ -161,7 +194,8 @@ export function FlowShape({ flow, points, from, to, obstacles = [], selected, ki
     <g data-flow-id={flow.id} style={{ cursor: "pointer" }}>
       <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
       <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.5 : 1.5} markerEnd={selected ? "url(#bpe-arrow-sel)" : "url(#bpe-arrow)"} />
-      {cond && (
+      {flow.is_default && pts.length > 1 && <DefaultSlash from={pts[0]} to={pts[1]} color={color} />}
+      {cond && showLabel && (
         <g pointerEvents="none">
           <rect x={label.anchor === "middle" ? label.x - cond.length * 3 - 4 : label.x - 3} y={label.y - 11} width={cond.length * 6 + 8} height={15} rx={3} fill="#fff" opacity={0.92} />
           <text x={label.x} y={label.y} textAnchor={label.anchor} fontSize={10.5} fill={color}>
@@ -171,6 +205,16 @@ export function FlowShape({ flow, points, from, to, obstacles = [], selected, ki
       )}
     </g>
   );
+}
+
+/** Косая черта у начала стрелки ветки «по умолчанию». */
+function DefaultSlash({ from, to, color }: { from: Pt; to: Pt; color: string }) {
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1;
+  const [tx, ty] = [(to[0] - from[0]) / len, (to[1] - from[1]) / len];
+  const d = Math.min(14, len / 2);
+  const [px, py] = [from[0] + tx * d, from[1] + ty * d];
+  const [nx, ny] = [-ty, tx];
+  return <path d={`M${px - nx * 5 - tx * 3} ${py - ny * 5 - ty * 3} L${px + nx * 5 + tx * 3} ${py + ny * 5 + ty * 3}`} stroke={color} strokeWidth={1.6} pointerEvents="none" />;
 }
 
 const GREY = "#64748b";

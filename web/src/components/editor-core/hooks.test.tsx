@@ -19,6 +19,26 @@ describe("история правок", () => {
     expect(result.current.draft).toBe(a);
   });
 
+  it("только чтение: commit, undo и redo ничего не меняют, а setDraft (модель с сервера) работает", () => {
+    const { result, rerender } = renderHook(({ ro }) => useModelHistory(() => ({ v: 0 }), ro), { initialProps: { ro: false } });
+    act(() => void result.current.commit({ v: 1 }));
+    rerender({ ro: true });
+    expect(result.current.readOnly).toBe(true);
+    expect(result.current.canUndo).toBe(false);
+    let changed = true;
+    act(() => {
+      changed = result.current.commit({ v: 2 });
+    });
+    expect(changed).toBe(false);
+    act(() => result.current.undo());
+    expect(result.current.draft.v).toBe(1);
+    act(() => result.current.setDraft({ v: 9 }));
+    expect(result.current.draft.v).toBe(9);
+    rerender({ ro: false }); // новый цикл правок снимает запрет
+    act(() => void result.current.commit({ v: 10 }));
+    expect(result.current.draft.v).toBe(10);
+  });
+
   it("повторный commit той же модели не создаёт шаг истории", () => {
     const { result } = renderHook(() => useModelHistory(() => ({ v: 0 })));
     let changed = true;

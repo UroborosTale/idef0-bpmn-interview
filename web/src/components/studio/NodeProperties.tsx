@@ -5,6 +5,7 @@ import { BLOCK_TRIGGERS, BOUNDARY_MAIN, BOUNDARY_TRIGGERS, SUBTYPES, TYPE_LABELS
 import { triggerView } from "../bpmn-editor/geometry";
 import { scopeView } from "@shared/scope";
 import { triggerSummary } from "@shared/events";
+import { LOOP_KINDS, LOOP_LABELS, type LoopKind } from "@shared/loops";
 import { descendantsOf } from "../idef0-editor/geometry";
 import { SLOT_ENTITY, attach, createEntity, detach, setFunctionRole, type EntityKind, type Slot } from "../idef0-editor/ops";
 import { bpmnHosts, functionDepth, processCodeOf, stepCodes } from "@shared/codes";
@@ -13,6 +14,9 @@ import AssignmentsEditor from "./AssignmentsEditor";
 import EventProperties from "./EventProperties";
 import MessagesEditor from "./MessagesEditor";
 import { HistoryList, Section, SourceList } from "./PanelParts";
+import { USAGE_LABELS, functionUsage, type FnUsage } from "./usage-ops";
+import { styleKindOf, type StyleKind } from "@shared/shapeStyles";
+import StyleEditor from "./StyleEditor";
 import { bpmnDoc, reportDoc, type DictKind, type StudioDoc } from "./docs";
 import type { Selection } from "./selection";
 
@@ -95,7 +99,10 @@ export default function NodeProperties({
   onReveal,
   onOpenDecomposition,
   onOpenDoc,
+  activeKind,
 }: {
+  /** Вид открытой диаграммы: на диаграмме IDEF0 оформляется блок функции, на BPMN — фигура шага. */
+  activeKind?: StudioDoc["kind"];
   model: M;
   id: string;
   codes: Map<string, string>;
@@ -153,6 +160,13 @@ export default function NodeProperties({
   const host = isStep ? model.nodes.find((n) => n.id === node.bpmn_scope) : undefined;
   const hasDiagram = isFn && bpmnHosts(model).some((h) => h.id === node.id);
   const depth = functionDepth(model, node.id);
+  const usage = functionUsage(model, node.id);
+  const styleKind: StyleKind | null = activeKind === "idef0" && isFn ? "idef0_block" : styleKindOf(node, !!node.attached_to);
+  const openUsage = (u: FnUsage) => {
+    if (u.kind === "decomposition") onOpenDecomposition(node.id);
+    else if (u.kind === "operation") onOpenDoc(u.doc);
+    else onReveal(node.id, u.kind === "block" ? "idef0" : "bpmn");
+  };
 
   // элементы, которые есть на диаграмме BPMN: шаги операций и функции общей схемы процесса
   const onDiagram = isStep || !node.idef0_parent;
@@ -217,6 +231,18 @@ export default function NodeProperties({
               {subtypes.map(([k, l]) => (
                 <option key={k} value={k}>
                   {l}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {(node.type === "task" || node.type === "subprocess") && (
+          <Field label="Цикличность (BPMN)">
+            <select value={node.loop ?? ""} onChange={(e) => set({ loop: (e.target.value || undefined) as LoopKind | undefined })}>
+              <option value="">Нет, выполняется один раз</option>
+              {LOOP_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {LOOP_LABELS[k]}
                 </option>
               ))}
             </select>
@@ -386,6 +412,21 @@ export default function NodeProperties({
       )}
 
       <Section title="Диаграммы">
+        {usage.length > 0 && (
+          <div className="prop-note">
+            <div className="muted">{isStep ? "Изображён на диаграмме:" : "Изображена на диаграммах:"}</div>
+            <ul className="usage-list">
+              {usage.map((u) => (
+                <li key={`${u.kind}:${u.doc.key}`}>
+                  <button className="link-button" onClick={() => openUsage(u)}>
+                    {u.title}
+                  </button>{" "}
+                  <span className="muted">— {USAGE_LABELS[u.kind]}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="bpe-actions" style={{ marginTop: 0 }}>
           {!node.idef0_parent && <button onClick={() => onReveal(node.id, "bpmn")}>Показать в BPMN</button>}
           {hasDiagram && <button onClick={() => onOpenDoc(bpmnDoc(node.id))}>Диаграмма BPMN операции</button>}
@@ -393,6 +434,8 @@ export default function NodeProperties({
           {isFn && <button onClick={() => onOpenDecomposition(node.id)}>{childCount > 0 ? `Декомпозиция (${childCount} функц.)` : "Декомпозировать…"}</button>}
         </div>
       </Section>
+
+      {styleKind && <StyleEditor model={model} kind={styleKind} onChange={onChange} />}
 
       <Section title="Источник в интервью" count={node.source.length} open={node.source.length > 0}>
         <SourceList source={node.source} fragments={fragments} />

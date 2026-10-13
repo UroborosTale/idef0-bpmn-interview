@@ -46,7 +46,7 @@ describe("панель «Свойства»: функция", () => {
     expect(title()).toBe("Свойства элемента");
     expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Задача\s*A3/);
     const sections = [...document.querySelectorAll(".prop-section > summary")].map((s) => s.firstChild!.textContent);
-    expect(sections).toEqual(["Общие", "Сроки и стоимость", "Триггеры блока", "Граничные события", "Потоки сообщений", "Ролевая модель", "Стороны блока IDEF0", "RACI", "Диаграммы", "Источник в интервью", "История"]);
+    expect(sections).toEqual(["Общие", "Сроки и стоимость", "Триггеры блока", "Граничные события", "Потоки сообщений", "Ролевая модель", "Стороны блока IDEF0", "RACI", "Диаграммы", "Оформление", "Источник в интервью", "История"]);
   });
 
   it("правка атрибутов и исполнителя", () => {

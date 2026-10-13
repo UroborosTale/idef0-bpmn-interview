@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { Fragment, ProcessLogicModel, ProcessMeta, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
-import { SIDE_LABELS, deleteFlow, reverseRoute, setFlowRoute, updateFlow, type FlowSide } from "../bpmn-editor/model-ops";
+import { SIDE_LABELS, deleteFlow, reverseRoute, setDefaultFlow, setFlowRoute, updateFlow, type FlowSide } from "../bpmn-editor/model-ops";
+import { canHaveDefaultFlow } from "@shared/loops";
 import { parseProcessCode } from "@shared/codes";
 import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
 import { removeArrow, setArrowIcom } from "../idef0-editor/ops";
 import { resetArrow, routeOf, setArrowRoute } from "../idef0-editor/arrow-edit";
+import { canTunnel, setArrowTunnel, tunnelOf } from "../idef0-editor/tunnels";
 import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
 import { MessageCard, PoolCard } from "./PoolCards";
@@ -120,6 +122,7 @@ export default function PropertiesPanel({
         issues={issues}
         sessionId={session.id}
         fragments={session.fragments}
+        activeKind={activeKind}
         stamp={stamp}
         onChange={onChange}
         onSelect={(s) => onSelect(s && { ...s, back: sel })}
@@ -148,6 +151,11 @@ export default function PropertiesPanel({
           <Field label={from?.type === "gateway" ? "Условие ветки" : "Условие (необязательно)"}>
             <CommitInput value={flow.condition ?? ""} placeholder="например, если сумма > 100 000" onCommit={(v) => onChange(updateFlow(model, flow.id, { condition: v.trim() || null }))} />
           </Field>
+          {from && canHaveDefaultFlow(from) && (
+            <label className="prop-check" title="Эта ветка идёт, когда условия остальных веток не выполнены (в BPMN — атрибут default источника)">
+              <input type="checkbox" checked={!!flow.is_default} onChange={(e) => onChange(setDefaultFlow(model, flow.id, e.target.checked))} /> Ветка по умолчанию
+            </label>
+          )}
           <button onClick={() => onChange(updateFlow(model, flow.id, { from: flow.to, to: flow.from, route: reverseRoute(flow.route) }))}>Развернуть стрелку</button>
         </Section>
         <Section title="Маршрут" open={!!flow.route}>
@@ -240,6 +248,17 @@ export default function PropertiesPanel({
             {isLink ? "Разорвать связь" : "Убрать стрелку"}
           </button>
         </div>
+        {canTunnel(a.kind) && (
+          <Section title="Туннель" open={tunnelOf(model, a).up || tunnelOf(model, a).down}>
+            <p className="muted prop-note">Туннель рисуется скобками у конца стрелки: она не продолжается на соседней диаграмме. Туннелированная стрелка не считается нарушением баланса декомпозиции.</p>
+            <label className="prop-check">
+              <input type="checkbox" checked={tunnelOf(model, a).up} onChange={(e) => onChange(setArrowTunnel(model, a, "up", e.target.checked))} /> У свободного конца: нет на диаграмме выше
+            </label>
+            <label className="prop-check">
+              <input type="checkbox" checked={tunnelOf(model, a).down} onChange={(e) => onChange(setArrowTunnel(model, a, "down", e.target.checked))} /> У блока: нет в декомпозиции функции
+            </label>
+          </Section>
+        )}
         <Section title="Тип и маршрут" open={!!route || isData}>
           {isData && (
             <Field label="Тип стрелки">

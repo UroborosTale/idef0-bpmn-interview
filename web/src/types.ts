@@ -1,4 +1,6 @@
 import type { EventTrigger } from "@shared/events";
+import type { LoopKind } from "@shared/loops";
+import type { ShapeStyle, StyleKind } from "@shared/shapeStyles";
 import type { IdefFrame } from "@shared/idef0Frame";
 export type Speaker = "interviewer" | "owner" | "participant" | "unknown";
 
@@ -100,8 +102,12 @@ export interface ProcessNode {
   attached_to?: string | null;
   /** Граничное событие прерывает задачу (по умолчанию) или нет. */
   interrupting?: boolean;
+  /** Цикличность задачи или подпроцесса: маркер на фигуре; без поля шаг выполняется один раз. */
+  loop?: LoopKind;
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
+  /** Туннели внешних стрелок IDEF0 этой функции (скобки у конца): ключ «вид:сущность»; up — нет на диаграмме выше, down — нет в декомпозиции. */
+  tunnels?: Record<string, { up?: boolean; down?: boolean }>;
   /** Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность». */
   arrow_routes?: Record<string, ArrowRoute>;
   /** Ручное смещение значков документов и хранилищ BPMN от автоматического места: ключ «вид:сущность». */
@@ -123,6 +129,8 @@ export interface ProcessFlow {
   from: string;
   to: string;
   condition?: string | null;
+  /** Ветка «по умолчанию»: идёт, когда условия других веток не выполнены. */
+  is_default?: boolean;
   /** Ручной маршрут: стороны, положение концов, точки излома; без него маршрут выбирается автоматически. */
   route?: FlowRoute | null;
   source: SourceRef[];
@@ -252,6 +260,13 @@ export interface RequirementLink {
   coverage: "full" | "partial";
 }
 
+/** Набор объектов (shared/objectSets.ts): именованный список функций; в набор входит функция и всё вложенное в неё. */
+export interface ObjectSet {
+  id: string;
+  name: string;
+  members: string[];
+}
+
 export interface RaciEntry {
   node_id: string;
   role_id: string;
@@ -310,6 +325,10 @@ export interface ProcessLogicModel {
   /** Рамка листа и сетка диаграмм IDEF0: ключ — id функции, "" — верхняя диаграмма. */
   idef0_frames?: Record<string, IdefFrame>;
   accepted_issues: AcceptedIssue[];
+  /** Наборы объектов для фильтра навигатора и выгрузки. */
+  object_sets?: ObjectSet[];
+  /** Оформление фигур по видам: заливка, линия, цвет и размер текста (shared/shapeStyles.ts); одно на все диаграммы. */
+  shape_styles?: Partial<Record<StyleKind, ShapeStyle>>;
   respondents: Respondent[];
   discrepancies: Discrepancy[];
 }

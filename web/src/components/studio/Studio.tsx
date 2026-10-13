@@ -1,3 +1,6 @@
+import { loadDisplay, saveDisplay, type DisplayOptions } from "../editor-core/display";
+import { deleteDiagramImpact } from "./usage-ops";
+import { addToSet, createSet, deleteSet, removeFromSet, renameSet } from "./set-ops";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
@@ -11,9 +14,9 @@ import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
-import { deleteNode, duplicateNode } from "../bpmn-editor/model-ops";
+import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import { diagramSvg, download, svgToPng } from "./export-image";
-import Navigator from "./Navigator";
+import Navigator, { type SetOp } from "./Navigator";
 import ProblemsPanel from "./ProblemsPanel";
 import DictionaryView from "./DictionaryView";
 import ReportView from "./ReportView";
@@ -21,7 +24,7 @@ import PropertiesPanel from "./PropertiesPanel";
 import type { Selection } from "./selection";
 import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
 import { acceptIssue, addOperationSkeleton, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
-import { addChildFunction, deleteImpact, moveFunction, type MoveTarget } from "./structure-ops";
+import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunction, pasteDestination, type MoveTarget } from "./structure-ops";
 import StructureWizard from "./StructureWizard";
 
 type M = ProcessLogicModel;
@@ -39,9 +42,16 @@ const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(wi
 /** У операции есть своя диаграмма BPMN — в модели есть её шаги. */
 const hasOperationDiagram = (m: ProcessLogicModel, id: string) => m.nodes.some((n) => n.bpmn_scope === id);
 
-export default function Studio({ session, busy, onSave, onOpenImport }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean>; /** Открыть вкладку приёма правок из внешних редакторов. */ onOpenImport?: () => void }) {
+/** Сколько открытых диаграмм помнит «Назад». */
+const HISTORY_DOCS = 50;
+
+export default function Studio({ session, busy, onSave, onOpenImport, onReopen }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean>; /** Открыть вкладку приёма правок из внешних редакторов. */ onOpenImport?: () => void; /** Открыть новый цикл правок у утверждённой версии. */ onReopen?: () => Promise<void> | void }) {
   const model = session.model!;
-  const h = useModelHistory<M>(() => seed(model, session.bpmnXml));
+  // утверждённая версия заблокирована от изменений (сервер отвечает 409): студия только показывает модель
+  const locked = model.process.status === "approved";
+  const h = useModelHistory<M>(() => seed(model, session.bpmnXml), locked);
+  // редакторам диаграмм история отдаётся без права писать: перетаскивание и промежуточные состояния жеста ничего не меняют
+  const hEdit = locked ? { ...h, setDraft: () => undefined, recordPast: () => undefined } : h;
   const draft = h.draft;
   const persisted = useDraftPersistence<M>({ id: `${session.id}:studio`, base: session.updatedAt, draft, dirty: h.dirty, restore: (m) => h.setDraft(normalize(m)) });
   useBeforeUnload(h.dirty);
@@ -64,6 +74,15 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
+  // вид диаграмм: слой подписей и номера (запоминается по сессии)
+  const displayKey = `display:${session.id}`;
+  const [display, setDisplayState] = useState<DisplayOptions>(() => loadDisplay(displayKey));
+  const setDisplay = (patch: Partial<DisplayOptions>) => {
+    const next = { ...display, ...patch };
+    setDisplayState(next);
+    saveDisplay(displayKey, next);
+  };
+  const [navReveal, setNavReveal] = useState<{ id: string | null; n: number }>({ id: null, n: 0 });
   /** Бумага для печати листа IDEF0: "" — по формату листа диаграммы (если он стандартный), иначе A4. */
   const [paper, setPaper] = useState("");
   const [propsOpen, setPropsOpen] = useState(true);
@@ -110,6 +129,7 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
 
   /** Применить предложение агента: правки попадают в черновик (шагом истории — их можно отменить), сохраняет аналитик как обычно. */
   const applyProposal = async (p: Proposal) => {
+    if (locked) return;
     const r = applyPatch(h.draftRef.current, p.patch);
     if (r.errors.length > 0) return;
     h.commit(seed(r.model, null));
@@ -124,6 +144,91 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
   const moveFn = (id: string, target: MoveTarget) => {
     h.commit(withIdef0Layout(moveFunction(h.draftRef.current, id, target)));
     setSelection({ kind: "node", id });
+  };
+  // буфер дерева: копирование функции вместе с вложенными и шагами диаграмм; вырезанная функция переносится при вставке
+  const [clip, setClip] = useState<{ id: string; mode: "copy" | "cut" } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const copyFn = (id: string) => {
+    setClip({ id, mode: "copy" });
+    setNotice(null);
+  };
+  const cutFn = (id: string) => {
+    setClip({ id, mode: "cut" });
+    setNotice(null);
+  };
+  const pasteFn = (target: string | null) => {
+    if (!clip || locked) return;
+    const m = h.draftRef.current;
+    const src = m.nodes.find((n) => n.id === clip.id);
+    if (!src) {
+      setClip(null);
+      setNotice("Скопированная функция уже удалена.");
+      return;
+    }
+    if (clip.mode === "cut") {
+      const dest = pasteDestination(m, clip.id, target);
+      if ("error" in dest) return setNotice(dest.error);
+      if (!dest.move) return setNotice("Функция уже на верхнем уровне.");
+      h.commit(withIdef0Layout(moveFunction(m, clip.id, dest.move)));
+      setClip(null);
+      setNotice(null);
+      setSelection({ kind: "node", id: clip.id });
+      return;
+    }
+    const imp = copyImpact(m, clip.id);
+    if ((imp.functions > 1 || imp.steps > 0) && !window.confirm(`Копировать «${src.name}» вместе с вложенным: функций ${imp.functions - 1}, шагов диаграмм ${imp.steps}?`)) return;
+    const host = target ? m.nodes.find((n) => n.id === target) : undefined;
+    let error = "";
+    for (const parent of target === null ? [null] : [target, host?.idef0_parent ?? null]) {
+      const r = copyFunctionTree(m, clip.id, parent);
+      if ("error" in r) {
+        error = r.error;
+        continue;
+      }
+      h.commit(withIdef0Layout(r.model));
+      setNotice(null);
+      setSelection({ kind: "node", id: r.id });
+      return;
+    }
+    setNotice(error);
+  };
+  // наборы объектов: фильтр дерева (запоминается по сессии) и правка состава
+  const setKey = `nav-set:${session.id}`;
+  const [activeSet, setActiveSetState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(setKey);
+    } catch {
+      return null;
+    }
+  });
+  const activeSetId = activeSet && (draft.object_sets ?? []).some((s) => s.id === activeSet) ? activeSet : null;
+  const chooseSet = (id: string | null) => {
+    setActiveSetState(id);
+    try {
+      if (id) localStorage.setItem(setKey, id);
+      else localStorage.removeItem(setKey);
+    } catch {
+      /* без хранилища фильтр просто не запоминается */
+    }
+  };
+  const setOp = (op: SetOp) => {
+    const m = h.draftRef.current;
+    if (op.kind === "create") {
+      const r = createSet(m, op.name, op.fnId ? [op.fnId] : []);
+      h.commit(r.model);
+      chooseSet(r.id);
+    } else if (op.kind === "rename") h.commit(renameSet(m, op.id, op.name));
+    else if (op.kind === "add") h.commit(addToSet(m, op.setId, op.fnId));
+    else if (op.kind === "remove") h.commit(removeFromSet(m, op.setId, op.fnId));
+    else {
+      const s = (m.object_sets ?? []).find((x) => x.id === op.id);
+      if (!s || !window.confirm(`Удалить набор «${s.name}»? Функции в модели останутся.`)) return;
+      h.commit(deleteSet(m, op.id));
+      if (activeSetId === op.id) chooseSet(null);
+    }
+  };
+  const renameFn = (id: string, name: string) => {
+    h.commit(updateNode(h.draftRef.current, id, { name }));
   };
   const fnAction = (action: "add-child" | "skeleton" | "duplicate" | "delete", id: string) => {
     const m = h.draftRef.current;
@@ -146,7 +251,13 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
       if (!node) return;
       const imp = deleteImpact(m, id);
       const what = [imp.functions > 1 ? `функций: ${imp.functions}` : "", imp.steps ? `шагов диаграмм: ${imp.steps}` : "", imp.flows ? `стрелок: ${imp.flows}` : ""].filter(Boolean).join(", ");
-      if (!window.confirm(`Удалить «${node.name}»${what ? ` (вместе с вложенным: ${what})` : ""}? Отменить можно Ctrl+Z.`)) return;
+      const dg = deleteDiagramImpact(m, id);
+      const diagrams = [dg.changed.length ? `блок уйдёт с диаграмм: ${dg.changed.join(", ")}` : "", dg.removed.length ? `исчезнут диаграммы: ${dg.removed.join(", ")}` : ""].filter(Boolean).join("; ");
+      if (!window.confirm(`Удалить «${node.name}»${what ? ` (вместе с вложенным: ${what})` : ""}?${diagrams ? `
+
+На диаграммах: ${diagrams}.` : ""}
+
+Отменить можно Ctrl+Z.`)) return;
       h.commit(deleteNode(m, id));
       setSelection(null);
     }
@@ -260,6 +371,60 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
     setDocs((ds) => (ds.some((d) => d.key === doc.key) ? ds : [...ds, doc]));
     activate(doc.key);
   };
+
+  // История открытых диаграмм («Назад» и «Вперёд»): переход по вкладке, по декомпозиции и из навигатора записывается одинаково
+  const [hist, setHist] = useState<{ items: StudioDoc[]; pos: number }>(() => ({ items: [bpmnDoc()], pos: 0 }));
+  const navTo = useRef<string | null>(null); // ключ документа, на который перешли кнопкой «Назад» или «Вперёд» — в историю не записывается
+  useEffect(() => {
+    if (navTo.current === active.key) {
+      navTo.current = null;
+      return;
+    }
+    navTo.current = null;
+    setHist((hs) => {
+      if (hs.items[hs.pos]?.key === active.key) return hs;
+      const items = [...hs.items.slice(0, hs.pos + 1), active].slice(-HISTORY_DOCS);
+      return { items, pos: items.length - 1 };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active.key]);
+  /** Ближайшая в сторону dir запись истории, документ которой ещё существует. */
+  const histTarget = (dir: -1 | 1): number | null => {
+    for (let q = hist.pos + dir; q >= 0 && q < hist.items.length; q += dir) if (!docIsStale(hist.items[q], draft)) return q;
+    return null;
+  };
+  const goHist = (dir: -1 | 1) => {
+    const q = histTarget(dir);
+    if (q === null) return;
+    const doc = hist.items[q];
+    if (doc.key !== active.key) navTo.current = doc.key;
+    setHist((hs) => ({ ...hs, pos: q }));
+    open(doc);
+  };
+  /** Диаграмма уровнем выше: для декомпозиции функции и для диаграммы BPMN операции — диаграмма IDEF0, где стоит их функция. */
+  const upTarget = (): { doc: StudioDoc; from: string } | null => {
+    const parentId = active.kind === "idef0" ? active.parent : active.kind === "bpmn" ? active.scope : null;
+    const fn = parentId ? draft.nodes.find((n) => n.id === parentId) : undefined;
+    return fn ? { doc: idef0Doc(fn.idef0_parent ?? null), from: fn.id } : null;
+  };
+  const goUp = () => {
+    const up = upTarget();
+    if (!up) return;
+    open(up.doc);
+    setSelection({ kind: "node", id: up.from });
+    goto(up.from);
+  };
+  /** Диаграмма уровнем ниже для выбранной функции: её декомпозиция, а без неё — диаграмма BPMN операции. */
+  const downTarget = (): StudioDoc | null => {
+    const fn = selection?.kind === "node" ? draft.nodes.find((n) => n.id === selection.id && !n.bpmn_scope && (n.type === "task" || n.type === "subprocess")) : undefined;
+    if (!fn) return null;
+    if (draft.nodes.some((n) => n.idef0_parent === fn.id && !n.bpmn_scope)) return idef0Doc(fn.id);
+    return draft.nodes.some((n) => n.bpmn_scope === fn.id) ? bpmnDoc(fn.id) : null;
+  };
+  const goDown = () => {
+    const doc = downTarget();
+    if (doc) open(doc);
+  };
   const close = (key: string) => {
     const rest = liveDocs.filter((d) => d.key !== key);
     if (rest.length === 0) return; // последний документ остаётся
@@ -281,6 +446,13 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
     } else open(idef0Doc(n.idef0_parent ?? null));
     setSelection({ kind: "node", id });
     goto(id);
+  };
+
+  /** «Найти в навигаторе»: выбранный элемент, а без выбора — функция текущей диаграммы или сама диаграмма. */
+  const findInNavigator = () => {
+    const id = selection?.kind === "node" ? selection.id : active.kind === "bpmn" ? active.scope : active.kind === "idef0" ? active.parent : null;
+    setNavOpen(true);
+    setNavReveal((r) => ({ id, n: r.n + 1 }));
   };
 
   /** Показать элемент на диаграмме выбранной нотации (из панели свойств). */
@@ -383,6 +555,12 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
 
   // История и сохранение вне редакторов диаграмм
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // Alt+← и Alt+→ — назад и вперёд по открытым диаграммам (как в браузере)
+    if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !isTextInput(e.target)) {
+      e.preventDefault();
+      goHist(e.key === "ArrowLeft" ? -1 : 1);
+      return;
+    }
     // диаграммы обрабатывают клавиши сами; остальное (справочники, отчёты, панель свойств) — здесь
     if ((e.target as Element).closest?.(".bpe") || isTextInput(e.target)) return;
     handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() });
@@ -398,7 +576,17 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
   const fnCount = draft.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope).length;
 
   return (
-    <div className={`studio ${full ? "full" : ""}`} onKeyDown={onKeyDown}>
+    <div className={`studio ${full ? "full" : ""} ${locked ? "studio-readonly" : ""}`} onKeyDown={onKeyDown}>
+      {locked && (
+        <div className="studio-lock" role="status">
+          <b>Версия утверждена и заблокирована от изменений.</b> Диаграммы, справочники и отчёты открыты только для просмотра.
+          {onReopen && (
+            <button disabled={busy} onClick={() => void onReopen()}>
+              Открыть новый цикл правок
+            </button>
+          )}
+        </div>
+      )}
       <DraftBanner
         restored={persisted.restored}
         stale={persisted.stale}
@@ -427,6 +615,18 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
         </div>
         <div className="ribbon-group">
           <div className="ribbon-buttons">
+            <button disabled={histTarget(-1) === null} onClick={() => goHist(-1)} title="Предыдущая открытая диаграмма (Alt+←)">
+              ‹ Предыдущая
+            </button>
+            <button disabled={histTarget(1) === null} onClick={() => goHist(1)} title="Следующая открытая диаграмма (Alt+→)">
+              Следующая ›
+            </button>
+            <button disabled={!upTarget()} onClick={goUp} title="Вверх: диаграмма, на которой стоит функция этой диаграммы">
+              ↑ Вверх
+            </button>
+            <button disabled={!downTarget()} onClick={goDown} title="Вниз: декомпозиция выбранной функции или диаграмма BPMN её операции">
+              ↓ Вниз
+            </button>
             <button onClick={() => open(bpmnDoc())}>Диаграмма BPMN</button>
             <button onClick={() => open(idef0Doc(null))}>Диаграмма IDEF0</button>
             <button onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
@@ -435,7 +635,7 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
             <button onClick={() => setWizardOpen(true)} title="Подпроцессы и операции списком: коды по Соглашению и заготовки диаграмм">
               Мастер структуры…
             </button>
-            <button disabled={selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
+            <button disabled={locked || selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
               Дублировать
             </button>
           </div>
@@ -446,9 +646,26 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
             <button className={navOpen ? "toggled" : ""} onClick={() => setNavOpen(!navOpen)}>
               Навигатор
             </button>
+            <button onClick={findInNavigator} title="Показать в навигаторе выбранный элемент или текущую диаграмму">
+              Найти в навигаторе
+            </button>
             <button className={propsOpen ? "toggled" : ""} onClick={() => setPropsOpen(!propsOpen)}>
               Свойства
             </button>
+            {(active.kind === "bpmn" || active.kind === "idef0") && (
+              <>
+                <button className={display.labels ? "toggled" : ""} onClick={() => setDisplay({ labels: !display.labels })} title="Слой подписей: названия событий и шлюзов, условия и подписи стрелок. Названия внутри задач и блоков остаются">
+                  Подписи
+                </button>
+                <button
+                  className={(active.kind === "bpmn" ? display.bpmnNumbers : display.idef0Numbers) ? "toggled" : ""}
+                  onClick={() => setDisplay(active.kind === "bpmn" ? { bpmnNumbers: !display.bpmnNumbers } : { idef0Numbers: !display.idef0Numbers })}
+                  title={active.kind === "bpmn" ? "Номера: код функции или шага на задачах диаграммы" : "Номера: код функции на блоках диаграммы"}
+                >
+                  Номера
+                </button>
+              </>
+            )}
             <button className={full ? "toggled" : ""} onClick={() => setFull(!full)} title="Окно студии на весь экран — больше места для диаграммы">
               {full ? "Свернуть окно" : "На весь экран"}
             </button>
@@ -473,6 +690,7 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
             {exportLink("BPMN", "bpmn")}
             {active.kind === "bpmn" && active.scope && hasOperationDiagram(draft, active.scope) && exportLink("BPMN операции", `bpmn?scope=${encodeURIComponent(active.scope)}`)}
             {bpmnHosts(draft).some((h) => hasOperationDiagram(draft, h.id)) && exportLink("BPMN всех операций (zip)", "bpmn.zip")}
+            {activeSetId && exportLink("BPMN набора (zip)", `bpmn.zip?set=${encodeURIComponent(activeSetId)}`)}
             {exportLink("IDEF0 (SVG)", "idef0/decomposition.svg")}
             {exportLink("Visio", "vsdx")}
             {exportLink("Модель (JSON)", "model.json")}
@@ -534,7 +752,7 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
 
       <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "330px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
-          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={moveFn} onFunctionAction={fnAction} onWizard={() => setWizardOpen(true)} />
+          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={locked ? () => undefined : addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={locked ? undefined : moveFn} onFunctionAction={locked ? undefined : fnAction} onWizard={locked ? undefined : () => setWizardOpen(true)} reveal={navReveal} storageKey={session.id} onRenameFunction={locked ? undefined : renameFn} clipboard={clip} onCopy={locked ? undefined : copyFn} onCut={locked ? undefined : cutFn} onPaste={locked ? undefined : pasteFn} activeSet={activeSetId} onActiveSet={chooseSet} onSetOp={locked ? undefined : setOp} />
         )}
         <div className="studio-main">
           <div className="doc-tabs" role="tablist">
@@ -558,17 +776,18 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
           </div>
           <div className="doc-area">
             {active.kind === "bpmn" && (
-              <BpmnEditor key={active.key} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={h} focus={focus} onSelectionChange={reportSelection} />
+              <BpmnEditor key={active.key} display={display} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={hEdit} focus={focus} onSelectionChange={reportSelection} />
             )}
             {active.kind === "idef0" && (
               <Idef0Editor
                 key={active.key}
+                display={display}
                 model={draft}
                 busy={busy}
                 onSave={onSave}
                 draftId={`${session.id}:studio`}
                 draftBase={session.updatedAt}
-                history={h}
+                history={hEdit}
                 focus={focus}
                 onSelectionChange={reportSelection}
                 parentId={active.parent}
@@ -591,6 +810,7 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
           {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} onHandOffAnswers={handOffAnswers} sessionId={session.id} agentAccess={session.meta.confidential ? { confidential: true, allowed: agentAllowed } : undefined} onSetAgentAccess={setAgentAccess} nodeByCode={nodeByCode} onSelectFn={selectFn} onAssignFinding={assignFinding} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>
         {propsOpen && (
+          <fieldset disabled={locked} className="props-fieldset">
           <PropertiesPanel
             model={draft}
             selection={selection}
@@ -605,10 +825,18 @@ export default function Studio({ session, busy, onSave, onOpenImport }: { sessio
             onOpenDoc={open}
             onClose={() => setPropsOpen(false)}
           />
+          </fieldset>
         )}
       </div>
 
       {wizardOpen && <StructureWizard model={draft} onApply={(next) => h.commit(seed(next, null))} onClose={() => setWizardOpen(false)} />}
+      {notice && (
+        <div className="bpe-banner" role="alert">
+          {notice}
+          <span className="spacer" />
+          <button onClick={() => setNotice(null)}>Скрыть</button>
+        </div>
+      )}
       {exportError && (
         <div className="bpe-banner" role="alert">
           {exportError}

@@ -115,6 +115,115 @@ export function shiftFunction(m: M, id: string, dir: -1 | 1): M {
   return moveFunction(m, id, { kind: dir < 0 ? "before" : "after", id: other.id });
 }
 
+// --- копирование и вставка ---
+
+/** Сколько функций и шагов диаграмм входит в функцию вместе с вложенными (для подтверждения копирования). */
+export function copyImpact(m: M, id: string): { functions: number; steps: number } {
+  const ids = subtreeIds(m, id);
+  return { functions: ids.size, steps: m.nodes.filter((n) => n.bpmn_scope && ids.has(n.bpmn_scope)).length };
+}
+
+function subtreeIds(m: M, id: string): Set<string> {
+  const ids = new Set<string>([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const n of m.nodes) if (isFn(n) && n.idef0_parent && ids.has(n.idef0_parent) && !ids.has(n.id)) (ids.add(n.id), (grew = true));
+  }
+  return ids;
+}
+
+const DEPTH_PROBLEM = "По Соглашению подпроцесс делится на операции, глубже операции функции не бывают";
+
+/** Мешает ли глубина: в модели с кодом процесса поддерево функции не должно оказаться глубже операции. */
+function depthProblem(m: M, id: string, parent: string | null): string | null {
+  if (!isStructured(m)) return null;
+  const depth = parent === null ? 1 : functionDepth(m, parent) + 1;
+  return depth + subtreeHeight(m, id) - 1 > 2 ? DEPTH_PROBLEM : null;
+}
+
+/**
+ * Копия функции вместе с вложенными, шагами их диаграмм BPMN, стрелками между ними и ролевой моделью — под функцией parent
+ * (null — верхний уровень), последней среди равных. Копия — новые id; источники, подтверждения и требования не копируются.
+ * У названия копии первой функции — приписка «(копия)», если среди равных уже есть такое название.
+ */
+export function copyFunctionTree(m: M, id: string, parent: string | null): { model: M; id: string } | { error: string } {
+  const src = m.nodes.find((n) => n.id === id);
+  if (!src || !isFn(src)) return { error: "Копировать можно только функции" };
+  if (parent !== null && !m.nodes.some((n) => n.id === parent && isFn(n))) return { error: "Вставить можно только в функцию" };
+  const problem = depthProblem(m, id, parent);
+  if (problem) return { error: problem };
+
+  const fns = subtreeIds(m, id);
+  const nodes = m.nodes.filter((n) => fns.has(n.id) || (n.bpmn_scope && fns.has(n.bpmn_scope)));
+  const used = new Set(m.nodes.map((n) => n.id));
+  const map = new Map<string, string>();
+  for (const n of nodes) {
+    const nid = nextId("n", used);
+    used.add(nid);
+    map.set(n.id, nid);
+  }
+  const siblings = m.nodes.filter((n) => isFn(n) && (n.idef0_parent ?? null) === parent).map((n) => n.name.trim().toLowerCase());
+  let name = src.name;
+  for (let k = 1; siblings.includes(name.trim().toLowerCase()); k++) name = k === 1 ? `${src.name} (копия)` : `${src.name} (копия ${k})`;
+
+  const mapped = (x: string | null | undefined) => (x ? map.get(x) ?? x : x);
+  const copies: ProcessNode[] = nodes.map((n) => ({
+    ...structuredClone(n),
+    id: map.get(n.id)!,
+    ...(n.id === id ? { name, idef0_parent: parent, idef0_layout: null } : {}),
+    ...(n.id !== id && n.idef0_parent ? { idef0_parent: mapped(n.idef0_parent) } : {}),
+    ...(n.bpmn_scope ? { bpmn_scope: mapped(n.bpmn_scope) } : {}),
+    ...(n.attached_to ? { attached_to: mapped(n.attached_to) } : {}),
+    source: [],
+    confirmed_by: [],
+    requirement_ids: [],
+    status: "confirmed" as const,
+    confidence: 1,
+  }));
+
+  const flowIds = new Set(m.flows.map((f) => f.id));
+  const flows = m.flows
+    .filter((f) => map.has(f.from) && map.has(f.to))
+    .map((f) => {
+      const fid = nextId("flow", flowIds);
+      flowIds.add(fid);
+      return { ...structuredClone(f), id: fid, from: map.get(f.from)!, to: map.get(f.to)!, source: [], confirmed_by: [] };
+    });
+  const messageIds = new Set((m.messages ?? []).map((x) => x.id));
+  const messages = (m.messages ?? [])
+    .filter((x) => map.has(x.from) || map.has(x.to))
+    .map((x) => {
+      const mid = nextId("msg", messageIds);
+      messageIds.add(mid);
+      return { ...structuredClone(x), id: mid, from: mapped(x.from) as string, to: mapped(x.to) as string };
+    });
+  const assignments = m.assignments.filter((a) => a.node_id && map.has(a.node_id)).map((a) => ({ ...structuredClone(a), node_id: map.get(a.node_id!)! }));
+  const raci = m.raci.filter((r) => map.has(r.node_id)).map((r) => ({ ...r, node_id: map.get(r.node_id)! }));
+
+  const next: M = { ...m, nodes: [...m.nodes, ...copies], flows: [...m.flows, ...flows], messages: [...(m.messages ?? []), ...messages], assignments: [...m.assignments, ...assignments], raci: [...m.raci, ...raci] };
+  return { model: remapCodes(m, next), id: map.get(id)! };
+}
+
+/**
+ * Куда встанет вставленная функция: в выбранную (последней дочерней), а если глубина не позволяет — после неё среди равных;
+ * target = null — на верхний уровень. Возвращает родителя и, для переноса, цель MoveTarget либо причину отказа.
+ */
+export function pasteDestination(m: M, id: string, target: string | null): { parent: string | null; move: MoveTarget | null } | { error: string } {
+  if (target === null) {
+    const last = [...m.nodes].reverse().find((n) => isFn(n) && !n.idef0_parent && n.id !== id);
+    const move: MoveTarget | null = last ? { kind: "after", id: last.id } : null;
+    const problem = move ? moveProblem(m, id, move) : null;
+    return problem ? { error: problem } : { parent: null, move };
+  }
+  const t = m.nodes.find((n) => n.id === target);
+  if (!t || !isFn(t)) return { error: "Вставить можно только в функцию" };
+  const into: MoveTarget = { kind: "into", id: target };
+  const after: MoveTarget = { kind: "after", id: target };
+  if (!moveProblem(m, id, into)) return { parent: target, move: into };
+  if (!moveProblem(m, id, after)) return { parent: t.idef0_parent ?? null, move: after };
+  return { error: moveProblem(m, id, after) ?? DEPTH_PROBLEM };
+}
+
 /** Дочерняя функция (операция в подпроцессе, подфункция) в конец списка; id новой возвращается. */
 export function addChildFunction(m: M, parentId: string | null): { model: M; id: string } {
   const r = addFunction(m, parentId, 300, 300);

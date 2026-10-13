@@ -309,7 +309,7 @@ export default function WorkspacePage({
         </div>
       )}
 
-      {tab === "studio" && model && <Studio session={session} busy={busy} onSave={saveModel} onOpenImport={() => setTab("diagramReimport")} />}
+      {tab === "studio" && model && <Studio session={session} busy={busy} onSave={saveModel} onOpenImport={() => setTab("diagramReimport")} onReopen={() => withBusy(async () => { await api.reopenSession(sessionId); await reload(); })} />}
       {tab === "studio" && !model && <p className="muted">Модели ещё нет — загрузите текст интервью и запустите обработку.</p>}
 
       {tab !== "chat" && tab !== "studio" && (

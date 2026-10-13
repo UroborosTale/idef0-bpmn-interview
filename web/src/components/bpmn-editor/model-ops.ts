@@ -188,6 +188,7 @@ export function deleteNode(m: M, id: string): M {
     requirements_links: m.requirements_links.filter((r) => !gone.has(r.element_id)),
     discrepancies: m.discrepancies.filter((d) => !gone.has(d.element_id)),
     interfaces: m.interfaces.map((i) => (i.linked_node_id && gone.has(i.linked_node_id) ? { ...i, linked_node_id: null } : i)),
+    ...(m.object_sets ? { object_sets: m.object_sets.map((s) => ({ ...s, members: s.members.filter((id) => !gone.has(id)) })) } : {}),
   };
 }
 
@@ -233,6 +234,17 @@ export const updateFlow = (m: M, id: string, patch: Partial<ProcessFlow>): M => 
   ...m,
   flows: m.flows.map((f) => (f.id === id ? { ...f, ...patch } : f)),
 });
+/** Ветка «по умолчанию» одна на узел: включение снимает признак с остальных исходящих стрелок. */
+export const setDefaultFlow = (m: M, id: string, on: boolean): M => {
+  const from = m.flows.find((f) => f.id === id)?.from;
+  return {
+    ...m,
+    flows: m.flows.map((f) => {
+      if (f.id === id) return on ? { ...f, is_default: true } : { ...f, is_default: undefined };
+      return on && f.from === from && f.is_default ? { ...f, is_default: undefined } : f;
+    }),
+  };
+};
 export const deleteFlow = (m: M, id: string): M => ({ ...m, flows: m.flows.filter((f) => f.id !== id) });
 
 // --- ручной маршрут стрелки ---

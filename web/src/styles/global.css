@@ -573,3 +573,19 @@ button.danger-fill:hover { background: #991b1b; }
 .bpe-menu[open] > summary { background: #eef2ff; border-color: #4338ca; }
 .bpe-menu-body { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 190px; background: #fff; border: 1px solid #c4d1e6; border-radius: 8px; padding: 8px; box-shadow: 0 6px 18px rgba(30, 41, 59, 0.2); }
 .repo-diff { margin: 4px 0 6px 16px; padding: 0; font-size: 12px; }
+
+/* Утверждённая версия: студия только показывает модель */
+.studio-lock { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: #fff7e6; border-bottom: 1px solid #f0c36d; color: #5c3b00; font-size: 13px; }
+.studio-lock button { margin-left: auto; }
+.studio-readonly [data-node-id], .studio-readonly [data-flow-id], .studio-readonly [data-marker], .studio-readonly [data-artifact] { cursor: default !important; }
+.props-fieldset { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
+
+/* Навигатор: переименование на месте и подсказки клавиш в меню */
+.nav-rename { flex: 1; min-width: 0; font: inherit; padding: 0 4px; margin: -1px 0; }
+.nav-kbd { margin-left: 16px; float: right; color: #64748b; font-size: 11px; }
+.nav-row.nav-cut { opacity: 0.5; font-style: italic; }
+
+/* Наборы объектов: фильтр дерева */
+.nav-filter { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: #eef2ff; border-bottom: 1px solid #c7d2fe; font-size: 12px; }
+.nav-filter .link-button { margin-left: auto; }
+.nav-filter-miss { padding: 4px 10px; font-size: 12px; }

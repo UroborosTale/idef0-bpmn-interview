@@ -1,3 +1,6 @@
+import { DEFAULT_DISPLAY, type DisplayOptions } from "../editor-core/display";
+import { stepCodes } from "@shared/codes";
+import { idef0Codes } from "../idef0-editor/geometry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { mergeScope, scopeView } from "@shared/scope";
 import type { ProcessLogicModel } from "../../types";
@@ -11,7 +14,7 @@ import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type Flow
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, snapShape, type Guide, type GuideTarget } from "./guides";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
 import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, setArtifactOffset, setPoolOffset, addPool, addMessage, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteMessage, deletePool, deleteNode, updateMessage, updatePool, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
-import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, UNASSIGNED_LANE } from "./shapes";
+import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, nodeStyle, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 import { entryOf, updateEntry } from "../studio/dict-ops";
 
@@ -42,7 +45,10 @@ export default function BpmnEditor({
   focus,
   onSelectionChange,
   scope,
+  display = DEFAULT_DISPLAY,
 }: {
+  /** Вид на экране: слой подписей и номера шагов. */
+  display?: DisplayOptions;
   model: M;
   busy: boolean;
   onSave: (m: M) => Promise<boolean>;
@@ -69,6 +75,8 @@ export default function BpmnEditor({
   const draft = useMemo(() => scopeView(h.draft, scopeId), [h.draft, scopeId]);
   const viewRef = useRef(draft);
   viewRef.current = draft;
+  // номера на задачах: коды функций общей схемы и шагов диаграммы операции (считаются по полной модели, у вида области шаги без scope)
+  const numbers = useMemo(() => (display.bpmnNumbers ? new Map([...idef0Codes(h.draft), ...stepCodes(h.draft)]) : null), [display.bpmnNumbers, h.draft]);
   const setDraft = (fn: (m: M) => M) => h.setDraft((full) => mergeScope(full, fn(scopeView(full, scopeId)), scopeId));
   const persisted = useDraftPersistence<M>({ id: draftId, base: draftBase, draft: h.draft, dirty: h.dirty, restore: (m) => h.setDraft(m), enabled: !embedded });
   const [sel, setSel] = useState<Sel>(null);
@@ -885,7 +893,7 @@ export default function BpmnEditor({
 
               {vflows.map((f) => {
                 const points = routes.get(f.id);
-                return points ? <FlowShape key={f.id} flow={f} points={points} selected={curSel?.kind === "flow" && curSel.id === f.id} /> : null;
+                return points ? <FlowShape key={f.id} flow={f} points={points} showLabel={display.labels} selected={curSel?.kind === "flow" && curSel.id === f.id} /> : null;
               })}
 
               {extras.messages.map(({ message, points }) => (
@@ -899,7 +907,7 @@ export default function BpmnEditor({
               ))}
 
               {shown.map((n) => (
-                <NodeShape key={n.id} node={n} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
+                <NodeShape key={n.id} node={n} style={nodeStyle(draft, n, isBoundary(n, shown))} showLabel={display.labels} code={numbers?.get(n.id)} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
               ))}
 
               {inGroup && (() => {

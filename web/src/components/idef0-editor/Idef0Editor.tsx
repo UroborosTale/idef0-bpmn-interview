@@ -1,3 +1,5 @@
+import { DEFAULT_DISPLAY, type DisplayOptions } from "../editor-core/display";
+import { styleOf } from "@shared/shapeStyles";
 import { useEffect, useRef, useState } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
@@ -50,7 +52,10 @@ export default function Idef0Editor({
   parentId: parentProp,
   onParentChange,
   onSelectionChange,
+  display = DEFAULT_DISPLAY,
 }: {
+  /** Вид на экране: слой подписей и номера блоков. */
+  display?: DisplayOptions;
   model: M;
   busy: boolean;
   onSave: (m: M) => Promise<boolean>;
@@ -102,6 +107,7 @@ export default function Idef0Editor({
   // открытая диаграмма могла исчезнуть (удалили родителя, отменили правку) — тогда показываем A0
   const cur = parentId && draft.nodes.some((n) => n.id === parentId) ? parentId : null;
   const layout = buildIdef0(draft, cur);
+  const blockStyle = styleOf(draft, "idef0_block");
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const frame = draft.idef0_frames?.[frameKey(cur)];
@@ -840,10 +846,10 @@ export default function Idef0Editor({
                 </text>
               )}
               {layout.arrows.map((a) => (
-                <ArrowShape key={a.key} arrow={a} selected={curSel?.kind === "arrow" && curSel.id === a.key} />
+                <ArrowShape key={a.key} arrow={a} showLabel={display.labels} selected={curSel?.kind === "arrow" && curSel.id === a.key} />
               ))}
               {layout.functions.map((f) => (
-                <BlockShape key={f.node.id} fn={f} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
+                <BlockShape key={f.node.id} fn={f} style={blockStyle} showCode={display.idef0Numbers} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
               ))}
 
               {arrowSel && !editing && <ArrowHandles arrow={arrowSel} labelAt={labelSpec(arrowSel)} k={view.k} />}
