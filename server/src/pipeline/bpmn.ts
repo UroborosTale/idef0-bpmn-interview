@@ -1,3 +1,4 @@
+import { canHaveDefaultFlow, loopXml, type LoopKind } from "../shared/loops.js";
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_H, LANE_X, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
@@ -18,9 +19,9 @@ export interface BpmnDiagramData {
   /** roleId — id роли дорожки; null у дорожки «Без исполнителя». */
   lanes: { roleId: string | null; name: string; x: number; y: number; w: number; h: number }[];
   /** nodeId — id узла модели; у служебных начала/конца (их нет в модели) его нет. */
-  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; /** Событие: вид, триггер и направление (залитый значок у выбрасывающих) */ event?: { position: EventPosition; trigger: TriggerType; throwing: boolean }; /** Триггеры блока: события, свёрнутые в значки на блоке (на диаграмме отдельной фигуры и стрелки у них нет) */ markers?: { name: string; trigger: TriggerType; start: boolean }[]; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean }[];
+  shapes: { id: string; nodeId?: string; kind: "task" | "subprocess" | "gateway" | "event"; subtype?: string; /** Событие: вид, триггер и направление (залитый значок у выбрасывающих) */ event?: { position: EventPosition; trigger: TriggerType; throwing: boolean }; /** Триггеры блока: события, свёрнутые в значки на блоке (на диаграмме отдельной фигуры и стрелки у них нет) */ markers?: { name: string; trigger: TriggerType; start: boolean }[]; name: string; x: number; y: number; w: number; h: number; /** id фигуры задачи, к которой прикреплено граничное событие */ attachedTo?: string; interrupting?: boolean; /** Цикличность задачи или подпроцесса */ loop?: LoopKind }[];
   /** flowId — id потока модели (у служебных стрелок отсутствует); from/to — id фигур. */
-  edges: { id: string; flowId?: string; from: string; to: string; points: [number, number][]; label?: string }[];
+  edges: { id: string; flowId?: string; from: string; to: string; points: [number, number][]; label?: string; isDefault?: boolean }[];
   /** data — документ, store — хранилище данных (информационная система), annotation — регламент; link — ассоциация с задачей. */
   extras: { kind: "data" | "store" | "annotation"; name: string; x: number; y: number; w: number; h: number; link?: [number, number][]; linkDirection?: "to-task" | "from-task" | "none" }[];
   /** Свёрнутые внешние пулы под диаграммой. */
@@ -319,6 +320,10 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   function pushEventXml(id: string, name: string, spec: EventSpec, attach?: { hostId: string; interrupting: boolean }) {
     flowElementsXml.push(events.eventXml(id, name, spec, attach ? ` attachedToRef="${nodeIdOf(attach.hostId)}" cancelActivity="${attach.interrupting}"` : ""));
   }
+  // ветка по умолчанию: атрибут default у узла-источника (одна на узел)
+  const defaultFlowOf = new Map<string, string>();
+  for (const f of flows) if (f.is_default && !defaultFlowOf.has(f.from)) defaultFlowOf.set(f.from, `Flow_${f.id}`);
+  const defaultAttr = (n: ProcessNode) => (defaultFlowOf.has(n.id) && canHaveDefaultFlow(n) ? ` default="${defaultFlowOf.get(n.id)}"` : "");
   for (const n of nodes) {
     const id = nodeIdOf(n.id);
     elementIndex[n.id] = id;
@@ -333,12 +338,12 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
         .filter((a) => a.kind === "output")
         .map((a) => `<bpmn:dataOutputAssociation id="DOA_${n.id}_${a.entityId}"><bpmn:targetRef>${artId(a)}</bpmn:targetRef></bpmn:dataOutputAssociation>`)
         .join("");
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}">${inputAssoc}${outputAssoc}</bpmn:${tag}>`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)}>${inputAssoc}${outputAssoc}${loopXml(n.loop)}</bpmn:${tag}>`);
     } else if (n.type === "subprocess") {
-      flowElementsXml.push(`<bpmn:subProcess id="${id}" name="${esc(n.name)}" />`);
+      flowElementsXml.push(`<bpmn:subProcess id="${id}" name="${esc(n.name)}"${defaultAttr(n)}>${loopXml(n.loop)}</bpmn:subProcess>`);
     } else if (n.type === "gateway") {
       const tag = gatewayTag(n.subtype);
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}" />`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)} />`);
     } else if (n.type === "event") {
       pushEventXml(id, n.name, eventSpec(n, isBoundary(n)), isBoundary(n) ? { hostId: n.attached_to!, interrupting: n.interrupting !== false } : undefined);
     }
@@ -433,8 +438,8 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // shapes (nodes)
   const allNodeIds = [...nodes.map((n) => nodeIdOf(n.id)), ...synthEvents.map((s) => s.id)];
   const eventDetail = (s: EventSpec) => ({ position: s.position, trigger: s.trigger, throwing: s.throwing });
-  const shapeMeta = new Map<string, { nodeId?: string; kind: BpmnDiagramData["shapes"][number]["kind"]; subtype?: string; event?: BpmnDiagramData["shapes"][number]["event"]; name: string; attachedTo?: string; interrupting?: boolean }>([
-    ...nodes.map((n) => [nodeIdOf(n.id), { nodeId: n.id, kind: n.type, subtype: n.subtype, ...(n.type === "event" ? { event: eventDetail(eventSpec(n, isBoundary(n))) } : {}), name: n.name, ...(isBoundary(n) ? { attachedTo: nodeIdOf(n.attached_to!), interrupting: n.interrupting !== false } : {}) }] as const),
+  const shapeMeta = new Map<string, { nodeId?: string; kind: BpmnDiagramData["shapes"][number]["kind"]; subtype?: string; event?: BpmnDiagramData["shapes"][number]["event"]; name: string; attachedTo?: string; interrupting?: boolean; loop?: LoopKind }>([
+    ...nodes.map((n) => [nodeIdOf(n.id), { nodeId: n.id, kind: n.type, subtype: n.subtype, ...(n.type === "event" ? { event: eventDetail(eventSpec(n, isBoundary(n))) } : {}), name: n.name, ...(n.loop && (n.type === "task" || n.type === "subprocess") ? { loop: n.loop } : {}), ...(isBoundary(n) ? { attachedTo: nodeIdOf(n.attached_to!), interrupting: n.interrupting !== false } : {}) }] as const),
     ...synthEvents.map((s) => [s.id, { kind: "event" as const, subtype: s.kind, event: eventDetail(eventSpec({ type: "event", subtype: s.kind })), name: s.name }] as const),
   ]);
   for (const id of allNodeIds) {
@@ -506,7 +511,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   }
   for (const f of tview.flows) {
     const points = routedView.get(`flow:${f.id}`);
-    if (points) diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined });
+    if (points) diagramEdges.push({ id: `Flow_${f.id}`, flowId: f.id, from: nodeIdOf(f.from), to: nodeIdOf(f.to), points, label: f.condition ?? undefined, ...(f.is_default ? { isDefault: true } : {}) });
   }
   for (const sf of synthFlows) {
     const xmlPoints = routed.get(`flow:${sf.id}`);

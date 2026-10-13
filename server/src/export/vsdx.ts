@@ -3,10 +3,13 @@ import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { frameGeometry, frameShown } from "../shared/idef0Frame.js";
+import { tunnelArcs } from "../shared/idef0Layout.js";
 import { isStructured } from "../shared/codes.js";
 import { flowLabelPoint } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
 import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
+import { visioFlowProps, visioShapeProps, type VisioPropOut } from "../shared/visioBpmn.js";
+import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -78,6 +81,8 @@ interface Style {
   /** Ключ для приклейки соединителей. */
   key?: string;
   ports?: Port[];
+  /** Данные фигуры (раздел Property): свойства BPMN, как в трафарете Visio; в Visio видны в «Данных фигуры». */
+  props?: VisioPropOut[];
 }
 
 interface Endpoint {
@@ -89,6 +94,17 @@ const userRows = (rows: Record<string, string>) =>
   `<Section N="User">${Object.entries(rows)
     .map(([k, v]) => `<Row N="${k}"><Cell N="Value" V="${esc(v)}" U="STR"/></Row>`)
     .join("")}</Section>`;
+
+/** Раздел Property: каждое свойство — список с текущим значением (Type = 1), как в трафарете «BPMN» Visio. */
+const propRows = (props: VisioPropOut[] | undefined) =>
+  props?.length
+    ? `<Section N="Property">${props
+        .map(
+          (p) =>
+            `<Row N="${p.name}"><Cell N="Value" V="${esc(p.value)}" U="STR"/><Cell N="Prompt" V=""/><Cell N="Label" V="${esc(p.label)}"/><Cell N="Format" V="${esc(p.list.join(";"))}"/><Cell N="SortKey" V=""/><Cell N="Type" V="1"/><Cell N="Invisible" V="0"/><Cell N="Verify" V="0"/><Cell N="DataLinked" V="0"/><Cell N="LangID" V="ru-RU"/><Cell N="Calendar" V="0"/></Row>`
+        )
+        .join("")}</Section>`
+    : "";
 
 export class Page {
   private shapes: string[] = [];
@@ -215,7 +231,7 @@ export class Page {
 
     const geom = this.geometry(main, h, 0, main.every((g) => g.kind === "path" && !g.closed) || style.fill === null) + (extra.length ? this.geometry(extra, h, 1, true) : "");
     this.shapes.push(
-      `<Shape ID="${id}" NameU="Shape.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${connection}${userRows(tag)}${textXml}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
+      `<Shape ID="${id}" NameU="Shape.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${connection}${propRows(style.props)}${userRows(tag)}${textXml}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
     );
     return id;
   }
@@ -252,7 +268,7 @@ export class Page {
    * переносе фигуры в Visio стрелка следует за ней. Нарисованный путь points совпадает с раскладкой генератора;
    * при переносе фигур Visio перестроит его собственной маршрутизацией.
    */
-  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean }): number {
+  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean; props?: VisioPropOut[] }): number {
     const id = this.nextId++;
     const H = this.heightPx;
     const [bx, by] = opts.points[0];
@@ -321,7 +337,7 @@ export class Page {
       .join("");
     const geom = `<Section N="Geometry" IX="0"><Cell N="NoFill" V="1"/><Cell N="NoLine" V="0"/><Cell N="NoShow" V="0"/><Cell N="NoSnap" V="0"/><Cell N="NoQuickDrag" V="0"/>${geomRows}</Section>`;
     this.shapes.push(
-      `<Shape ID="${id}" NameU="Connector.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${control}${userRows(tag)}${chars}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
+      `<Shape ID="${id}" NameU="Connector.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${control}${propRows(opts.props)}${userRows(tag)}${chars}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
     );
 
     const glue = (from: "BeginX" | "EndX", part: number, ep: Endpoint | undefined, sheet: number | null) => {
@@ -441,9 +457,10 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const pp = editable ? blockPorts(b, d) : { ports: [], indexOf: () => 0 };
     portsOf.set(b.nodeId, pp);
     // код блока — вторым отрезком текста: при переименовании в Visio он остаётся на месте и при импорте отбрасывается
-    const runs: Run[] = [{ text: b.name, fontPx: big ? 13 : 12 }];
+    const own = ownStyle(model, "idef0_block");
+    const runs: Run[] = [{ text: b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
     if (editable) runs.push({ text: `\n${b.code}${b.hasChildren ? " ⊞" : ""}`, fontPx: 11, color: "#374151" });
-    page.rect(b.x, b.y, b.w, b.h, { fill: "#eef2ff", weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
+    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#eef2ff", ...(own.line ? { line: own.line } : {}), weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
   }
 
@@ -474,6 +491,11 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       tag: { pm_k: "arrow", pm_id: a.ref.entityId, pm_a: `${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`, pm_n: lab?.text ?? "" },
       weightPt: 1.1,
     });
+    // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
+    for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) {
+      const pts: Pt[] = [0, 0.25, 0.5, 0.75, 1].map((u) => [(1 - u) ** 2 * arc.from[0] + 2 * (1 - u) * u * arc.ctl[0] + u ** 2 * arc.to[0], (1 - u) ** 2 * arc.from[1] + 2 * (1 - u) * u * arc.ctl[1] + u ** 2 * arc.to[1]]);
+      page.polyline(pts, { weightPt: 1.1 });
+    }
   }
   if (editable) page.meta.pm_manifest = JSON.stringify({ fn: d.blocks.map((b) => b.nodeId), ar: d.arrows.flatMap((a) => (a.ref ? [`${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`] : [])) });
   d.footer.forEach((line, i) => line && page.label(line, { x: 16, y: d.height - 34 + i * 18, anchor: "start", w: Math.max(300, line.length * 7) }, { fontPx: 11, color: "#374151" }));
@@ -531,7 +553,7 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
   }
 }
 
-function bpmnPage(d: BpmnDiagramData, name: string): Page {
+function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel): Page {
   const page = new Page(name, d.width, d.height, { pm_page: "bpmn" });
   // пул и дорожки
   page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
@@ -591,37 +613,68 @@ function bpmnPage(d: BpmnDiagramData, name: string): Page {
       text: edge.label,
       textAt,
       tag: edge.flowId ? { pm_k: "flow", pm_id: edge.flowId, pm_n: edge.label ?? "" } : { pm_k: "synthflow" },
+      props: visioFlowProps(!!edge.label, edge.isDefault),
     });
   }
 
-  for (const s of d.shapes) drawBpmnShape(page, s);
+  for (const s of d.shapes) drawBpmnShape(page, s, model);
   // что было нарисовано: по этому списку импорт отличает удалённое в Visio от появившегося в модели позже
   page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId ? [e.flowId] : [])) });
   return page;
 }
 
-function drawBpmnShape(page: Page, s: Shape) {
+function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel) {
   const { x, y, w, h } = s;
   const tag: Record<string, string> = s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
+  const props = visioShapeProps(s);
+  // оформление вида из модели (shape_styles) ложится поверх значений выгрузки по умолчанию
+  const pos = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");
+  const styleKind: StyleKind = s.kind === "event" ? (pos === "start" ? "event_start" : pos === "end" ? "event_end" : "event_intermediate") : s.kind;
+  const own = ownStyle(model, styleKind);
+  const look: Style = { ...(own.fill ? { fill: own.fill } : {}), ...(own.line ? { line: own.line } : {}), ...(own.text ? { color: own.text } : {}), ...(own.font_size ? { fontPx: own.font_size } : {}) };
   if (s.kind === "event") {
+    // параметры триггера (имя сообщения, ссылки, срок таймера, условие) в свойствах Visio не помещаются — они в метке фигуры
+    const trigger = s.nodeId ? model.nodes.find((n) => n.id === s.nodeId)?.trigger : undefined;
+    if (trigger && trigger.type !== "none") tag.pm_trg = JSON.stringify(trigger);
     const position = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");
     const isStart = position === "start";
     const isEnd = position === "end";
     const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
     const glyphs = triggerGlyph(s.event?.trigger ?? "none", s.event?.throwing ?? false);
-    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id }, [...inner, ...eventGlyph(glyphs, w, h)]);
+    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
     drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
-    page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id }, gatewayGlyph(s.subtype, w, h));
+    page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
   } else {
-    drawBlock(page, s, x, y, w, h, tag);
+    drawBlock(page, s, x, y, w, h, tag, props, look);
   }
 }
 
+/** Маркер цикличности внизу блока (локальные координаты, y вниз): круговая стрелка, три вертикальные или три горизонтальные черты. */
+function loopGlyph(loop: string | undefined, w: number, h: number, withSubMarker: boolean): GeomPart[] {
+  if (!loop) return [];
+  const cx = w / 2 - (withSubMarker ? 24 : 0);
+  const cy = h - 10;
+  if (loop === "parallel") return [-4, 0, 4].map((dx) => ({ kind: "path" as const, pts: [[cx + dx, cy - 5], [cx + dx, cy + 5]] as Pt[] }));
+  if (loop === "sequential") return [-4, 0, 4].map((dy) => ({ kind: "path" as const, pts: [[cx - 5, cy + dy], [cx + 5, cy + dy]] as Pt[] }));
+  const r = 5;
+  const at = (deg: number): Pt => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+  const arc: Pt[] = [];
+  for (let a = 120; a <= 400; a += 20) arc.push(at(a));
+  const end = at(400);
+  return [
+    { kind: "path", pts: arc },
+    { kind: "path", pts: [[end[0] - 3, end[1] - 3], end, [end[0] + 3, end[1] - 3]] },
+  ];
+}
+
 /** Задача или подпроцесс; триггеры блока (ожидающие события) — значки на его границе, без отдельных фигур и стрелок. */
-function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: number, tag: Record<string, string>) {
+function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: number, tag: Record<string, string>, props: VisioPropOut[], look: Style) {
   {
-    page.rect(x, y, w, h, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id }, s.kind === "subprocess" ? [{ kind: "path", pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]], closed: true }, { kind: "path", pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] }, { kind: "path", pts: [[w / 2, h - 14], [w / 2, h - 6]] }] : []);
+    page.rect(x, y, w, h, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id, props, ...look }, [
+      ...(s.kind === "subprocess" ? [{ kind: "path" as const, pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]] as Pt[], closed: true }, { kind: "path" as const, pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] as Pt[] }, { kind: "path" as const, pts: [[w / 2, h - 14], [w / 2, h - 6]] as Pt[] }] : []),
+      ...loopGlyph(s.loop, w, h, s.kind === "subprocess"),
+    ]);
   }
   // триггеры блока: значок с кольцом (двойным у промежуточного события) на границе блока
   const markers = s.markers ?? [];
@@ -731,8 +784,8 @@ export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string
   const contextPage = idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0", model, "context");
   const rootPage = idef0Page(idef0.root, rootName, model, "root");
   const childPages = idef0.children.map((c) => ({ parentNodeId: c.parentNodeId, page: idef0Page(c, `IDEF0 ${c.code}`, model, "child", c.parentNodeId) }));
-  const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`) }));
-  const schemePage = bpmnPage(bpmn.diagram, "BPMN");
+  const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`, model) }));
+  const schemePage = bpmnPage(bpmn.diagram, "BPMN", model);
 
   // имена страниц Visio уникальны и без запрещённых символов
   if (isStructured(model)) {

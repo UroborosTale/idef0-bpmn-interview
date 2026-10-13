@@ -3,6 +3,7 @@ import type { ProcessLogicModel, ProcessNode, ProcessFlow, Role, NodeType } from
 import { SCHEMA_VERSION } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
 import type { EventTrigger, TriggerType } from "../shared/events.js";
+import type { LoopKind } from "../shared/loops.js";
 
 /**
  * ФТ-М9.4.1/9.5.2: разбор структурированных форматов диаграмм (.bpmn, .drawio).
@@ -41,6 +42,12 @@ export interface ParsedBpmnElement {
   trigger?: EventTrigger;
   attachedToRef?: string;
   cancelActivity?: boolean;
+  /** Задача или подпроцесс: цикличность из loopCharacteristics. */
+  loop?: LoopKind;
+  /** Задача или шлюз: id потока, который идёт по умолчанию (атрибут default). */
+  defaultRef?: string;
+  /** Поток — ветка по умолчанию (на него ссылается default узла-источника). */
+  isDefault?: boolean;
 }
 export interface ParsedBpmn {
   elements: ParsedBpmnElement[];
@@ -69,7 +76,7 @@ export function parseBpmnXml(xml: string): ParsedBpmn {
   while ((m = nodeRe.exec(xml))) {
     const attrs = parseAttrs(m[2]);
     if (!attrs.id) continue;
-    elements.push({ id: attrs.id, tag: m[1], name: attrs.name ?? null, ...(EVENT_TAGS.includes(m[1]) ? { attachedToRef: attrs.attachedToRef, cancelActivity: attrs.cancelActivity === undefined ? undefined : attrs.cancelActivity !== "false" } : {}) });
+    elements.push({ id: attrs.id, tag: m[1], name: attrs.name ?? null, ...(attrs.default ? { defaultRef: attrs.default } : {}), ...(EVENT_TAGS.includes(m[1]) ? { attachedToRef: attrs.attachedToRef, cancelActivity: attrs.cancelActivity === undefined ? undefined : attrs.cancelActivity !== "false" } : {}) });
   }
 
   // триггеры событий: определения лежат внутри элемента события, названия сообщений, сигналов и ошибок — в корневых элементах
@@ -87,12 +94,28 @@ export function parseBpmnXml(xml: string): ParsedBpmn {
     if (trigger) el.trigger = trigger;
   }
 
+  // цикличность: характеристика стоит в начале элемента, до вложенных элементов подпроцесса
+  const NESTED = /<(?:\w+:)?(?:laneSet|task|userTask|serviceTask|manualTask|sendTask|receiveTask|scriptTask|subProcess|startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|\w*Gateway|sequenceFlow)\b/;
+  for (const el of elements) {
+    if (!TASK_TAGS.includes(el.tag)) continue;
+    const block = new RegExp(`<(?:\\w+:)?${el.tag}\\s+[^>]*?\\bid="${el.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*?(?:/>|>([\\s\\S]*?)</(?:\\w+:)?${el.tag}>)`).exec(xml);
+    const head = (block?.[1] ?? "").split(NESTED)[0];
+    if (/<(?:\w+:)?standardLoopCharacteristics\b/.test(head)) el.loop = "standard";
+    else {
+      const mi = /<(?:\w+:)?multiInstanceLoopCharacteristics\b([^>]*)>/.exec(head);
+      if (mi) el.loop = /isSequential="true"/.test(mi[1]) ? "sequential" : "parallel";
+    }
+  }
+
   const flowRe = /<(?:\w+:)?sequenceFlow\s+([^>]*?)(?:\/>|>)/g;
   while ((m = flowRe.exec(xml))) {
     const attrs = parseAttrs(m[1]);
     if (!attrs.id || !attrs.sourceRef || !attrs.targetRef) continue;
     elements.push({ id: attrs.id, tag: "sequenceFlow", name: attrs.name ?? null, sourceRef: attrs.sourceRef, targetRef: attrs.targetRef, condition: attrs.name ?? null });
   }
+
+  const defaults = new Set(elements.flatMap((e) => (e.defaultRef ? [e.defaultRef] : [])));
+  for (const el of elements) if (el.tag === "sequenceFlow" && defaults.has(el.id)) el.isDefault = true;
 
   if (elements.length === 0) warnings.push("Не найдено ни одного распознаваемого элемента BPMN — проверьте, что файл экспортирован из bpmn.io/Camunda Modeler и содержит стандартные теги.");
   return { elements, lanes, warnings };
@@ -178,6 +201,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
       type,
       subtype,
       ...eventFields(e),
+      ...(e.loop ? { loop: e.loop } : {}),
       name: e.name ?? "(без названия)",
       role_id: null,
       system_ids: [],
@@ -210,7 +234,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
       warnings.push(`Связь ${f.id} ссылается на нераспознанный элемент — пропущена.`);
       continue;
     }
-    flows.push({ id: `flow_${nanoid(8)}`, from, to, condition: f.condition ?? null, source: [{ fragment_id: "diagram_import", quote: f.id }], confirmed_by: [] });
+    flows.push({ id: `flow_${nanoid(8)}`, from, to, condition: f.condition ?? null, ...(f.isDefault ? { is_default: true } : {}), source: [{ fragment_id: "diagram_import", quote: f.id }], confirmed_by: [] });
   }
 
   const model: ProcessLogicModel = {
@@ -355,7 +379,7 @@ export function reconcileBpmnEdit(model: ProcessLogicModel, parsed: ParsedBpmn):
     if (!fromId || !toId) continue;
     const key = `${fromId}|${toId}`;
     if (!existingFlowKeys.has(key)) {
-      out.flows.push({ id: `flow_${nanoid(8)}`, from: fromId, to: toId, condition: f.condition ?? null, source: [{ fragment_id: "diagram_import", quote: f.id }], confirmed_by: [] });
+      out.flows.push({ id: `flow_${nanoid(8)}`, from: fromId, to: toId, condition: f.condition ?? null, ...(f.isDefault ? { is_default: true } : {}), source: [{ fragment_id: "diagram_import", quote: f.id }], confirmed_by: [] });
       existingFlowKeys.add(key);
     }
   }

@@ -29,6 +29,54 @@ export interface ArrowRoute {
 export const arrowRouteKey = (kind: ArrowKind, entityId: string) => `${kind}:${entityId}`;
 
 /**
+ * Туннель стрелки (в IDEF0 — скобки у конца): стрелка не продолжается на соседней диаграмме. up — у свободного конца
+ * (на диаграмме выше её нет), down — у блока (на диаграмме ниже, в декомпозиции функции, её нет). Ключ — вид:сущность,
+ * как у ручных маршрутов. Туннелируются только внешние стрелки: входы, выходы, управление и управление-данные.
+ */
+export interface ArrowTunnel {
+  up?: boolean;
+  down?: boolean;
+}
+export const TUNNEL_KINDS: ReadonlySet<ArrowKind> = new Set<ArrowKind>(["input", "output", "control", "controlData"]);
+
+/** Дуга скобки туннеля — квадратичная кривая; одни и те же дуги рисуют редактор, SVG и Visio. */
+export interface TunnelArc {
+  from: Pt;
+  ctl: Pt;
+  to: Pt;
+}
+
+/**
+ * Скобки «( )» у помеченных концов стрелки: у свободного конца (tunnelUp) и у блока (tunnelDown). Скобки охватывают
+ * конец стрелки: центр на 7 px внутрь от конца, расстояние между скобками 10 px, высота 14 px.
+ */
+export function tunnelArcs(a: { kind: ArrowKind; points: Pt[]; tunnelUp?: boolean; tunnelDown?: boolean }): TunnelArc[] {
+  const pts = a.points;
+  if (pts.length < 2 || !TUNNEL_KINDS.has(a.kind) || (!a.tunnelUp && !a.tunnelDown)) return [];
+  const last = pts.length - 1;
+  const freeAtEnd = FREE_END[a.kind] === "end";
+  const free = freeAtEnd ? { at: pts[last], from: pts[last - 1] } : { at: pts[0], from: pts[1] };
+  const block = freeAtEnd ? { at: pts[0], from: pts[1] } : { at: pts[last], from: pts[last - 1] };
+  const out: TunnelArc[] = [];
+  for (const [on, end] of [[a.tunnelUp, free], [a.tunnelDown, block]] as const) {
+    if (!on) continue;
+    const len = Math.hypot(end.at[0] - end.from[0], end.at[1] - end.from[1]) || 1;
+    const t = [(end.at[0] - end.from[0]) / len, (end.at[1] - end.from[1]) / len];
+    const n = [-t[1], t[0]];
+    const c = [end.at[0] - t[0] * 7, end.at[1] - t[1] * 7];
+    for (const s of [-1, 1]) {
+      const b = [c[0] + t[0] * s * 5, c[1] + t[1] * s * 5];
+      out.push({
+        from: [b[0] + n[0] * 7, b[1] + n[1] * 7],
+        ctl: [b[0] + t[0] * s * 4, b[1] + t[1] * s * 4],
+        to: [b[0] - n[0] * 7, b[1] - n[1] * 7],
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Стороны стрелки в направлении от начала к концу: из какой стороны выходит начало (куда идёт первый отрезок) и в какую сторону
  * смотрит нормаль у конца (с какой стороны подходит последний отрезок). Для orthogonalPath и ручек редактора.
  */
@@ -74,6 +122,7 @@ export interface NodeLike {
   bpmn_scope?: string | null;
   idef0_layout?: { x: number; y: number } | null;
   arrow_routes?: Record<string, ArrowRoute> | null;
+  tunnels?: Record<string, ArrowTunnel> | null;
   role_id?: string | null;
   inputs: string[];
   outputs: string[];
@@ -122,6 +171,9 @@ export interface Arrow {
   labelRow?: number;
   /** Сдвиг подписи от обычного места (ручной маршрут). */
   labelOffset?: Pt;
+  /** Туннель у свободного конца (стрелки нет на диаграмме выше) и у блока (нет на диаграмме ниже): скобки у этих концов. */
+  tunnelUp?: boolean;
+  tunnelDown?: boolean;
   /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
   manual?: boolean;
 }
@@ -358,6 +410,12 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       );
       list.forEach((a, i) => (a.labelRow = rows[i]));
     }
+  }
+  for (const a of arrows) {
+    if (!TUNNEL_KINDS.has(a.kind)) continue;
+    const t = fnNodes.find((n) => n.id === a.nodeId)?.tunnels?.[arrowRouteKey(a.kind, a.entityId)];
+    if (t?.up) a.tunnelUp = true;
+    if (t?.down) a.tunnelDown = true;
   }
   return { functions, arrows };
 }

@@ -8,6 +8,7 @@ import { PAPER_MM, idef0PrintHtml, type Orientation } from "../export/idef0Print
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { bpmnHosts } from "../shared/codes.js";
+import { setMembers } from "../shared/objectSets.js";
 import JSZip from "jszip";
 import { buildProtocolMarkdown } from "../export/protocol.js";
 import { buildStatementsMarkdown } from "../export/statements.js";
@@ -70,13 +71,21 @@ exportRouter.get("/sessions/:id/export/bpmn.zip", async (req, res) => {
   const codes = idef0Codes(model);
   const zip = new JSZip();
   let count = 0;
+  // ?set=<id набора> — только операции набора (и вложенные в его функции)
+  const setId = typeof req.query.set === "string" ? req.query.set : "";
+  if (setId && !model.object_sets?.some((s) => s.id === setId)) {
+    res.status(404).json({ error: "набор не найден" });
+    return;
+  }
+  const inSet = setId ? setMembers(model, setId) : null;
   for (const host of bpmnHosts(model)) {
+    if (inSet && !inSet.has(host.id)) continue;
     if (!model.nodes.some((n) => n.bpmn_scope === host.id)) continue;
     zip.file(`${codes.get(host.id)} ${host.name}.bpmn`.replace(/[\\/:*?"<>|]+/g, "_"), (await generateBpmn(model, host.id)).xml);
     count++;
   }
   if (count === 0) {
-    res.status(400).json({ error: "нет операций с диаграммами BPMN" });
+    res.status(400).json({ error: inSet ? "в наборе нет операций с диаграммами BPMN" : "нет операций с диаграммами BPMN" });
     return;
   }
   attachment(res, `${session.meta.processName}.bpmn.zip`);

@@ -298,6 +298,9 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       controls: new Set(kids.flatMap((k) => k.controls)),
       data: new Set(kids.flatMap((k) => k.control_data_ids ?? [])),
     };
+    // туннель снимает стрелку с проверки: у родителя down — «в декомпозиции её нет», у дочерней up — «выше её нет»
+    const tunnelDown = (kind: string, id: string) => !!parent.tunnels?.[`${kind}:${id}`]?.down;
+    const tunnelUp = (kind: string, id: string) => kids.some((k) => k.tunnels?.[`${kind}:${id}`]?.up);
     const pIn = parent.inputs;
     const pCtl = parent.controls;
     const pData = parent.control_data_ids ?? [];
@@ -306,17 +309,17 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
     const consumedInside = new Set(kids.flatMap((k) => [...k.inputs, ...(k.control_data_ids ?? [])]));
     // у родителя есть, у дочерних нет (вход может использоваться и как управление-данные)
     const onlyParent = {
-      inputs: pIn.filter((id) => !kid.inputs.has(id) && !kid.data.has(id)),
-      controls: pCtl.filter((id) => !kid.controls.has(id)),
-      data: pData.filter((id) => !kid.data.has(id) && !kid.inputs.has(id)),
-      outputs: pOut.filter((id) => !kid.outputs.has(id)),
+      inputs: pIn.filter((id) => !kid.inputs.has(id) && !kid.data.has(id) && !tunnelDown("input", id)),
+      controls: pCtl.filter((id) => !kid.controls.has(id) && !tunnelDown("control", id)),
+      data: pData.filter((id) => !kid.data.has(id) && !kid.inputs.has(id) && !tunnelDown("controlData", id)),
+      outputs: pOut.filter((id) => !kid.outputs.has(id) && !tunnelDown("output", id)),
     };
     // у дочерних есть «снаружи», а у родителя нет
     const onlyKids = {
-      inputs: [...kid.inputs].filter((id) => !producedInside.has(id) && !pIn.includes(id) && !pData.includes(id)),
-      controls: [...kid.controls].filter((id) => !pCtl.includes(id)),
-      data: [...kid.data].filter((id) => !producedInside.has(id) && !pData.includes(id) && !pIn.includes(id)),
-      outputs: [...kid.outputs].filter((id) => !consumedInside.has(id) && !pOut.includes(id)),
+      inputs: [...kid.inputs].filter((id) => !producedInside.has(id) && !pIn.includes(id) && !pData.includes(id) && !tunnelUp("input", id)),
+      controls: [...kid.controls].filter((id) => !pCtl.includes(id) && !tunnelUp("control", id)),
+      data: [...kid.data].filter((id) => !producedInside.has(id) && !pData.includes(id) && !pIn.includes(id) && !tunnelUp("controlData", id)),
+      outputs: [...kid.outputs].filter((id) => !consumedInside.has(id) && !pOut.includes(id) && !tunnelUp("output", id)),
     };
     const parts = [diffText("есть у родителя, но нет у дочерних функций", onlyParent), diffText("есть у дочерних функций, но нет у родителя", onlyKids)].filter(Boolean);
     if (parts.length > 0) {

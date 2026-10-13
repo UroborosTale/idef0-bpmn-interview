@@ -1,11 +1,12 @@
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import { nanoid } from "nanoid";
-import type { ProcessFlow, ProcessNode, Role } from "../types/model.js";
+import { EventTriggerSchema, type ProcessFlow, type ProcessNode, type Role } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
 import type { EventTrigger, TriggerType } from "../shared/events.js";
 import { importedModel } from "./diagramImport.js";
 import { zipReader } from "../util/zipSafe.js";
+import { decodeVisioBpmn, type VisioBpmnInfo, type VisioProps } from "../shared/visioBpmn.js";
 
 /**
  * Импорт Visio (.vsdx → модель процесса, ТЗ Р10, М9.5). Файл — ZIP-пакет OPC: страницы лежат в visio/pages, имена
@@ -14,7 +15,10 @@ import { zipReader } from "../util/zipSafe.js";
  *    («Task», «Decision», «Start Event», «Процесс»…), а для фигур без мастера — по геометрии (эллипс, ромб, прямоугольник);
  *  - соединители, приклеенные к фигурам (таблица Connect); неприклеенные концы привязываются к ближайшей фигуре;
  *  - дорожки и пулы (по имени мастера) → исполнители: шаг получает роль той дорожки, в которой лежит;
- *  - собственные выгрузки приложения (ячейки pm_*): точные виды, названия и дорожки.
+ *  - собственные выгрузки приложения (ячейки pm_*): точные виды, названия и дорожки;
+ *  - фигуры трафарета BPMN из Visio: тип задачи, шлюза, вид и триггер события, тип потока берутся из ячеек раздела
+ *    Property (Bpmn*), а не из имени мастера (shared/visioBpmn.ts); свойства мастера подмешиваются под свойства фигуры.
+ * Порядок определения вида: метки pm_* → свойства Bpmn* → имя мастера → геометрия.
  * Страницы IDEF0 пропускаются. Всё распознанное — черновик (гипотезы, где у фигуры нет текста): аналитик проверяет модель.
  */
 
@@ -23,6 +27,7 @@ const IN = 96; // дюйм Visio → пиксели
 const AUTO_NAME = /^(sheet|shape|лист|фигура|форма)[.\s]*\d*$/;
 const MAX_PAGES = 100;
 const MAX_SHAPES = 6000; // на странице
+const MAX_MASTERS = 200;
 
 export interface VsdxBox {
   x: number;
@@ -38,6 +43,10 @@ export interface VsdxNode {
   /** Вид задачи (user, service…), шлюза (exclusive, parallel…) или события (start, end, intermediate); для события без явного вида — не задан. */
   subtype?: string;
   trigger?: EventTrigger;
+  /** Цикличность задачи или подпроцесса (BpmnLoopType). */
+  loop?: "standard" | "parallel" | "sequential";
+  /** Граничное событие, которое не прерывает задачу («Промежуточное (без прерывания)» в Visio). */
+  nonInterrupting?: boolean;
   text: string;
   box: VsdxBox;
 }
@@ -51,6 +60,8 @@ export interface VsdxEdge {
   from: string;
   to: string;
   label: string;
+  /** Ветка «по умолчанию» (свойство BpmnConditionType). */
+  isDefault?: boolean;
 }
 export interface VsdxPage {
   name: string;
@@ -110,6 +121,23 @@ function userCells(shape: X): Record<string, string> {
   return out;
 }
 
+/** Ячейки раздела Property: имя строки → значение и список допустимых значений (Format). */
+function propCells(shape: X): VisioProps {
+  const out: VisioProps = {};
+  for (const s of arr<X>(shape.Section)) {
+    if (attr(s, "N") !== "Property") continue;
+    for (const r of arr<X>(s.Row)) {
+      const n = attr(r, "N");
+      if (!n) continue;
+      const c = cells(r);
+      const value = c.get("Value");
+      if (value === undefined && !c.has("Format")) continue;
+      out[n] = { value: value ?? out[n]?.value ?? "", ...(c.has("Format") ? { format: c.get("Format") } : {}) };
+    }
+  }
+  return out;
+}
+
 /** Текст фигуры (смешанное содержимое: отрезки текста между разметкой <cp/>, <pp/>, <tp/>). */
 function textOf(shape: X): string {
   const t = shape.Text;
@@ -124,8 +152,12 @@ const norm = (s: string) => clean(s).toLowerCase().replace(/ё/g, "е");
 
 // --- геометрия ---
 
-function boxOf(shape: X, origin: { x: number; y: number }, pageH: number): { box: VsdxBox; pin: { x: number; y: number }; origin: { x: number; y: number } } {
+/** Размеры, которые экземпляр наследует от мастера, пока не изменён вручную. */
+const INHERITED_SIZE = ["Width", "Height", "LocPinX", "LocPinY"];
+
+function boxOf(shape: X, origin: { x: number; y: number }, pageH: number, master?: Map<string, string>): { box: VsdxBox; pin: { x: number; y: number }; origin: { x: number; y: number } } {
   const c = cells(shape);
+  if (master) for (const k of INHERITED_SIZE) if (!c.has(k) && master.has(k)) c.set(k, master.get(k)!);
   const w = numOf(c, "Width");
   const h = numOf(c, "Height");
   const lx = numOf(c, "LocPinX", w / 2);
@@ -243,6 +275,17 @@ const EVENT_TRIGGERS: [RegExp, TriggerType][] = [
   [/terminate|терминат|завершение процесса/, "terminate"],
 ];
 
+/** Триггер из метки pm_trg собственной выгрузки; испорченная метка не ошибка. */
+function savedTrigger(raw: string | undefined): EventTrigger | undefined {
+  if (!raw) return undefined;
+  try {
+    const r = EventTriggerSchema.safeParse(JSON.parse(raw));
+    return r.success ? (r.data as EventTrigger) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // --- разбор пакета ---
 
 interface Shp {
@@ -251,6 +294,8 @@ interface Shp {
   parent: Shp | null;
   name: string; // имя мастера или фигуры, в нижнем регистре
   user: Record<string, string>;
+  /** Свойства BPMN фигуры (раздел Property) поверх свойств её мастера, уже разобранные. */
+  bpmn: VisioBpmnInfo;
   box: VsdxBox;
   pin: { x: number; y: number };
   isGroup: boolean;
@@ -272,12 +317,35 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
 
   // мастера: id → имя
   const masterNames = new Map<string, string>();
+  const masterProps = new Map<string, VisioProps>(); // id мастера → его свойства (значения по умолчанию для фигур-экземпляров)
+  const masterSize = new Map<string, Map<string, string>>(); // id мастера → размер фигуры по умолчанию
   const mastersXml = await read("visio/masters/masters.xml");
   if (mastersXml) {
-    for (const m of arr<X>(parser.parse(mastersXml).Masters?.Master)) {
+    const mrelsXml = (await read("visio/masters/_rels/masters.xml.rels")) ?? "";
+    const mtargets = new Map<string, string>();
+    for (const r of arr<X>(parser.parse(mrelsXml).Relationships?.Relationship)) {
+      const id = attr(r, "Id");
+      const target = attr(r, "Target");
+      if (id && target) mtargets.set(id, target);
+    }
+    const masterList = arr<X>(parser.parse(mastersXml).Masters?.Master);
+    for (let i = 0; i < masterList.length; i++) {
+      const m = masterList[i];
       const id = attr(m, "ID");
       const name = attr(m, "NameU") ?? attr(m, "Name");
       if (id && name) masterNames.set(id, name);
+      if (!id || i >= MAX_MASTERS) continue;
+      const part = mtargets.get(attr(m.Rel, "id") ?? "");
+      const mxml = part ? await read(`visio/masters/${part.replace(/^\/?(visio\/masters\/)?/, "")}`) : undefined;
+      if (!mxml) continue;
+      const top = arr<X>(parser.parse(mxml).MasterContents?.Shapes?.Shape)[0];
+      const props = top ? propCells(top) : {};
+      if (Object.keys(props).length) masterProps.set(id, props);
+      if (top) {
+        const tc = cells(top);
+        const size = new Map(INHERITED_SIZE.filter((k) => tc.has(k)).map((k) => [k, tc.get(k)!] as const));
+        if (size.size) masterSize.set(id, size);
+      }
     }
   }
 
@@ -310,7 +378,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
       warnings.push(`Страница «${name}» не найдена в пакете — пропущена.`);
       continue;
     }
-    const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, warnings);
+    const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings);
     if (page.nodes.length) pages.push(page);
   }
   if (skippedIdef0) warnings.push(`Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`);
@@ -318,7 +386,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   return { pages, warnings };
 }
 
-function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, warnings: string[]): VsdxPage {
+function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[]): VsdxPage {
   // все фигуры страницы, включая вложенные в группы
   const all: Shp[] = [];
   let truncated = false;
@@ -331,8 +399,9 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
       }
       const id = attr(shape, "ID");
       if (!id) continue;
-      const b = boxOf(shape, origin, pageH);
-      const master = masters.get(attr(shape, "Master") ?? "");
+      const masterId = attr(shape, "Master") ?? "";
+      const b = boxOf(shape, origin, pageH, masterInfo.size.get(masterId));
+      const master = masters.get(masterId);
       const s: Shp = {
         id,
         shape,
@@ -340,6 +409,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
         // фигура без мастера получает от Visio служебное имя «Sheet.5» — это не подсказка о виде, поэтому считается безымянной
         name: master ? norm(master) : AUTO_NAME.test(norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? "")) ? "" : norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? ""),
         user: userCells(shape),
+        bpmn: decodeVisioBpmn({ ...masterInfo.props.get(masterId), ...propCells(shape) }),
         box: b.box,
         pin: b.pin,
         isGroup: attr(shape, "Type") === "Group",
@@ -367,7 +437,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
   }
   const isConnector = (s: Shp) => {
     const c = cells(s.shape);
-    return (c.has("BeginX") && c.has("EndX")) || glued.has(s.id) || s.user.pm_k === "flow" || s.user.pm_k === "synthflow";
+    return (c.has("BeginX") && c.has("EndX")) || glued.has(s.id) || s.user.pm_k === "flow" || s.user.pm_k === "synthflow" || s.bpmn.kind === "flow";
   };
   // фигуры, к которым приклеен соединитель, и их предки (приклеиваться можно к части группы)
   const connected = new Set<string>();
@@ -379,6 +449,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
   const nodeKinds = new Map<string, Kind>();
   const lanes: VsdxContainer[] = [];
   const nodes: VsdxNode[] = [];
+  const lost: string[] = []; // свойства Visio, которым нет места в модели (или не опознанные значения)
   const laneNames = new Map<string, string>(); // собственная выгрузка: id роли → название из подписи дорожки
 
   for (const s of all) if (s.user.pm_k === "lanelabel" && s.user.pm_id) laneNames.set(s.user.pm_id, s.user.pm_n ?? textOf(s.shape));
@@ -410,7 +481,10 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
       if (pk !== "node" && pk !== "synth") continue;
     }
     const geo = geometryOf(s.shape);
-    let kind: Kind = pk ? (geo.diamond ? "gateway" : geo.ellipse ? "event" : "task") : classify(s.name, geo, connected.has(s.id), s.box);
+    const vb = s.bpmn;
+    // у собственной выгрузки вид задаёт метка pm_*, а подтип, триггер и признаки — свойства фигуры (их правят в «Данных фигуры» Visio)
+    const byProps: Kind | undefined = pk ? undefined : vb.kind === "pool" ? "lane" : vb.kind === "flow" ? "ignore" : vb.kind;
+    let kind: Kind = pk ? (geo.diamond ? "gateway" : geo.ellipse ? "event" : "task") : byProps ?? classify(s.name, geo, connected.has(s.id), s.box);
     // подпроцесс собственной выгрузки отличает маркер «+» во второй секции геометрии
     if (pk && kind === "task" && arr<X>(s.shape.Section).some((x) => attr(x, "N") === "Geometry" && attr(x, "IX") === "1")) kind = "subprocess";
     if (kind === "lane") {
@@ -422,18 +496,26 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     if (!s.box.w || !s.box.h) continue;
     const text = pk ? clean(s.user.pm_n ?? textDeep(s)) : textDeep(s);
     const node: VsdxNode = { key: `${pageIndex}:${s.id}`, shapeId: s.id, kind, text, box: s.box };
-    if (kind === "task") {
-      const sub = TASK_SUBTYPES.find(([re]) => re.test(s.name));
-      if (sub) node.subtype = sub[1];
+    if (vb) lost.push(...vb.lost);
+    if (kind === "task" || kind === "subprocess") {
+      const sub = vb?.taskType ?? TASK_SUBTYPES.find(([re]) => re.test(s.name))?.[1];
+      if (sub) node.subtype = sub;
+      if (vb?.loop) node.loop = vb.loop;
     } else if (kind === "gateway") {
       const g = geo.glyph;
-      node.subtype = g ?? (/parallel|параллел|\band\b/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
+      node.subtype = vb?.gateway ?? g ?? (/parallel|параллел|\band\b/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
     } else if (kind === "event") {
-      if (/start|начал|старт/.test(s.name) || (!s.name && /^(начало|старт|start)/.test(norm(text)))) node.subtype = "start";
+      if (vb?.position) node.subtype = vb.position;
+      else if (/start|начал|старт/.test(s.name) || (!s.name && /^(начало|старт|start)/.test(norm(text)))) node.subtype = "start";
       else if (/\bend\b|конец|конечн|заверш|финиш|стоп/.test(s.name) || (!s.name && /^(конец|завершени|финиш|end)/.test(norm(text)))) node.subtype = "end";
       else if (/intermediate|промежуточн/.test(s.name)) node.subtype = "intermediate";
       const trig = EVENT_TRIGGERS.find(([re]) => re.test(s.name));
-      if (trig) node.trigger = { type: trig[1] };
+      // собственная выгрузка хранит параметры триггера в метке pm_trg; правка типа в «Данных фигуры» Visio сильнее метки
+      const saved = pk ? savedTrigger(s.user.pm_trg) : undefined;
+      if (saved && (vb.trigger === saved.type || !vb.position)) node.trigger = saved;
+      else if (vb?.trigger) node.trigger = { type: vb.trigger, ...(vb.throwing && node.subtype === "intermediate" ? { direction: "throw" as const } : {}) };
+      else if (trig) node.trigger = { type: trig[1] };
+      if (vb?.nonInterrupting && vb.position === "intermediate") node.nonInterrupting = true;
     }
     nodes.push(node);
     nodeKinds.set(s.id, kind);
@@ -459,8 +541,14 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
 
   const edges: VsdxEdge[] = [];
   let loose = 0;
+  const skippedFlows = { association: 0, message: 0 };
   for (const s of all) {
     if (!isConnector(s)) continue;
+    const ft = s.bpmn.flowType;
+    if (ft === "association" || ft === "message") {
+      skippedFlows[ft]++;
+      continue;
+    }
     const c = cells(s.shape);
     const g = glued.get(s.id) ?? {};
     let from = nodeOf(g.begin);
@@ -474,9 +562,16 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
     // стрелка на начале, а не на конце — направление обратное
     if (numOf(c, "BeginArrow") > 0 && numOf(c, "EndArrow") === 0) [from, to] = [to, from];
-    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape) });
+    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), ...(s.bpmn.condition === "default" ? { isDefault: true } : {}) });
   }
   if (loose) warnings.push(`На странице «${pageName}» ${loose} соедин. не привязаны к шагам — пропущены.`);
+  if (skippedFlows.association) warnings.push(`На странице «${pageName}» ассоциации (${skippedFlows.association}) пропущены: они связывают шаги с примечаниями и данными, а не задают порядок.`);
+  if (skippedFlows.message) warnings.push(`На странице «${pageName}» потоки сообщений (${skippedFlows.message}) пропущены: импорт пулов-участников не поддерживается, потоки добавьте в редакторе.`);
+  if (lost.length) {
+    const counts = new Map<string, number>();
+    for (const l of lost) counts.set(l, (counts.get(l) ?? 0) + 1);
+    warnings.push(`На странице «${pageName}» не перенесено в модель: ${[...counts].map(([k, n]) => (n > 1 ? `${k} (${n})` : k)).join(", ")}.`);
+  }
 
   return { name: pageName, nodes, containers: lanes, edges };
 }
@@ -594,6 +689,7 @@ export function buildModelFromParsedVsdx(parsed: ParsedVsdx, meta: SessionMeta) 
         type: n.kind,
         subtype,
         ...(n.trigger ? { trigger: n.trigger } : {}),
+        ...(n.loop ? { loop: n.loop } : {}),
         name,
         role_id: n.kind === "event" || n.kind === "gateway" ? null : role?.id ?? null,
         system_ids: [],
@@ -616,7 +712,10 @@ export function buildModelFromParsedVsdx(parsed: ParsedVsdx, meta: SessionMeta) 
     for (const [eventKey, hostKey] of boundaryHost) {
       const ev = nodes.find((n) => n.id === idByKey.get(eventKey));
       const host = idByKey.get(hostKey);
-      if (ev && host) ev.attached_to = host;
+      if (ev && host) {
+        ev.attached_to = host;
+        if (page.nodes.find((n) => n.key === eventKey)?.nonInterrupting) ev.interrupting = false;
+      }
     }
 
     const seen = new Set<string>();
@@ -627,7 +726,7 @@ export function buildModelFromParsedVsdx(parsed: ParsedVsdx, meta: SessionMeta) 
       const k = `${from}|${to}|${e.label}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      flows.push({ id: `flow_${nanoid(8)}`, from, to, condition: e.label || null, source: [{ fragment_id: "diagram_import", quote: `${page.name}` }], confirmed_by: [] });
+      flows.push({ id: `flow_${nanoid(8)}`, from, to, condition: e.label || null, ...(e.isDefault ? { is_default: true } : {}), source: [{ fragment_id: "diagram_import", quote: `${page.name}` }], confirmed_by: [] });
     }
   }
 

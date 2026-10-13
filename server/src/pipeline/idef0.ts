@@ -1,6 +1,6 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
-import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 import { frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
 export type { ArrowKind, LabelSide, Pt };
@@ -38,6 +38,9 @@ export interface Idef0Arrow {
   /** Блоки, к которым приклеены начало и конец стрелки (в Visio — концы соединителя). */
   startNode?: string;
   endNode?: string;
+  /** Туннель: скобки у свободного конца и у блока (shared/idef0Layout.ts, tunnelArcs). */
+  tunnelUp?: boolean;
+  tunnelDown?: boolean;
 }
 
 export interface Idef0Block {
@@ -117,6 +120,8 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
     startNode: a.fromId ?? (a.kind === "output" ? a.nodeId : undefined),
     endNode: a.kind === "output" ? undefined : a.nodeId,
+    ...(a.tunnelUp ? { tunnelUp: true } : {}),
+    ...(a.tunnelDown ? { tunnelDown: true } : {}),
   }));
 
   // стрелки на границе диаграммы — это её внешние входы, управление, выходы и механизмы (для A-0)
@@ -265,6 +270,7 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   for (const a of d.arrows) {
     const path = a.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
     parts.push(`<path d="${path}" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#arrow)" />`);
+    if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
     if (lab) {
       parts.push(`<text x="${lab.x}" y="${lab.y}" font-size="10.5" text-anchor="${lab.anchor}" font-family="Arial, sans-serif" fill="#374151">${esc(lab.text)}</text>`);

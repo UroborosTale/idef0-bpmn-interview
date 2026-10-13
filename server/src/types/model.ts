@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { MAX_DIAGRAM_W, MAX_LANE_H, MIN_DIAGRAM_W, MIN_LANE_H } from "../shared/bpmnGeometry.js";
 import { TRIGGER_TYPES } from "../shared/events.js";
+import { LOOP_KINDS } from "../shared/loops.js";
+import { FONT_SIZE_MAX, FONT_SIZE_MIN, STYLE_KINDS } from "../shared/shapeStyles.js";
 
 /**
  * Process Logic JSON — единый источник истины для IDEF0 и BPMN (ТЗ, раздел 5).
@@ -149,9 +151,15 @@ export const ProcessNode = z.object({
   attached_to: z.string().nullable().optional(),
   // Граничное событие прерывает задачу (по умолчанию) или нет (пунктирная рамка).
   interrupting: z.boolean().optional(),
+  // Цикличность задачи или подпроцесса: маркер на фигуре (shared/loops.ts); без поля шаг выполняется один раз.
+  loop: z.enum(LOOP_KINDS).optional(),
   // Позиция на холсте редактора BPMN (левый верхний угол). Если задана, генератор BPMN
   // использует её вместо авто-раскладки, чтобы экспорт совпадал с нарисованным.
   layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  // Туннели внешних стрелок IDEF0 (скобки у конца): ключ «вид:сущность» (input:d1, control:c1, output:d2, controlData:d3);
+  // up — стрелка не продолжается на диаграмме выше, down — на диаграмме ниже (в декомпозиции функции). Туннель снимает
+  // стрелку с проверки баланса декомпозиции.
+  tunnels: z.record(z.string(), z.object({ up: z.boolean().optional(), down: z.boolean().optional() })).optional(),
   // Позиция блока на диаграмме IDEF0 A0 (редактор IDEF0); без неё блоки идут по диагонали.
   idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   // Ручные маршруты стрелок IDEF0, привязанных к этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1, system:s1…).
@@ -214,6 +222,8 @@ export const ProcessFlow = z.object({
   from: z.string(),
   to: z.string(),
   condition: z.string().nullable().optional(),
+  // Ветка «по умолчанию»: идёт, когда условия остальных веток не выполнены (атрибут default у шлюза или задачи в BPMN).
+  is_default: z.boolean().optional(),
   route: FlowRoute.nullable().optional(),
   source: z.array(SourceRef).default([]),
   confirmed_by: z.array(z.string()).default([]), // ФТ-М4.1.2
@@ -375,6 +385,23 @@ export const AcceptedIssue = z.object({
 });
 export type AcceptedIssue = z.infer<typeof AcceptedIssue>;
 
+// Оформление фигур по видам (shared/shapeStyles.ts): заливка, линия, цвет и размер текста; чего нет — значения по умолчанию.
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const ShapeStyleSchema = z.object({
+  fill: HexColor.optional(),
+  line: HexColor.optional(),
+  text: HexColor.optional(),
+  font_size: z.number().min(FONT_SIZE_MIN).max(FONT_SIZE_MAX).optional(),
+});
+
+// Набор объектов (shared/objectSets.ts): именованный список функций; в набор входит функция и всё вложенное в неё.
+export const ObjectSet = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  members: z.array(z.string()).default([]),
+});
+export type ObjectSet = z.infer<typeof ObjectSet>;
+
 export const ProcessLogicModel = z.object({
   schema_version: z.string().default(SCHEMA_VERSION),
   process: ProcessMeta,
@@ -412,6 +439,10 @@ export const ProcessLogicModel = z.object({
     .optional(),
   diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
+  // Наборы объектов для фильтра навигатора и выгрузки; без поля наборов нет.
+  object_sets: z.array(ObjectSet).optional(),
+  // Оформление фигур по видам: одно на все диаграммы модели.
+  shape_styles: z.record(z.enum(STYLE_KINDS), ShapeStyleSchema).optional(),
   respondents: z.array(Respondent).default([]),
   discrepancies: z.array(Discrepancy).default([]),
 });

@@ -334,6 +334,8 @@ const FIELD_NAMES: Record<string, string> = {
   qualification: "квалификация",
   attached_to: "прикреплено к",
   interrupting: "прерывает задачу",
+  loop: "цикличность",
+  is_default: "ветка по умолчанию",
   status: "статус",
 };
 

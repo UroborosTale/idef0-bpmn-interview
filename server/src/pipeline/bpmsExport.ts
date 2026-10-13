@@ -1,3 +1,4 @@
+import { canHaveDefaultFlow, loopXml } from "../shared/loops.js";
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { parseDurationToMinutes } from "./timeUtils.js";
 import { createEventWriter } from "./bpmn.js";
@@ -80,6 +81,9 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
 
   const flowElementsXml: string[] = [];
 
+  const defaultFlowOf = new Map<string, string>();
+  for (const f of model.flows) if (f.is_default && !defaultFlowOf.has(f.from)) defaultFlowOf.set(f.from, `Flow_${f.id}`);
+  const defaultAttr = (n: ProcessNode) => (defaultFlowOf.has(n.id) && canHaveDefaultFlow(n) ? ` default="${defaultFlowOf.get(n.id)}"` : "");
   for (const n of model.nodes) {
     const id = nodeIdOf(n.id);
     if (n.type === "task" || n.type === "subprocess") {
@@ -100,10 +104,10 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
       } else if (tag === "userTask") {
         notes.push(`Задача «${n.name}»: нет входных данных — черновик формы не сформирован, поля нужно добавить вручную.`);
       }
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${assigneeAttr}>${formDataXml}</bpmn:${tag}>`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${assigneeAttr}${defaultAttr(n)}>${formDataXml}${loopXml(n.loop)}</bpmn:${tag}>`);
     } else if (n.type === "gateway") {
       const tag = gatewayTag(n.subtype);
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}" />`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)} />`);
     } else if (n.type === "event") {
       const boundary = isBoundaryNode(n, model.nodes);
       const spec = eventSpec(n, boundary);

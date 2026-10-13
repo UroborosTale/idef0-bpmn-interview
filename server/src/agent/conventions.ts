@@ -34,6 +34,9 @@ export const CONVENTIONS = `# Правила работы агента с про
 - Граничное событие — узел type=event с attached_to = id задачи и триггером (trigger: timer, message, error, signal, conditional,
   escalation, compensation, cancel; interrupting: false — не прерывает задачу). Входящих стрелок у него нет, из него ведут
   стрелку к шагу ветки.
+- Цикличность шага: поле loop у задачи или подпроцесса — standard (повторять), parallel (несколько экземпляров параллельно),
+  sequential (по очереди); без поля шаг выполняется один раз. Ветка по умолчанию: is_default: true у стрелки, исходящей из
+  задачи, подпроцесса, исключающего или включающего шлюза (одна на узел); условие такой стрелки обычно пустое.
 - **События и триггеры.** Вид события — subtype: start (начальное), intermediate (промежуточное), end (конечное); граничное —
   событие с attached_to. Что его запускает или что оно выбрасывает — trigger: {type, direction?, name?, timer?, condition?, members?}.
   Допустимые type: none, message, timer, conditional, signal, error, escalation, compensation, cancel, link, terminate,
