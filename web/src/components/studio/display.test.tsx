@@ -60,7 +60,7 @@ describe("вид диаграмм: фигуры", () => {
 
 describe("окно студии: «Подписи» и «Номера»", () => {
   const open = () => render(<Studio session={session(structuredModel())} busy={false} onSave={vi.fn(async () => true)} />);
-  const btn = (name: string) => screen.getByText(name) as HTMLButtonElement;
+  const btn = (name: string) => screen.getByRole("button", { name }) as HTMLButtonElement;
   const eventNames = () => [...document.querySelectorAll('[data-event-position] text')].map((t) => t.textContent);
 
   it("BPMN: «Подписи» убирает названия событий; «Номера» показывает коды задач; настройка запоминается", () => {
@@ -98,7 +98,7 @@ describe("окно студии: «Подписи» и «Номера»", () => 
   it("на диаграммах других видов кнопок нет", () => {
     open();
     fireEvent.click(screen.getAllByText("Паспорт процесса")[0]);
-    expect(screen.queryByText("Подписи")).toBeNull();
-    expect(screen.queryByText("Номера")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Подписи" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Номера" })).toBeNull();
   });
 });

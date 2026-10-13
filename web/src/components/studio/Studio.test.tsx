@@ -252,7 +252,7 @@ describe("окно студии: навигатор следует за выбо
     expect(document.querySelector('[data-nav-fn="b"]')!.className).toMatch(/selected/);
     fireEvent.click(document.querySelector(".nav-section-head")!); // свернуть «Процессы»
     expect(document.querySelector('[data-nav-fn="b"]')).toBeNull();
-    fireEvent.click(screen.getByText("Найти в навигаторе"));
+    fireEvent.click(screen.getByRole("button", { name: "Найти в навигаторе" }));
     expect(document.querySelector('[data-nav-fn="b"]')!.className).toMatch(/selected/);
   });
 });
@@ -284,7 +284,7 @@ describe("окно студии: клавиши навигатора", () => {
 
 describe("окно студии: «Предыдущая», «Следующая», «Вверх», «Вниз»", () => {
   const structured = () => render(<Studio session={session(structuredModel())} busy={false} onSave={vi.fn(async () => true)} />);
-  const btn = (text: RegExp | string) => screen.getByText(text) as HTMLButtonElement;
+  const btn = (name: RegExp | string) => screen.getByRole("button", { name }) as HTMLButtonElement;
   const active = () => document.querySelector(".doc-tab.active")!.firstChild!.textContent;
 
   it("«Предыдущая» и «Следующая» ходят по открытым диаграммам; кнопки отключены на краях истории", () => {

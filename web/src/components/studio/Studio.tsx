@@ -615,18 +615,37 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         </div>
         <div className="ribbon-group">
           <div className="ribbon-buttons">
-            <button disabled={histTarget(-1) === null} onClick={() => goHist(-1)} title="Предыдущая открытая диаграмма (Alt+←)">
-              ‹ Предыдущая
+            <button className="ribbon-icon" aria-label="Предыдущая диаграмма" disabled={histTarget(-1) === null} onClick={() => goHist(-1)} title="Предыдущая открытая диаграмма (Alt+←)">
+              ‹
             </button>
-            <button disabled={histTarget(1) === null} onClick={() => goHist(1)} title="Следующая открытая диаграмма (Alt+→)">
-              Следующая ›
+            <button className="ribbon-icon" aria-label="Следующая диаграмма" disabled={histTarget(1) === null} onClick={() => goHist(1)} title="Следующая открытая диаграмма (Alt+→)">
+              ›
             </button>
-            <button disabled={!upTarget()} onClick={goUp} title="Вверх: диаграмма, на которой стоит функция этой диаграммы">
-              ↑ Вверх
+            <button className="ribbon-icon" aria-label="Вверх: диаграмма выше" disabled={!upTarget()} onClick={goUp} title="Вверх: диаграмма, на которой стоит функция этой диаграммы">
+              ↑
             </button>
-            <button disabled={!downTarget()} onClick={goDown} title="Вниз: декомпозиция выбранной функции или диаграмма BPMN её операции">
-              ↓ Вниз
+            <button className="ribbon-icon" aria-label="Вниз: диаграмма ниже" disabled={!downTarget()} onClick={goDown} title="Вниз: декомпозиция выбранной функции или диаграмма BPMN её операции">
+              ↓
             </button>
+            <button className="ribbon-icon" onClick={findInNavigator} aria-label="Найти в навигаторе" title="Найти в навигаторе: показать в дереве выбранный элемент или текущую диаграмму">
+              ⌖
+            </button>
+            {(active.kind === "bpmn" || active.kind === "idef0") && (
+              <>
+                <button className={`ribbon-icon ${display.labels ? "toggled" : ""}`} aria-label="Подписи" aria-pressed={display.labels} onClick={() => setDisplay({ labels: !display.labels })} title="Слой подписей: названия событий и шлюзов, условия и подписи стрелок. Названия внутри задач и блоков остаются">
+                  Аб
+                </button>
+                <button
+                  className={`ribbon-icon ${(active.kind === "bpmn" ? display.bpmnNumbers : display.idef0Numbers) ? "toggled" : ""}`}
+                  aria-label="Номера"
+                  aria-pressed={active.kind === "bpmn" ? display.bpmnNumbers : display.idef0Numbers}
+                  onClick={() => setDisplay(active.kind === "bpmn" ? { bpmnNumbers: !display.bpmnNumbers } : { idef0Numbers: !display.idef0Numbers })}
+                  title={active.kind === "bpmn" ? "Номера: код функции или шага на задачах диаграммы" : "Номера: код функции на блоках диаграммы"}
+                >
+                  №
+                </button>
+              </>
+            )}
             <button onClick={() => open(bpmnDoc())}>Диаграмма BPMN</button>
             <button onClick={() => open(idef0Doc(null))}>Диаграмма IDEF0</button>
             <button onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
@@ -646,26 +665,9 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
             <button className={navOpen ? "toggled" : ""} onClick={() => setNavOpen(!navOpen)}>
               Навигатор
             </button>
-            <button onClick={findInNavigator} title="Показать в навигаторе выбранный элемент или текущую диаграмму">
-              Найти в навигаторе
-            </button>
             <button className={propsOpen ? "toggled" : ""} onClick={() => setPropsOpen(!propsOpen)}>
               Свойства
             </button>
-            {(active.kind === "bpmn" || active.kind === "idef0") && (
-              <>
-                <button className={display.labels ? "toggled" : ""} onClick={() => setDisplay({ labels: !display.labels })} title="Слой подписей: названия событий и шлюзов, условия и подписи стрелок. Названия внутри задач и блоков остаются">
-                  Подписи
-                </button>
-                <button
-                  className={(active.kind === "bpmn" ? display.bpmnNumbers : display.idef0Numbers) ? "toggled" : ""}
-                  onClick={() => setDisplay(active.kind === "bpmn" ? { bpmnNumbers: !display.bpmnNumbers } : { idef0Numbers: !display.idef0Numbers })}
-                  title={active.kind === "bpmn" ? "Номера: код функции или шага на задачах диаграммы" : "Номера: код функции на блоках диаграммы"}
-                >
-                  Номера
-                </button>
-              </>
-            )}
             <button className={full ? "toggled" : ""} onClick={() => setFull(!full)} title="Окно студии на весь экран — больше места для диаграммы">
               {full ? "Свернуть окно" : "На весь экран"}
             </button>

@@ -164,7 +164,16 @@ export default function Navigator({
     for (const k of keys) n.delete(k);
     return n;
   };
-  const revealFn = (id: string, clearSearch: boolean) => {
+  // выбор сделан щелчком в самом навигаторе: строка уже под курсором, прокрутка сдвинула бы её из-под второго щелчка двойного
+  const pickedHere = useRef(false);
+  const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markPicked = () => {
+    pickedHere.current = true;
+    if (pickTimer.current) clearTimeout(pickTimer.current);
+    pickTimer.current = setTimeout(() => (pickedHere.current = false), 400);
+  };
+  useEffect(() => () => void (pickTimer.current && clearTimeout(pickTimer.current)), []);
+  const revealFn = (id: string, clearSearch: boolean, scroll = true) => {
     const byId = (x: string | null | undefined) => model.nodes.find((n) => n.id === x);
     const node = byId(id);
     if (!node) return;
@@ -177,7 +186,7 @@ export default function Navigator({
       cur = byId(cur.idef0_parent);
     }
     setCollapsed((s) => without(s, path));
-    setScrollTo({ q: `[data-nav-fn="${target}"]`, n: ++scrollNonce.current });
+    if (scroll) setScrollTo({ q: `[data-nav-fn="${target}"]`, n: ++scrollNonce.current });
   };
   const revealActiveDoc = () => {
     setQuery("");
@@ -188,7 +197,7 @@ export default function Navigator({
   };
   /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    if (selectedId) revealFn(selectedId, false);
+    if (selectedId) revealFn(selectedId, false, !pickedHere.current);
   }, [selectedId]);
   useEffect(() => {
     if (!reveal || reveal.n === 0) return;
@@ -586,7 +595,7 @@ export default function Navigator({
   const entryHits = q ? (Object.keys(DICT_TITLES) as DictKind[]).flatMap((k) => entriesOf(model, k).filter((e) => e.name.toLowerCase().includes(q)).map((e) => ({ k, e }))) : [];
 
   return (
-    <div className="nav" ref={rootRef} onKeyDown={onNavKey}>
+    <div className="nav" ref={rootRef} onKeyDown={onNavKey} onMouseDownCapture={markPicked}>
       {contextMenu}
       <div className="nav-search">
         <input ref={searchRef} type="search" placeholder="Найти функцию или запись…" aria-label="Поиск в навигаторе" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} />

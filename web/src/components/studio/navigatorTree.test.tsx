@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { purchaseModel, structuredModel } from "../../test/fixtures";
 import type { ProcessLogicModel } from "../../types";
@@ -175,6 +175,22 @@ describe("навигатор: показать выбранное в дерев�
     expect(visible("o1")).toBe(true);
     expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
     expect(document.querySelector('[data-nav-fn="o1"]')!.className).toMatch(/selected/);
+  });
+
+  it("выбор щелчком в самом навигаторе не прокручивает дерево (строка не уходит из-под двойного щелчка)", () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.useFakeTimers();
+    const { rerender } = render(props(null));
+    scroll.mockClear();
+    fireEvent.mouseDown(document.querySelector('[data-nav-fn="o2"]')!);
+    rerender(props("o2")); // выбор сменился после щелчка по строке
+    expect(scroll).not.toHaveBeenCalled();
+    // выбор с диаграммы (позже и без щелчка в навигаторе) по-прежнему показывается прокруткой
+    act(() => void vi.advanceTimersByTime(500));
+    rerender(props("o3"));
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest" });
+    vi.useRealTimers();
   });
 
   it("шаг диаграммы операции показывает в дереве саму операцию", () => {
