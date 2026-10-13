@@ -59,8 +59,9 @@ export function buildRaci(model: ProcessLogicModel): RaciEntry[] {
 }
 
 /** ФТ-М1.3.3/М6.4: матрица RACI как .xlsx-буфер (строки — действия, столбцы — роли) — используется и отдельной выгрузкой, и пакетом к аудиту. */
-export function buildRaciWorkbookBuffer(model: ProcessLogicModel): Buffer {
-  const tasks = model.nodes.filter((n) => n.type === "task" || n.type === "subprocess");
+export function buildRaciWorkbookBuffer(model: ProcessLogicModel, opts: { nodeIds?: Set<string> } = {}): Buffer {
+  // nodeIds — отчёт по набору объектов: только его функции и шаги их диаграмм
+  const tasks = model.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && (!opts.nodeIds || opts.nodeIds.has(n.id)));
   const sheetRows = tasks.map((n) => {
     const row: Record<string, string> = { Действие: n.name };
     for (const r of model.roles) {

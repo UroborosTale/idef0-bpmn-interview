@@ -1,3 +1,4 @@
+import { setNodeIds } from "../shared/objectSets.js";
 import { Router } from "express";
 import { getSession, updateSession, addVersion, editBlockReason } from "../repo.js";
 import { buildRaci, buildRaciWorkbookBuffer } from "../pipeline/raci.js";
@@ -81,7 +82,13 @@ raciRouter.get("/sessions/:id/raci/export/xlsx", (req, res) => {
     res.status(404).json({ error: "модель ещё не построена" });
     return;
   }
-  const buf = buildRaciWorkbookBuffer(session.model);
+  // ?set=<id набора> — матрица только по функциям набора
+  const setId = typeof req.query.set === "string" ? req.query.set : "";
+  if (setId && !session.model.object_sets?.some((s) => s.id === setId)) {
+    res.status(404).json({ error: "набор не найден" });
+    return;
+  }
+  const buf = buildRaciWorkbookBuffer(session.model, setId ? { nodeIds: setNodeIds(session.model, setId) } : {});
   res.setHeader("Content-Disposition", `attachment; filename="raci.xlsx"`);
   res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(buf);
 });

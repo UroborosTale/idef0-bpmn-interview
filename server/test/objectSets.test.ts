@@ -1,6 +1,8 @@
 import JSZip from "jszip";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { setMembers, setVisible } from "../src/shared/objectSets.js";
+import * as XLSX from "xlsx";
+import { buildRaciWorkbookBuffer } from "../src/pipeline/raci.js";
+import { entryKey, setEntryKeys, setMembers, setNodeIds, setVisible } from "../src/shared/objectSets.js";
 import { demoModel } from "../src/reference/demo.js";
 import { ProcessLogicModel } from "../src/types/model.js";
 import { startApp } from "./api.js";
@@ -17,6 +19,8 @@ const withSets = () => {
   ];
   return m;
 };
+
+const rows = (buf: Buffer) => XLSX.utils.sheet_to_json<Record<string, string>>(XLSX.read(buf, { type: "buffer" }).Sheets.RACI).map((r) => r["Действие"]);
 
 describe("наборы объектов", () => {
   it("модель принимает наборы, а без поля их нет", () => {
@@ -74,3 +78,48 @@ describe("выгрузка BPMN по набору", () => {
     expect((await app.raw(`/sessions/${s.id}/export/bpmn.zip?set=k2`)).status).toBe(400);
   }, 90_000);
 });
+
+describe("наборы: записи справочников и отчёты по набору", () => {
+  it("записи справочников хранятся ключами «справочник:id»; схема принимает поле, без него записей нет", () => {
+    const m = withSets();
+    m.object_sets![0].entries = [entryKey("roles", "r1"), entryKey("data", "d1")];
+    expect(ProcessLogicModel.safeParse(JSON.parse(JSON.stringify(m))).success).toBe(true);
+    expect([...setEntryKeys(m, "k1")].sort()).toEqual(["data:d1", "roles:r1"]);
+    expect(setEntryKeys(m, "k2").size).toBe(0);
+    expect(setEntryKeys(m, "нет").size).toBe(0);
+  });
+
+  it("узлы набора для отчётов: функции и шаги диаграмм их операций", () => {
+    const m = withSets();
+    expect([...setNodeIds(m, "k1")].sort()).toEqual(["b0", "b1", "b2", "b9", "o1", "o2", "s1"]);
+    expect([...setNodeIds(m, "k2")]).toEqual(["o3"]); // у o3 нет диаграммы
+  });
+
+  it("RACI в .xlsx: без набора все задачи, с набором — только его функции и шаги", () => {
+    const m = withSets();
+    const all = rows(buildRaciWorkbookBuffer(m));
+    const some = rows(buildRaciWorkbookBuffer(m, { nodeIds: setNodeIds(m, "k2") }));
+    expect(all.length).toBeGreaterThan(some.length);
+    expect(some).toEqual(["Анализ соответствия"]);
+    expect(rows(buildRaciWorkbookBuffer(m, { nodeIds: new Set() }))).toEqual([]);
+  });
+});
+
+describe("выгрузка RACI по набору", () => {
+  let app: Awaited<ReturnType<typeof startApp>>;
+  beforeAll(async () => {
+    app = await startApp();
+  });
+  afterAll(() => app.close());
+
+  it("?set= ограничивает матрицу, неизвестный набор — 404", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Тест" } })).body;
+    expect((await app.call("PUT", `/sessions/${s.id}/model`, withSets())).status).toBe(200);
+    const all = rows((await app.raw(`/sessions/${s.id}/raci/export/xlsx`)).body as Buffer);
+    const some = rows((await app.raw(`/sessions/${s.id}/raci/export/xlsx?set=k2`)).body as Buffer);
+    expect(some).toEqual(["Анализ соответствия"]);
+    expect(all.length).toBeGreaterThan(1);
+    expect((await app.raw(`/sessions/${s.id}/raci/export/xlsx?set=нет`)).status).toBe(404);
+  }, 60_000);
+});
+

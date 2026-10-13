@@ -399,6 +399,8 @@ export const ObjectSet = z.object({
   id: z.string(),
   name: z.string().min(1),
   members: z.array(z.string()).default([]),
+  // Записи справочников (исполнители, системы, документы и данные, регламенты, показатели, риски): ключи «справочник:id».
+  entries: z.array(z.string()).optional(),
 });
 export type ObjectSet = z.infer<typeof ObjectSet>;
 
