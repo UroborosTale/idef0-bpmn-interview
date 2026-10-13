@@ -35,7 +35,9 @@ export type SetOp =
   | { kind: "rename"; id: string; name: string }
   | { kind: "delete"; id: string }
   | { kind: "add"; setId: string; fnId: string }
-  | { kind: "remove"; setId: string; fnId: string };
+  | { kind: "remove"; setId: string; fnId: string }
+  | { kind: "add-entry"; setId: string; dict: DictKind; id: string }
+  | { kind: "remove-entry"; setId: string; dict: DictKind; id: string };
 
 /** Состояние дерева между открытиями: свёрнутые ветки и закрытые разделы. */
 function loadNavState(key: string | undefined): { collapsed: string[]; closed: string[] } {
@@ -684,7 +686,9 @@ export default function Navigator({
                 ) : (
                   <span className="nav-name">{s.name}</span>
                 )}
-                <span className="nav-count">{setMembers(model, s.id).size}</span>
+                <span className="nav-count" title={`функций: ${setMembers(model, s.id).size}, записей справочников: ${s.entries?.length ?? 0}`}>
+                  {setMembers(model, s.id).size + (s.entries?.length ?? 0)}
+                </span>
               </div>
             ))}
             {creatingSet !== null && (

@@ -149,7 +149,7 @@ export const api = {
     req<SessionRecord>("POST", `/sessions/${id}/raci/entries`, { node_id, role_id, type }),
   removeRaciEntry: (id: string, node_id: string, role_id: string, type: "R" | "A" | "C" | "I") =>
     req<SessionRecord>("DELETE", `/sessions/${id}/raci/entries`, { node_id, role_id, type }),
-  raciExportXlsxUrl: (id: string) => `${BASE}/sessions/${id}/raci/export/xlsx`,
+  raciExportXlsxUrl: (id: string, setId?: string) => `${BASE}/sessions/${id}/raci/export/xlsx${setId ? `?set=${encodeURIComponent(setId)}` : ""}`,
 
   // --- М1.1 Регламент ---
   regulationPreviewUrl: (id: string, structureOnly?: boolean) => `${BASE}/sessions/${id}/regulation/preview${structureOnly ? "?structureOnly=1" : ""}`,

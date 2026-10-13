@@ -1,5 +1,7 @@
+import { entryKey } from "@shared/objectSets";
+import type { SetOp } from "./Navigator";
 import { useRef, useState } from "react";
-import type { ProcessLogicModel } from "../../types";
+import type { ObjectSet, ProcessLogicModel } from "../../types";
 import { api } from "../../api/client";
 import { DICT_TITLES, type DictKind } from "./docs";
 import { KIND_OPTIONS, REPO_CLASS, addEntry, addLinkedEntry, entriesOf, hasRepoObject, removeEntry, unlinkedCount, updateEntry, usageOf } from "./dict-ops";
@@ -29,7 +31,16 @@ export default function DictionaryView({
   onSelect,
   onChange,
   onGoto,
+  sets = [],
+  filterSet = null,
+  onSetOp,
+  onClearFilter,
 }: {
+  /** Наборы объектов: у записи можно выбрать «В набор…», а при фильтре по набору показываются только записи набора. */
+  sets?: ObjectSet[];
+  filterSet?: ObjectSet | null;
+  onSetOp?: (op: SetOp) => void;
+  onClearFilter?: () => void;
   kind: DictKind;
   model: M;
   selectedId: string | null;
@@ -40,7 +51,10 @@ export default function DictionaryView({
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [adding, setAdding] = useState("");
-  const rows = entriesOf(model, kind);
+  const allRows = entriesOf(model, kind);
+  const inSet = filterSet ? new Set(filterSet.entries ?? []) : null;
+  const rows = inSet ? allRows.filter((r) => inSet.has(entryKey(kind, r.id))) : allRows;
+  const canSets = !!onSetOp && sets.length > 0;
   const q = query.trim().toLowerCase();
   const shown = q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows;
   const options = KIND_OPTIONS[kind];
@@ -126,6 +140,14 @@ export default function DictionaryView({
         />
       )}
 
+      {filterSet && (
+        <p className="muted dict-hint" data-dict-filter>
+          Фильтр по набору «{filterSet.name}»: показаны записи набора ({rows.length} из {allRows.length}).{" "}
+          <button className="link-button" onClick={onClearFilter}>
+            Снять фильтр
+          </button>
+        </p>
+      )}
       <table className="dict-table">
         <thead>
           <tr>
@@ -141,14 +163,15 @@ export default function DictionaryView({
             {kind === "risks" && <th>Мера снижения</th>}
             <th style={{ width: 200 }}>Описание</th>
             {withUsage && <th style={{ width: 150 }}>Используется</th>}
+            {canSets && <th style={{ width: 120 }}>Набор</th>}
             <th style={{ width: repoClass ? 62 : 36 }} />
           </tr>
         </thead>
         <tbody>
           {shown.length === 0 && (
             <tr>
-              <td colSpan={8} className="muted" style={{ padding: 14 }}>
-                {rows.length === 0 ? "Справочник пуст." : "Ничего не найдено."}
+              <td colSpan={9} className="muted" style={{ padding: 14 }}>
+                {rows.length === 0 ? (filterSet ? "В наборе нет записей этого справочника." : "Справочник пуст.") : "Ничего не найдено."}
               </td>
             </tr>
           )}
@@ -206,6 +229,28 @@ export default function DictionaryView({
                       ) : (
                         <span className="muted">не используется</span>
                       )}
+                    </td>
+                  )}
+                  {canSets && (
+                    <td>
+                      <select
+                        className="dict-set-select"
+                        aria-label={`Набор для записи «${r.name}»`}
+                        value=""
+                        onChange={(e) => {
+                          const s = sets.find((x) => x.id === e.target.value);
+                          if (!s) return;
+                          const listed = (s.entries ?? []).includes(entryKey(kind, r.id));
+                          onSetOp?.({ kind: listed ? "remove-entry" : "add-entry", setId: s.id, dict: kind, id: r.id });
+                        }}
+                      >
+                        <option value="">{sets.filter((s) => (s.entries ?? []).includes(entryKey(kind, r.id))).map((s) => s.name).join(", ") || "—"}</option>
+                        {sets.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {(s.entries ?? []).includes(entryKey(kind, r.id)) ? `Убрать из «${s.name}»` : `В набор «${s.name}»`}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                   )}
                   <td>

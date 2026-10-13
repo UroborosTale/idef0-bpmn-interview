@@ -1,6 +1,7 @@
 import { loadDisplay, saveDisplay, type DisplayOptions } from "../editor-core/display";
 import { deleteDiagramImpact } from "./usage-ops";
-import { addToSet, createSet, deleteSet, removeFromSet, renameSet } from "./set-ops";
+import { addEntryToSet, addToSet, createSet, deleteSet, removeEntryFromSet, removeFromSet, renameSet } from "./set-ops";
+import { setNodeIds } from "@shared/objectSets";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
@@ -202,6 +203,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     }
   });
   const activeSetId = activeSet && (draft.object_sets ?? []).some((s) => s.id === activeSet) ? activeSet : null;
+  const activeSetObj = activeSetId ? (draft.object_sets ?? []).find((s) => s.id === activeSetId) : undefined;
   const chooseSet = (id: string | null) => {
     setActiveSetState(id);
     try {
@@ -220,6 +222,8 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     } else if (op.kind === "rename") h.commit(renameSet(m, op.id, op.name));
     else if (op.kind === "add") h.commit(addToSet(m, op.setId, op.fnId));
     else if (op.kind === "remove") h.commit(removeFromSet(m, op.setId, op.fnId));
+    else if (op.kind === "add-entry") h.commit(addEntryToSet(m, op.setId, op.dict, op.id));
+    else if (op.kind === "remove-entry") h.commit(removeEntryFromSet(m, op.setId, op.dict, op.id));
     else {
       const s = (m.object_sets ?? []).find((x) => x.id === op.id);
       if (!s || !window.confirm(`Удалить набор «${s.name}»? Функции в модели останутся.`)) return;
@@ -805,9 +809,13 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                 onSelect={(id) => setSelection({ kind: "entry", dict: active.dict, id })}
                 onChange={h.commit}
                 onGoto={(id) => gotoIssue({ elementId: id, notation: "BPMN" })}
+                sets={draft.object_sets ?? []}
+                filterSet={activeSetObj ?? null}
+                onSetOp={locked ? undefined : setOp}
+                onClearFilter={() => chooseSet(null)}
               />
             )}
-            {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} onSave={() => void save()} />}
+            {active.kind === "report" && <ReportView key={active.key} kind={active.report} session={session} model={draft} dirty={h.dirty} onChange={h.commit} filterSet={activeSetObj ? { id: activeSetObj.id, name: activeSetObj.name, nodeIds: setNodeIds(draft, activeSetObj.id) } : null} onClearFilter={() => chooseSet(null)} onSave={() => void save()} />}
           </div>
           {problemsOpen && <ProblemsPanel model={draft} issues={issues} onGoto={gotoIssue} proposals={proposals} onApplyProposal={applyProposal} onRejectProposal={rejectProposal} showTab={problemsTab} tasks={tasks} selectedFn={selectedFn} labelOf={fnLabel} onCreateTask={createTask} onCancelTask={cancelTask} questions={questions} onQuestionStatus={setQuestionStatus} reports={reports} onReportStatus={setReportStatus} onHandOffAnswers={handOffAnswers} sessionId={session.id} agentAccess={session.meta.confidential ? { confidential: true, allowed: agentAllowed } : undefined} onSetAgentAccess={setAgentAccess} nodeByCode={nodeByCode} onSelectFn={selectFn} onAssignFinding={assignFinding} acceptedIssues={split.accepted} fixFor={(i) => quickFixFor(draft, i)} onFix={fixIssue} onAccept={acceptOne} onRevoke={revokeOne} />}
         </div>

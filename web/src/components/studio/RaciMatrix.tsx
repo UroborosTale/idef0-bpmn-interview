@@ -12,9 +12,24 @@ const TITLE: Record<RaciType, string> = { R: "Исполняет (Responsible)",
  * Матрица RACI по функциям и исполнителям — правится на текущем черновике. Правила: на каждую функцию
  * ровно один «A» и хотя бы один «R»; нарушения подсвечиваются.
  */
-export default function RaciMatrix({ model, dirty, sessionId, onChange }: { model: M; dirty: boolean; sessionId: string; onChange: (next: M) => void }) {
+export default function RaciMatrix({
+  model,
+  dirty,
+  sessionId,
+  onChange,
+  filterSet = null,
+  onClearFilter,
+}: {
+  model: M;
+  dirty: boolean;
+  sessionId: string;
+  onChange: (next: M) => void;
+  /** Отчёт по набору объектов: только функции набора; xlsx тоже по набору. */
+  filterSet?: { id: string; name: string; nodeIds: Set<string> } | null;
+  onClearFilter?: () => void;
+}) {
   const codes = idef0Codes(model);
-  const fns = [...codes.keys()].map((id) => model.nodes.find((n) => n.id === id)!).filter(Boolean);
+  const fns = [...codes.keys()].map((id) => model.nodes.find((n) => n.id === id)!).filter((n) => n && (!filterSet || filterSet.nodeIds.has(n.id)));
   const has = (nodeId: string, roleId: string, t: RaciType) => model.raci.some((r) => r.node_id === nodeId && r.role_id === roleId && r.type === t);
   const count = (nodeId: string, t: RaciType) => model.raci.filter((r) => r.node_id === nodeId && r.type === t).length;
 
@@ -42,7 +57,12 @@ export default function RaciMatrix({ model, dirty, sessionId, onChange }: { mode
   return (
     <div className="raci">
       <div className="passport-bar">
-        <h4>Матрица RACI</h4>
+        <h4>Матрица RACI{filterSet ? ` — набор «${filterSet.name}»` : ""}</h4>
+        {filterSet && (
+          <button className="link-button" data-raci-filter onClick={onClearFilter}>
+            Показать все функции
+          </button>
+        )}
         <span className="muted">
           {problems.length === 0 ? "Правила соблюдены." : `Нарушены правила у ${problems.length} функц.: нужен ровно один A и хотя бы один R.`}
         </span>
@@ -50,7 +70,7 @@ export default function RaciMatrix({ model, dirty, sessionId, onChange }: { mode
         <button onClick={fill} title="Добавить R и A по исполнителю функции там, где отметок нет">
           Заполнить по исполнителям
         </button>
-        <a href={dirty ? undefined : api.raciExportXlsxUrl(sessionId)} target="_blank" rel="noreferrer" className={dirty ? "disabled-link" : ""} title={dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
+        <a href={dirty ? undefined : api.raciExportXlsxUrl(sessionId, filterSet?.id)} target="_blank" rel="noreferrer" className={dirty ? "disabled-link" : ""} title={dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
           <button disabled={dirty}>Экспорт .xlsx</button>
         </a>
       </div>

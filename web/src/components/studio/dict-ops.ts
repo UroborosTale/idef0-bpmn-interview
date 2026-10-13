@@ -1,3 +1,4 @@
+import { dropEntryFromSets } from "./set-ops";
 import type { AssignmentKind, ProcessLogicModel, ProcessNode } from "../../types";
 import type { RepoClass, RepoObject } from "../../api/types";
 import { addRole, deleteRole, nextId, renameRole, setNodeRole } from "../bpmn-editor/model-ops";
@@ -165,7 +166,7 @@ function dropPlacements(m: M, id: string): M {
 /** Удалить запись вместе со ссылками на неё: шаги остаются, но теряют исполнителя, систему, документ или регламент. */
 export function removeEntry(m: M, kind: DictKind, id: string): M {
   const out = removeEntryLinks(m, kind, id);
-  return kind === "data" || kind === "systems" || kind === "controls" || kind === "roles" ? dropPlacements(out, id) : out;
+  return dropEntryFromSets(kind === "data" || kind === "systems" || kind === "controls" || kind === "roles" ? dropPlacements(out, id) : out, kind, id);
 }
 
 function removeEntryLinks(m: M, kind: DictKind, id: string): M {

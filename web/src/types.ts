@@ -265,6 +265,8 @@ export interface ObjectSet {
   id: string;
   name: string;
   members: string[];
+  /** Записи справочников в наборе: ключи «справочник:id» (shared/objectSets.ts, entryKey). */
+  entries?: string[];
 }
 
 export interface RaciEntry {

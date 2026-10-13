@@ -116,6 +116,39 @@ describe("студия: навигатор по образцу Business Studio, 
     await ctx.close();
   });
 
+  it("набор: запись справочника входит в набор, фильтр сужает справочник и матрицу RACI, сохранение доходит до сервера", async () => {
+    const id = await seeded();
+    const { ctx, page, errors } = await open(id);
+    await page.locator('[data-nav-fn="o3"]').click();
+    await page.getByTitle("Новый набор (с выбранной функцией)").click();
+    await page.locator('input[aria-label="Название нового набора"]').fill("Анализ");
+    await page.keyboard.press("Enter");
+    await page.locator("[data-nav-filter]").waitFor();
+
+    // запись справочника: создаём исполнителя и кладём в набор (фильтр набора включён, поэтому снимаем его на время)
+    await page.getByText("Снять", { exact: true }).click();
+    await page.locator(".nav-row", { hasText: "Исполнители" }).click();
+    await page.locator(".dict-add input").fill("Аналитик");
+    await page.locator(".dict-add input").press("Enter");
+    await page.locator(".dict-add input").fill("Менеджер");
+    await page.locator(".dict-add input").press("Enter");
+    await page.getByLabel("Набор для записи «Аналитик»").selectOption({ label: "В набор «Анализ»" });
+    await page.locator('[data-nav-set="set1"]').click(); // фильтр по набору
+    await page.locator("[data-dict-filter]").waitFor();
+    expect(await page.locator(".dict-table tbody tr td:nth-child(2) input").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(["Аналитик"]);
+
+    // матрица RACI — только функции набора
+    await page.locator(".nav-row", { hasText: "Матрица RACI" }).click();
+    expect(await page.locator(".raci-table tbody tr").count()).toBe(1); // в наборе одна функция — o3
+    await page.getByTitle("Сохранить (Ctrl+S)").click();
+    await page.getByText(/сохранено/).first().waitFor();
+    const saved = (await api<any>("GET", `/sessions/${id}`)).body.model;
+    expect(saved.object_sets[0].entries).toHaveLength(1);
+    expect(saved.object_sets[0].entries[0]).toMatch(/^roles:/);
+    expect(errors).toEqual([]);
+    await ctx.close();
+  });
+
   it("оформление вида фигур: цвет задач меняется у всех задач диаграммы, попадает в модель", async () => {
     const id = await seeded();
     const { ctx, page, errors } = await open(id);

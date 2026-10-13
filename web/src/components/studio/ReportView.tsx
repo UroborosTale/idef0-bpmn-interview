@@ -19,7 +19,12 @@ export default function ReportView({
   dirty,
   onChange,
   onSave,
+  filterSet = null,
+  onClearFilter,
 }: {
+  /** Активный набор объектов: матрица RACI строится по его функциям. */
+  filterSet?: { id: string; name: string; nodeIds: Set<string> } | null;
+  onClearFilter?: () => void;
   kind: ReportKind;
   session: SessionRecord;
   model: M;
@@ -29,7 +34,7 @@ export default function ReportView({
 }) {
   if (kind === "passport") return <PassportView model={model} onChange={onChange} />;
   if (kind === "statuses") return <StatusScheme model={model} />;
-  if (kind === "raci") return <RaciMatrix model={model} dirty={dirty} sessionId={session.id} onChange={onChange} />;
+  if (kind === "raci") return <RaciMatrix model={model} dirty={dirty} sessionId={session.id} onChange={onChange} filterSet={filterSet} onClearFilter={onClearFilter} />;
 
   // серверные отчёты: до сохранения они показали бы старую модель
   if (dirty) {

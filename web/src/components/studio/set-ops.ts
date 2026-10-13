@@ -1,4 +1,4 @@
-import { setMembers } from "@shared/objectSets";
+import { entryKey, setMembers, type DictKey } from "@shared/objectSets";
 import type { ObjectSet, ProcessLogicModel } from "../../types";
 import { nextId } from "../bpmn-editor/model-ops";
 
@@ -44,3 +44,32 @@ export function addToSet(m: M, setId: string, fnId: string): M {
 /** Убирает функцию, перечисленную в наборе напрямую; вложенную в уже входящую функцию так убрать нельзя. */
 export const removeFromSet = (m: M, setId: string, fnId: string): M =>
   withSets(m, (m.object_sets ?? []).map((s) => (s.id === setId ? { ...s, members: s.members.filter((x) => x !== fnId) } : s)));
+
+/** Добавляет запись справочника в набор; повторное добавление и неизвестный набор модель не меняют. */
+export function addEntryToSet(m: M, setId: string, dict: DictKey, id: string): M {
+  const key = entryKey(dict, id);
+  const set = (m.object_sets ?? []).find((s) => s.id === setId);
+  if (!set || (set.entries ?? []).includes(key)) return m;
+  return withSets(m, (m.object_sets ?? []).map((s) => (s.id === setId ? { ...s, entries: [...(s.entries ?? []), key] } : s)));
+}
+
+/** Убирает запись справочника из набора; когда записей не осталось, поле набора убирается. */
+export function removeEntryFromSet(m: M, setId: string, dict: DictKey, id: string): M {
+  const key = entryKey(dict, id);
+  return withSets(
+    m,
+    (m.object_sets ?? []).map((s) => {
+      if (s.id !== setId || !(s.entries ?? []).includes(key)) return s;
+      const entries = (s.entries ?? []).filter((x) => x !== key);
+      const { entries: _old, ...rest } = s;
+      return entries.length === 0 ? rest : { ...rest, entries };
+    })
+  );
+}
+
+/** Удалённую запись справочника из всех наборов убирает; без наборов модель не меняется. */
+export function dropEntryFromSets(m: M, dict: DictKey, id: string): M {
+  const key = entryKey(dict, id);
+  if (!(m.object_sets ?? []).some((s) => (s.entries ?? []).includes(key))) return m;
+  return (m.object_sets ?? []).reduce((acc, s) => (s.entries?.includes(key) ? removeEntryFromSet(acc, s.id, dict, id) : acc), m);
+}
