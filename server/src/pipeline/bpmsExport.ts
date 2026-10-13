@@ -126,7 +126,9 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
     const fromNode = model.nodes.find((n) => n.id === f.from);
     const isBranchingGateway = fromNode?.type === "gateway" && (outAdj.get(f.from) ?? 0) > 1;
     let condXml = "";
-    if (f.condition) {
+    // поток, на который ссылается default узла-источника, условия не несёт: иначе Camunda не развернёт процесс
+    const isDefault = !!fromNode && defaultAttr(fromNode) === ` default="Flow_${f.id}"`;
+    if (f.condition && !isDefault) {
       if (isBranchingGateway) {
         // ФТ-М1.4.2: условие шлюза как выражение-заглушка — реальная бизнес-логика ("f.condition")
         // требует ручного переноса в реальное JUEL/FEEL выражение.

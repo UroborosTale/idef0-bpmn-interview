@@ -207,6 +207,21 @@ describe("импорт Visio: свойства BPMN фигур трафарет�
     expect(model.nodes.find((x) => x.name === "Шаг")?.type).toBe("task");
   });
 
+  it("строка свойства экземпляра без значения (только список Format) не затирает значение мастера", async () => {
+    const zip = new JSZip();
+    zip.file("visio/document.xml", `<VisioDocument ${NS}/>`);
+    zip.file("visio/masters/masters.xml", `<Masters ${NS}><Master ID="1" NameU="Шлюз" Name="Шлюз"><Rel r:id="rId1"/></Master></Masters>`);
+    zip.file("visio/masters/_rels/masters.xml.rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="x" Target="master1.xml"/></Relationships>`);
+    zip.file("visio/masters/master1.xml", `<MasterContents ${NS}><Shapes><Shape ID="5" Type="Group">${propSection({ BpmnGatewayType: "Оператор И", BpmnExclusiveType: "Данные" })}</Shape></Shapes></MasterContents>`);
+    zip.file("visio/pages/pages.xml", `<Pages ${NS}><Page ID="0" NameU="P" Name="P"><PageSheet>${c("PageWidth", 8)}${c("PageHeight", 4)}</PageSheet><Rel r:id="rId1"/></Page></Pages>`);
+    zip.file("visio/pages/_rels/pages.xml.rels", `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="x" Target="page1.xml"/></Relationships>`);
+    // у экземпляра переопределён только список значений, само значение наследуется
+    const formatOnly = `<Section N="Property"><Row N="BpmnGatewayType">${c("Format", "Исключающее ИЛИ;Оператор И")}</Row></Section>`;
+    zip.file("visio/pages/page1.xml", `<PageContents ${NS}><Shapes><Shape ID="1" Master="1" Type="Group">${c("PinX", 2)}${c("PinY", 2)}${c("Width", 0.6)}${c("Height", 0.6)}${formatOnly}<Text>Ветвление</Text></Shape></Shapes></PageContents>`);
+    const { model } = buildModelFromParsedVsdx(await parseVsdx(await zip.generateAsync({ type: "nodebuffer" })), meta);
+    expect(model.nodes.find((x) => x.name === "Ветвление")).toMatchObject({ type: "gateway", subtype: "parallel" });
+  });
+
   it("без свойств Bpmn* вид по-прежнему определяется по имени мастера", async () => {
     const zip = new JSZip();
     zip.file("visio/document.xml", `<VisioDocument ${NS}/>`);

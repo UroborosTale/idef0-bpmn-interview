@@ -9,7 +9,8 @@ import type { TriggerType } from "./events.js";
  */
 
 export interface VisioProp {
-  value: string;
+  /** Значение; у экземпляра фигуры может не быть — тогда действует значение мастера. */
+  value?: string;
   /** Список допустимых значений (ячейка Format), если есть. */
   format?: string;
 }

@@ -132,9 +132,16 @@ function propCells(shape: X): VisioProps {
       const c = cells(r);
       const value = c.get("Value");
       if (value === undefined && !c.has("Format")) continue;
-      out[n] = { value: value ?? out[n]?.value ?? "", ...(c.has("Format") ? { format: c.get("Format") } : {}) };
+      out[n] = { ...(value !== undefined ? { value } : {}), ...(c.has("Format") ? { format: c.get("Format") } : {}) };
     }
   }
+  return out;
+}
+
+/** Свойства экземпляра поверх свойств мастера — по ячейкам: строка экземпляра без значения оставляет значение мастера. */
+function mergeProps(master: VisioProps | undefined, own: VisioProps): VisioProps {
+  const out: VisioProps = { ...master };
+  for (const [k, v] of Object.entries(own)) out[k] = { ...out[k], ...v };
   return out;
 }
 
@@ -409,7 +416,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
         // фигура без мастера получает от Visio служебное имя «Sheet.5» — это не подсказка о виде, поэтому считается безымянной
         name: master ? norm(master) : AUTO_NAME.test(norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? "")) ? "" : norm(attr(shape, "NameU") ?? attr(shape, "Name") ?? ""),
         user: userCells(shape),
-        bpmn: decodeVisioBpmn({ ...masterInfo.props.get(masterId), ...propCells(shape) }),
+        bpmn: decodeVisioBpmn(mergeProps(masterInfo.props.get(masterId), propCells(shape))),
         box: b.box,
         pin: b.pin,
         isGroup: attr(shape, "Type") === "Group",

@@ -351,7 +351,10 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   for (const se of synthEvents) pushEventXml(se.id, se.name, eventSpec({ type: "event", subtype: se.kind }));
 
   for (const f of flows) {
-    const condXml = f.condition
+    // поток, на который ссылается default узла-источника, условия не несёт (BPMN 2.0); подпись остаётся
+    const src = nodes.find((n) => n.id === f.from);
+    const isDefault = !!src && defaultAttr(src) === ` default="Flow_${f.id}"`;
+    const condXml = f.condition && !isDefault
       ? `<bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${esc(f.condition)}</bpmn:conditionExpression>`
       : "";
     flowElementsXml.push(

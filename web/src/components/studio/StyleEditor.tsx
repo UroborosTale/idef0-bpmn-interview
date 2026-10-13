@@ -19,11 +19,20 @@ export default function StyleEditor({ model, kind, onChange }: { model: M; kind:
   const modelRef = useRef(model);
   modelRef.current = model;
   const pending = useRef<ShapeStyle>({});
-  useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
-  useEffect(() => {
-    setDraft({});
-    pending.current = {};
-  }, [kind]);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  // смена вида или закрытие панели до паузы: недописанное оформление записывается прежнему виду, а не теряется
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
+      const patch = pending.current;
+      pending.current = {};
+      if (Object.keys(patch).length) onChangeRef.current(setKindStyle(modelRef.current, kind, patch));
+    },
+    [kind]
+  );
+  useEffect(() => setDraft({}), [kind]);
 
   const flush = () => {
     if (timer.current) clearTimeout(timer.current);

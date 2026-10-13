@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildVsdx } from "../src/export/vsdx.js";
 import { buildCamundaBpmn } from "../src/pipeline/bpmsExport.js";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
-import { buildModelFromParsedBpmn, parseBpmnXml } from "../src/pipeline/diagramImport.js";
+import { buildModelFromParsedBpmn, parseBpmnXml, reconcileBpmnEdit } from "../src/pipeline/diagramImport.js";
 import { buildModelFromParsedVsdx, parseVsdx } from "../src/pipeline/vsdxImport.js";
 import { ProcessLogicModel } from "../src/types/model.js";
 import { branchingModel } from "./fixtures.js";
@@ -91,3 +91,52 @@ describe("цикличность задач и ветка по умолчани�
     expect(defaults[0]).toMatchObject({ from: gate.id, to: byName("подписать договор").id });
   });
 });
+
+describe("багхант: ветка по умолчанию и цикличность", () => {
+  /** Элемент потока по id: открывающий тег и содержимое. */
+  const flowXml = (xml: string, id: string) => new RegExp(`<bpmn:sequenceFlow id="${id}"[^>]*>(.*?)</bpmn:sequenceFlow>`).exec(xml)?.[0] ?? "";
+
+  it("у ветки по умолчанию с подписью нет conditionExpression ни в BPMN, ни в выгрузке Camunda; у других веток условие остаётся", async () => {
+    const m = loopModel();
+    m.flows.find((f) => f.id === "f4")!.condition = "иначе"; // ветка по умолчанию с подписью
+    for (const xml of [(await generateBpmn(m)).xml, buildCamundaBpmn(m).xml]) {
+      expect(xml).toContain('default="Flow_f4"');
+      expect(flowXml(xml, "Flow_f4")).toContain('name="иначе"');
+      expect(flowXml(xml, "Flow_f4")).not.toContain("conditionExpression");
+      expect(flowXml(xml, "Flow_f3")).toContain("conditionExpression");
+    }
+  });
+
+  it("если default у узла недопустим (параллельный шлюз), условие у потока сохраняется", async () => {
+    const m = loopModel();
+    m.flows.find((f) => f.id === "f4")!.condition = "иначе";
+    m.nodes.find((n) => n.id === "g")!.subtype = "parallel";
+    const { xml } = await generateBpmn(m);
+    expect(flowXml(xml, "Flow_f4")).toContain("conditionExpression");
+  });
+
+  it("сверка правок из .bpmn: новый узел получает цикличность, новая ветка по умолчанию снимает признак с прежней", async () => {
+    const m = loopModel();
+    let { xml } = await generateBpmn(m);
+    // в редакторе добавили задачу с циклом и новую ветку из шлюза, ставшую веткой по умолчанию
+    xml = xml.replace('default="Flow_f4"', 'default="FlowNew"');
+    xml = xml.replace("</bpmn:process>", '<bpmn:userTask id="TaskNew" name="Проверить повторно"><bpmn:standardLoopCharacteristics /></bpmn:userTask><bpmn:sequenceFlow id="FlowNew" sourceRef="Node_g" targetRef="TaskNew" /></bpmn:process>');
+    const { model } = reconcileBpmnEdit(m, parseBpmnXml(xml));
+    const added = model.nodes.find((n) => n.name === "Проверить повторно")!;
+    expect(added.loop).toBe("standard");
+    const defaults = model.flows.filter((f) => f.from === "g" && f.is_default);
+    expect(defaults).toHaveLength(1);
+    expect(defaults[0].to).toBe(added.id);
+  });
+
+  it("цикличность подпроцесса не берётся у вложенной задачи бизнес-правил или вызова", () => {
+    const xml = `<bpmn:definitions xmlns:bpmn="x"><bpmn:process id="P">
+      <bpmn:subProcess id="S1" name="Без цикла"><bpmn:businessRuleTask id="B1" name="Правило"><bpmn:standardLoopCharacteristics /></bpmn:businessRuleTask></bpmn:subProcess>
+      <bpmn:subProcess id="S2" name="С вызовом"><bpmn:callActivity id="C1" name="Вызов"><bpmn:multiInstanceLoopCharacteristics isSequential="true" /></bpmn:callActivity></bpmn:subProcess>
+    </bpmn:process></bpmn:definitions>`;
+    const { model } = buildModelFromParsedBpmn(parseBpmnXml(xml), meta);
+    expect(model.nodes.find((n) => n.name === "Без цикла")!.loop).toBeUndefined();
+    expect(model.nodes.find((n) => n.name === "С вызовом")!.loop).toBeUndefined();
+  });
+});
+

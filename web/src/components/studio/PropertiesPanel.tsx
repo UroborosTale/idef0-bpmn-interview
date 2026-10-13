@@ -156,7 +156,7 @@ export default function PropertiesPanel({
               <input type="checkbox" checked={!!flow.is_default} onChange={(e) => onChange(setDefaultFlow(model, flow.id, e.target.checked))} /> Ветка по умолчанию
             </label>
           )}
-          <button onClick={() => onChange(updateFlow(model, flow.id, { from: flow.to, to: flow.from, route: reverseRoute(flow.route) }))}>Развернуть стрелку</button>
+          <button onClick={() => onChange(updateFlow(model, flow.id, { from: flow.to, to: flow.from, route: reverseRoute(flow.route), is_default: undefined }))}>Развернуть стрелку</button>
         </Section>
         <Section title="Маршрут" open={!!flow.route}>
           <p className="muted prop-note">{flow.route ? "Маршрут задан вручную: остальные стрелки его обходят." : "Маршрут подбирается автоматически: из разных портов, без наложений. Его можно изменить здесь или на диаграмме: у выбранной стрелки есть ручки для концов, отрезков и изломов."}</p>

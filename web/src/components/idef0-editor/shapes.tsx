@@ -90,15 +90,16 @@ export function Idef0Defs() {
 export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: FunctionBlock; selected: boolean; hot: boolean; style?: ResolvedStyle; showCode?: boolean }) {
   const { x, y, w, h } = fn.box;
   const lines = wrapText(fn.node.name || "", 22, 3);
-  const top = y + h / 2 - 6 - ((lines.length - 1) * 14) / 2;
   const stroke = selected ? ACCENT : hot ? "#16a34a" : style?.line ?? INK;
   const size = style?.font_size ?? 12;
+  const lh = Math.round((size * 7) / 6);
+  const top = y + h / 2 - 6 - ((lines.length - 1) * lh) / 2;
   return (
     <g data-fn-id={fn.node.id} style={{ cursor: "move" }}>
       <rect x={x} y={y} width={w} height={h} fill={style?.fill ?? "#eef2ff"} stroke={stroke} strokeWidth={selected || hot ? 2.6 : 1.6} strokeDasharray={fn.node.status === "hypothesis" ? "6 4" : undefined} />
       <text textAnchor="middle" fontSize={size} fontFamily="Arial, sans-serif" fill={style?.text ?? INK} pointerEvents="none">
         {lines.map((l, i) => (
-          <tspan key={i} x={x + w / 2} y={top + i * Math.round((size * 7) / 6) + 4}>
+          <tspan key={i} x={x + w / 2} y={top + i * lh + 4}>
             {l}
           </tspan>
         ))}

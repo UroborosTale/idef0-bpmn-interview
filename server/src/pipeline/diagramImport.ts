@@ -95,7 +95,7 @@ export function parseBpmnXml(xml: string): ParsedBpmn {
   }
 
   // цикличность: характеристика стоит в начале элемента, до вложенных элементов подпроцесса
-  const NESTED = /<(?:\w+:)?(?:laneSet|task|userTask|serviceTask|manualTask|sendTask|receiveTask|scriptTask|subProcess|startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|\w*Gateway|sequenceFlow)\b/;
+  const NESTED = /<(?:\w+:)?(?:laneSet|\w*[tT]ask|subProcess|adHocSubProcess|transaction|callActivity|startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|\w*Gateway|sequenceFlow|dataObject|dataObjectReference|dataStoreReference|textAnnotation|association|group)\b/;
   for (const el of elements) {
     if (!TASK_TAGS.includes(el.tag)) continue;
     const block = new RegExp(`<(?:\\w+:)?${el.tag}\\s+[^>]*?\\bid="${el.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*?(?:/>|>([\\s\\S]*?)</(?:\\w+:)?${el.tag}>)`).exec(xml);
@@ -342,6 +342,7 @@ export function reconcileBpmnEdit(model: ProcessLogicModel, parsed: ParsedBpmn):
         type,
         subtype,
         ...eventFields(e),
+        ...(e.loop ? { loop: e.loop } : {}),
         name: e.name ?? "(без названия)",
         role_id: null,
         system_ids: [],
@@ -379,6 +380,8 @@ export function reconcileBpmnEdit(model: ProcessLogicModel, parsed: ParsedBpmn):
     if (!fromId || !toId) continue;
     const key = `${fromId}|${toId}`;
     if (!existingFlowKeys.has(key)) {
+      // файл задаёт одну ветку по умолчанию на узел: прежняя ветка по умолчанию того же источника этот признак теряет
+      if (f.isDefault) out.flows = out.flows.map((x) => (x.from === fromId && x.is_default ? { ...x, is_default: undefined } : x));
       out.flows.push({ id: `flow_${nanoid(8)}`, from: fromId, to: toId, condition: f.condition ?? null, ...(f.isDefault ? { is_default: true } : {}), source: [{ fragment_id: "diagram_import", quote: f.id }], confirmed_by: [] });
       existingFlowKeys.add(key);
     }
