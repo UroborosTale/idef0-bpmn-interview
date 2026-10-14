@@ -127,7 +127,7 @@ describe("правка стрелок и триггеры блока в брау
     await ctx.close();
   });
 
-  it("триггер блока: значок вместо фигуры и стрелки; удаление возвращает прямую стрелку; в файле BPMN остаётся событие", async () => {
+  it("триггер блока: событие-таймер отдельной фигурой на пути к блоку; в файле BPMN оно остаётся событием", async () => {
     const id = await seeded();
     const { ctx, page, errors } = await openContext(browser);
     await page.goto(`${WEB}/s/${id}`);
@@ -139,15 +139,16 @@ describe("правка стрелок и триггеры блока в брау
     const shapes = () => page.locator(".studio g[data-node-id]").count();
     const arrows = () => page.locator(".studio [data-flow-id]").count();
     const [s0, a0] = [await shapes(), await arrows()];
+    const idsBefore = await page.locator(".studio g[data-node-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-node-id")));
 
     await page.locator('.studio g[data-node-id="t3"]').click();
     await page.locator(".props-vtab", { hasText: "Дополнительно" }).click(); // раздел — на вкладке «Дополнительно»
     await page.locator("summary", { hasText: "Триггеры блока" }).click(); // раздел свёрнут, пока у блока нет триггеров
     await page.getByRole("button", { name: "+ Таймер" }).first().click();
-    await page.locator('[data-marker]').waitFor();
-    expect(await shapes()).toBe(s0); // отдельной фигуры события нет
-    expect(await arrows()).toBe(a0); // и стрелки «событие → блок» нет
-    expect(await page.locator('[data-marker] [data-trigger="timer"]').count()).toBe(1);
+    await page.waitForFunction((n) => document.querySelectorAll(".studio g[data-node-id]").length === n + 1, s0);
+    expect(await shapes()).toBe(s0 + 1); // как в Business Studio, ожидающее событие — отдельная фигура
+    expect(await arrows()).toBe(a0 + 1); // и стрелка «X → событие → блок» из двух
+    const eventId = (await page.locator(".studio g[data-node-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-node-id")))).find((x) => !idsBefore.includes(x))!;
 
     // параметры срока — в карточке события (значок выбран после добавления)
     await page.locator(".props-vtab", { hasText: "Основные" }).click(); // карточка события — на вкладке «Основные»
@@ -160,17 +161,15 @@ describe("правка стрелок и триггеры блока в брау
     expect(xml).toMatch(/<bpmn:intermediateCatchEvent id="Node_n\d+"[^>]*><bpmn:timerEventDefinition><bpmn:timeDuration[^>]*>P3D</);
     expect(xml).toMatch(/<bpmn:sequenceFlow id="Flow_flow\d+" sourceRef="Node_n\d+" targetRef="Node_t3"/);
 
-    // удаление значка: Delete на выбранном значке, прямая стрелка t2 → t3 сохранена
-    await page.locator("[data-marker]").click();
+    // удаление события: фигура уходит из модели (стрелки к ней — вместе с ней)
+    await page.locator(`.studio g[data-node-id="${eventId}"]`).click();
     await page.locator(".bpe").first().focus();
     await page.keyboard.press("Delete");
-    await page.locator("[data-marker]").waitFor({ state: "detached" });
+    await page.locator(`.studio g[data-node-id="${eventId}"]`).waitFor({ state: "detached" });
     expect(await shapes()).toBe(s0);
-    expect(await arrows()).toBe(a0);
     await page.getByTitle("Сохранить (Ctrl+S)").click();
     await page.getByText(/сохранено/).first().waitFor();
     const saved = await api<any>("GET", `/sessions/${id}`);
-    expect(saved.body.model.flows.find((f: any) => f.id === "f2")).toMatchObject({ from: "t2", to: "t3" });
     expect(saved.body.model.nodes.some((n: any) => n.type === "event")).toBe(false);
     expect(errors).toEqual([]);
     await ctx.close();
