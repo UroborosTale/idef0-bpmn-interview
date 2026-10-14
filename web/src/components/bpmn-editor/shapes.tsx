@@ -103,7 +103,8 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
       </g>
     );
   } else {
-    const lines = wrapText(node.name || "", 15, 4);
+    // ширина строки — по ширине блока (шрифт 12 px ≈ 6,3 px на знак), как в Business Studio до 4 строк
+    const lines = wrapText(node.name || "", Math.max(12, Math.floor((w - 22) / 6.3)), 4);
     const lh = Math.round(((size ?? 12) * 7) / 6);
     const top = cy - ((lines.length - 1) * lh) / 2 + 4;
     body = (

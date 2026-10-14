@@ -14,7 +14,7 @@ export type { Box, EndKinds } from "@shared/bpmnGeometry";
 export type { Pt };
 
 export const GRID = 10;
-const COL_W = 170;
+const COL_W = 220;
 
 /**
  * Свёртка триггеров диаграммы (shared/bpmnTriggers.ts): ожидающие события, ведущие прямо в блок действия, рисуются значками

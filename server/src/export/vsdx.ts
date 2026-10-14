@@ -387,8 +387,8 @@ export function stencilMasters(): StencilMaster[] {
   ];
   const below = (w: number) => ({ w, h: 30, gap: 3 });
   return [
-    mk("Задача", "task", "Шаг процесса BPMN", 100, 80, (p, tag) => p.rect(0, 0, 100, 80, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
-    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 110, 80, (p, tag) => p.rect(0, 0, 110, 80, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(110, 80))),
+    mk("Задача", "task", "Шаг процесса BPMN", 150, 90, (p, tag) => p.rect(0, 0, 150, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
+    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 160, 90, (p, tag) => p.rect(0, 0, 160, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(160, 90))),
     mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
     mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
     mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#99ff66", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag })),
@@ -567,6 +567,9 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
  * Страница BPMN; scope — операция диаграммы (null — общая схема процесса). Лист (model.bpmn_frames) по умолчанию выключен;
  * автоматический лист накрывает пул целиком с полем, как в редакторе, а заданный вручную стоит по своим координатам.
  */
+/** Шрифт заголовка дорожки: 14 px, а длинное название уменьшается, чтобы уместиться по высоте дорожки (в две строки при 10,5 px). */
+const laneLabelFont = (text: string, laneH: number): number => (text.length * 7.7 <= laneH - 10 ? 14 : text.length * 6.1 <= laneH - 10 ? 12 : 10.5);
+
 function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, scope: string | null, code: string): Page {
   const settings = model.bpmn_frames?.[scope ?? ""];
   const sheetName = scope ? model.nodes.find((n) => n.id === scope)?.name ?? "" : model.process.name;
@@ -594,7 +597,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
     page.add(
       { x: l.x + 15 - l.h / 2, y: l.y + l.h / 2 - 15, w: l.h, h: 30 },
       [{ kind: "path", pts: [[0, 0], [l.h, 0], [l.h, 30], [0, 30]], closed: true }],
-      { fill: "#e8eef7", line: null, text: l.name, fontPx: 14, bold: false, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
+      { fill: "#e8eef7", line: null, text: l.name, fontPx: laneLabelFont(l.name, l.h), bold: false, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
     );
     page.polyline([[l.x + 30, l.y], [l.x + 30, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
   }

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
 import { ProcessFlow } from "../src/types/model.js";
-import { SIZE } from "../src/shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows, routeFlowsDetailed, type RouteFlow, type RouteNode } from "../src/shared/bpmnRouting.js";
 import { purchaseModel } from "./fixtures.js";
+
+/** Размеры фигур, на которые рассчитаны ожидаемые числа этого теста (логика маршрутов от размеров не зависит). */
+const SIZE = { task: { w: 100, h: 80 }, subprocess: { w: 110, h: 80 }, gateway: { w: 50, h: 50 }, event: { w: 36, h: 36 } };
 import { JOG, STUB, insertJog, interiorOf, moveCorner, moveSegment, nearestSegment, orthogonalPath, positionOnSide, tidy, type Pt } from "../src/shared/bpmnManual.js";
 
 /** Каждая пара соседних точек лежит на одной горизонтали или вертикали. */

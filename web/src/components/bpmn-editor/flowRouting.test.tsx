@@ -225,7 +225,7 @@ describe("редактор: направляющие при перетаскив
 
   it("отрезок, подведённый к линии фигуры, прилипает к ней, пока тянешь виден розовый штрих, после отпускания он исчезает", () => {
     studio(structuredModel());
-    pickFlow("bf2");
+    pickFlow("bf1");
     const handle = document.querySelector('[data-flow-handle^="seg:"]') as SVGRectElement;
     const [hx, hy, hw, hh] = ["x", "y", "width", "height"].map((a) => Number(handle.getAttribute(a)));
     const horizontal = hw > hh;

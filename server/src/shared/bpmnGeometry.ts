@@ -12,10 +12,11 @@ export interface Box {
   h: number;
 }
 
-// Размеры фигур по соглашениям OMG BPMN DI (bpmn.io/Camunda Modeler): 100×80 задачи, 50×50 шлюзы, 36×36 события.
+// Размеры фигур: задача 150×90 и подпроцесс 160×90 — как на диаграммах Business Studio (длинные названия умещаются в 4 строки),
+// шлюзы 50×50 и события 36×36 — по соглашениям OMG BPMN DI.
 export const SIZE: Record<string, { w: number; h: number }> = {
-  task: { w: 100, h: 80 },
-  subprocess: { w: 110, h: 80 },
+  task: { w: 150, h: 90 },
+  subprocess: { w: 160, h: 90 },
   gateway: { w: 50, h: 50 },
   event: { w: 36, h: 36 },
 };

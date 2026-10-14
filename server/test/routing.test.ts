@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { SIZE, flowLabelPoint, waypoints, type Box, type EndKinds, type Pt } from "../src/shared/bpmnGeometry.js";
+import { flowLabelPoint, waypoints, type Box, type EndKinds, type Pt } from "../src/shared/bpmnGeometry.js";
+
+/** Размеры фигур, на которые рассчитаны ожидаемые числа этого теста (логика маршрутов от размеров не зависит). */
+const SIZE = { task: { w: 100, h: 80 }, subprocess: { w: 110, h: 80 }, gateway: { w: 50, h: 50 }, event: { w: 36, h: 36 } };
 
 const box = (type: keyof typeof SIZE, cx: number, cy: number): Box => ({ x: cx - SIZE[type].w / 2, y: cy - SIZE[type].h / 2, w: SIZE[type].w, h: SIZE[type].h });
 const ports = (b: Box): Pt[] => [[b.x + b.w, b.y + b.h / 2], [b.x, b.y + b.h / 2], [b.x + b.w / 2, b.y], [b.x + b.w / 2, b.y + b.h]];

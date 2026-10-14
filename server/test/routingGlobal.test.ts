@@ -169,7 +169,7 @@ describe("прокладка стрелок по всей диаграмме", (
 
   it("быстро: 80 фигур и 120 стрелок — меньше секунды", () => {
     const nodes: RouteNode[] = [];
-    for (let c = 0; c < 20; c++) for (let r = 0; r < 4; r++) nodes.push(node(`n${c}_${r}`, c % 3 === 0 ? "gateway" : "task", 150 + c * 170, 135 + r * 150));
+    for (let c = 0; c < 20; c++) for (let r = 0; r < 4; r++) nodes.push(node(`n${c}_${r}`, c % 3 === 0 ? "gateway" : "task", 150 + c * 220, 135 + r * 150));
     const flows: RouteFlow[] = [];
     for (let c = 0; c < 19; c++) for (let r = 0; r < 4; r++) if ((c + r) % 3 !== 0) flows.push({ id: `f${c}_${r}`, from: `n${c}_${r}`, to: `n${c + 1}_${(r + (c % 2)) % 4}` });
     const t0 = Date.now();
@@ -189,7 +189,7 @@ describe("прокладка стрелок по всей диаграмме", (
       const cols = 3 + Math.floor(rnd() * 5);
       const rows = 2 + Math.floor(rnd() * 3);
       const nodes: RouteNode[] = [];
-      for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) if (rnd() < 0.55) nodes.push(node(`n${nodes.length}`, types[Math.floor(rnd() * types.length)], 160 + c * 170, 135 + r * 150));
+      for (let c = 0; c < cols; c++) for (let r = 0; r < rows; r++) if (rnd() < 0.55) nodes.push(node(`n${nodes.length}`, types[Math.floor(rnd() * types.length)], 160 + c * 220, 135 + r * 150));
       if (nodes.length < 3) continue;
       const flows: RouteFlow[] = [];
       const seen = new Set<string>();
