@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { frameGeometry, frameTexts, withFrameHeight } from "../src/shared/idef0Frame.js";
 import { generateIdef0 } from "../src/pipeline/idef0.js";
 import { purchaseModel } from "./fixtures.js";
+import type { ProcessLogicModel } from "../src/types/model.js";
 
 describe("рамка листа IDEF0", () => {
   const defaults = { node: "A0", title: "Закупка", no: "1.0" };
@@ -107,5 +108,46 @@ describe("рамка листа в других выгрузках", () => {
     expect(await pageXml(m, 3)).toContain("Мой лист");
     m.idef0_frames = { "": { show: false } };
     expect(await pageXml(m, 3)).not.toContain("NODE:");
+  });
+
+  it("VSDX: лист BPMN по умолчанию не выгружается; включённый — штамп с кодом и названием операции, ручной лист растит страницу; при чтении правок лист пропускается", async () => {
+    const JSZip = (await import("jszip")).default;
+    const { buildVsdx } = await import("../src/export/vsdx.js");
+    const { buildModelFromParsedVsdx, parseVsdx } = await import("../src/pipeline/vsdxImport.js");
+    const { structuredModel } = await import("./fixtures.js");
+    /** Страницы файла по именам: разметка и ширина в дюймах. */
+    const pages = async (model: ProcessLogicModel) => {
+      const zip = await JSZip.loadAsync(await buildVsdx(model));
+      const list = await zip.file("visio/pages/pages.xml")!.async("string");
+      const out = new Map<string, { xml: string; width: number }>();
+      for (const [i, p] of [...list.matchAll(/<Page ID="\d+" NameU="([^"]+)".*?<Cell N="PageWidth" V="([\d.]+)"/g)].entries()) out.set(p[1], { xml: await zip.file(`visio/pages/page${i + 1}.xml`)!.async("string"), width: Number(p[2]) });
+      return out;
+    };
+    const m = structuredModel();
+    const op = "BPMN B002.01.01"; // диаграмма операции o1
+    const plain = await pages(m);
+    expect([...plain].filter(([, p]) => p.xml.includes("NODE:")).every(([name]) => name.startsWith("IDEF0"))).toBe(true); // штамп только у IDEF0
+    expect(plain.get(op)!.xml).not.toContain("NODE:");
+
+    m.bpmn_frames = { o1: { show: true } };
+    const framed = await pages(m);
+    expect(framed.get(op)!.xml).toContain("NODE:");
+    expect(framed.get(op)!.xml).toContain("B002.01.01 Актуализация реестра процессов");
+    expect(framed.get("BPMN")!.xml).not.toContain("NODE:"); // у общей схемы лист свой и выключен
+    expect(framed.get(op)!.width).toBeGreaterThanOrEqual(plain.get(op)!.width);
+
+    m.bpmn_frames = { o1: { show: true, x: 40, y: 40, w: 2240, h: 1560, texts: { title: "Лист <операции>" } }, "": { show: true } };
+    const manual = await pages(m);
+    expect(manual.get(op)!.xml).toContain("Лист &lt;операции&gt;");
+    expect(manual.get(op)!.width).toBeCloseTo((40 + 2240) / 96, 3);
+    expect(manual.get("BPMN")!.xml).toContain("B002.00.00 Управление процессами");
+
+    // лист — оформление: шаги, стрелки и дорожки при чтении файла те же, что без него
+    const meta = { processName: "Импорт", modelType: "AS-IS" as const, decompositionDepth: 2, notations: ["IDEF0", "BPMN"] as ("IDEF0" | "BPMN")[] };
+    const back = async (model: ProcessLogicModel) => buildModelFromParsedVsdx(await parseVsdx(await buildVsdx(model)), meta).model;
+    const [a, b] = [await back(structuredModel()), await back(m)];
+    expect(b.nodes.map((n) => n.name).sort()).toEqual(a.nodes.map((n) => n.name).sort());
+    expect(b.flows).toHaveLength(a.flows.length);
+    expect(b.roles.map((r) => r.name).sort()).toEqual(a.roles.map((r) => r.name).sort());
   });
 });

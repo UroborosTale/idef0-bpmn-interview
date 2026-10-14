@@ -2,9 +2,9 @@ import JSZip from "jszip";
 import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
-import { frameGeometry, frameShown } from "../shared/idef0Frame.js";
+import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 import { tunnelArcs } from "../shared/idef0Layout.js";
-import { isStructured } from "../shared/codes.js";
+import { isStructured, processCodeOf } from "../shared/codes.js";
 import { flowLabelPoint } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
 import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
@@ -432,24 +432,32 @@ function blockPorts(b: Idef0Block, d: Idef0DiagramData): { ports: Port[]; indexO
   return { ports, indexOf: (p) => index.get(`${p[0]},${p[1]}`) ?? 0 };
 }
 
+/** Лист со штампом (shared/idef0Frame.ts) для страницы Visio: лист в отрицательных координатах Visio не показывает, такой лист не рисуется. */
+function sheetOnPage(world: { w: number; h: number }, settings: IdefFrame | undefined, defaults: FrameDefaults): FrameGeometry | null {
+  const g = frameGeometry(world, settings, defaults);
+  return g.sheet.x >= 0 && g.sheet.y >= 0 ? g : null;
+}
+
+/** Размер страницы: диаграмма и лист, где бы он ни стоял. */
+const pageSize = (w: number, h: number, geo: FrameGeometry | null): [number, number] => (geo ? [Math.max(w, geo.sheet.x + geo.sheet.w), Math.max(h, geo.sheet.y + geo.sheet.h)] : [w, h]);
+
+/** Рамка и штамп — оформление (pm_k = deco): при чтении правок из Visio они пропускаются. Сетка в Visio не выгружается. */
+function drawSheet(page: Page, geo: FrameGeometry) {
+  page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef9", weightPt: 1 });
+  page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 1.2 });
+  for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 1 });
+  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 14, color: "#111827" });
+}
+
 function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): Page {
   const editable = d.code !== "A-0";
-  // рамка листа и штамп (shared/idef0Frame.ts): лист в отрицательных координатах Visio не показывает, такая рамка в Visio не рисуется
   const fi = frameInfo(d, model, kind, parentNodeId);
-  const geo = (() => {
-    const settings = model.idef0_frames?.[fi.key];
-    if (!frameShown(settings)) return null;
-    const g = frameGeometry({ w: d.width, h: d.height }, settings, fi.defaults);
-    return g.sheet.x >= 0 && g.sheet.y >= 0 ? g : null;
-  })();
-  const [pw, ph] = geo ? [Math.max(d.width, geo.sheet.x + geo.sheet.w), Math.max(d.height, geo.sheet.y + geo.sheet.h)] : [d.width, d.height];
+  const settings = model.idef0_frames?.[fi.key];
+  const geo = frameShown(settings) ? sheetOnPage({ w: d.width, h: d.height }, settings, fi.defaults) : null;
+  const [pw, ph] = pageSize(d.width, d.height, geo);
   const page = new Page(name, pw, ph, { pm_page: `idef0:${d.code}`, ...(parentNodeId ? { pm_parent: parentNodeId } : {}), ...(editable ? {} : { pm_ro: "1" }) });
-  if (geo) {
-    page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef9", weightPt: 1 });
-    page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 1.2 });
-    for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 1 });
-    for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 14, color: "#111827" });
-  } else page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
+  if (geo) drawSheet(page, geo);
+  else page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
 
   const portsOf = new Map<string, ReturnType<typeof blockPorts>>();
   for (const b of d.blocks) {
@@ -553,8 +561,20 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
   }
 }
 
-function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel): Page {
-  const page = new Page(name, d.width, d.height, { pm_page: "bpmn" });
+/**
+ * Страница BPMN; scope — операция диаграммы (null — общая схема процесса). Лист (model.bpmn_frames) по умолчанию выключен;
+ * автоматический лист накрывает пул целиком с полем, как в редакторе, а заданный вручную стоит по своим координатам.
+ */
+function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, scope: string | null, code: string): Page {
+  const settings = model.bpmn_frames?.[scope ?? ""];
+  const sheetName = scope ? model.nodes.find((n) => n.id === scope)?.name ?? "" : model.process.name;
+  // «мир» как в редакторе: правый край пула и низ содержимого с полем 20 (d.width и d.height — с полем 40)
+  const world = bpmnSheetWorld({ w: d.pool.x + d.pool.w, h: d.height - BPMN_SHEET_MARGIN / 2 });
+  const geo = bpmnFrameShown(settings) ? sheetOnPage(world, settings, bpmnFrameDefaults(code, sheetName)) : null;
+  const [pw, ph] = pageSize(d.width, d.height, geo);
+  const page = new Page(name, pw, ph, { pm_page: "bpmn" });
+  // лист — под диаграммой: штамп и рамка рисуются первыми
+  if (geo) drawSheet(page, geo);
   // пул и дорожки
   page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   // название пула вертикально в полосе шириной 20 (повёрнутая фигура, иначе текст переносится по буквам)
@@ -784,8 +804,8 @@ export async function buildVsdx(model: ProcessLogicModel, docMeta: Record<string
   const contextPage = idef0Page(idef0.context, isStructured(model) ? `IDEF0 ${idef0.context.code} контекст` : "IDEF0 A-0", model, "context");
   const rootPage = idef0Page(idef0.root, rootName, model, "root");
   const childPages = idef0.children.map((c) => ({ parentNodeId: c.parentNodeId, page: idef0Page(c, `IDEF0 ${c.code}`, model, "child", c.parentNodeId) }));
-  const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`, model) }));
-  const schemePage = bpmnPage(bpmn.diagram, "BPMN", model);
+  const bpmnPages = scoped.map((s) => ({ scope: s.scope, page: bpmnPage(s.d, `BPMN ${s.code}`, model, s.scope, codes.get(s.scope) ?? "") }));
+  const schemePage = bpmnPage(bpmn.diagram, "BPMN", model, null, processCodeOf(model));
 
   // имена страниц Visio уникальны и без запрещённых символов
   if (isStructured(model)) {

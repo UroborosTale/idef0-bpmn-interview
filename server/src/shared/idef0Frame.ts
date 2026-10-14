@@ -42,6 +42,9 @@ export const frameShown = (f: IdefFrame | undefined) => f?.show !== false;
 /** На диаграммах BPMN рамка листа по умолчанию выключена: её включают в меню «Лист» для нужной диаграммы. */
 export const bpmnFrameShown = (f: IdefFrame | undefined) => f?.show === true;
 
+/** Штамп листа BPMN по умолчанию: код и название операции (у общей схемы — процесса), номер листа. */
+export const bpmnFrameDefaults = (code: string, name: string): FrameDefaults => ({ node: code || "BPMN", title: `${code} ${name}`.trim(), no: "1.0" });
+
 /** Поле вокруг диаграммы BPMN под автоматическим листом: края листа не совпадают с краями дорожек и их ручками. */
 export const BPMN_SHEET_MARGIN = 40;
 

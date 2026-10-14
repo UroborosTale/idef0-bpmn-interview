@@ -1,4 +1,4 @@
-import { bpmnFrameShown, bpmnSheetWorld, frameGeometry, gridShown, type FrameField } from "@shared/idef0Frame";
+import { bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, gridShown, type FrameField } from "@shared/idef0Frame";
 import { processCodeOf } from "@shared/codes";
 import { setSheetFrame, type FramePatch } from "../editor-core/sheet-ops";
 import { FrameLayer, FrameMenu, dragRect, startFrameDrag, type FrameDrag } from "../editor-core/sheetFrame";
@@ -840,7 +840,7 @@ export default function BpmnEditor({
   const frameOn = bpmnFrameShown(frame);
   const sheetCode = scopeId ? idef0Codes(h.draft).get(scopeId) ?? "" : processCodeOf(h.draft);
   const sheetName = scopeId ? h.draft.nodes.find((n) => n.id === scopeId)?.name ?? "" : h.draft.process.name;
-  const frameGeo = frameGeometry(sheetWorld(draft), frame, { node: sheetCode || "BPMN", title: `${sheetCode} ${sheetName}`.trim(), no: "1.0" });
+  const frameGeo = frameGeometry(sheetWorld(draft), frame, bpmnFrameDefaults(sheetCode, sheetName));
   // фигуры за пределами листа, заданного вручную (лист по размеру диаграммы их и так вмещает)
   const outside =
     frameOn && frame?.w !== undefined
