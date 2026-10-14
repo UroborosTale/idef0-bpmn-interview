@@ -62,7 +62,7 @@ describe("навигатор: иерархия по кодам процесса 
     expect(document.querySelector("[data-nav-group]")).toBeNull();
     expect(rows()[0]).toMatchObject({ code: "B002.00.00", name: "Управление процессами", pad: 8 });
     const kinds = [...document.querySelector(".nav-section")!.querySelectorAll(".nav-icon")].map((i) => i.getAttribute("class")!.replace("nav-icon nav-icon-", ""));
-    expect(kinds).toEqual(["process", "subprocess", "operation", "bpmn", "operation", "operation", "operation", "bpmn", "subprocess", "operation", "bpmn"]);
+    expect(kinds).toEqual(["process", "subprocess", "operation", "bpmn", "step", "step", "operation", "bpmn", "subprocess", "operation", "bpmn"]);
     const withGroup = structuredModel();
     withGroup.process.group = "Группа";
     document.body.innerHTML = "";

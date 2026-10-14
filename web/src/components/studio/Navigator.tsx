@@ -381,7 +381,7 @@ export default function Navigator({
               title={s.name}
             >
               <span className="nav-twisty" />
-              <NavIcon kind="operation" />
+              <NavIcon kind="step" />
               <span className="nav-num">{`${bpmnNum}.${i + 1}`}</span>
               <span className="nav-name">{s.name}</span>
             </div>
@@ -644,6 +644,17 @@ export default function Navigator({
             ×
           </button>
         )}
+      </div>
+      <div className="nav-tools" role="toolbar" aria-label="Действия навигатора">
+        <button className="nav-tool" title="Раскрыть все ветки дерева" onClick={() => setCollapsed(new Set())}>
+          Раскрыть
+        </button>
+        <button className="nav-tool" title="Свернуть все ветки дерева" onClick={() => setCollapsed(new Set([...model.nodes.map((n) => n.id), "~group", "~process"]))}>
+          Свернуть
+        </button>
+        <button className="nav-tool" title="Показать отчёты" onClick={() => setNavTab("reports")}>
+          Отчёты
+        </button>
       </div>
       <div className="nav-scroll">
       <div className="nav-search">

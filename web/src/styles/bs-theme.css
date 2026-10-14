@@ -160,10 +160,13 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .nav-scroll { flex: 1; min-height: 0; overflow: auto; }
 .nav-title { display: flex; align-items: center; gap: 4px; background: var(--bs-head); border-bottom: 1px solid var(--bs-border); padding: 2px 6px; font-size: 11px; color: var(--bs-text); white-space: nowrap; }
 .nav-title-btn { padding: 0 5px; font-size: 14px; line-height: 14px; border-radius: 0; }
-.nav-vtabs { flex: 0 0 24px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--bs-border); }
+.nav-vtabs { flex: 0 0 24px; display: flex; flex-direction: column; background: #d9dde2; border-left: 1px solid var(--bs-border); }
 .nav-vtab { writing-mode: vertical-rl; padding: 8px 3px; border: 1px solid transparent; border-radius: 0; font-size: 11px; color: var(--bs-text); white-space: nowrap; text-align: center; }
 .nav-vtab:hover:not([aria-selected="true"]) { background: var(--bs-hover); }
-.nav-vtab[aria-selected="true"] { background: var(--bs-head); border-color: var(--bs-border); font-weight: 600; }
+.nav-vtab[aria-selected="true"] { background: #fff; border-color: var(--bs-border); border-right-color: #fff; font-weight: 400; }
+.nav-tools { display: flex; gap: 2px; padding: 2px 4px; background: var(--bs-toolbar); border-bottom: 1px solid var(--bs-border); }
+.nav-tool { font-size: 12px; padding: 1px 8px; border: 1px solid transparent; border-radius: 2px; background: transparent; }
+.nav-tool:hover { background: var(--bs-hover); border-color: var(--bs-hover-border); }
 
 /* ——— значки ленты: контурные, мелкие слева от подписи, крупные над подписью ——— */
 .ri { width: 16px; height: 16px; flex: 0 0 auto; }
