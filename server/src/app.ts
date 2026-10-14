@@ -114,6 +114,14 @@ app.use("/api", bpmsRouter);
 app.use("/api", diagramImportRouter);
 app.use("/api", auditPackageRouter);
 app.use("/api", agentRouter);
+
+// Собранный веб-интерфейс (WEB_DIST — папка web/dist): так студия работает без Vite, например в настольном приложении.
+// Страницы по прямым ссылкам (/s/<id>, /registry…) отдают index.html; запросы к /api сюда не доходят.
+if (process.env.WEB_DIST) {
+  const dist = path.resolve(process.env.WEB_DIST);
+  app.use(express.static(dist));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(path.join(dist, "index.html")));
+}
 app.use("/api", repositoryRouter);
 
 /**
