@@ -27,7 +27,7 @@ describe("процесс C025 по документу «ДПО от 05.10» в �
     expect(await page.locator("[data-nav-process] .nav-code").innerText()).toBe("C025.00.00");
     expect(await page.locator("[data-nav-fn] .nav-code").allTextContents()).toEqual(["C025.01.00", "C025.01.01", "C025.01.02", "C025.01.03", "C025.02.00", "C025.02.01", "C025.02.02"]);
     expect(await page.locator("[data-nav-bpmn]").count()).toBe(5);
-    expect(await page.locator(".nav-num, [data-nav-a0]").count()).toBe(0);
+    expect(await page.locator("[data-nav-a0]").count()).toBe(0); // строки A0 нет; номера блоков стоят рядом с кодами
     // проверки показывают только настоящие пробелы документа: ошибок нет
     expect(await page.locator(".statusbar").innerText()).toMatch(/ошибок: 0/);
 

@@ -110,7 +110,8 @@ input[type="checkbox"], input[type="radio"] { width: auto; min-height: 0; }
 .nav-row:hover { background: var(--bs-hover); }
 .nav-row.selected { background: var(--bs-select); color: #fff; }
 .nav-row.selected .nav-code, .nav-row.selected .nav-num, .nav-row.selected .nav-badge { color: #fff; }
-.nav-row.active-doc { background: var(--bs-press); font-weight: 400; }
+.nav-row.active-doc { background: var(--bs-select); color: #fff; font-style: italic; font-weight: 400; }
+.nav-row.active-doc .nav-code, .nav-row.active-doc .nav-num { color: #fff; }
 .nav-row.active-doc.selected { background: var(--bs-select); }
 .nav-twisty { width: 9px; height: 9px; flex: 0 0 9px; border: 1px solid #919191; background: #fff; color: #333; font-size: 9px; line-height: 7px; text-align: center; }
 .nav-twisty:empty { border-color: transparent; background: none; }

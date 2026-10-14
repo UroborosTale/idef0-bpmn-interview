@@ -263,7 +263,8 @@ export default function Navigator({
     const hasSteps = model.nodes.some((s) => s.bpmn_scope === n.id);
     // шаги диаграммы BPMN операции — задачи и подпроцессы, с номерами «A3.1.1» (код диаграммы + порядковый номер)
     const steps = model.nodes.filter((s) => s.bpmn_scope === n.id && (s.type === "task" || s.type === "subprocess"));
-    const bpmnCode = (structured ? codes.get(n.id) : `${num}.1`) ?? "";
+    const bpmnNum = `${num}.1`;
+    const bpmnCode = (structured ? codes.get(n.id) : bpmnNum) ?? "";
     const dropHere = drop?.id === n.id ? drop : null;
     return (
       <div key={n.id}>
@@ -331,6 +332,7 @@ export default function Navigator({
             {expandable ? (open ? "−" : "+") : ""}
           </span>
           <NavIcon kind={n.idef0_parent ? "operation" : "subprocess"} />
+          {structured && <span className="nav-num">{nums.get(n.id)}</span>}
           <span className="nav-code">{labelOf(n.id)}</span>
           {renaming === n.id ? (
             <input
@@ -363,6 +365,7 @@ export default function Navigator({
           >
             {twisty(`~steps:${n.id}`, steps.length > 0)}
             <NavIcon kind="bpmn" />
+            {structured && <span className="nav-num">{bpmnNum}</span>}
             <span className="nav-code">{bpmnCode}</span>
             <span className="nav-name">{n.name}</span>
           </div>
@@ -379,7 +382,7 @@ export default function Navigator({
             >
               <span className="nav-twisty" />
               <NavIcon kind="operation" />
-              <span className="nav-code">{`${bpmnCode}.${i + 1}`}</span>
+              <span className="nav-num">{`${bpmnNum}.${i + 1}`}</span>
               <span className="nav-name">{s.name}</span>
             </div>
           ))}
