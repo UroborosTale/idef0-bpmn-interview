@@ -234,3 +234,5 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .ws-desk-row > .toolbar { margin: 0; padding: 0 0 4px 8px; border: 0; background: none; flex-wrap: nowrap; }
 .ws-desk-row > .toolbar h2 { font-size: 12px; font-weight: 400; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ws-desk-row > .ws-groups { border: 0; background: none; flex: 1; }
+
+.nav-num { color: var(--bs-text); font-weight: 400; font-size: 12px; }
