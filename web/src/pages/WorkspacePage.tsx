@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
+import { onShellMessage } from "../desktop";
 import type { SessionRecord } from "../types";
 import TextPanel from "../components/TextPanel";
 import BpmnDiagram from "../components/bpmn-editor/BpmnDiagram";
@@ -85,6 +86,15 @@ export default function WorkspacePage({
     const s = await api.getSession(sessionId);
     setSession(s);
   }, [sessionId]);
+
+  // настольное приложение: после приёма правок из Visio оболочка присылает обновлённую сессию — страница не перезагружается
+  useEffect(
+    () =>
+      onShellMessage((m) => {
+        if (m.t === "session") setSession(m.session as SessionRecord);
+      }),
+    []
+  );
 
   useEffect(() => {
     reload();

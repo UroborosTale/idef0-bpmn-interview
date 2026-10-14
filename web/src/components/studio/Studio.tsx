@@ -30,7 +30,7 @@ import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunct
 import StructureWizard from "./StructureWizard";
 import VisioSlot from "./VisioSlot";
 import RibbonIcon from "./RibbonIcon";
-import { inDesktopShell, postToShell, recalledTabs, rememberTabs } from "../../desktop";
+import { inDesktopShell, onShellMessage, postToShell, recalledTabs, rememberTabs } from "../../desktop";
 
 type M = ProcessLogicModel;
 
@@ -489,6 +489,26 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
       }
       return s;
     });
+
+  // Живая связь с Visio в настольном приложении: выбранная в Visio фигура становится выделением студии (панель свойств), а шаг,
+  // выбранный в студии (навигатор, проверки, свойства), выделяется на диаграмме Visio. Последний id, пришедший из Visio, не
+  // отправляется обратно, чтобы не было эха.
+  const shellSelected = useRef<string | null>(null);
+  useEffect(() => {
+    if (!inDesktopShell()) return;
+    return onShellMessage((m) => {
+      if (m.t !== "visio-select") return;
+      shellSelected.current = m.id;
+      reportSelection({ kind: m.kind, id: m.id });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!inDesktopShell() || selection?.kind !== "node") return;
+    if (selection.id === shellSelected.current) return;
+    shellSelected.current = selection.id;
+    postToShell({ t: "select", id: selection.id });
+  }, [selection]);
 
   /** Переход к элементу из списка проверок: нужная диаграмма и выделение. */
   const gotoIssue = ({ elementId, notation }: { elementId: string | null; notation: ValidationIssue["notation"] }) => {

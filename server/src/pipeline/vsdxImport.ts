@@ -66,6 +66,8 @@ export interface VsdxEdge {
   isDefault?: boolean;
   /** id потока модели у собственной выгрузки (метка pm_id). */
   pmId?: string;
+  /** id соединителя в Visio (по нему оболочка помечает новую стрелку id потока модели). */
+  shapeId?: string;
 }
 export interface VsdxPage {
   name: string;
@@ -590,7 +592,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
     // стрелка на начале, а не на конце — направление обратное
     if (numOf(c, "BeginArrow") > 0 && numOf(c, "EndArrow") === 0) [from, to] = [to, from];
-    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), ...(s.bpmn.condition === "default" ? { isDefault: true } : {}), ...(s.user.pm_k === "flow" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) });
+    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), shapeId: s.id, ...(s.bpmn.condition === "default" ? { isDefault: true } : {}), ...(s.user.pm_k === "flow" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) });
   }
   if (loose) warnings.push(`На странице «${pageName}» ${loose} соедин. не привязаны к шагам — пропущены.`);
   if (skippedFlows.association) warnings.push(`На странице «${pageName}» ассоциации (${skippedFlows.association}) пропущены: они связывают шаги с примечаниями и данными, а не задают порядок.`);
@@ -776,6 +778,9 @@ export interface VsdxReconcileChanges {
   /** Нарисованное при выгрузке, но не найденное в файле (удалено в Visio): модель не меняется, аналитик решает сам. */
   missing: string[];
   missingFlows: string[];
+  /** Какая новая фигура Visio стала каким шагом (и какое новое соединение — каким потоком): по этим парам оболочка ставит на фигуры метки pm_id, иначе при следующем приёме правок они создались бы заново. */
+  shapeMap: { page: string; shapeId: string; nodeId: string }[];
+  flowMap: { page: string; shapeId: string; flowId: string }[];
 }
 
 /**
@@ -785,7 +790,7 @@ export interface VsdxReconcileChanges {
  */
 export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx): { model: ProcessLogicModel; changes: VsdxReconcileChanges } {
   const out: ProcessLogicModel = JSON.parse(JSON.stringify(model));
-  const changes: VsdxReconcileChanges = { renamed: [], added: [], addedFlows: [], flowsRenamed: [], missing: [], missingFlows: [] };
+  const changes: VsdxReconcileChanges = { renamed: [], added: [], addedFlows: [], flowsRenamed: [], missing: [], missingFlows: [], shapeMap: [], flowMap: [] };
   const nodeById = new Map(out.nodes.map((n) => [n.id, n] as const));
   const flowById = new Map(out.flows.map((f) => [f.id, f] as const));
   const seenNodes = new Set<string>();
@@ -845,6 +850,7 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
       seenNodes.add(node.id);
       idByKey.set(n.key, node.id);
       changes.added.push(node.id);
+      changes.shapeMap.push({ page: page.name, shapeId: n.shapeId, nodeId: node.id });
     }
 
     for (const e of page.edges) {
@@ -863,6 +869,7 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
       out.flows.push(added);
       flowKeys.add(`${from}|${to}`);
       changes.addedFlows.push(added.id);
+      if (e.shapeId) changes.flowMap.push({ page: page.name, shapeId: e.shapeId, flowId: added.id });
     }
 
     for (const id of page.manifest?.nodes ?? []) if (!seenNodes.has(id) && nodeById.has(id)) changes.missing.push(id);

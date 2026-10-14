@@ -26,7 +26,7 @@ describe("правки из Visio в существующую модель", () 
     const m = structuredModel();
     const parsed = await parseVsdx(await buildVsdx(m));
     const { model, changes } = reconcileVsdxEdit(m, parsed);
-    expect(changes).toEqual({ renamed: [], added: [], addedFlows: [], flowsRenamed: [], missing: [], missingFlows: [] });
+    expect(changes).toEqual({ renamed: [], added: [], addedFlows: [], flowsRenamed: [], missing: [], missingFlows: [], shapeMap: [], flowMap: [] });
     expect(model.nodes.map((n) => n.name)).toEqual(m.nodes.map((n) => n.name));
     expect(model.flows).toHaveLength(m.flows.length);
   });
@@ -101,5 +101,8 @@ describe("фигуры из палитры Visio (без меток pm_*)", () =
     expect(by("event", "start")!.name).toBe("Начало");
     expect(by("event", "end")!.name).toBe("Конец");
     expect(added.every((n) => n.bpmn_scope === "o1" && n.tags.includes("added_externally"))).toBe(true);
+    // каждая новая фигура сопоставлена шагу: оболочка пометит её, и повторный приём правок дубликатов не создаст
+    expect(changes.shapeMap.map((x) => x.shapeId).sort()).toEqual(["9001", "9002", "9003", "9004", "9005"]);
+    expect(changes.shapeMap.every((x) => x.page === "BPMN B002.01.01" && changes.added.includes(x.nodeId))).toBe(true);
   });
 });

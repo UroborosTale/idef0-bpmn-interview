@@ -40,7 +40,12 @@ internal sealed class MainForm : Form
             await web.EnsureCoreWebView2Async();
             web.CoreWebView2.WebMessageReceived += async (_, e) => await Guard(() => OnMessage(e.WebMessageAsJson));
             coreReady.TrySetResult();
-            if (SelfTestDir == "") web.Source = new Uri(server.Url); // самопроверка открывает свою сессию сама
+            if (SelfTestDir == "")
+            {
+                web.Source = new Uri(server.Url);
+                poll.Tick += async (_, _) => await Guard(PollTick); // самопроверка вызывает PollTick сама
+                poll.Start();
+            }
             status.Text = $"Сервер: {server.Url}";
         });
         FormClosed += (_, _) => server.Dispose();
@@ -59,6 +64,10 @@ internal sealed class MainForm : Form
             case "fit": visio.FitPage(); break;
             case "grid": visio.ToggleGrid(); break;
             case "drop": OnDrop(root); break;
+            case "select":
+                // студия выбрала шаг — выделяем его фигуру в Visio; выделение не эхом возвращается в студию
+                if (visio.Visible && visio.SelectNode(root.GetProperty("id").GetString() ?? "")) lastSel = visio.SelectedTag();
+                break;
         }
     }
 
@@ -128,7 +137,16 @@ internal sealed class MainForm : Form
         finally { gate.Release(); }
     }
 
-    private async Task Apply()
+    private void PostToWeb(string json)
+    {
+        try { web.CoreWebView2?.PostWebMessageAsJson(json); } catch { /* студия ещё не загружена */ }
+    }
+
+    /// <summary>
+    /// Принять правки из Visio: файл уходит на сервер, новые фигуры помечаются id созданных шагов (иначе следующий приём создал бы
+    /// их заново), студия получает обновлённую сессию без перезагрузки страницы. Возвращает ответ сервера (JSON).
+    /// </summary>
+    private async Task<string> Apply(bool auto = false)
     {
         await gate.WaitAsync();
         try
@@ -137,10 +155,46 @@ internal sealed class MainForm : Form
             using var doc = JsonDocument.Parse(json);
             var c = doc.RootElement.GetProperty("changes");
             int n(string k) => c.GetProperty(k).GetArrayLength();
-            status.Text = $"Правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}; не найдено в файле {n("missing")}";
-            web.Reload();
+            visio.TagCreated(c);
+            var changed = n("renamed") + n("added") + n("addedFlows") + n("flowsRenamed");
+            status.Text = (auto ? "Автоматически: " : "") + $"правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}" + (n("missing") + n("missingFlows") > 0 ? $"; удалено в Visio {n("missing")} шагов и {n("missingFlows")} стрелок (в модели остались)" : "");
+            if (!auto || changed > 0) PostToWeb("{\"t\":\"session\",\"session\":" + doc.RootElement.GetProperty("session").GetRawText() + "}");
+            return json;
         }
         finally { gate.Release(); }
+    }
+
+    // ——— живая связь студии и Visio: выделение и автоприём правок ———
+    private (string Kind, string Id)? lastSel;
+    private (string Kind, string Id)? selAtDirty;
+    private DateTime dirtySince = DateTime.MinValue;
+    private bool polling;
+    private readonly System.Windows.Forms.Timer poll = new() { Interval = 400 };
+
+    /// <summary>Раз в 0,4 с: выделенная в Visio фигура уходит в студию (панель свойств), а накопившиеся правки принимаются сами.</summary>
+    public async Task PollTick()
+    {
+        if (polling || !visio.Visible || visio.LoadedSession == null || !coreReady.Task.IsCompleted) return;
+        polling = true;
+        try
+        {
+            var sel = visio.SelectedTag();
+            if (sel != lastSel)
+            {
+                lastSel = sel;
+                if (sel is { } t) PostToWeb("{\"t\":\"visio-select\",\"kind\":" + JsonSerializer.Serialize(t.Kind == "flow" ? "flow" : "node") + ",\"id\":" + JsonSerializer.Serialize(t.Id) + "}");
+            }
+            if (!visio.IsDirty) { dirtySince = DateTime.MinValue; return; }
+            if (dirtySince == DateTime.MinValue) { dirtySince = DateTime.UtcNow; selAtDirty = sel; }
+            var elapsed = (DateTime.UtcNow - dirtySince).TotalMilliseconds;
+            // правка закончена: кнопка мыши отпущена и либо выделение сменилось (пользователь перешёл к другой фигуре), либо тишина 5 с
+            if (Control.MouseButtons == MouseButtons.None && ((sel != selAtDirty && elapsed >= 400) || elapsed >= 5000))
+            {
+                dirtySince = DateTime.MinValue;
+                await Apply(auto: true);
+            }
+        }
+        finally { polling = false; }
     }
 
     private async Task Guard(Func<Task> action)
@@ -185,12 +239,48 @@ internal sealed class MainForm : Form
         var madeAll = drops.Select(k => visio.DropMaster(k, null)).ToList();
         L($"палитра: создано {string.Join(", ", madeAll.Select(m => $"«{m}»"))}; фигур на странице {before} → {visio.ShapeCount}");
         if (madeAll.Any(m => m == null) || visio.ShapeCount != before + drops.Length) L("ПРОВАЛ: фигуры из палитры не созданы");
-        var applied = await visio.SendEditsAsync(server);
+        var applied = await Apply(); // общий путь кнопки «Записать правки»: приём, пометка новых фигур, сессия в студию
         using (var ad = JsonDocument.Parse(applied)) L($"после «Записать правки»: новых шагов {ad.RootElement.GetProperty("changes").GetProperty("added").GetArrayLength()}");
         var nodesJson = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}");
         var added = JsonDocument.Parse(nodesJson).RootElement.GetProperty("model").GetProperty("nodes").EnumerateArray().Where(n => n.TryGetProperty("tags", out var tg) && tg.EnumerateArray().Any(t => t.GetString() == "added_externally")).ToList();
         L("новые шаги в модели: " + string.Join("; ", added.Select(n => $"{n.GetProperty("type").GetString()}:{n.GetProperty("name").GetString()}")));
         if (added.Count != drops.Length || !added.Any(n => n.GetProperty("name").GetString() == "Новая задача" && n.GetProperty("type").GetString() == "task")) L("ПРОВАЛ: фигуры из палитры не стали шагами модели");
+        // повторный приём без правок не должен создавать шаги заново: новые фигуры помечены id созданных шагов
+        var again = await Apply();
+        using (var ad2 = JsonDocument.Parse(again))
+        {
+            var n2 = ad2.RootElement.GetProperty("changes").GetProperty("added").GetArrayLength();
+            L($"повторный приём: новых шагов {n2}");
+            if (n2 != 0) L("ПРОВАЛ: повторный приём создал дубликаты");
+        }
+        // живая связь: фигура, выделенная в Visio, открывается в панели свойств студии
+        var taskId = added.First(n => n.GetProperty("name").GetString() == "Новая задача").GetProperty("id").GetString()!;
+        L($"выделение в Visio: {visio.SelectNode(taskId)}; метка: {visio.SelectedTag()}");
+        await PollTick();
+        await Task.Delay(1500);
+        var props = await web.CoreWebView2.ExecuteScriptAsync("(() => { const t = document.querySelector('.props-head b'); const v = [...document.querySelectorAll('input')].some(i => i.value === 'Новая задача'); return (t ? t.textContent : '') + '|' + v; })()");
+        L($"панель свойств студии после выделения в Visio: {props}");
+        if (!props.Contains("Свойства элемента") || !props.Contains("true")) L("ПРОВАЛ: выделение из Visio не дошло до панели свойств студии");
+        // после приёма правок студия вернула Visio на свою страницу; для проверок возвращаемся на страницу операции
+        visio.ShowDiagram(new Diagram("bpmn", scope));
+        await Task.Delay(300);
+        // студия → Visio: шаг, выбранный в студии, выделяется на диаграмме
+        var gateId = added.First(n => n.GetProperty("type").GetString() == "gateway").GetProperty("id").GetString()!;
+        await OnMessage("{\"t\":\"select\",\"id\":" + JsonSerializer.Serialize(gateId) + "}");
+        var picked = visio.SelectedTag();
+        L($"выбор шага в студии → выделение в Visio: {picked}");
+        if (picked?.Id != gateId) L("ПРОВАЛ: выбор шага в студии не выделил фигуру в Visio");
+        // автоприём: правка текста фигуры, затем выделение другой фигуры — через долю секунды правка уходит в модель сама
+        await OnMessage("{\"t\":\"select\",\"id\":" + JsonSerializer.Serialize(taskId) + "}");
+        visio.SetTextOf(taskId, "Переименована в Visio сама");
+        await PollTick(); // увидели правку: запомнили выделение
+        await OnMessage("{\"t\":\"select\",\"id\":" + JsonSerializer.Serialize(gateId) + "}"); // перешли к другой фигуре
+        await Task.Delay(700);
+        await PollTick(); // правка закончена — принимается без кнопки
+        var live = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}");
+        var liveOk = live.Contains("Переименована в Visio сама");
+        L($"автоприём правки без кнопки: {(liveOk ? "модель обновилась" : "модель не обновилась")}");
+        if (!liveOk) L("ПРОВАЛ: автоприём не принял правку");
         await Task.Delay(3500);
 
         // панель инструментов диаграммы: масштаб, вписать, сетка

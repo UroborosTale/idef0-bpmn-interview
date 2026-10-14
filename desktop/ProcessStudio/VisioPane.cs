@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 /// <summary>Окно Visio внутри приложения: «Microsoft Visio 16.0 Drawing Control» (VISOCX.DLL).</summary>
@@ -182,6 +183,106 @@ internal sealed class VisioPane : Panel
         Try(() => win.DeselectAll());
         return spec.Text;
     }
+
+    /// <summary>Записывает пользовательскую ячейку фигуры (User.имя): фигура получает метку модели, как у фигур нашей выгрузки.</summary>
+    private static void SetUser(dynamic holder, string name, string value)
+    {
+        const short visSectionUser = 242;
+        var cell = "User." + name;
+        if ((short)holder.CellExistsU[cell, 0] == 0) holder.AddNamedRow(visSectionUser, name, 0);
+        holder.CellsU[cell].FormulaU = "\"" + value.Replace("\"", "\"\"") + "\"";
+    }
+
+    /// <summary>
+    /// После приёма правок: новые фигуры помечаются id созданных шагов и потоков (pm_k, pm_id, pm_n), а id попадают в список нарисованного
+    /// на странице (pm_manifest). Без меток следующий приём правок создал бы эти шаги ещё раз.
+    /// </summary>
+    public int TagCreated(System.Text.Json.JsonElement changes)
+    {
+        dynamic doc = visio.Ocx.Document;
+        var tagged = 0;
+        var wasSaved = Convert.ToInt32(doc.Saved) != 0;
+        void Tag(string pageName, string shapeId, string kind, string id, bool node)
+        {
+            try
+            {
+                dynamic page = doc.Pages.ItemU[pageName];
+                dynamic shape = page.Shapes.ItemFromID[int.Parse(shapeId)];
+                SetUser(shape, "pm_k", kind);
+                SetUser(shape, "pm_id", id);
+                SetUser(shape, "pm_n", Regex.Replace((string)shape.Text ?? "", @"\s+", " ").Trim());
+                // в список нарисованного на странице: n — шаги, f — потоки
+                dynamic sheet = page.PageSheet;
+                var raw = (short)sheet.CellExistsU["User.pm_manifest", 0] == 0 ? "{}" : (string)sheet.CellsU["User.pm_manifest"].ResultStr[""];
+                var m = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw)!.AsObject();
+                var key = node ? "n" : "f";
+                var list = m[key] as System.Text.Json.Nodes.JsonArray ?? new System.Text.Json.Nodes.JsonArray();
+                list.Add(id);
+                m[key] = list;
+                SetUser(sheet, "pm_manifest", m.ToJsonString());
+                tagged++;
+            }
+            catch { /* страницы или фигуры уже нет (удалили, пока шёл приём правок) */ }
+        }
+        foreach (var x in changes.GetProperty("shapeMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "node", x.GetProperty("nodeId").GetString()!, true);
+        foreach (var x in changes.GetProperty("flowMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "flow", x.GetProperty("flowId").GetString()!, false);
+        // пометки — не правки пользователя: документ остаётся «сохранённым» и не вызывает новый приём правок
+        if (wasSaved) doc.Saved = true;
+        return tagged;
+    }
+
+    /// <summary>Выделенная в Visio фигура: вид метки (node, fn, flow…) и id объекта модели; null — ничего не выделено или у фигуры нет метки.</summary>
+    public (string Kind, string Id)? SelectedTag()
+    {
+        try
+        {
+            dynamic sel = visio.Ocx.Window.Selection;
+            if ((int)sel.Count < 1) return null;
+            dynamic shape = sel[1];
+            var kind = User(shape, "pm_k");
+            var id = User(shape, "pm_id");
+            return kind != null && id != null ? (kind, id) : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Выделяет в Visio фигуру объекта модели на текущей странице (по команде студии); false — такой фигуры на странице нет.</summary>
+    public bool SelectNode(string nodeId)
+    {
+        const short visSelect = 2;
+        try
+        {
+            dynamic win = visio.Ocx.Window;
+            foreach (dynamic s in win.Page.Shapes)
+            {
+                if (User(s, "pm_id") != nodeId) continue;
+                win.DeselectAll();
+                win.Select(s, visSelect);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>Для самопроверки: меняет текст фигуры шага на текущей странице.</summary>
+    public bool SetTextOf(string nodeId, string text)
+    {
+        try
+        {
+            foreach (dynamic s in visio.Ocx.Window.Page.Shapes)
+            {
+                if (User(s, "pm_id") != nodeId) continue;
+                s.Text = text;
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    /// <summary>Курсор находится над окном Visio (пользователь работает в нём): автоприём правок откладывается.</summary>
+    public bool CursorInside => RectangleToScreen(ClientRectangle).Contains(Cursor.Position);
 
     /// <summary>Точка экрана в координатах окна Visio.</summary>
     public Point ToClient(Point screen) => PointToClient(screen);
