@@ -158,7 +158,7 @@ describe("студия: навигатор по образцу Business Studio, 
     await page.locator('[data-nav-bpmn="o1"]').click();
     await page.locator('.studio g[data-node-id="t1"]').click();
     const fills = () => page.locator('.studio g[data-node-id] rect[rx="10"]').evaluateAll((els) => els.map((e) => e.getAttribute("fill")));
-    expect(await fills()).toEqual(["#ffffff", "#ffffff"]);
+    expect(await fills()).toEqual(["#e8eef7", "#e8eef7"]);
     await page.getByText("Оформление", { exact: true }).click();
     await page.getByLabel("Заливка").fill("#ffeecc");
     await page.getByLabel("Заливка").blur();

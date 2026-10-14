@@ -6,14 +6,16 @@ import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 /** Рамка листа (клетки, контур, штамп NODE / TITLE / NO.) — общая с редактором BPMN. */
 export { FrameLayer } from "../editor-core/sheetFrame";
 
-const INK = "#1f2937";
+const INK = "#000000";
+/** Цвет стрелок IDEF0 в Business Studio. */
+const ARROW = "#4677bf";
 const ACCENT = "#4338ca";
 
 export function Idef0Defs() {
   return (
     <defs>
       <marker id="i0-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-        <path d="M0,0 L0,6 L9,3 z" fill={INK} />
+        <path d="M0,0 L0,6 L9,3 z" fill={ARROW} />
       </marker>
       <marker id="i0-arrow-sel" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
         <path d="M0,0 L0,6 L9,3 z" fill={ACCENT} />
@@ -31,7 +33,7 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
   const top = y + h / 2 - 6 - ((lines.length - 1) * lh) / 2;
   return (
     <g data-fn-id={fn.node.id} style={{ cursor: "move" }}>
-      <rect x={x} y={y} width={w} height={h} fill={style?.fill ?? "#eef2ff"} stroke={stroke} strokeWidth={selected || hot ? 2.6 : 1.6} strokeDasharray={fn.node.status === "hypothesis" ? "6 4" : undefined} />
+      <rect x={x} y={y} width={w} height={h} fill={style?.fill ?? "#e8eef7"} stroke={stroke} strokeWidth={selected || hot ? 2.6 : 1.6} strokeDasharray={fn.node.status === "hypothesis" ? "6 4" : undefined} />
       <text textAnchor="middle" fontSize={size} fontFamily="Arial, sans-serif" fill={style?.text ?? INK} pointerEvents="none">
         {lines.map((l, i) => (
           <tspan key={i} x={x + w / 2} y={top + i * lh + 4}>
@@ -129,7 +131,7 @@ export function ArrowHandles({ arrow, labelAt, k }: { arrow: Arrow; labelAt: { x
 
 export function ArrowShape({ arrow, selected, showLabel = true }: { arrow: Arrow; selected: boolean; showLabel?: boolean }) {
   const d = arrow.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
-  const color = selected ? ACCENT : INK;
+  const color = selected ? ACCENT : ARROW;
   const lab = labelSpec(arrow);
   return (
     <g data-arrow-key={arrow.key} style={{ cursor: "pointer" }}>

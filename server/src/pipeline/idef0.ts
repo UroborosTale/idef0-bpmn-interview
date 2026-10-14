@@ -214,7 +214,7 @@ export function buildIdef0Diagrams(model: ProcessLogicModel): { context: Idef0Di
 
 const DEFS = `<defs>
   <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-    <path d="M0,0 L0,6 L9,3 z" fill="#1f2937" />
+    <path d="M0,0 L0,6 L9,3 z" fill="#4677bf" />
   </marker>
 </defs>`;
 
@@ -236,7 +236,7 @@ function frameSvg(geo: FrameGeometry, grid: boolean): string {
     for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
     for (const l of geo.gridYs) out.push(`<line x1="${geo.sheet.x}" y1="${l.at}" x2="${geo.sheet.x + geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#cfd4dc" : "#e3e6eb"}" stroke-width="0.7" />`);
   }
-  out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef9" stroke="#1f2937" />`);
+  out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef7" stroke="#1f2937" />`);
   for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" />`);
   out.push(`<rect x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
   for (const c of geo.cells) {
@@ -258,7 +258,7 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   const parts: string[] = [DEFS];
   for (const b of d.blocks) {
     const big = b.w >= 200; // блок контекстной диаграммы
-    parts.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#eef2ff" stroke="#1f2937" stroke-width="${big ? 1.8 : 1.6}" />`);
+    parts.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#e8eef7" stroke="#1f2937" stroke-width="${big ? 1.8 : 1.6}" />`);
     parts.push(textBlock(b.x + b.w / 2, b.y + b.h / 2 - (big ? 8 : 6), b.name, big ? 26 : 22, big ? 13 : 12));
     parts.push(`<text x="${b.x + (big ? 8 : 6)}" y="${b.y + b.h - (big ? 8 : 6)}" font-size="10" font-family="Arial, sans-serif" fill="#4b5563">${esc(b.code)}</text>`);
     if (b.hasChildren) {
@@ -269,7 +269,7 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   }
   for (const a of d.arrows) {
     const path = a.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
-    parts.push(`<path d="${path}" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#arrow)" />`);
+    parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.4" marker-end="url(#arrow)" />`);
     if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
     if (lab) {
@@ -316,7 +316,7 @@ function renderNodeTree(model: ProcessLogicModel, codes: Map<string, string>): s
   const width = Math.max(700, X0 + maxLevel * INDENT + BOX_W + 40);
   const height = 60 + (rows.length + 1) * ROW_H;
   const parts: string[] = [];
-  parts.push(`<rect x="${X0}" y="20" width="200" height="34" fill="#eef2ff" stroke="#1f2937" />`);
+  parts.push(`<rect x="${X0}" y="20" width="200" height="34" fill="#e8eef7" stroke="#1f2937" />`);
   parts.push(`<text x="${X0 + 100}" y="42" text-anchor="middle" font-size="11" font-family="Arial, sans-serif">${processCodeOf(model)} — ${esc(model.process.name.length > 26 ? model.process.name.slice(0, 24) + "…" : model.process.name)}</text>`);
   const rowY = (i: number) => 90 + i * ROW_H;
   rows.forEach((r, i) => {
@@ -365,7 +365,7 @@ export function idef0ToDrawio(model: ProcessLogicModel, result: Idef0Result): st
     const frameCells = geo
       ? [
           `<mxCell id="FRAME_sheet" value="" style="fillColor=none;strokeColor=#1f2937;strokeWidth=1.2;connectable=0;" vertex="1" parent="1"><mxGeometry x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" as="geometry" /></mxCell>`,
-          `<mxCell id="FRAME_stamp" value="" style="fillColor=#e8eef9;strokeColor=#1f2937;connectable=0;" vertex="1" parent="1"><mxGeometry x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" as="geometry" /></mxCell>`,
+          `<mxCell id="FRAME_stamp" value="" style="fillColor=#e8eef7;strokeColor=#1f2937;connectable=0;" vertex="1" parent="1"><mxGeometry x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" as="geometry" /></mxCell>`,
           ...geo.cells.map(
             (c) =>
               `<mxCell id="FRAME_${c.field}" value="${escXml(c.text)}" style="text;html=1;strokeColor=none;fillColor=none;align=${c.anchor === "middle" ? "center" : "left"};verticalAlign=middle;spacingLeft=4;fontSize=14;connectable=0;" vertex="1" parent="1"><mxGeometry x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" as="geometry" /></mxCell>`
@@ -379,7 +379,7 @@ export function idef0ToDrawio(model: ProcessLogicModel, result: Idef0Result): st
       // ФТ-М9.4.2: id ячейки несёт id узла PLM ("IDEF0_<nodeId>") — это делает возможным
       // round-trip импорт правок из draw.io обратно в модель (routes/diagramImport.ts).
       (b) =>
-        `<mxCell id="IDEF0_${b.nodeId}" value="${b.code}: ${escXml(b.name)}" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eef2ff;strokeColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" as="geometry" /></mxCell>`
+        `<mxCell id="IDEF0_${b.nodeId}" value="${b.code}: ${escXml(b.name)}" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8eef7;strokeColor=#1f2937;" vertex="1" parent="1"><mxGeometry x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" as="geometry" /></mxCell>`
     );
     return `  <diagram name="${escXml(name)}" id="${id}">
     <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="${width}" pageHeight="${height}" math="0" shadow="0">

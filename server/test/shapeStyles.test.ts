@@ -55,7 +55,8 @@ describe("оформление фигур по видам", () => {
     expect(xml).toContain("#ccddff"); // конечное событие
     // шрифт задач 15 px = 0,15625 дюйма
     expect(xml).toContain(`<Cell N="Size" V="${Math.round(((15 * 0.75) / 72) * 1e5) / 1e5}"/>`);
-    // у шлюза и начального события цвета прежние
-    expect(xml).toContain("#f0fdf4");
+    // у шлюза и начального события цвета по умолчанию — палитра Business Studio
+    expect(xml).toContain("#99ff66");
+    expect(xml).toContain("#ffff99");
   });
 });

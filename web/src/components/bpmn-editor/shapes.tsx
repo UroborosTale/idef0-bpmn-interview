@@ -3,6 +3,10 @@ import type { Artifact } from "@shared/bpmnArtifacts";
 import { eventSpec, scaleGlyphs, triggerGlyph, triggerSummary, type TriggerType } from "@shared/events";
 import { LOOP_LABELS, type LoopKind } from "@shared/loops";
 import { styleKindOf, styleOf, type ResolvedStyle, type StyledModel } from "@shared/shapeStyles";
+import { TASK_ICON_PAD, taskIcon } from "@shared/taskIcons";
+
+/** Подсказка к значку типа задачи. */
+const TASK_TYPE_TITLES: Record<string, string> = { user: "Пользовательская задача", service: "Сервисная задача", manual: "Ручная задача", send: "Отправка сообщения", receive: "Получение сообщения", script: "Сценарий", business_rule: "Бизнес-правило" };
 import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
 import { LANE_X, LABEL_W, LABEL_CHARS, LABEL_LINES, flowLabelPoint, laneCount, laneHeights, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
@@ -84,7 +88,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
     body = (
       <g data-event-position={spec.position}>
         <title>{`${spec.trigger === "none" ? "Событие" : triggerSummary(spec)}${spec.position === "intermediate" ? (spec.throwing ? " (выбрасывает)" : " (ждёт)") : ""}`}</title>
-        <circle cx={cx} cy={cy} r={w / 2} fill={style?.fill ?? (isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#fff")} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
+        <circle cx={cx} cy={cy} r={w / 2} fill={style?.fill ?? (isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933")} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
         {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
         <EventGlyph cx={cx} cy={cy} trigger={spec.trigger} throwing={spec.throwing} />
         {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
@@ -93,7 +97,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
   } else if (node.type === "gateway") {
     body = (
       <g>
-        <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill={style?.fill ?? "#fff"} {...common} strokeLinejoin="round" />
+        <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill={style?.fill ?? "#ffff99"} {...common} strokeLinejoin="round" />
         <GatewayGlyph cx={cx} cy={cy} subtype={node.subtype} />
         {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
       </g>
@@ -104,7 +108,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
     const top = cy - ((lines.length - 1) * lh) / 2 + 4;
     body = (
       <g>
-        <rect x={x} y={y} width={w} height={h} rx={10} fill={style?.fill ?? "#fff"} {...common} />
+        <rect x={x} y={y} width={w} height={h} rx={10} fill={style?.fill ?? "#e8eef7"} {...common} />
         {node.type === "subprocess" && (
           <g stroke={INK} strokeWidth={1.2} fill="#fff">
             <rect x={cx - 7} y={y + h - 16} width={14} height={14} />
@@ -118,9 +122,12 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
           </text>
         )}
         {node.type === "task" && node.subtype && (
-          <text x={x + (hasMarkers ? 20 : 8)} y={y + 14} fontSize={9} fill="#64748b" pointerEvents="none">
-            {{ user: "Польз.", service: "Сервис", manual: "Ручн.", send: "Отпр.", receive: "Получ.", script: "Скрипт", business_rule: "Правила" }[node.subtype] ?? ""}
-          </text>
+          <g transform={`translate(${x + (hasMarkers ? 24 : TASK_ICON_PAD)} ${y + TASK_ICON_PAD})`} fill="none" stroke={INK} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" data-task-icon={node.subtype}>
+            <title>{TASK_TYPE_TITLES[node.subtype] ?? ""}</title>
+            {taskIcon(node.subtype).map((p, i) =>
+              p.kind === "ellipse" ? <ellipse key={i} cx={p.cx} cy={p.cy} rx={p.rx} ry={p.ry} /> : <path key={i} d={`M${p.pts.map(([px, py]) => `${px} ${py}`).join(" L")}${p.closed ? " Z" : ""}`} />
+            )}
+          </g>
         )}
         <text textAnchor="middle" fontSize={size ?? 12} fill={ink} pointerEvents="none">
           {lines.map((l, i) => (
@@ -158,7 +165,7 @@ export function TriggerMarkers({ box, markers, selectedId }: { box: Box; markers
           <g key={mk.eventId} data-marker={mk.eventId} style={{ cursor: "pointer" }}>
             <title>{`${mk.name} — ${triggerSummary(mk.spec)}${mk.start ? " (запускает блок)" : " (блок ждёт)"}`}</title>
             <circle cx={cx} cy={cy} r={MARKER_R + 3} fill="transparent" />
-            <circle cx={cx} cy={cy} r={MARKER_R} fill={mk.start ? "#f0fdf4" : "#fff"} stroke={stroke} strokeWidth={selected ? 2.2 : 1.3} />
+            <circle cx={cx} cy={cy} r={MARKER_R} fill={mk.start ? "#99ff66" : "#ff9933"} stroke={stroke} strokeWidth={selected ? 2.2 : 1.3} />
             {!mk.start && <circle cx={cx} cy={cy} r={MARKER_R - 2.5} fill="none" stroke={stroke} strokeWidth={1} />}
             <EventGlyph cx={cx} cy={cy} trigger={mk.spec.trigger} throwing={false} k={0.55} />
           </g>
@@ -302,9 +309,9 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
         const laneH = heights[i];
         return (
           <g key={id}>
-            <rect x={LANE_X} y={top} width={width - LANE_X} height={laneH} fill={hotLane === i ? "#eef2ff" : i % 2 ? "#f8fafc" : "#fff"} stroke="#cbd5e1" />
+            <rect x={LANE_X} y={top} width={width - LANE_X} height={laneH} fill={hotLane === i ? "#eef2ff" : "#fff"} stroke="#000" strokeWidth={1} />
             <g data-lane-id={id} style={{ cursor: "pointer" }}>
-              <rect x={LANE_X} y={top} width={LABEL_W} height={laneH} fill={selectedLaneId === id ? "#c7d2fe" : "#e2e8f0"} stroke="#cbd5e1" />
+              <rect x={LANE_X} y={top} width={LABEL_W} height={laneH} fill={selectedLaneId === id ? "#c7d2fe" : "#e8eef7"} stroke="#000" strokeWidth={1} />
               <text
                 transform={`translate(${LANE_X + LABEL_W / 2 + 4} ${top + laneH / 2}) rotate(-90)`}
                 textAnchor="middle"

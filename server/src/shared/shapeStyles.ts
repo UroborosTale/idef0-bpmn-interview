@@ -2,8 +2,8 @@ import { eventSpec } from "./events.js";
 
 /**
  * Оформление фигур по видам (как стили диаграммы в Business Studio): для каждого вида фигуры — заливка, цвет линии, цвет и
- * размер текста. Хранится в модели (shape_styles), одно на все диаграммы; чего нет — берётся из DEFAULT_STYLES, они совпадают
- * с прежним видом фигур, поэтому модель без стилей выглядит как раньше. Общий модуль редакторов, выгрузки VSDX и клиента
+ * размер текста. Хранится в модели (shape_styles), одно на все диаграммы; чего нет — берётся из DEFAULT_STYLES: палитра
+ * Business Studio (задачи и блоки #E8EEF7, начало #99FF66, промежуточные #FF9933, конец #FF8262, шлюзы #FFFF99). Общий модуль редакторов, выгрузки VSDX и клиента
  * (web подключает его через псевдоним @shared).
  */
 
@@ -37,17 +37,17 @@ export const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 export const FONT_SIZE_MIN = 8;
 export const FONT_SIZE_MAX = 24;
 
-const BPMN_INK = "#1e293b";
-const IDEF0_INK = "#1f2937";
+const BPMN_INK = "#000000";
+const IDEF0_INK = "#000000";
 
 export const DEFAULT_STYLES: Record<StyleKind, ResolvedStyle> = {
-  task: { fill: "#ffffff", line: BPMN_INK, text: BPMN_INK, font_size: 12 },
-  subprocess: { fill: "#ffffff", line: BPMN_INK, text: BPMN_INK, font_size: 12 },
-  gateway: { fill: "#ffffff", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
-  event_start: { fill: "#f0fdf4", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
-  event_intermediate: { fill: "#ffffff", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
-  event_end: { fill: "#fef2f2", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
-  idef0_block: { fill: "#eef2ff", line: IDEF0_INK, text: IDEF0_INK, font_size: 12 },
+  task: { fill: "#e8eef7", line: BPMN_INK, text: BPMN_INK, font_size: 12 },
+  subprocess: { fill: "#e8eef7", line: BPMN_INK, text: BPMN_INK, font_size: 12 },
+  gateway: { fill: "#ffff99", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
+  event_start: { fill: "#99ff66", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
+  event_intermediate: { fill: "#ff9933", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
+  event_end: { fill: "#ff8262", line: BPMN_INK, text: BPMN_INK, font_size: 11 },
+  idef0_block: { fill: "#e8eef7", line: IDEF0_INK, text: IDEF0_INK, font_size: 12 },
 };
 
 /** Модель, у которой могут быть стили. */

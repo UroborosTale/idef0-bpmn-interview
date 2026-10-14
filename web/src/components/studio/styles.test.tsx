@@ -15,7 +15,7 @@ describe("оформление по видам: операции над моде
     expect(a.shape_styles).toEqual({ task: { fill: "#ffeecc", font_size: 14 } });
     const b = setKindStyle(a, "task", { fill: "красный", line: "#aa0000" });
     expect(b.shape_styles).toEqual({ task: { fill: "#ffeecc", line: "#aa0000", font_size: 14 } }); // неверный цвет игнорируется, прежнее остаётся
-    expect(setKindStyle(b, "task", { fill: "#ffffff" }).shape_styles!.task!.fill).toBeUndefined(); // стандартная заливка — поле убирается
+    expect(setKindStyle(b, "task", { fill: "#e8eef7" }).shape_styles!.task!.fill).toBeUndefined(); // стандартная заливка — поле убирается
     expect(setKindStyle(a, "task", { font_size: 99 }).shape_styles!.task!.font_size).toBe(14); // вне границ — прежний размер остаётся
     expect(setKindStyle(a, "task", { font_size: 12 }).shape_styles!.task).toEqual({ fill: "#ffeecc" }); // стандартный размер
   });
@@ -25,7 +25,7 @@ describe("оформление по видам: операции над моде
     const both = setKindStyle(setKindStyle(m, "task", { fill: "#ffeecc" }), "gateway", { fill: "#ccffee" });
     expect(Object.keys(resetKindStyle(both, "task").shape_styles!)).toEqual(["gateway"]);
     expect("shape_styles" in resetKindStyle(resetKindStyle(both, "task"), "gateway")).toBe(false);
-    expect(setKindStyle(m, "task", { fill: "#ffffff" })).not.toHaveProperty("shape_styles"); // стандарт — ничего не пишется
+    expect(setKindStyle(m, "task", { fill: "#e8eef7" })).not.toHaveProperty("shape_styles"); // стандарт — ничего не пишется
   });
 });
 
@@ -49,8 +49,8 @@ describe("оформление по видам: отрисовка", () => {
     const m = structuredModel();
     const node = m.nodes.find((n) => n.id === "b1")!;
     const c = render(<svg><NodeShape node={node} box={{ x: 0, y: 0, w: 100, h: 80 }} selected={false} hot={false} style={nodeStyle(m, node)} /></svg>).container;
-    expect(c.querySelector("rect[rx]")!.getAttribute("fill")).toBe("#ffffff");
-    expect(c.querySelector("rect[rx]")!.getAttribute("stroke")).toBe("#1e293b");
+    expect(c.querySelector("rect[rx]")!.getAttribute("fill")).toBe("#e8eef7");
+    expect(c.querySelector("rect[rx]")!.getAttribute("stroke")).toBe("#000000");
     expect(c.querySelector("text")!.getAttribute("font-size")).toBe("12");
   });
 
@@ -60,7 +60,7 @@ describe("оформление по видам: отрисовка", () => {
     const start = m.nodes.find((n) => n.id === "b0")!;
     const fillOf = (n: typeof end) => render(<svg><NodeShape node={n} box={{ x: 0, y: 0, w: 36, h: 36 }} selected={false} hot={false} style={nodeStyle(m, n)} /></svg>).container.querySelector("circle")!.getAttribute("fill");
     expect(fillOf(end)).toBe("#ccddff");
-    expect(fillOf(start)).toBe("#f0fdf4");
+    expect(fillOf(start)).toBe("#99ff66");
   });
 });
 
@@ -74,19 +74,19 @@ describe("окно студии: оформление вида из панели
     fireEvent.click(document.querySelector('[data-nav-bpmn="o1"]')!); // диаграмма BPMN операции: четыре шага, две задачи
     fireEvent.pointerDown(document.querySelector('[data-node-id="b1"]')!, { button: 0, pointerId: 1 });
     expect(screen.getByText("Относится ко всем фигурам вида «Задачи BPMN» на всех диаграммах.")).toBeTruthy();
-    expect(taskFills()).toEqual(["#ffffff", "#ffffff"]);
+    expect(taskFills()).toEqual(["#e8eef7", "#e8eef7"]);
     fireEvent.change(field("Заливка"), { target: { value: "#ffeecc" } });
-    expect(taskFills()).toEqual(["#ffffff", "#ffffff"]); // до паузы в модель не записано
+    expect(taskFills()).toEqual(["#e8eef7", "#e8eef7"]); // до паузы в модель не записано
     act(() => void vi.advanceTimersByTime(600));
     expect(taskFills()).toEqual(["#ffeecc", "#ffeecc"]); // обе задачи диаграммы
     expect((screen.getByText("Сбросить к стандартному") as HTMLButtonElement).disabled).toBe(false);
     fireEvent.keyDown(document.querySelector(".studio")!, { key: "z", ctrlKey: true });
-    expect(taskFills()).toEqual(["#ffffff", "#ffffff"]);
+    expect(taskFills()).toEqual(["#e8eef7", "#e8eef7"]);
     fireEvent.change(field("Заливка"), { target: { value: "#ffeecc" } });
     fireEvent.blur(field("Заливка")); // потеря фокуса записывает сразу
     expect(taskFills()).toEqual(["#ffeecc", "#ffeecc"]);
     fireEvent.click(screen.getByText("Сбросить к стандартному"));
-    expect(taskFills()).toEqual(["#ffffff", "#ffffff"]);
+    expect(taskFills()).toEqual(["#e8eef7", "#e8eef7"]);
   });
 
   it("на утверждённой версии поля оформления отключены", () => {

@@ -239,7 +239,7 @@ describe("студия: новые элементы на диаграмме оп
   it("палитра: «Бизнес-правила» добавляет задачу с этим видом", async () => {
     const { onSave } = studio(structuredModel());
     fireEvent.click(palette("Бизнес-правила"));
-    expect(document.querySelector(".studio")!.textContent).toContain("Правила");
+    expect(document.querySelector('.studio [data-task-icon="business_rule"]')).toBeTruthy(); // у задачи значок бизнес-правила, как на диаграммах Business Studio
     await act(async () => fireEvent.click(screen.getByTitle("Сохранить (Ctrl+S)")));
     const added = onSave.mock.calls[0][0].nodes.find((n) => n.name === "Применить правило")!;
     expect(added).toMatchObject({ type: "task", subtype: "business_rule", bpmn_scope: "o1" });

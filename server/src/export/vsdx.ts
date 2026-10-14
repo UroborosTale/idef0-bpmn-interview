@@ -10,6 +10,7 @@ import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
 import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
 import { visioFlowProps, visioShapeProps, type VisioPropOut } from "../shared/visioBpmn.js";
 import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
+import { TASK_ICON_PAD, taskIcon } from "../shared/taskIcons.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -166,7 +167,7 @@ export class Page {
     const runs: Run[] = style.runs ?? (style.text ? [{ text: style.text, fontPx: style.fontPx ?? 12, color: style.color, bold: style.bold }] : []);
     if (runs.length === 0) return { xml: "", text: "" };
     const chars = runs
-      .map((r, i) => `<Row IX="${i}"><Cell N="Size" V="${num((r.fontPx * 0.75) / 72)}"/><Cell N="Color" V="${r.color ?? "#1f2937"}"/><Cell N="Style" V="${r.bold ? 1 : 0}"/></Row>`)
+      .map((r, i) => `<Row IX="${i}"><Cell N="Size" V="${num((r.fontPx * 0.75) / 72)}"/><Cell N="Color" V="${r.color ?? "#000000"}"/><Cell N="Style" V="${r.bold ? 1 : 0}"/></Row>`)
       .join("");
     const text = runs.length === 1 ? esc(runs[0].text) : runs.map((r, i) => `<cp IX="${i}"/>${esc(r.text)}`).join("");
     return {
@@ -186,7 +187,7 @@ export class Page {
     const pinX = (x + w / 2) * PX;
     const pinY = (this.heightPx - (y + h / 2)) * PX;
     const fill = style.fill === undefined ? "#ffffff" : style.fill;
-    const line = style.line === undefined ? "#1f2937" : style.line;
+    const line = style.line === undefined ? "#000000" : style.line;
     const cells: string[] = [
       `<Cell N="PinX" V="${num(pinX)}"/>`,
       `<Cell N="PinY" V="${num(pinY)}"/>`,
@@ -202,7 +203,7 @@ export class Page {
       `<Cell N="LineWeight" V="${num((style.weightPt ?? 1.2) / 72)}"/>`,
       `<Cell N="Rounding" V="${num((style.roundingPx ?? 0) * PX)}"/>`,
     ];
-    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="2"/>`);
+    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="1"/>`);
     if (style.noMargins) cells.push(`<Cell N="LeftMargin" V="0"/>`, `<Cell N="RightMargin" V="0"/>`, `<Cell N="TopMargin" V="0"/>`, `<Cell N="BottomMargin" V="0"/>`);
     if (style.textBelow) {
       // блок текста под фигурой, выровненный по верху: так подпись остаётся частью фигуры и двигается вместе с ней
@@ -268,7 +269,7 @@ export class Page {
    * переносе фигуры в Visio стрелка следует за ней. Нарисованный путь points совпадает с раскладкой генератора;
    * при переносе фигур Visio перестроит его собственной маршрутизацией.
    */
-  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean; props?: VisioPropOut[] }): number {
+  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean; props?: VisioPropOut[]; color?: string }): number {
     const id = this.nextId++;
     const H = this.heightPx;
     const [bx, by] = opts.points[0];
@@ -321,17 +322,17 @@ export class Page {
       `<Cell N="ObjType" V="2"/>`,
       `<Cell N="NoLiveDynamics" V="1"/>`,
       `<Cell N="ShapeSplittable" V="1"/>`,
-      `<Cell N="LineColor" V="#1f2937"/>`,
+      `<Cell N="LineColor" V="${opts.color ?? "#000000"}"/>`,
       `<Cell N="LinePattern" V="${opts.dash ? 2 : 1}"/>`,
-      `<Cell N="LineWeight" V="${num((opts.weightPt ?? 1.1) / 72)}"/>`,
+      `<Cell N="LineWeight" V="${num((opts.weightPt ?? 0.9) / 72)}"/>`,
       `<Cell N="EndArrow" V="13"/>`,
-      `<Cell N="EndArrowSize" V="2"/>`,
+      `<Cell N="EndArrowSize" V="1"/>`,
       `<Cell N="TextBkgnd" V="#ffffff"/>`,
       `<Cell N="TextBkgndTrans" V="0"/>`,
     ];
     const control = `<Section N="Control"><Row N="TextPosition"><Cell N="X" V="${num(ctrlX)}"/><Cell N="Y" V="${num(ctrlY)}"/><Cell N="XDyn" V="${num(ctrlX)}" F="Controls.TextPosition"/><Cell N="YDyn" V="${num(ctrlY)}" F="Controls.TextPosition.Y"/><Cell N="XCon" V="0"/><Cell N="YCon" V="0"/><Cell N="CanGlue" V="0"/></Row></Section>`;
     const tag: Record<string, string> = { ...opts.tag, pm_sid: String(id) };
-    const chars = text ? `<Section N="Character"><Row IX="0"><Cell N="Size" V="${num((fontPx * 0.75) / 72)}"/><Cell N="Color" V="#1f2937"/></Row></Section>` : "";
+    const chars = text ? `<Section N="Character"><Row IX="0"><Cell N="Size" V="${num((fontPx * 0.75) / 72)}"/><Cell N="Color" V="#000000"/></Row></Section>` : "";
     const geomRows = local
       .map(([x, y], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${num(x)}"/><Cell N="Y" V="${num(y)}"/></Row>`)
       .join("");
@@ -386,14 +387,14 @@ export function stencilMasters(): StencilMaster[] {
   ];
   const below = (w: number) => ({ w, h: 30, gap: 3 });
   return [
-    mk("Задача", "task", "Шаг процесса BPMN", 100, 80, (p, tag) => p.rect(0, 0, 100, 80, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
-    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 110, 80, (p, tag) => p.rect(0, 0, 110, 80, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(110, 80))),
-    mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
-    mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
-    mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#f0fdf4", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag })),
-    mk("Промежуточное событие", "event:intermediate", "Событие внутри процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { weightPt: 1.3, fontPx: 11, textBelow: below(120), tag }, [{ kind: "ellipse", cx: 18, cy: 18, rx: 14, ry: 14 }])),
-    mk("Конечное событие", "event:end", "Завершение процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#fef2f2", weightPt: 3.2, fontPx: 11, textBelow: below(120), tag })),
-    mk("Функция IDEF0", "fn", "Функциональный блок IDEF0", 170, 90, (p, tag) => p.rect(0, 0, 170, 90, { fill: "#eef2ff", weightPt: 1.4, fontPx: 12, tag })),
+    mk("Задача", "task", "Шаг процесса BPMN", 100, 80, (p, tag) => p.rect(0, 0, 100, 80, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
+    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 110, 80, (p, tag) => p.rect(0, 0, 110, 80, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(110, 80))),
+    mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
+    mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
+    mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#99ff66", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag })),
+    mk("Промежуточное событие", "event:intermediate", "Событие внутри процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff9933", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag }, [{ kind: "ellipse", cx: 18, cy: 18, rx: 14, ry: 14 }])),
+    mk("Конечное событие", "event:end", "Завершение процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff8262", weightPt: 3.2, fontPx: 11, textBelow: below(120), tag })),
+    mk("Функция IDEF0", "fn", "Функциональный блок IDEF0", 170, 90, (p, tag) => p.rect(0, 0, 170, 90, { fill: "#e8eef7", weightPt: 1.4, fontPx: 12, tag })),
   ];
 }
 
@@ -468,7 +469,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const own = ownStyle(model, "idef0_block");
     const runs: Run[] = [{ text: b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
     if (editable) runs.push({ text: `\n${b.code}${b.hasChildren ? " ⊞" : ""}`, fontPx: 11, color: "#374151" });
-    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#eef2ff", ...(own.line ? { line: own.line } : {}), weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
+    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
   }
 
@@ -476,7 +477,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const lab = arrowLabelPlacement(a);
     if (!a.ref || (!a.startNode && !a.endNode)) {
       // стрелки контекстной диаграммы — только оформление
-      page.polyline(a.points, { endArrow: true, weightPt: 1.1 });
+      page.polyline(a.points, { endArrow: true, weightPt: 0.9, line: "#4677bf" });
       if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor }, { fontPx: 10.5, color: "#374151" });
       continue;
     }
@@ -497,12 +498,13 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       text: lab?.text,
       textAt,
       tag: { pm_k: "arrow", pm_id: a.ref.entityId, pm_a: `${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`, pm_n: lab?.text ?? "" },
-      weightPt: 1.1,
+      weightPt: 0.9,
+      color: "#4677bf",
     });
     // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
     for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) {
       const pts: Pt[] = [0, 0.25, 0.5, 0.75, 1].map((u) => [(1 - u) ** 2 * arc.from[0] + 2 * (1 - u) * u * arc.ctl[0] + u ** 2 * arc.to[0], (1 - u) ** 2 * arc.from[1] + 2 * (1 - u) * u * arc.ctl[1] + u ** 2 * arc.to[1]]);
-      page.polyline(pts, { weightPt: 1.1 });
+      page.polyline(pts, { weightPt: 0.9, line: "#4677bf" });
     }
   }
   if (editable) page.meta.pm_manifest = JSON.stringify({ fn: d.blocks.map((b) => b.nodeId), ar: d.arrows.flatMap((a) => (a.ref ? [`${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`] : [])) });
@@ -575,22 +577,24 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   const page = new Page(name, pw, ph, { pm_page: "bpmn", ...(scope ? { pm_scope: scope } : {}) });
   // лист — под диаграммой: штамп и рамка рисуются первыми
   if (geo) drawSheet(page, geo);
+  // полоса заголовка над пулом: код и название диаграммы (оформление — при чтении правок пропускается)
+  page.rect(d.pool.x, 6, d.pool.w, 30, { fill: "#e8eef7", weightPt: 1.2, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
   // пул и дорожки
   page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   // название пула вертикально в полосе шириной 20 (повёрнутая фигура, иначе текст переносится по буквам)
   page.add(
     { x: d.pool.x + 10 - d.pool.h / 2, y: d.pool.y + d.pool.h / 2 - 10, w: d.pool.h, h: 20 },
     [{ kind: "path", pts: [[0, 0], [d.pool.h, 0], [d.pool.h, 20], [0, 20]], closed: true }],
-    { fill: "#e2e8f0", weightPt: 1, text: d.poolName, fontPx: 12, bold: true, angle: Math.PI / 2, tag: { pm_k: "poollabel" } }
+    { fill: "#e8eef7", weightPt: 1, text: d.poolName, fontPx: 14, bold: false, angle: Math.PI / 2, tag: { pm_k: "poollabel" } }
   );
   for (const l of d.lanes) {
     const laneId = l.roleId ?? "__unassigned__";
-    page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#94a3b8", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });
+    page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#000000", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });
     // подпись дорожки вертикально, по центру полосы шириной 30; текст редактируется — так переименовывается роль
     page.add(
       { x: l.x + 15 - l.h / 2, y: l.y + l.h / 2 - 15, w: l.h, h: 30 },
       [{ kind: "path", pts: [[0, 0], [l.h, 0], [l.h, 30], [0, 30]], closed: true }],
-      { fill: "#e2e8f0", line: null, text: l.name, fontPx: 12, bold: true, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
+      { fill: "#e8eef7", line: null, text: l.name, fontPx: 14, bold: false, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
     );
     page.polyline([[l.x + 30, l.y], [l.x + 30, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
   }
@@ -661,10 +665,10 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel) {
     const isEnd = position === "end";
     const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
     const glyphs = triggerGlyph(s.event?.trigger ?? "none", s.event?.throwing ?? false);
-    page.ellipse(x, y, w, h, { fill: isStart ? "#f0fdf4" : isEnd ? "#fef2f2" : "#ffffff", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
+    page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
     drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
-    page.diamond(x, y, w, h, { weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
+    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
   } else {
     drawBlock(page, s, x, y, w, h, tag, props, look);
   }
@@ -689,11 +693,19 @@ function loopGlyph(loop: string | undefined, w: number, h: number, withSubMarker
 }
 
 /** Задача или подпроцесс; триггеры блока (ожидающие события) — значки на его границе, без отдельных фигур и стрелок. */
+/** Значок типа задачи в левом верхнем углу блока (контуры из shared/taskIcons.ts). */
+function taskIconParts(subtype: string | undefined): GeomPart[] {
+  return taskIcon(subtype).map((p) =>
+    p.kind === "ellipse" ? { kind: "ellipse" as const, cx: p.cx + TASK_ICON_PAD, cy: p.cy + TASK_ICON_PAD, rx: p.rx, ry: p.ry } : { kind: "path" as const, pts: p.pts.map(([x, y]) => [x + TASK_ICON_PAD, y + TASK_ICON_PAD] as Pt), ...(p.closed ? { closed: true } : {}) }
+  );
+}
+
 function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: number, tag: Record<string, string>, props: VisioPropOut[], look: Style) {
   {
-    page.rect(x, y, w, h, { fill: "#ffffff", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id, props, ...look }, [
+    page.rect(x, y, w, h, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id, props, ...look }, [
       ...(s.kind === "subprocess" ? [{ kind: "path" as const, pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]] as Pt[], closed: true }, { kind: "path" as const, pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] as Pt[] }, { kind: "path" as const, pts: [[w / 2, h - 14], [w / 2, h - 6]] as Pt[] }] : []),
       ...loopGlyph(s.loop, w, h, s.kind === "subprocess"),
+      ...(s.kind === "task" ? taskIconParts(s.subtype) : []),
     ]);
   }
   // триггеры блока: значок с кольцом (двойным у промежуточного события) на границе блока
@@ -703,7 +715,7 @@ function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: num
     const d = MARKER_R * 2;
     const glyphs = scaleGlyphs(triggerGlyph(mk.trigger, false), 0.55);
     const ring: GeomPart[] = mk.start ? [] : [{ kind: "ellipse", cx: MARKER_R, cy: MARKER_R, rx: MARKER_R - 2.5, ry: MARKER_R - 2.5 }];
-    page.ellipse(cx - MARKER_R, cy - MARKER_R, d, d, { fill: mk.start ? "#f0fdf4" : "#ffffff", weightPt: 1.1, tag: { pm_k: "trigger", pm_n: mk.name } }, [...ring, ...eventGlyph(glyphs, d, d)]);
+    page.ellipse(cx - MARKER_R, cy - MARKER_R, d, d, { fill: mk.start ? "#99ff66" : "#ff9933", weightPt: 0.9, tag: { pm_k: "trigger", pm_n: mk.name } }, [...ring, ...eventGlyph(glyphs, d, d)]);
   });
 }
 
@@ -719,7 +731,7 @@ function documentXml(meta: Record<string, string>): string {
 <StyleSheets><StyleSheet ID="0" NameU="No Style" Name="No Style">
 <Cell N="EnableLineProps" V="1"/><Cell N="EnableFillProps" V="1"/><Cell N="EnableTextProps" V="1"/><Cell N="HideForApply" V="0"/>
 <Cell N="LineWeight" V="0.01388888888888889"/><Cell N="LineColor" V="#000000"/><Cell N="LinePattern" V="1"/><Cell N="Rounding" V="0"/>
-<Cell N="BeginArrow" V="0"/><Cell N="EndArrow" V="0"/><Cell N="BeginArrowSize" V="2"/><Cell N="EndArrowSize" V="2"/>
+<Cell N="BeginArrow" V="0"/><Cell N="EndArrow" V="0"/><Cell N="BeginArrowSize" V="2"/><Cell N="EndArrowSize" V="1"/>
 <Cell N="FillForegnd" V="#ffffff"/><Cell N="FillBkgnd" V="#ffffff"/><Cell N="FillPattern" V="1"/>
 <Cell N="LeftMargin" V="0.05555555555555555"/><Cell N="RightMargin" V="0.05555555555555555"/><Cell N="TopMargin" V="0.05555555555555555"/><Cell N="BottomMargin" V="0.05555555555555555"/>
 <Cell N="VerticalAlign" V="1"/><Cell N="TextBkgnd" V="0"/>
