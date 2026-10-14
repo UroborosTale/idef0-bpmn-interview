@@ -78,7 +78,7 @@ describe("элементы BPMN по Соглашению в браузере", 
     }
 
     // граничное событие: выбор открывает панель, вид и прерывание меняются, граница остаётся у задачи
-    await page.locator('.studio g[data-node-id="be"]').click();
+    await page.locator('.studio g[data-node-id="be"] circle').first().click();
     await expectPanel(page, "Свойства элемента");
     const interrupting = page.getByLabel(/Прерывает задачу/);
     expect(await interrupting.isChecked()).toBe(false);

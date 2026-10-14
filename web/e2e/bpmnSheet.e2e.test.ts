@@ -60,6 +60,16 @@ describe("рамка листа BPMN и печать, в браузере", () =
     const canvas = (await page.locator(".studio svg.bpe-svg").boundingBox())!;
     const footer = (await page.locator(".studio [data-frame-move]").boundingBox())!;
     expect(footer.y + footer.height).toBeLessThanOrEqual(canvas.y + canvas.height + 1);
+    // и на низком окне: холст короткий, масштаб «Вписать» ниже 0,3 — лист всё равно целиком в холсте (с полем справа и снизу)
+    await page.setViewportSize({ width: 1600, height: 640 });
+    await page.getByRole("button", { name: "Вписать" }).click();
+    const low = (await page.locator(".studio svg.bpe-svg").boundingBox())!;
+    const lowFrame = (await page.locator(".studio [data-frame-back] > rect").boundingBox())!;
+    const lowFooter = (await page.locator(".studio [data-frame-move]").boundingBox())!;
+    expect(lowFooter.y + lowFooter.height).toBeLessThanOrEqual(low.y + low.height);
+    expect(lowFrame.x + lowFrame.width).toBeLessThanOrEqual(low.x + low.width);
+    await page.setViewportSize({ width: 1600, height: 950 });
+    await page.getByRole("button", { name: "Вписать" }).click();
     // лист накрывает все фигуры диаграммы
     const sheet = (await page.locator(".studio [data-frame-back] > rect").boundingBox())!;
     for (const n of ["e0", "t1", "t2", "e1"]) {

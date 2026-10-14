@@ -161,6 +161,8 @@ export function useDraftPersistence<M>(opts: { id: string; base: string; draft: 
   };
 }
 
+const FIT_PAD = 10;
+
 export interface View {
   k: number;
   tx: number;
@@ -185,7 +187,8 @@ export function useViewport(
     const el = wrapRef.current;
     if (!el) return;
     const { w, h } = extentsRef.current();
-    setView({ k: clamp(Math.min(el.clientWidth / w, el.clientHeight / h), 0.3, 1.2), tx: 10, ty: 10 });
+    // поле FIT_PAD с каждой стороны: иначе содержимое, сдвинутое на tx = ty = 10, выходит за правый и нижний край холста
+    setView({ k: clamp(Math.min((el.clientWidth - 2 * FIT_PAD) / w, (el.clientHeight - 2 * FIT_PAD) / h), 0.2, 1.2), tx: FIT_PAD, ty: FIT_PAD });
   }, [wrapRef]);
 
   useEffect(() => {
