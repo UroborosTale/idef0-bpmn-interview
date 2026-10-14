@@ -261,6 +261,9 @@ export default function Navigator({
     const nextSeen = new Set(seen).add(n.id);
     const num = nums.get(n.id) ?? "";
     const hasSteps = model.nodes.some((s) => s.bpmn_scope === n.id);
+    // шаги диаграммы BPMN операции — задачи и подпроцессы, с номерами «A3.1.1» (код диаграммы + порядковый номер)
+    const steps = model.nodes.filter((s) => s.bpmn_scope === n.id && (s.type === "task" || s.type === "subprocess"));
+    const bpmnCode = (structured ? codes.get(n.id) : `${num}.1`) ?? "";
     const dropHere = drop?.id === n.id ? drop : null;
     return (
       <div key={n.id}>
@@ -358,12 +361,28 @@ export default function Navigator({
             onClick={() => onOpenDoc(bpmnDoc(n.id))}
             title={hasSteps ? "Диаграмма BPMN операции" : "Диаграмма BPMN операции ещё пуста — откройте и опишите шаги"}
           >
-            <span className="nav-twisty" />
+            {twisty(`~steps:${n.id}`, steps.length > 0)}
             <NavIcon kind="bpmn" />
-            <span className="nav-code">{structured ? codes.get(n.id) : `${num}.1`}</span>
+            <span className="nav-code">{bpmnCode}</span>
             <span className="nav-name">{n.name}</span>
           </div>
         )}
+        {open && isHost && !collapsed.has(`~steps:${n.id}`) &&
+          steps.map((s, i) => (
+            <div
+              key={s.id}
+              className="nav-row nav-step"
+              style={{ paddingLeft: 8 + (depth + 2) * 14 }}
+              data-nav-step={s.id}
+              onClick={() => onOpenDoc(bpmnDoc(n.id))}
+              title={s.name}
+            >
+              <span className="nav-twisty" />
+              <NavIcon kind="operation" />
+              <span className="nav-code">{`${bpmnCode}.${i + 1}`}</span>
+              <span className="nav-name">{s.name}</span>
+            </div>
+          ))}
       </div>
     );
   };

@@ -35,6 +35,8 @@ describe("навигатор: иерархия по кодам процесса 
       ["", "B002.01.00", "Моделирование процесса", 36],
       ["", "B002.01.01", "Актуализация реестра", 50],
       ["", "B002.01.01", "Актуализация реестра", 64], // диаграмма BPMN операции: тот же код и название
+      ["", "B002.01.01.1", "Открыть реестр", 78], // шаги диаграммы — с номерами по порядку
+      ["", "B002.01.01.2", "Внести код процесса", 78],
       ["", "B002.01.02", "Проведение интервью", 50],
       ["", "B002.01.02", "Проведение интервью", 64],
       ["", "B002.02.00", "Анализ эффективности", 36],
@@ -59,7 +61,7 @@ describe("навигатор: иерархия по кодам процесса 
     expect(document.querySelector("[data-nav-group]")).toBeNull();
     expect(rows()[0]).toMatchObject({ code: "B002.00.00", name: "Управление процессами", pad: 8 });
     const kinds = [...document.querySelector(".nav-section")!.querySelectorAll(".nav-icon")].map((i) => i.getAttribute("class")!.replace("nav-icon nav-icon-", ""));
-    expect(kinds).toEqual(["process", "subprocess", "operation", "bpmn", "operation", "bpmn", "subprocess", "operation", "bpmn"]);
+    expect(kinds).toEqual(["process", "subprocess", "operation", "bpmn", "operation", "operation", "operation", "bpmn", "subprocess", "operation", "bpmn"]);
     const withGroup = structuredModel();
     withGroup.process.group = "Группа";
     document.body.innerHTML = "";
@@ -94,7 +96,7 @@ describe("навигатор: иерархия по кодам процесса 
     const m = structuredModel();
     m.process.group = "Группа";
     nav(m);
-    expect(count()).toBe(10);
+    expect(count()).toBe(12);
     fireEvent.click(document.querySelector('[data-nav-fn="o1"] .nav-twisty')!); // операция
     expect(document.querySelector('[data-nav-bpmn="o1"]')).toBeNull();
     expect(count()).toBe(9);
