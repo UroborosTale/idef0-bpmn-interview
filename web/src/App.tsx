@@ -1,3 +1,4 @@
+import { inDesktopShell } from "./desktop";
 import { useEffect, useState } from "react";
 import { api, AUTH_REQUIRED_EVENT } from "./api/client";
 import { routePath, useRoute, type Route } from "./router";
@@ -79,7 +80,7 @@ export default function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${inDesktopShell() && route.name === "workspace" ? "desk-ws" : ""}`}>
       <div className="topbar">
         {link({ name: "list" }, "IDEF0 / BPMN — модели по интервью", "brand")}
         <div className="topbar-nav">

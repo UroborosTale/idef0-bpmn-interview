@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import { onShellMessage } from "../desktop";
+import { inDesktopShell, onShellMessage } from "../desktop";
 import type { SessionRecord } from "../types";
 import TextPanel from "../components/TextPanel";
 import BpmnDiagram from "../components/bpmn-editor/BpmnDiagram";
@@ -226,8 +226,9 @@ export default function WorkspacePage({
   ];
   const activeGroup = groups.find((g) => g.tabs.some((t) => t.key === tab)) ?? groups[0];
 
-  return (
-    <div className="workspace">
+  // в настольном приложении, как в Business Studio, вместо шапки сайта — одна строка: «Назад», название сессии и вкладки разделов
+  const desk = inDesktopShell();
+  const toolbarEl = (
       <div className="toolbar">
         <button onClick={onBack}>← Назад</button>
         <h2 style={{ margin: 0 }}>{session.title}</h2>
@@ -240,6 +241,20 @@ export default function WorkspacePage({
         <div className="spacer" />
         {session.provider && <span className="muted" style={{ fontSize: 12 }}>LLM: {session.provider}</span>}
       </div>
+  );
+  const groupsEl = (
+      <div className="ws-groups" role="tablist" aria-label="Разделы сессии">
+        {groups.map((g) => (
+          <button key={g.key} role="tab" aria-selected={g === activeGroup} className={g === activeGroup ? "active" : ""} onClick={() => setTab(g.tabs[0].key)}>
+            {g.label}
+          </button>
+        ))}
+      </div>
+  );
+
+  return (
+    <div className="workspace">
+      {desk ? <div className="ws-desk-row">{toolbarEl}{groupsEl}</div> : toolbarEl}
 
       {error && <div className="validation-item error">{error}</div>}
       {progress && <div className="validation-item" style={{ background: "#eef2ff" }}>Идёт обработка — {progress}. Можно переключаться между вкладками.</div>}
@@ -267,13 +282,7 @@ export default function WorkspacePage({
         </div>
       )}
 
-      <div className="ws-groups" role="tablist" aria-label="Разделы сессии">
-        {groups.map((g) => (
-          <button key={g.key} role="tab" aria-selected={g === activeGroup} className={g === activeGroup ? "active" : ""} onClick={() => setTab(g.tabs[0].key)}>
-            {g.label}
-          </button>
-        ))}
-      </div>
+      {!desk && groupsEl}
       <div className="ws-tabs" role="tablist" aria-label={activeGroup.label}>
         {activeGroup.tabs.map((t) => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} className={tab === t.key ? "active" : ""} onClick={() => setTab(t.key)}>

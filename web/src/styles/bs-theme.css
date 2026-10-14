@@ -224,3 +224,10 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .palette-flyout button:hover { background: var(--bs-hover); }
 .palette-flyout button.on { font-weight: 600; background: var(--bs-press); }
 .palette-item.dragging { background: var(--bs-press); border-color: var(--bs-hover-border); }
+
+/* настольное приложение: на странице сессии вместо шапки сайта — одна строка, как вкладки ленты Business Studio */
+.app-shell.desk-ws > .topbar { display: none; }
+.ws-desk-row { display: flex; align-items: flex-end; gap: 8px; background: var(--bs-window); border-bottom: 1px solid var(--bs-border); }
+.ws-desk-row > .toolbar { margin: 0; padding: 0 0 4px 8px; border: 0; background: none; flex-wrap: nowrap; }
+.ws-desk-row > .toolbar h2 { font-size: 12px; font-weight: 400; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-desk-row > .ws-groups { border: 0; background: none; flex: 1; }
