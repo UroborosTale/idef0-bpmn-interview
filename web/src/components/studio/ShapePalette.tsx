@@ -18,7 +18,7 @@ export const PALETTE: { kind: string; title: string }[] = [
 export const EVENT_TYPES: Record<string, { type: string; title: string }[]> = {
   start: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }],
   intermediate: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }, { type: "escalation", title: "Эскалация" }],
-  end: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "error", title: "Ошибка" }, { type: "escalation", title: "Эскалация" }, { type: "signal", title: "Сигнал" }, { type: "terminate", title: "Завершение процесса" }],
+  end: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "error", title: "Ошибка" }, { type: "escalation", title: "Эскалация" }, { type: "signal", title: "Сигнал" }],
 };
 
 const INK = "#000";

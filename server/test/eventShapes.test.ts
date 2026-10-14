@@ -10,7 +10,7 @@ describe("фигуры событий для палитры оболочки", (
     expect(names).toEqual([
       "start:none", "start:message", "start:timer", "start:conditional", "start:signal",
       "intermediate:none", "intermediate:message", "intermediate:timer", "intermediate:conditional", "intermediate:signal", "intermediate:escalation",
-      "end:none", "end:message", "end:error", "end:escalation", "end:signal", "end:terminate",
+      "end:none", "end:message", "end:error", "end:escalation", "end:signal",
     ]);
     const files = Object.keys(zip.files).filter((f) => /^visio\/pages\/page\d+\.xml$/.test(f));
     expect(files).toHaveLength(names.length);

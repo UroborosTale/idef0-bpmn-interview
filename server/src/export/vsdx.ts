@@ -762,7 +762,7 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
 const PALETTE_EVENTS: Record<string, string[]> = {
   start: ["none", "message", "timer", "conditional", "signal"],
   intermediate: ["none", "message", "timer", "conditional", "signal", "escalation"],
-  end: ["none", "message", "error", "escalation", "signal", "terminate"],
+  end: ["none", "message", "error", "escalation", "signal"], // «завершение процесса» — залитый значок отдельной фигурой, в палитру не берётся
 };
 
 /**

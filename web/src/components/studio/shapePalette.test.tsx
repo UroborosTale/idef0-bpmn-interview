@@ -46,9 +46,9 @@ describe("палитра фигур", () => {
     fireEvent.pointerDown(screen.getByRole("button", { name: "Промежуточное событие" }), { clientX: 20, clientY: 20 });
     fireEvent.pointerUp(document, { clientX: 20, clientY: 20 });
     expect(post).toHaveBeenCalledWith({ t: "drop", kind: "event:intermediate:timer", dragged: false });
-    // у конечного события — свои типы, среди них завершение процесса; «Без типа» возвращает простое событие
+    // у конечного события — свои типы, среди них эскалация; «Без типа» возвращает простое событие
     fireEvent.click(screen.getByRole("button", { name: "Тип: Конечное событие" }));
-    expect(screen.getByRole("menuitemradio", { name: "Завершение процесса" })).toBeTruthy();
+    expect(screen.getByRole("menuitemradio", { name: "Эскалация" })).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Без типа" }));
     post.mockClear();
     fireEvent.pointerDown(screen.getByRole("button", { name: "Конечное событие" }), { clientX: 20, clientY: 20 });
