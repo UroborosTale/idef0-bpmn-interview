@@ -1,499 +1,499 @@
 # редактор BPMN общая схема
-shape s1 task 120,540 150×90 «Моделирование процесса»
-shape s2 task 310,540 150×90 «Анализ эффективности процессной модели»
-shape s3 task 500,540 150×90 «Реинжиниринг процесса»
-artifact s1:input:d_minutes 100,516 18×20 edge[109,536 130,540] «Пункт протокола совещания»
-artifact s1:input:d_incoming 157.3,516 18×20 edge[166.3,536 166.3,540] «Информация о вновь выявленном процессе»
-artifact s1:output:d_kbProject 214.7,516 18×20 edge[223.7,540 223.7,536] «Проект свода знаний процесса»
-artifact s1:output:d_procProject 272,516 18×20 edge[260,540 281,536] «Проект процесса»
-artifact s2:input:d_results 306.6,516 18×20 edge[315.6,536 320,540] «Информация об итогах реализации процессов»
-artifact s2:output:d_eff 376,516 18×20 edge[385,540 385,536] «Информация об эффективности реализации процесса»
-artifact s2:output:d_ineff 445.4,516 18×20 edge[450,540 454.4,536] «Информация о неэффективности реализации процесса»
-artifact s3:input:d_ineff 496.6,516 18×20 edge[505.6,536 510,540] «Информация о неэффективности реализации процесса»
-artifact s3:output:d_optProject 566,516 18×20 edge[575,540 575,536] «Проект оптимизированного процесса»
-artifact s3:output:d_optKb 635.4,516 18×20 edge[640,540 644.4,536] «Проект свода знаний оптимизированного процесса»
+shape s1 task 130,540 150×90 «Моделирование процесса»
+shape s2 task 320,540 150×90 «Анализ эффективности процессной модели»
+shape s3 task 510,540 150×90 «Реинжиниринг процесса»
+artifact s1:input:d_minutes 110,516 18×20 edge[119,536 140,540] «Пункт протокола совещания»
+artifact s1:input:d_incoming 167.3,516 18×20 edge[176.3,536 176.3,540] «Информация о вновь выявленном процессе»
+artifact s1:output:d_kbProject 224.7,516 18×20 edge[233.7,540 233.7,536] «Проект свода знаний процесса»
+artifact s1:output:d_procProject 282,516 18×20 edge[270,540 291,536] «Проект процесса»
+artifact s2:input:d_results 316.6,516 18×20 edge[325.6,536 330,540] «Информация об итогах реализации процессов»
+artifact s2:output:d_eff 386,516 18×20 edge[395,540 395,536] «Информация об эффективности реализации процесса»
+artifact s2:output:d_ineff 455.4,516 18×20 edge[460,540 464.4,536] «Информация о неэффективности реализации процесса»
+artifact s3:input:d_ineff 506.6,516 18×20 edge[515.6,536 520,540] «Информация о неэффективности реализации процесса»
+artifact s3:output:d_optProject 576,516 18×20 edge[585,540 585,536] «Проект оптимизированного процесса»
+artifact s3:output:d_optKb 645.4,516 18×20 edge[650,540 654.4,536] «Проект свода знаний оптимизированного процесса»
 # редактор BPMN B002.01.01
-shape o11_start1 event/start 170,117 36×36 «Информация о вновь выявленном процессе получена»
-shape o11_start2 event/start 360,117 36×36 «Пункт протокола совещания получен»
-shape o11_m1 gateway/exclusive 550,110 50×50 «Слияние потоков»
-shape o11_open task/user 690,90 150×90 «Открыть последнюю версию реестра процессов ООО «РУ КМЗ»»
-shape o11_code task/user 880,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Код процесса»
-shape o11_name task/user 1070,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Наименование процесса»
-shape o11_owner task/user 1260,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Владельца процесса»
-shape o11_author task/user 1450,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Автора процесса»
-shape o11_status task/user 1640,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Статус процесса»
-shape o11_m2 gateway/exclusive 1880,110 50×50 «Слияние потоков»
-shape o11_need gateway/exclusive 2070,110 50×50 «Необходимо предоставить актуальный реестр процессов?»
-shape o11_load task/user 2210,90 150×90 «Загрузить последнюю версию реестра процессов ООО «РУ КМЗ»»
-shape o11_end event/end 2450,117 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
-flow o11_f1 o11_start1→o11_m1 [188,153 188,184 575,184 575,160]
-flow o11_f2 o11_start2→o11_m1 [396,135 550,135]
-flow o11_f3 o11_m1→o11_open [600,135 690,135]
-flow o11_f4 o11_open→o11_code [840,135 880,135]
-flow o11_f5 o11_code→o11_name [1030,135 1070,135]
-flow o11_f6 o11_name→o11_owner [1220,135 1260,135]
-flow o11_f7 o11_owner→o11_author [1410,135 1450,135]
-flow o11_f8 o11_author→o11_status [1600,135 1640,135]
-flow o11_f9 o11_status→o11_m2 [1790,135 1880,135]
-flow o11_f10 o11_m2→o11_need [1930,135 2070,135]
-flow o11_f11 o11_need→o11_end [2095,110 2095,31 2468,31 2468,117] «Нет»
-flow o11_f12 o11_need→o11_load [2120,135 2210,135] «Да»
-flow o11_f13 o11_load→o11_m2 [2285,90 2285,21 1905,21 1905,110]
-artifact o11_open:input:d_registry 756,66 18×20 edge[765,86 765,90] «Реестр процессов ООО «РУ КМЗ»»
-artifact o11_open:store:s_excel 756,184 18×20 edge[765,184 765,180] «Excel»
-artifact o11_code:output:d_registryActual 946,66 18×20 edge[955,90 955,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_code:store:s_excel 946,184 18×20 edge[955,184 955,180] «Excel»
-artifact o11_name:output:d_registryActual 1136,66 18×20 edge[1145,90 1145,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_name:store:s_excel 1136,184 18×20 edge[1145,184 1145,180] «Excel»
-artifact o11_owner:output:d_registryActual 1326,66 18×20 edge[1335,90 1335,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_owner:store:s_excel 1326,184 18×20 edge[1335,184 1335,180] «Excel»
-artifact o11_author:output:d_registryActual 1516,66 18×20 edge[1525,90 1525,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_author:store:s_excel 1516,184 18×20 edge[1525,184 1525,180] «Excel»
-artifact o11_status:output:d_registryActual 1706,66 18×20 edge[1715,90 1715,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_status:store:s_excel 1706,184 18×20 edge[1715,184 1715,180] «Excel»
-artifact o11_load:input:d_registryActual 2276,66 18×20 edge[2285,86 2285,90] «Актуальный реестр процессов ООО «РУ КМЗ»»
-artifact o11_load:store:s_elma 2276,184 18×20 edge[2285,184 2285,180] «ELMA365»
+shape o11_start1 event/start 180,117 36×36 «Информация о вновь выявленном процессе получена»
+shape o11_start2 event/start 370,117 36×36 «Пункт протокола совещания получен»
+shape o11_m1 gateway/exclusive 560,110 50×50 «Слияние потоков»
+shape o11_open task/user 700,90 150×90 «Открыть последнюю версию реестра процессов ООО «РУ КМЗ»»
+shape o11_code task/user 890,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Код процесса»
+shape o11_name task/user 1080,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Наименование процесса»
+shape o11_owner task/user 1270,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Владельца процесса»
+shape o11_author task/user 1460,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Автора процесса»
+shape o11_status task/user 1650,90 150×90 «Вносить в реестр процессов ООО «РУ КМЗ» Статус процесса»
+shape o11_m2 gateway/exclusive 1890,110 50×50 «Слияние потоков»
+shape o11_need gateway/exclusive 2080,110 50×50 «Необходимо предоставить актуальный реестр процессов?»
+shape o11_load task/user 2220,90 150×90 «Загрузить последнюю версию реестра процессов ООО «РУ КМЗ»»
+shape o11_end event/end 2460,117 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
+flow o11_f1 o11_start1→o11_m1 [198,153 198,184 585,184 585,160]
+flow o11_f2 o11_start2→o11_m1 [406,135 560,135]
+flow o11_f3 o11_m1→o11_open [610,135 700,135]
+flow o11_f4 o11_open→o11_code [850,135 890,135]
+flow o11_f5 o11_code→o11_name [1040,135 1080,135]
+flow o11_f6 o11_name→o11_owner [1230,135 1270,135]
+flow o11_f7 o11_owner→o11_author [1420,135 1460,135]
+flow o11_f8 o11_author→o11_status [1610,135 1650,135]
+flow o11_f9 o11_status→o11_m2 [1800,135 1890,135]
+flow o11_f10 o11_m2→o11_need [1940,135 2080,135]
+flow o11_f11 o11_need→o11_end [2105,110 2105,31 2478,31 2478,117] «Нет»
+flow o11_f12 o11_need→o11_load [2130,135 2220,135] «Да»
+flow o11_f13 o11_load→o11_m2 [2295,90 2295,21 1915,21 1915,110]
+artifact o11_open:input:d_registry 766,66 18×20 edge[775,86 775,90] «Реестр процессов ООО «РУ КМЗ»»
+artifact o11_open:store:s_excel 766,184 18×20 edge[775,184 775,180] «Excel»
+artifact o11_code:output:d_registryActual 956,66 18×20 edge[965,90 965,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_code:store:s_excel 956,184 18×20 edge[965,184 965,180] «Excel»
+artifact o11_name:output:d_registryActual 1146,66 18×20 edge[1155,90 1155,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_name:store:s_excel 1146,184 18×20 edge[1155,184 1155,180] «Excel»
+artifact o11_owner:output:d_registryActual 1336,66 18×20 edge[1345,90 1345,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_owner:store:s_excel 1336,184 18×20 edge[1345,184 1345,180] «Excel»
+artifact o11_author:output:d_registryActual 1526,66 18×20 edge[1535,90 1535,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_author:store:s_excel 1526,184 18×20 edge[1535,184 1535,180] «Excel»
+artifact o11_status:output:d_registryActual 1716,66 18×20 edge[1725,90 1725,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_status:store:s_excel 1716,184 18×20 edge[1725,184 1725,180] «Excel»
+artifact o11_load:input:d_registryActual 2286,66 18×20 edge[2295,86 2295,90] «Актуальный реестр процессов ООО «РУ КМЗ»»
+artifact o11_load:store:s_elma 2286,184 18×20 edge[2295,184 2295,180] «ELMA365»
 # редактор BPMN B002.01.02
-shape o12_start event/start 170,117 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
-shape o12_card task/user 310,90 150×90 «Создать карточку процесса»
-shape o12_primary task/user 500,90 150×90 «Заполнить первичные данные по процессу»
-shape o12_study task/user 690,90 150×90 «Изучить нормативную документацию по процессу»
-shape o12_collect task/user 880,90 150×90 «Собрать данные по процессу из нормативной документации»
-shape o12_assign task/user 1070,90 150×90 «Назначить первичное интервью с владельцем процесса»
-shape o12_timer event/timer 1310,117 36×36 «Наступление интервью»
-shape o12_interview task/business_rule 1450,90 150×90 «Интервьюировать по вопросам процесса»
-shape o12_comment1 task/user 1640,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape o12_finish task/user 1830,90 150×90 «Завершить задачу по проведению первичного интервью»
-shape o12_notify task/service 2020,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape o12_chain task/user 2210,90 150×90 «Создать продуктовую цепочку»
-shape o12_attach task/user 2400,90 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
-shape o12_comment2 task/user 2590,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape o12_approve subprocess 2770,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o12_end event/end 3020,117 36×36 «Проведено первичное интервью»
-flow o12_f1 o12_start→o12_card [206,135 310,135]
-flow o12_f2 o12_card→o12_primary [460,135 500,135]
-flow o12_f3 o12_primary→o12_study [650,135 690,135]
-flow o12_f4 o12_study→o12_collect [840,135 880,135]
-flow o12_f5 o12_collect→o12_assign [1030,135 1070,135]
-flow o12_f6 o12_assign→o12_timer [1220,135 1310,135]
-flow o12_f7 o12_timer→o12_interview [1346,135 1450,135]
-flow o12_f8 o12_interview→o12_comment1 [1600,135 1640,135]
-flow o12_f9 o12_comment1→o12_finish [1790,135 1830,135]
-flow o12_f10 o12_finish→o12_notify [1980,135 2020,135]
-flow o12_f11 o12_notify→o12_chain [2170,135 2210,135]
-flow o12_f12 o12_chain→o12_attach [2360,135 2400,135]
-flow o12_f13 o12_attach→o12_comment2 [2550,135 2590,135]
-flow o12_f14 o12_comment2→o12_approve [2740,135 2770,135]
-flow o12_f15 o12_approve→o12_end [2930,135 3020,135]
-artifact o12_card:store:s_elma 376,184 18×20 edge[385,184 385,180] «ELMA365»
-artifact o12_primary:store:s_elma 566,184 18×20 edge[575,184 575,180] «ELMA365»
-artifact o12_study:store:s_intranet 756,184 18×20 edge[765,184 765,180] «Intranet.kmzlift.ru»
-artifact o12_collect:output:d_protocol 946,66 18×20 edge[955,90 955,86] «Протокол интервью»
-artifact o12_collect:store:s_word 946,184 18×20 edge[955,184 955,180] «Microsoft Word»
-artifact o12_assign:store:s_outlook 1136,184 18×20 edge[1145,184 1145,180] «Outlook»
-artifact o12_interview:input:d_checklist 1481.3,66 18×20 edge[1490.3,86 1490.3,90] «Чек-лист интервью»
-artifact o12_interview:output:d_protocol 1550.7,66 18×20 edge[1559.7,90 1559.7,86] «Протокол интервью»
-artifact o12_comment1:store:s_elma 1706,184 18×20 edge[1715,184 1715,180] «ELMA365»
-artifact o12_finish:store:s_elma 1896,184 18×20 edge[1905,184 1905,180] «ELMA365»
-artifact o12_notify:store:s_elma 2086,184 18×20 edge[2095,184 2095,180] «ELMA365»
-artifact o12_chain:input:d_protocol 2241.3,66 18×20 edge[2250.3,86 2250.3,90] «Протокол интервью»
-artifact o12_chain:output:d_chain 2310.7,66 18×20 edge[2319.7,90 2319.7,86] «Продуктовая цепочка»
-artifact o12_attach:input:d_chain 2466,66 18×20 edge[2475,86 2475,90] «Продуктовая цепочка»
-artifact o12_attach:store:s_elma 2466,184 18×20 edge[2475,184 2475,180] «ELMA365»
-artifact o12_comment2:store:s_elma 2656,184 18×20 edge[2665,184 2665,180] «ELMA365»
+shape o12_start event/start 180,117 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
+shape o12_card task/user 320,90 150×90 «Создать карточку процесса»
+shape o12_primary task/user 510,90 150×90 «Заполнить первичные данные по процессу»
+shape o12_study task/user 700,90 150×90 «Изучить нормативную документацию по процессу»
+shape o12_collect task/user 890,90 150×90 «Собрать данные по процессу из нормативной документации»
+shape o12_assign task/user 1080,90 150×90 «Назначить первичное интервью с владельцем процесса»
+shape o12_timer event/timer 1320,117 36×36 «Наступление интервью»
+shape o12_interview task/business_rule 1460,90 150×90 «Интервьюировать по вопросам процесса»
+shape o12_comment1 task/user 1650,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape o12_finish task/user 1840,90 150×90 «Завершить задачу по проведению первичного интервью»
+shape o12_notify task/service 2030,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
+shape o12_chain task/user 2220,90 150×90 «Создать продуктовую цепочку»
+shape o12_attach task/user 2410,90 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
+shape o12_comment2 task/user 2600,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape o12_approve subprocess 2780,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape o12_end event/end 3030,117 36×36 «Проведено первичное интервью»
+flow o12_f1 o12_start→o12_card [216,135 320,135]
+flow o12_f2 o12_card→o12_primary [470,135 510,135]
+flow o12_f3 o12_primary→o12_study [660,135 700,135]
+flow o12_f4 o12_study→o12_collect [850,135 890,135]
+flow o12_f5 o12_collect→o12_assign [1040,135 1080,135]
+flow o12_f6 o12_assign→o12_timer [1230,135 1320,135]
+flow o12_f7 o12_timer→o12_interview [1356,135 1460,135]
+flow o12_f8 o12_interview→o12_comment1 [1610,135 1650,135]
+flow o12_f9 o12_comment1→o12_finish [1800,135 1840,135]
+flow o12_f10 o12_finish→o12_notify [1990,135 2030,135]
+flow o12_f11 o12_notify→o12_chain [2180,135 2220,135]
+flow o12_f12 o12_chain→o12_attach [2370,135 2410,135]
+flow o12_f13 o12_attach→o12_comment2 [2560,135 2600,135]
+flow o12_f14 o12_comment2→o12_approve [2750,135 2780,135]
+flow o12_f15 o12_approve→o12_end [2940,135 3030,135]
+artifact o12_card:store:s_elma 386,184 18×20 edge[395,184 395,180] «ELMA365»
+artifact o12_primary:store:s_elma 576,184 18×20 edge[585,184 585,180] «ELMA365»
+artifact o12_study:store:s_intranet 766,184 18×20 edge[775,184 775,180] «Intranet.kmzlift.ru»
+artifact o12_collect:output:d_protocol 956,66 18×20 edge[965,90 965,86] «Протокол интервью»
+artifact o12_collect:store:s_word 956,184 18×20 edge[965,184 965,180] «Microsoft Word»
+artifact o12_assign:store:s_outlook 1146,184 18×20 edge[1155,184 1155,180] «Outlook»
+artifact o12_interview:input:d_checklist 1491.3,66 18×20 edge[1500.3,86 1500.3,90] «Чек-лист интервью»
+artifact o12_interview:output:d_protocol 1560.7,66 18×20 edge[1569.7,90 1569.7,86] «Протокол интервью»
+artifact o12_comment1:store:s_elma 1716,184 18×20 edge[1725,184 1725,180] «ELMA365»
+artifact o12_finish:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
+artifact o12_notify:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
+artifact o12_chain:input:d_protocol 2251.3,66 18×20 edge[2260.3,86 2260.3,90] «Протокол интервью»
+artifact o12_chain:output:d_chain 2320.7,66 18×20 edge[2329.7,90 2329.7,86] «Продуктовая цепочка»
+artifact o12_attach:input:d_chain 2476,66 18×20 edge[2485,86 2485,90] «Продуктовая цепочка»
+artifact o12_attach:store:s_elma 2476,184 18×20 edge[2485,184 2485,180] «ELMA365»
+artifact o12_comment2:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
 # редактор BPMN B002.01.03
-shape o13_start event/start 170,117 36×36 «Проведено первичное интервью»
-shape o13_idef0_0 task/user 310,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
-shape o13_idef0_1 task/user 500,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
-shape o13_idef0_attach task/user 690,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
-shape o13_idef0_comment task/user 880,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
-shape o13_approve1 subprocess 1060,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_assign task/user 1260,90 150×90 «Назначить повторное интервью с владельцем процесса»
-shape o13_timer event/timer 1500,117 36×36 «Наступление интервью»
-shape o13_interview task/business_rule 1640,90 150×90 «Интервьюировать по вопросам процесса»
-shape o13_comment_i task/user 1830,90 150×90 «Заполнить текстовый комментарий по проведению повторного интервью»
-shape o13_finish_i task/user 2020,90 150×90 «Завершить задачу по проведению повторного интервью»
-shape o13_notify task/service 2210,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape o13_bpmn task/user 2400,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
-shape o13_bpmn_attach task/user 2590,90 150×90 «Прикрепить файл к задаче по описанию BPMN»
-shape o13_bpmn_comment task/user 2780,90 150×90 «Заполнить текстовый комментарий по описанию BPMN»
-shape o13_atlas task/user 2970,90 150×90 «Создать атлас процессов»
-shape o13_wi task/user 3160,90 150×90 «Создать рабочую инструкцию»
-shape o13_wi_attach task/user 3350,90 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
-shape o13_wi_comment task/user 3540,90 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
-shape o13_approve2 subprocess 3720,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_reg task/user 3920,90 150×90 «Написать регламент по смоделированному процессу ООО «РУ КМЗ»»
-shape o13_reg_attach task/user 4110,90 150×90 «Прикрепить файл к задаче по описанию регламента процесса»
-shape o13_reg_comment task/user 4300,90 150×90 «Заполнить текстовый комментарий по описанию регламента процесса»
-shape o13_approve3 subprocess 4480,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_kb task/service 4680,90 150×90 «Сформировать свод знаний процесса»
-shape o13_task_kk task/service 4870,90 150×90 «Создать задачу «Утвердить процесс на КК» на ответственного секретаря»
-shape o13_end event/end 5110,117 36×36 «Завершено моделирование текущего процесса»
-flow o13_f1 o13_start→o13_idef0_0 [206,135 310,135]
-flow o13_f2 o13_idef0_0→o13_idef0_1 [460,135 500,135]
-flow o13_f3 o13_idef0_1→o13_idef0_attach [650,135 690,135]
-flow o13_f4 o13_idef0_attach→o13_idef0_comment [840,135 880,135]
-flow o13_f5 o13_idef0_comment→o13_approve1 [1030,135 1060,135]
-flow o13_f6 o13_approve1→o13_assign [1220,135 1260,135]
-flow o13_f7 o13_assign→o13_timer [1410,135 1500,135]
-flow o13_f8 o13_timer→o13_interview [1536,135 1640,135]
-flow o13_f9 o13_interview→o13_comment_i [1790,135 1830,135]
-flow o13_f10 o13_comment_i→o13_finish_i [1980,135 2020,135]
-flow o13_f11 o13_finish_i→o13_notify [2170,135 2210,135]
-flow o13_f12 o13_notify→o13_bpmn [2360,135 2400,135]
-flow o13_f13 o13_bpmn→o13_bpmn_attach [2550,135 2590,135]
-flow o13_f14 o13_bpmn_attach→o13_bpmn_comment [2740,135 2780,135]
-flow o13_f15 o13_bpmn_comment→o13_atlas [2930,135 2970,135]
-flow o13_f16 o13_atlas→o13_wi [3120,135 3160,135]
-flow o13_f17 o13_wi→o13_wi_attach [3310,135 3350,135]
-flow o13_f18 o13_wi_attach→o13_wi_comment [3500,135 3540,135]
-flow o13_f19 o13_wi_comment→o13_approve2 [3690,135 3720,135]
-flow o13_f20 o13_approve2→o13_reg [3880,135 3920,135]
-flow o13_f21 o13_reg→o13_reg_attach [4070,135 4110,135]
-flow o13_f22 o13_reg_attach→o13_reg_comment [4260,135 4300,135]
-flow o13_f23 o13_reg_comment→o13_approve3 [4450,135 4480,135]
-flow o13_f24 o13_approve3→o13_kb [4640,135 4680,135]
-flow o13_f25 o13_kb→o13_task_kk [4830,135 4870,135]
-flow o13_f26 o13_task_kk→o13_end [5020,135 5110,135]
-artifact o13_idef0_0:output:d_idef0_0 376,66 18×20 edge[385,90 385,86] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o13_idef0_0:store:s_visio 341.3,184 18×20 edge[350.3,184 350.3,180] «Microsoft Visio»
-artifact o13_idef0_0:store:s_bs 410.7,184 18×20 edge[419.7,184 419.7,180] «Business studio»
-artifact o13_idef0_1:output:d_idef0_1 566,66 18×20 edge[575,90 575,86] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o13_idef0_1:store:s_visio 531.3,184 18×20 edge[540.3,184 540.3,180] «Microsoft Visio»
-artifact o13_idef0_1:store:s_bs 600.7,184 18×20 edge[609.7,184 609.7,180] «Business studio»
-artifact o13_idef0_attach:input:d_idef0_0 721.3,66 18×20 edge[730.3,86 730.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o13_idef0_attach:input:d_idef0_1 790.7,66 18×20 edge[799.7,86 799.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o13_idef0_attach:store:s_elma 756,184 18×20 edge[765,184 765,180] «ELMA365»
-artifact o13_idef0_comment:store:s_elma 946,184 18×20 edge[955,184 955,180] «ELMA365»
-artifact o13_assign:input:d_checklist 1291.3,66 18×20 edge[1300.3,86 1300.3,90] «Чек-лист интервью»
-artifact o13_assign:output:d_protocol 1360.7,66 18×20 edge[1369.7,90 1369.7,86] «Протокол интервью»
-artifact o13_comment_i:store:s_elma 1896,184 18×20 edge[1905,184 1905,180] «ELMA365»
-artifact o13_finish_i:store:s_elma 2086,184 18×20 edge[2095,184 2095,180] «ELMA365»
-artifact o13_notify:store:s_elma 2276,184 18×20 edge[2285,184 2285,180] «ELMA365»
-artifact o13_bpmn:output:d_bpmn 2466,66 18×20 edge[2475,90 2475,86] «Диаграмма процесса BPMN 2.0»
-artifact o13_bpmn:store:s_visio 2431.3,184 18×20 edge[2440.3,184 2440.3,180] «Microsoft Visio»
-artifact o13_bpmn:store:s_bs 2500.7,184 18×20 edge[2509.7,184 2509.7,180] «Business studio»
-artifact o13_bpmn_attach:input:d_bpmn 2656,66 18×20 edge[2665,86 2665,90] «Диаграмма процесса BPMN 2.0»
-artifact o13_bpmn_attach:store:s_elma 2656,184 18×20 edge[2665,184 2665,180] «ELMA365»
-artifact o13_bpmn_comment:store:s_elma 2846,184 18×20 edge[2855,184 2855,180] «ELMA365»
-artifact o13_atlas:output:d_atlas 3036,66 18×20 edge[3045,90 3045,86] «Атлас процессов»
-artifact o13_atlas:store:s_visio 3036,184 18×20 edge[3045,184 3045,180] «Microsoft Visio»
-artifact o13_wi:input:d_wiTpl 3191.3,66 18×20 edge[3200.3,86 3200.3,90] «Шаблон рабочей инструкции»
-artifact o13_wi:output:d_wi 3260.7,66 18×20 edge[3269.7,90 3269.7,86] «Рабочая инструкция»
-artifact o13_wi:store:s_visio 3226,184 18×20 edge[3235,184 3235,180] «Microsoft Visio»
-artifact o13_wi_attach:input:d_wi 3416,66 18×20 edge[3425,86 3425,90] «Рабочая инструкция»
-artifact o13_wi_attach:store:s_elma 3416,184 18×20 edge[3425,184 3425,180] «ELMA365»
-artifact o13_wi_comment:store:s_elma 3606,184 18×20 edge[3615,184 3615,180] «ELMA365»
-artifact o13_reg:input:d_regTpl 3951.3,66 18×20 edge[3960.3,86 3960.3,90] «Шаблон регламента процесса»
-artifact o13_reg:output:d_reg 4020.7,66 18×20 edge[4029.7,90 4029.7,86] «Регламент процесса»
-artifact o13_reg:store:s_word 3986,184 18×20 edge[3995,184 3995,180] «Microsoft Word»
-artifact o13_reg_attach:input:d_reg 4176,66 18×20 edge[4185,86 4185,90] «Регламент процесса»
-artifact o13_reg_attach:store:s_elma 4176,184 18×20 edge[4185,184 4185,180] «ELMA365»
-artifact o13_reg_comment:store:s_elma 4366,184 18×20 edge[4375,184 4375,180] «ELMA365»
-artifact o13_kb:input:d_reg 4676.6,66 18×20 edge[4685.6,86 4690,90] «Регламент процесса»
-artifact o13_kb:input:d_wi 4746,66 18×20 edge[4755,86 4755,90] «Рабочая инструкция»
-artifact o13_kb:output:d_kbProject 4815.4,66 18×20 edge[4820,90 4824.4,86] «Проект свода знаний процесса»
-artifact o13_kb:store:s_word 4746,184 18×20 edge[4755,184 4755,180] «Microsoft Word»
-artifact o13_task_kk:store:s_elma 4936,184 18×20 edge[4945,184 4945,180] «ELMA365»
+shape o13_start event/start 180,117 36×36 «Проведено первичное интервью»
+shape o13_idef0_0 task/user 320,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
+shape o13_idef0_1 task/user 510,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
+shape o13_idef0_attach task/user 700,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
+shape o13_idef0_comment task/user 890,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
+shape o13_approve1 subprocess 1070,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape o13_assign task/user 1270,90 150×90 «Назначить повторное интервью с владельцем процесса»
+shape o13_timer event/timer 1510,117 36×36 «Наступление интервью»
+shape o13_interview task/business_rule 1650,90 150×90 «Интервьюировать по вопросам процесса»
+shape o13_comment_i task/user 1840,90 150×90 «Заполнить текстовый комментарий по проведению повторного интервью»
+shape o13_finish_i task/user 2030,90 150×90 «Завершить задачу по проведению повторного интервью»
+shape o13_notify task/service 2220,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
+shape o13_bpmn task/user 2410,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
+shape o13_bpmn_attach task/user 2600,90 150×90 «Прикрепить файл к задаче по описанию BPMN»
+shape o13_bpmn_comment task/user 2790,90 150×90 «Заполнить текстовый комментарий по описанию BPMN»
+shape o13_atlas task/user 2980,90 150×90 «Создать атлас процессов»
+shape o13_wi task/user 3170,90 150×90 «Создать рабочую инструкцию»
+shape o13_wi_attach task/user 3360,90 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
+shape o13_wi_comment task/user 3550,90 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
+shape o13_approve2 subprocess 3730,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape o13_reg task/user 3930,90 150×90 «Написать регламент по смоделированному процессу ООО «РУ КМЗ»»
+shape o13_reg_attach task/user 4120,90 150×90 «Прикрепить файл к задаче по описанию регламента процесса»
+shape o13_reg_comment task/user 4310,90 150×90 «Заполнить текстовый комментарий по описанию регламента процесса»
+shape o13_approve3 subprocess 4490,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape o13_kb task/service 4690,90 150×90 «Сформировать свод знаний процесса»
+shape o13_task_kk task/service 4880,90 150×90 «Создать задачу «Утвердить процесс на КК» на ответственного секретаря»
+shape o13_end event/end 5120,117 36×36 «Завершено моделирование текущего процесса»
+flow o13_f1 o13_start→o13_idef0_0 [216,135 320,135]
+flow o13_f2 o13_idef0_0→o13_idef0_1 [470,135 510,135]
+flow o13_f3 o13_idef0_1→o13_idef0_attach [660,135 700,135]
+flow o13_f4 o13_idef0_attach→o13_idef0_comment [850,135 890,135]
+flow o13_f5 o13_idef0_comment→o13_approve1 [1040,135 1070,135]
+flow o13_f6 o13_approve1→o13_assign [1230,135 1270,135]
+flow o13_f7 o13_assign→o13_timer [1420,135 1510,135]
+flow o13_f8 o13_timer→o13_interview [1546,135 1650,135]
+flow o13_f9 o13_interview→o13_comment_i [1800,135 1840,135]
+flow o13_f10 o13_comment_i→o13_finish_i [1990,135 2030,135]
+flow o13_f11 o13_finish_i→o13_notify [2180,135 2220,135]
+flow o13_f12 o13_notify→o13_bpmn [2370,135 2410,135]
+flow o13_f13 o13_bpmn→o13_bpmn_attach [2560,135 2600,135]
+flow o13_f14 o13_bpmn_attach→o13_bpmn_comment [2750,135 2790,135]
+flow o13_f15 o13_bpmn_comment→o13_atlas [2940,135 2980,135]
+flow o13_f16 o13_atlas→o13_wi [3130,135 3170,135]
+flow o13_f17 o13_wi→o13_wi_attach [3320,135 3360,135]
+flow o13_f18 o13_wi_attach→o13_wi_comment [3510,135 3550,135]
+flow o13_f19 o13_wi_comment→o13_approve2 [3700,135 3730,135]
+flow o13_f20 o13_approve2→o13_reg [3890,135 3930,135]
+flow o13_f21 o13_reg→o13_reg_attach [4080,135 4120,135]
+flow o13_f22 o13_reg_attach→o13_reg_comment [4270,135 4310,135]
+flow o13_f23 o13_reg_comment→o13_approve3 [4460,135 4490,135]
+flow o13_f24 o13_approve3→o13_kb [4650,135 4690,135]
+flow o13_f25 o13_kb→o13_task_kk [4840,135 4880,135]
+flow o13_f26 o13_task_kk→o13_end [5030,135 5120,135]
+artifact o13_idef0_0:output:d_idef0_0 386,66 18×20 edge[395,90 395,86] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o13_idef0_0:store:s_visio 351.3,184 18×20 edge[360.3,184 360.3,180] «Microsoft Visio»
+artifact o13_idef0_0:store:s_bs 420.7,184 18×20 edge[429.7,184 429.7,180] «Business studio»
+artifact o13_idef0_1:output:d_idef0_1 576,66 18×20 edge[585,90 585,86] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o13_idef0_1:store:s_visio 541.3,184 18×20 edge[550.3,184 550.3,180] «Microsoft Visio»
+artifact o13_idef0_1:store:s_bs 610.7,184 18×20 edge[619.7,184 619.7,180] «Business studio»
+artifact o13_idef0_attach:input:d_idef0_0 731.3,66 18×20 edge[740.3,86 740.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o13_idef0_attach:input:d_idef0_1 800.7,66 18×20 edge[809.7,86 809.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o13_idef0_attach:store:s_elma 766,184 18×20 edge[775,184 775,180] «ELMA365»
+artifact o13_idef0_comment:store:s_elma 956,184 18×20 edge[965,184 965,180] «ELMA365»
+artifact o13_assign:input:d_checklist 1301.3,66 18×20 edge[1310.3,86 1310.3,90] «Чек-лист интервью»
+artifact o13_assign:output:d_protocol 1370.7,66 18×20 edge[1379.7,90 1379.7,86] «Протокол интервью»
+artifact o13_comment_i:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
+artifact o13_finish_i:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
+artifact o13_notify:store:s_elma 2286,184 18×20 edge[2295,184 2295,180] «ELMA365»
+artifact o13_bpmn:output:d_bpmn 2476,66 18×20 edge[2485,90 2485,86] «Диаграмма процесса BPMN 2.0»
+artifact o13_bpmn:store:s_visio 2441.3,184 18×20 edge[2450.3,184 2450.3,180] «Microsoft Visio»
+artifact o13_bpmn:store:s_bs 2510.7,184 18×20 edge[2519.7,184 2519.7,180] «Business studio»
+artifact o13_bpmn_attach:input:d_bpmn 2666,66 18×20 edge[2675,86 2675,90] «Диаграмма процесса BPMN 2.0»
+artifact o13_bpmn_attach:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
+artifact o13_bpmn_comment:store:s_elma 2856,184 18×20 edge[2865,184 2865,180] «ELMA365»
+artifact o13_atlas:output:d_atlas 3046,66 18×20 edge[3055,90 3055,86] «Атлас процессов»
+artifact o13_atlas:store:s_visio 3046,184 18×20 edge[3055,184 3055,180] «Microsoft Visio»
+artifact o13_wi:input:d_wiTpl 3201.3,66 18×20 edge[3210.3,86 3210.3,90] «Шаблон рабочей инструкции»
+artifact o13_wi:output:d_wi 3270.7,66 18×20 edge[3279.7,90 3279.7,86] «Рабочая инструкция»
+artifact o13_wi:store:s_visio 3236,184 18×20 edge[3245,184 3245,180] «Microsoft Visio»
+artifact o13_wi_attach:input:d_wi 3426,66 18×20 edge[3435,86 3435,90] «Рабочая инструкция»
+artifact o13_wi_attach:store:s_elma 3426,184 18×20 edge[3435,184 3435,180] «ELMA365»
+artifact o13_wi_comment:store:s_elma 3616,184 18×20 edge[3625,184 3625,180] «ELMA365»
+artifact o13_reg:input:d_regTpl 3961.3,66 18×20 edge[3970.3,86 3970.3,90] «Шаблон регламента процесса»
+artifact o13_reg:output:d_reg 4030.7,66 18×20 edge[4039.7,90 4039.7,86] «Регламент процесса»
+artifact o13_reg:store:s_word 3996,184 18×20 edge[4005,184 4005,180] «Microsoft Word»
+artifact o13_reg_attach:input:d_reg 4186,66 18×20 edge[4195,86 4195,90] «Регламент процесса»
+artifact o13_reg_attach:store:s_elma 4186,184 18×20 edge[4195,184 4195,180] «ELMA365»
+artifact o13_reg_comment:store:s_elma 4376,184 18×20 edge[4385,184 4385,180] «ELMA365»
+artifact o13_kb:input:d_reg 4686.6,66 18×20 edge[4695.6,86 4700,90] «Регламент процесса»
+artifact o13_kb:input:d_wi 4756,66 18×20 edge[4765,86 4765,90] «Рабочая инструкция»
+artifact o13_kb:output:d_kbProject 4825.4,66 18×20 edge[4830,90 4834.4,86] «Проект свода знаний процесса»
+artifact o13_kb:store:s_word 4756,184 18×20 edge[4765,184 4765,180] «Microsoft Word»
+artifact o13_task_kk:store:s_elma 4946,184 18×20 edge[4955,184 4955,180] «ELMA365»
 # редактор BPMN B002.02.01
-shape o21_start event/start 170,117 36×36 «Направлена информация об итогах реализации процессов»
-shape o21_get task/receive 310,90 150×90 «Получить информацию по процессу ООО «РУ КМЗ»»
-shape o21_enough gateway/exclusive 550,110 50×50 «Исходных данных достаточно для анализа процесса?»
-shape o21_ask task/send 690,90 150×90 «Запросить недостающую информацию по процессу»
-shape o21_recv task/receive 880,90 150×90 «Получить информацию по процессу»
-shape o21_m1 gateway/exclusive 1120,110 50×50 «Слияние потоков»
-shape o21_study_reg task/user 1260,90 150×90 «Изучить регламент рассматриваемого процесса»
-shape o21_study_model task/user 1450,90 150×90 «Изучить утвержденную модель процесса»
-shape o21_compare task/user 1640,90 150×90 «Сопоставить фактическую реализацию процесса с утвержденной моделью»
-shape o21_find task/user 1830,90 150×90 «Выявить отклонения по качеству брака»
-shape o21_found gateway/exclusive 2070,110 50×50 «Отклонения выявлены?»
-shape o21_fix_ok task/user 2210,90 150×90 «Зафиксировать соответствие фактической реализации процесса с утвержденной моделью»
-shape o21_approve subprocess 2390,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
-shape o21_end_ok event/end 2640,117 36×36 «Составлена информация об эффективности реализации процесса»
-shape o21_by_object task/user 2780,90 150×90 «Классифицировать брак по объекту отклонения»
-shape o21_by_weight task/user 2970,90 150×90 «Классифицировать брак по значимости»
-shape o21_by_freq task/user 3160,90 150×90 «Классифицировать брак по частоте возникновения»
-shape o21_by_impact task/user 3350,90 150×90 «Классифицировать брак по влиянию на процесс»
-shape o21_register task/user 3540,90 150×90 «Сформировать реестр отклонений по полученной информации по браку процессной модели»
-shape o21_end_dev event/end 3780,117 36×36 «Составлен перечень выявленных отклонений»
-flow o21_f1 o21_start→o21_get [206,135 310,135]
-flow o21_f2 o21_get→o21_enough [460,135 550,135]
-flow o21_f3 o21_enough→o21_ask [600,135 690,135] «Нет»
-flow o21_f4 o21_enough→o21_m1 [575,110 575,31 1145,31 1145,110] «Да»
-flow o21_f5 o21_ask→o21_recv [840,135 880,135]
-flow o21_f6 o21_recv→o21_m1 [1030,135 1120,135]
-flow o21_f7 o21_m1→o21_study_reg [1170,135 1260,135]
-flow o21_f8 o21_study_reg→o21_study_model [1410,135 1450,135]
-flow o21_f9 o21_study_model→o21_compare [1600,135 1640,135]
-flow o21_f10 o21_compare→o21_find [1790,135 1830,135]
-flow o21_f11 o21_find→o21_found [1980,135 2070,135]
-flow o21_f12 o21_found→o21_fix_ok [2120,135 2210,135] «Нет»
-flow o21_f13 o21_fix_ok→o21_approve [2360,135 2390,135]
-flow o21_f14 o21_approve→o21_end_ok [2550,135 2640,135]
-flow o21_f15 o21_found→o21_by_object [2095,110 2095,31 2855,31 2855,90] «Да»
-flow o21_f16 o21_by_object→o21_by_weight [2930,135 2970,135]
-flow o21_f17 o21_by_weight→o21_by_freq [3120,135 3160,135]
-flow o21_f18 o21_by_freq→o21_by_impact [3310,135 3350,135]
-flow o21_f19 o21_by_impact→o21_register [3500,135 3540,135]
-flow o21_f20 o21_register→o21_end_dev [3690,135 3780,135]
-artifact o21_ask:store:s_outlook 756,184 18×20 edge[765,184 765,180] «Outlook»
-artifact o21_recv:output:d_procInfo 946,66 18×20 edge[955,90 955,86] «Информация по процессу»
-artifact o21_recv:store:s_outlook 946,184 18×20 edge[955,184 955,180] «Outlook»
-artifact o21_study_reg:input:d_reg 1326,66 18×20 edge[1335,86 1335,90] «Регламент процесса»
-artifact o21_study_reg:store:s_word 1326,184 18×20 edge[1335,184 1335,180] «Microsoft Word»
-artifact o21_study_model:store:s_word 1516,184 18×20 edge[1525,184 1525,180] «Microsoft Word»
-artifact o21_compare:input:d_atlas 1706,66 18×20 edge[1715,86 1715,90] «Атлас процессов»
-artifact o21_compare:store:s_word 1706,184 18×20 edge[1715,184 1715,180] «Microsoft Word»
-artifact o21_fix_ok:output:d_report 2276,66 18×20 edge[2285,90 2285,86] «Отчет о результатах анализа соответствия»
-artifact o21_fix_ok:store:s_word 2276,184 18×20 edge[2285,184 2285,180] «Microsoft Word»
-artifact o21_by_object:store:s_word 2846,184 18×20 edge[2855,184 2855,180] «Microsoft Word»
-artifact o21_by_weight:store:s_word 3036,184 18×20 edge[3045,184 3045,180] «Microsoft Word»
-artifact o21_by_freq:store:s_word 3226,184 18×20 edge[3235,184 3235,180] «Microsoft Word»
-artifact o21_by_impact:store:s_word 3416,184 18×20 edge[3425,184 3425,180] «Microsoft Word»
-artifact o21_register:output:d_devReg 3606,66 18×20 edge[3615,90 3615,86] «Реестр отклонений»
-artifact o21_register:store:s_word 3606,184 18×20 edge[3615,184 3615,180] «Microsoft Word»
+shape o21_start event/start 180,117 36×36 «Направлена информация об итогах реализации процессов»
+shape o21_get task/receive 320,90 150×90 «Получить информацию по процессу ООО «РУ КМЗ»»
+shape o21_enough gateway/exclusive 560,110 50×50 «Исходных данных достаточно для анализа процесса?»
+shape o21_ask task/send 700,90 150×90 «Запросить недостающую информацию по процессу»
+shape o21_recv task/receive 890,90 150×90 «Получить информацию по процессу»
+shape o21_m1 gateway/exclusive 1130,110 50×50 «Слияние потоков»
+shape o21_study_reg task/user 1270,90 150×90 «Изучить регламент рассматриваемого процесса»
+shape o21_study_model task/user 1460,90 150×90 «Изучить утвержденную модель процесса»
+shape o21_compare task/user 1650,90 150×90 «Сопоставить фактическую реализацию процесса с утвержденной моделью»
+shape o21_find task/user 1840,90 150×90 «Выявить отклонения по качеству брака»
+shape o21_found gateway/exclusive 2080,110 50×50 «Отклонения выявлены?»
+shape o21_fix_ok task/user 2220,90 150×90 «Зафиксировать соответствие фактической реализации процесса с утвержденной моделью»
+shape o21_approve subprocess 2400,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
+shape o21_end_ok event/end 2650,117 36×36 «Составлена информация об эффективности реализации процесса»
+shape o21_by_object task/user 2790,90 150×90 «Классифицировать брак по объекту отклонения»
+shape o21_by_weight task/user 2980,90 150×90 «Классифицировать брак по значимости»
+shape o21_by_freq task/user 3170,90 150×90 «Классифицировать брак по частоте возникновения»
+shape o21_by_impact task/user 3360,90 150×90 «Классифицировать брак по влиянию на процесс»
+shape o21_register task/user 3550,90 150×90 «Сформировать реестр отклонений по полученной информации по браку процессной модели»
+shape o21_end_dev event/end 3790,117 36×36 «Составлен перечень выявленных отклонений»
+flow o21_f1 o21_start→o21_get [216,135 320,135]
+flow o21_f2 o21_get→o21_enough [470,135 560,135]
+flow o21_f3 o21_enough→o21_ask [610,135 700,135] «Нет»
+flow o21_f4 o21_enough→o21_m1 [585,110 585,31 1155,31 1155,110] «Да»
+flow o21_f5 o21_ask→o21_recv [850,135 890,135]
+flow o21_f6 o21_recv→o21_m1 [1040,135 1130,135]
+flow o21_f7 o21_m1→o21_study_reg [1180,135 1270,135]
+flow o21_f8 o21_study_reg→o21_study_model [1420,135 1460,135]
+flow o21_f9 o21_study_model→o21_compare [1610,135 1650,135]
+flow o21_f10 o21_compare→o21_find [1800,135 1840,135]
+flow o21_f11 o21_find→o21_found [1990,135 2080,135]
+flow o21_f12 o21_found→o21_fix_ok [2130,135 2220,135] «Нет»
+flow o21_f13 o21_fix_ok→o21_approve [2370,135 2400,135]
+flow o21_f14 o21_approve→o21_end_ok [2560,135 2650,135]
+flow o21_f15 o21_found→o21_by_object [2105,110 2105,31 2865,31 2865,90] «Да»
+flow o21_f16 o21_by_object→o21_by_weight [2940,135 2980,135]
+flow o21_f17 o21_by_weight→o21_by_freq [3130,135 3170,135]
+flow o21_f18 o21_by_freq→o21_by_impact [3320,135 3360,135]
+flow o21_f19 o21_by_impact→o21_register [3510,135 3550,135]
+flow o21_f20 o21_register→o21_end_dev [3700,135 3790,135]
+artifact o21_ask:store:s_outlook 766,184 18×20 edge[775,184 775,180] «Outlook»
+artifact o21_recv:output:d_procInfo 956,66 18×20 edge[965,90 965,86] «Информация по процессу»
+artifact o21_recv:store:s_outlook 956,184 18×20 edge[965,184 965,180] «Outlook»
+artifact o21_study_reg:input:d_reg 1336,66 18×20 edge[1345,86 1345,90] «Регламент процесса»
+artifact o21_study_reg:store:s_word 1336,184 18×20 edge[1345,184 1345,180] «Microsoft Word»
+artifact o21_study_model:store:s_word 1526,184 18×20 edge[1535,184 1535,180] «Microsoft Word»
+artifact o21_compare:input:d_atlas 1716,66 18×20 edge[1725,86 1725,90] «Атлас процессов»
+artifact o21_compare:store:s_word 1716,184 18×20 edge[1725,184 1725,180] «Microsoft Word»
+artifact o21_fix_ok:output:d_report 2286,66 18×20 edge[2295,90 2295,86] «Отчет о результатах анализа соответствия»
+artifact o21_fix_ok:store:s_word 2286,184 18×20 edge[2295,184 2295,180] «Microsoft Word»
+artifact o21_by_object:store:s_word 2856,184 18×20 edge[2865,184 2865,180] «Microsoft Word»
+artifact o21_by_weight:store:s_word 3046,184 18×20 edge[3055,184 3055,180] «Microsoft Word»
+artifact o21_by_freq:store:s_word 3236,184 18×20 edge[3245,184 3245,180] «Microsoft Word»
+artifact o21_by_impact:store:s_word 3426,184 18×20 edge[3435,184 3435,180] «Microsoft Word»
+artifact o21_register:output:d_devReg 3616,66 18×20 edge[3625,90 3625,86] «Реестр отклонений»
+artifact o21_register:store:s_word 3616,184 18×20 edge[3625,184 3625,180] «Microsoft Word»
 # редактор BPMN B002.02.02
-shape o22_start event/start 170,117 36×36 «Составлен перечень выявленных отклонений»
-shape o22_factors task/user 310,90 150×90 «Анализировать факторы, обеспечивающие неэффективную реализацию процесса»
-shape o22_split gateway/exclusive 550,110 50×50 «Какой метод анализа применить?»
-shape o22_model_ishikawa task/user 690,90 150×90 «Моделировать диаграмму Исикавы»
-shape o22_analyze_ishikawa task/user 880,90 150×90 «Анализировать с помощью диаграммы Исикавы»
-shape o22_model_5why task/user 1070,90 150×90 «Моделировать с помощью метода «5 Почему»»
-shape o22_analyze_5why task/user 1260,90 150×90 «Анализировать с помощью метода «5 Почему»»
-shape o22_join gateway/exclusive 1500,110 50×50 «Слияние потоков»
-shape o22_causes task/user 1640,90 150×90 «Определить возможные причины выявленных отклонений»
-shape o22_prepare task/user 1830,90 150×90 «Подготовить информацию о неэффективности реализации процесса»
-shape o22_approve1 subprocess 2010,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
-shape o22_approve2 subprocess 2200,90 160×90 «Согласовать с директором по персоналу и операционной эффективности»
-shape o22_end event/end 2450,117 36×36 «Составлена информация о неэффективности реализации процесса»
-flow o22_f1 o22_start→o22_factors [206,135 310,135]
-flow o22_f2 o22_factors→o22_split [460,135 550,135]
-flow o22_f3 o22_split→o22_model_ishikawa [600,135 690,135] «Метод Исикавы»
-flow o22_f4 o22_model_ishikawa→o22_analyze_ishikawa [840,135 880,135]
-flow o22_f5 o22_analyze_ishikawa→o22_join [955,90 955,66 1525,66 1525,110]
-flow o22_f6 o22_split→o22_model_5why [575,110 575,56 1145,56 1145,90] «Метод «5 Почему»»
-flow o22_f7 o22_model_5why→o22_analyze_5why [1220,135 1260,135]
-flow o22_f8 o22_analyze_5why→o22_join [1410,135 1500,135]
-flow o22_f9 o22_join→o22_causes [1550,135 1640,135]
-flow o22_f10 o22_causes→o22_prepare [1790,135 1830,135]
-flow o22_f11 o22_prepare→o22_approve1 [1980,135 2010,135]
-flow o22_f12 o22_approve1→o22_approve2 [2170,135 2200,135]
-flow o22_f13 o22_approve2→o22_end [2360,135 2450,135]
-artifact o22_factors:input:d_devReg 376,66 18×20 edge[385,86 385,90] «Реестр отклонений»
-artifact o22_factors:store:s_word 376,184 18×20 edge[385,184 385,180] «Microsoft Word»
-artifact o22_model_ishikawa:store:s_visio 756,184 18×20 edge[765,184 765,180] «Microsoft Visio»
-artifact o22_model_5why:store:s_visio 1136,184 18×20 edge[1145,184 1145,180] «Microsoft Visio»
-artifact o22_prepare:output:d_report 1896,66 18×20 edge[1905,90 1905,86] «Отчет о результатах анализа соответствия»
-artifact o22_prepare:store:s_word 1896,184 18×20 edge[1905,184 1905,180] «Microsoft Word»
+shape o22_start event/start 180,117 36×36 «Составлен перечень выявленных отклонений»
+shape o22_factors task/user 320,90 150×90 «Анализировать факторы, обеспечивающие неэффективную реализацию процесса»
+shape o22_split gateway/exclusive 560,110 50×50 «Какой метод анализа применить?»
+shape o22_model_ishikawa task/user 700,90 150×90 «Моделировать диаграмму Исикавы»
+shape o22_analyze_ishikawa task/user 890,90 150×90 «Анализировать с помощью диаграммы Исикавы»
+shape o22_model_5why task/user 1080,90 150×90 «Моделировать с помощью метода «5 Почему»»
+shape o22_analyze_5why task/user 1270,90 150×90 «Анализировать с помощью метода «5 Почему»»
+shape o22_join gateway/exclusive 1510,110 50×50 «Слияние потоков»
+shape o22_causes task/user 1650,90 150×90 «Определить возможные причины выявленных отклонений»
+shape o22_prepare task/user 1840,90 150×90 «Подготовить информацию о неэффективности реализации процесса»
+shape o22_approve1 subprocess 2020,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
+shape o22_approve2 subprocess 2210,90 160×90 «Согласовать с директором по персоналу и операционной эффективности»
+shape o22_end event/end 2460,117 36×36 «Составлена информация о неэффективности реализации процесса»
+flow o22_f1 o22_start→o22_factors [216,135 320,135]
+flow o22_f2 o22_factors→o22_split [470,135 560,135]
+flow o22_f3 o22_split→o22_model_ishikawa [610,135 700,135] «Метод Исикавы»
+flow o22_f4 o22_model_ishikawa→o22_analyze_ishikawa [850,135 890,135]
+flow o22_f5 o22_analyze_ishikawa→o22_join [965,90 965,66 1535,66 1535,110]
+flow o22_f6 o22_split→o22_model_5why [585,110 585,56 1155,56 1155,90] «Метод «5 Почему»»
+flow o22_f7 o22_model_5why→o22_analyze_5why [1230,135 1270,135]
+flow o22_f8 o22_analyze_5why→o22_join [1420,135 1510,135]
+flow o22_f9 o22_join→o22_causes [1560,135 1650,135]
+flow o22_f10 o22_causes→o22_prepare [1800,135 1840,135]
+flow o22_f11 o22_prepare→o22_approve1 [1990,135 2020,135]
+flow o22_f12 o22_approve1→o22_approve2 [2180,135 2210,135]
+flow o22_f13 o22_approve2→o22_end [2370,135 2460,135]
+artifact o22_factors:input:d_devReg 386,66 18×20 edge[395,86 395,90] «Реестр отклонений»
+artifact o22_factors:store:s_word 386,184 18×20 edge[395,184 395,180] «Microsoft Word»
+artifact o22_model_ishikawa:store:s_visio 766,184 18×20 edge[775,184 775,180] «Microsoft Visio»
+artifact o22_model_5why:store:s_visio 1146,184 18×20 edge[1155,184 1155,180] «Microsoft Visio»
+artifact o22_prepare:output:d_report 1906,66 18×20 edge[1915,90 1915,86] «Отчет о результатах анализа соответствия»
+artifact o22_prepare:store:s_word 1906,184 18×20 edge[1915,184 1915,180] «Microsoft Word»
 # редактор BPMN B002.03.01
-shape o31_start event/start 170,117 36×36 «Завершено моделирование текущего процесса»
-shape o31_card task/user 310,90 150×90 «Создать карточку процесса»
-shape o31_data task/user 500,90 150×90 «Заполнить данные по процессу»
-shape o31_study task/user 690,90 150×90 «Изучить нормативную документацию по процессу»
-shape o31_collect task/user 880,90 150×90 «Собрать данные по процессу из нормативной документации»
-shape o31_assign task/user 1070,90 150×90 «Назначить интервью с владельцем процесса»
-shape o31_timer event/timer 1310,117 36×36 «Наступление интервью»
-shape o31_interview task/business_rule 1450,90 150×90 «Интервьюировать по вопросам процесса»
-shape o31_comment1 task/user 1640,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape o31_finish task/user 1830,90 150×90 «Завершить задачу по проведению первичного интервью»
-shape o31_notify task/service 2020,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape o31_chain task/user 2210,90 150×90 «Создать продуктовую цепочку»
-shape o31_attach task/user 2400,90 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
-shape o31_comment2 task/user 2590,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape o31_approve subprocess 2770,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o31_end event/end 3020,117 36×36 «Проведено интервью»
-flow o31_f1 o31_start→o31_card [206,135 310,135]
-flow o31_f2 o31_card→o31_data [460,135 500,135]
-flow o31_f3 o31_data→o31_study [650,135 690,135]
-flow o31_f4 o31_study→o31_collect [840,135 880,135]
-flow o31_f5 o31_collect→o31_assign [1030,135 1070,135]
-flow o31_f6 o31_assign→o31_timer [1220,135 1310,135]
-flow o31_f7 o31_timer→o31_interview [1346,135 1450,135]
-flow o31_f8 o31_interview→o31_comment1 [1600,135 1640,135]
-flow o31_f9 o31_comment1→o31_finish [1790,135 1830,135]
-flow o31_f10 o31_finish→o31_notify [1980,135 2020,135]
-flow o31_f11 o31_notify→o31_chain [2170,135 2210,135]
-flow o31_f12 o31_chain→o31_attach [2360,135 2400,135]
-flow o31_f13 o31_attach→o31_comment2 [2550,135 2590,135]
-flow o31_f14 o31_comment2→o31_approve [2740,135 2770,135]
-flow o31_f15 o31_approve→o31_end [2930,135 3020,135]
-artifact o31_card:store:s_elma 376,184 18×20 edge[385,184 385,180] «ELMA365»
-artifact o31_data:store:s_elma 566,184 18×20 edge[575,184 575,180] «ELMA365»
-artifact o31_study:store:s_intranet 756,184 18×20 edge[765,184 765,180] «Intranet.kmzlift.ru»
-artifact o31_collect:output:d_protocol 946,66 18×20 edge[955,90 955,86] «Протокол интервью»
-artifact o31_collect:store:s_word 946,184 18×20 edge[955,184 955,180] «Microsoft Word»
-artifact o31_assign:store:s_outlook 1136,184 18×20 edge[1145,184 1145,180] «Outlook»
-artifact o31_interview:input:d_checklist 1481.3,66 18×20 edge[1490.3,86 1490.3,90] «Чек-лист интервью»
-artifact o31_interview:output:d_protocol 1550.7,66 18×20 edge[1559.7,90 1559.7,86] «Протокол интервью»
-artifact o31_comment1:store:s_elma 1706,184 18×20 edge[1715,184 1715,180] «ELMA365»
-artifact o31_finish:store:s_elma 1896,184 18×20 edge[1905,184 1905,180] «ELMA365»
-artifact o31_notify:store:s_elma 2086,184 18×20 edge[2095,184 2095,180] «ELMA365»
-artifact o31_chain:input:d_protocol 2241.3,66 18×20 edge[2250.3,86 2250.3,90] «Протокол интервью»
-artifact o31_chain:output:d_chain 2310.7,66 18×20 edge[2319.7,90 2319.7,86] «Продуктовая цепочка»
-artifact o31_attach:input:d_chain 2466,66 18×20 edge[2475,86 2475,90] «Продуктовая цепочка»
-artifact o31_attach:store:s_elma 2466,184 18×20 edge[2475,184 2475,180] «ELMA365»
-artifact o31_comment2:store:s_elma 2656,184 18×20 edge[2665,184 2665,180] «ELMA365»
+shape o31_start event/start 180,117 36×36 «Завершено моделирование текущего процесса»
+shape o31_card task/user 320,90 150×90 «Создать карточку процесса»
+shape o31_data task/user 510,90 150×90 «Заполнить данные по процессу»
+shape o31_study task/user 700,90 150×90 «Изучить нормативную документацию по процессу»
+shape o31_collect task/user 890,90 150×90 «Собрать данные по процессу из нормативной документации»
+shape o31_assign task/user 1080,90 150×90 «Назначить интервью с владельцем процесса»
+shape o31_timer event/timer 1320,117 36×36 «Наступление интервью»
+shape o31_interview task/business_rule 1460,90 150×90 «Интервьюировать по вопросам процесса»
+shape o31_comment1 task/user 1650,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape o31_finish task/user 1840,90 150×90 «Завершить задачу по проведению первичного интервью»
+shape o31_notify task/service 2030,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
+shape o31_chain task/user 2220,90 150×90 «Создать продуктовую цепочку»
+shape o31_attach task/user 2410,90 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
+shape o31_comment2 task/user 2600,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape o31_approve subprocess 2780,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape o31_end event/end 3030,117 36×36 «Проведено интервью»
+flow o31_f1 o31_start→o31_card [216,135 320,135]
+flow o31_f2 o31_card→o31_data [470,135 510,135]
+flow o31_f3 o31_data→o31_study [660,135 700,135]
+flow o31_f4 o31_study→o31_collect [850,135 890,135]
+flow o31_f5 o31_collect→o31_assign [1040,135 1080,135]
+flow o31_f6 o31_assign→o31_timer [1230,135 1320,135]
+flow o31_f7 o31_timer→o31_interview [1356,135 1460,135]
+flow o31_f8 o31_interview→o31_comment1 [1610,135 1650,135]
+flow o31_f9 o31_comment1→o31_finish [1800,135 1840,135]
+flow o31_f10 o31_finish→o31_notify [1990,135 2030,135]
+flow o31_f11 o31_notify→o31_chain [2180,135 2220,135]
+flow o31_f12 o31_chain→o31_attach [2370,135 2410,135]
+flow o31_f13 o31_attach→o31_comment2 [2560,135 2600,135]
+flow o31_f14 o31_comment2→o31_approve [2750,135 2780,135]
+flow o31_f15 o31_approve→o31_end [2940,135 3030,135]
+artifact o31_card:store:s_elma 386,184 18×20 edge[395,184 395,180] «ELMA365»
+artifact o31_data:store:s_elma 576,184 18×20 edge[585,184 585,180] «ELMA365»
+artifact o31_study:store:s_intranet 766,184 18×20 edge[775,184 775,180] «Intranet.kmzlift.ru»
+artifact o31_collect:output:d_protocol 956,66 18×20 edge[965,90 965,86] «Протокол интервью»
+artifact o31_collect:store:s_word 956,184 18×20 edge[965,184 965,180] «Microsoft Word»
+artifact o31_assign:store:s_outlook 1146,184 18×20 edge[1155,184 1155,180] «Outlook»
+artifact o31_interview:input:d_checklist 1491.3,66 18×20 edge[1500.3,86 1500.3,90] «Чек-лист интервью»
+artifact o31_interview:output:d_protocol 1560.7,66 18×20 edge[1569.7,90 1569.7,86] «Протокол интервью»
+artifact o31_comment1:store:s_elma 1716,184 18×20 edge[1725,184 1725,180] «ELMA365»
+artifact o31_finish:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
+artifact o31_notify:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
+artifact o31_chain:input:d_protocol 2251.3,66 18×20 edge[2260.3,86 2260.3,90] «Протокол интервью»
+artifact o31_chain:output:d_chain 2320.7,66 18×20 edge[2329.7,90 2329.7,86] «Продуктовая цепочка»
+artifact o31_attach:input:d_chain 2476,66 18×20 edge[2485,86 2485,90] «Продуктовая цепочка»
+artifact o31_attach:store:s_elma 2476,184 18×20 edge[2485,184 2485,180] «ELMA365»
+artifact o31_comment2:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
 # редактор BPMN B002.03.02
-shape o32_start1 event/start 170,117 36×36 «Проведено интервью»
-shape o32_start2 event/start 360,117 36×36 «Завершено моделирование текущего процесса»
-shape o32_join gateway/parallel 550,110 50×50 «Слияние потоков»
-shape o32_go task/manual 690,90 150×90 «Выехать на место работы сотрудника»
-shape o32_shift_start event/timer 930,117 36×36 «Начало смены»
-shape o32_greet task/manual 1070,90 150×90 «Приветствовать сотрудника»
-shape o32_introduce task/manual 1260,90 150×90 «Представить себя сотруднику»
-shape o32_open task/user 1450,90 150×90 «Открыть программу ELMA365 на планшете»
-shape o32_add task/user 1640,90 150×90 «Добавить сотрудника»
-shape o32_fill task/user 1830,90 150×90 «Заполнить данные сотрудника»
-shape o32_create task/user 2020,90 150×90 «Нажать «Создать»»
-shape o32_fix_start task/user 2210,90 150×90 «Фиксировать время начала операции сотрудника»
-shape o32_work_kind task/user 2400,90 150×90 «Фиксировать Вид работ»
-shape o32_work_sub task/user 2590,90 150×90 «Фиксировать подвид работ»
-shape o32_software task/user 2780,90 150×90 «Заполнить ПО, которым пользуется сотрудник»
-shape o32_comment task/user 2970,90 150×90 «Заполнить поле с комментарием по работе сотрудника»
-shape o32_shift_end event/timer 3210,117 36×36 «Конец смены»
-shape o32_report task/user 3350,90 150×90 «Оформить результаты ФРД в презентацию»
-shape o32_end event/end 3590,117 36×36 «ФРД проведено»
-flow o32_f1 o32_start1→o32_join [188,117 188,86 575,86 575,110]
-flow o32_f2 o32_start2→o32_join [396,135 550,135]
-flow o32_f3 o32_join→o32_go [600,135 690,135]
-flow o32_f4 o32_go→o32_shift_start [840,135 930,135]
-flow o32_f5 o32_shift_start→o32_greet [966,135 1070,135]
-flow o32_f6 o32_greet→o32_introduce [1220,135 1260,135]
-flow o32_f7 o32_introduce→o32_open [1410,135 1450,135]
-flow o32_f8 o32_open→o32_add [1600,135 1640,135]
-flow o32_f9 o32_add→o32_fill [1790,135 1830,135]
-flow o32_f10 o32_fill→o32_create [1980,135 2020,135]
-flow o32_f11 o32_create→o32_fix_start [2170,135 2210,135]
-flow o32_f12 o32_fix_start→o32_work_kind [2360,135 2400,135]
-flow o32_f13 o32_work_kind→o32_work_sub [2550,135 2590,135]
-flow o32_f14 o32_work_sub→o32_software [2740,135 2780,135]
-flow o32_f15 o32_software→o32_comment [2930,135 2970,135]
-flow o32_f16 o32_comment→o32_shift_end [3120,135 3210,135]
-flow o32_f17 o32_shift_end→o32_report [3246,135 3350,135]
-flow o32_f18 o32_report→o32_end [3500,135 3590,135]
-artifact o32_open:store:s_elma 1516,184 18×20 edge[1525,184 1525,180] «ELMA365»
-artifact o32_add:store:s_elma 1706,184 18×20 edge[1715,184 1715,180] «ELMA365»
-artifact o32_fill:store:s_elma 1896,184 18×20 edge[1905,184 1905,180] «ELMA365»
-artifact o32_create:store:s_elma 2086,184 18×20 edge[2095,184 2095,180] «ELMA365»
-artifact o32_fix_start:store:s_elma 2276,184 18×20 edge[2285,184 2285,180] «ELMA365»
-artifact o32_work_kind:input:d_catWork 2466,66 18×20 edge[2475,86 2475,90] «Справочник «Виды работ»»
-artifact o32_work_kind:store:s_elma 2466,184 18×20 edge[2475,184 2475,180] «ELMA365»
-artifact o32_work_sub:input:d_catSub 2656,66 18×20 edge[2665,86 2665,90] «Справочник «Подвид работ»»
-artifact o32_work_sub:store:s_elma 2656,184 18×20 edge[2665,184 2665,180] «ELMA365»
-artifact o32_software:input:d_catSw 2846,66 18×20 edge[2855,86 2855,90] «Справочник «Программное обеспечение»»
-artifact o32_software:store:s_elma 2846,184 18×20 edge[2855,184 2855,180] «ELMA365»
-artifact o32_comment:store:s_elma 3036,184 18×20 edge[3045,184 3045,180] «ELMA365»
-artifact o32_report:output:d_frd 3416,66 18×20 edge[3425,90 3425,86] «Результаты ФРД ООО «РУ КМЗ»»
-artifact o32_report:store:s_ppt 3416,184 18×20 edge[3425,184 3425,180] «PowerPoint»
+shape o32_start1 event/start 180,117 36×36 «Проведено интервью»
+shape o32_start2 event/start 370,117 36×36 «Завершено моделирование текущего процесса»
+shape o32_join gateway/parallel 560,110 50×50 «Слияние потоков»
+shape o32_go task/manual 700,90 150×90 «Выехать на место работы сотрудника»
+shape o32_shift_start event/timer 940,117 36×36 «Начало смены»
+shape o32_greet task/manual 1080,90 150×90 «Приветствовать сотрудника»
+shape o32_introduce task/manual 1270,90 150×90 «Представить себя сотруднику»
+shape o32_open task/user 1460,90 150×90 «Открыть программу ELMA365 на планшете»
+shape o32_add task/user 1650,90 150×90 «Добавить сотрудника»
+shape o32_fill task/user 1840,90 150×90 «Заполнить данные сотрудника»
+shape o32_create task/user 2030,90 150×90 «Нажать «Создать»»
+shape o32_fix_start task/user 2220,90 150×90 «Фиксировать время начала операции сотрудника»
+shape o32_work_kind task/user 2410,90 150×90 «Фиксировать Вид работ»
+shape o32_work_sub task/user 2600,90 150×90 «Фиксировать подвид работ»
+shape o32_software task/user 2790,90 150×90 «Заполнить ПО, которым пользуется сотрудник»
+shape o32_comment task/user 2980,90 150×90 «Заполнить поле с комментарием по работе сотрудника»
+shape o32_shift_end event/timer 3220,117 36×36 «Конец смены»
+shape o32_report task/user 3360,90 150×90 «Оформить результаты ФРД в презентацию»
+shape o32_end event/end 3600,117 36×36 «ФРД проведено»
+flow o32_f1 o32_start1→o32_join [198,117 198,86 585,86 585,110]
+flow o32_f2 o32_start2→o32_join [406,135 560,135]
+flow o32_f3 o32_join→o32_go [610,135 700,135]
+flow o32_f4 o32_go→o32_shift_start [850,135 940,135]
+flow o32_f5 o32_shift_start→o32_greet [976,135 1080,135]
+flow o32_f6 o32_greet→o32_introduce [1230,135 1270,135]
+flow o32_f7 o32_introduce→o32_open [1420,135 1460,135]
+flow o32_f8 o32_open→o32_add [1610,135 1650,135]
+flow o32_f9 o32_add→o32_fill [1800,135 1840,135]
+flow o32_f10 o32_fill→o32_create [1990,135 2030,135]
+flow o32_f11 o32_create→o32_fix_start [2180,135 2220,135]
+flow o32_f12 o32_fix_start→o32_work_kind [2370,135 2410,135]
+flow o32_f13 o32_work_kind→o32_work_sub [2560,135 2600,135]
+flow o32_f14 o32_work_sub→o32_software [2750,135 2790,135]
+flow o32_f15 o32_software→o32_comment [2940,135 2980,135]
+flow o32_f16 o32_comment→o32_shift_end [3130,135 3220,135]
+flow o32_f17 o32_shift_end→o32_report [3256,135 3360,135]
+flow o32_f18 o32_report→o32_end [3510,135 3600,135]
+artifact o32_open:store:s_elma 1526,184 18×20 edge[1535,184 1535,180] «ELMA365»
+artifact o32_add:store:s_elma 1716,184 18×20 edge[1725,184 1725,180] «ELMA365»
+artifact o32_fill:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
+artifact o32_create:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
+artifact o32_fix_start:store:s_elma 2286,184 18×20 edge[2295,184 2295,180] «ELMA365»
+artifact o32_work_kind:input:d_catWork 2476,66 18×20 edge[2485,86 2485,90] «Справочник «Виды работ»»
+artifact o32_work_kind:store:s_elma 2476,184 18×20 edge[2485,184 2485,180] «ELMA365»
+artifact o32_work_sub:input:d_catSub 2666,66 18×20 edge[2675,86 2675,90] «Справочник «Подвид работ»»
+artifact o32_work_sub:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
+artifact o32_software:input:d_catSw 2856,66 18×20 edge[2865,86 2865,90] «Справочник «Программное обеспечение»»
+artifact o32_software:store:s_elma 2856,184 18×20 edge[2865,184 2865,180] «ELMA365»
+artifact o32_comment:store:s_elma 3046,184 18×20 edge[3055,184 3055,180] «ELMA365»
+artifact o32_report:output:d_frd 3426,66 18×20 edge[3435,90 3435,86] «Результаты ФРД ООО «РУ КМЗ»»
+artifact o32_report:store:s_ppt 3426,184 18×20 edge[3435,184 3435,180] «PowerPoint»
 # редактор BPMN B002.03.03
-shape o33_start1 event/start 170,117 36×36 «ФРД проведено»
-shape o33_start2 event/start 360,117 36×36 «Завершено моделирование текущего процесса»
-shape o33_join gateway/parallel 550,110 50×50 «Слияние потоков»
-shape o33_goal task/user 690,90 150×90 «Определить цель картирования»
-shape o33_docs task/user 880,90 150×90 «Собрать исходные документы по процессу»
-shape o33_plan task/user 1070,90 150×90 «Составить план проведения картирования»
-shape o33_m1 gateway/exclusive 1310,110 50×50 «Слияние потоков»
-shape o33_agree1 task/user 1450,90 150×90 «Согласовать план с владельцем процесса»
-shape o33_ok1 gateway/exclusive 1690,110 50×50 «План согласован?»
-shape o33_fix1 task/user 1830,90 150×90 «Скорректировать план проведения картирования»
-shape o33_day event/timer 2070,117 36×36 «День выезда»
-shape o33_watch task/user 2210,90 150×90 «Наблюдать за ходом процесса»
-shape o33_state task/user 2400,90 150×90 «Фиксировать текущее состояние потока»
-shape o33_measure task/user 2590,90 150×90 «Выполнить замер ключевых временных параметров»
-shape o33_map_cur task/user 2780,90 150×90 «Моделировать текущую карту потока создания ценности»
-shape o33_map_an task/user 2970,90 150×90 «Анализировать карту потока создания ценности»
-shape o33_loss_an task/user 3160,90 150×90 «Анализировать потери»
-shape o33_improve task/user 3350,90 150×90 «Сформировать точки улучшения»
-shape o33_map_ideal task/user 3540,90 150×90 «Моделировать идеальное состояние карты потока создания ценности»
-shape o33_feasible task/user 3730,90 150×90 «Анализировать возможности реализации»
-shape o33_map_target task/user 3920,90 150×90 «Моделировать целевое состояние карты потока создания ценности»
-shape o33_m2 gateway/exclusive 4160,110 50×50 «Слияние потоков»
-shape o33_agree2 task/user 4300,90 150×90 «Согласовать план с владельцем процесса»
-shape o33_ok2 gateway/exclusive 4540,110 50×50 «План согласован?»
-shape o33_fix2 task/user 4680,90 150×90 «Скорректировать план проведения картирования»
-shape o33_end event/end 4920,117 36×36 «Картирование проведено»
-flow o33_f1 o33_start1→o33_join [188,117 188,86 575,86 575,110]
-flow o33_f2 o33_start2→o33_join [396,135 550,135]
-flow o33_f3 o33_join→o33_goal [600,135 690,135]
-flow o33_f4 o33_goal→o33_docs [840,135 880,135]
-flow o33_f5 o33_docs→o33_plan [1030,135 1070,135]
-flow o33_f6 o33_plan→o33_m1 [1220,135 1310,135]
-flow o33_f7 o33_m1→o33_agree1 [1360,135 1450,135]
-flow o33_f8 o33_agree1→o33_ok1 [1600,135 1690,135]
-flow o33_f9 o33_ok1→o33_fix1 [1740,135 1830,135] «Нет»
-flow o33_f10 o33_fix1→o33_m1 [1905,90 1905,66 1335,66 1335,110]
-flow o33_f11 o33_ok1→o33_day [1715,110 1715,56 2088,56 2088,117] «Да»
-flow o33_f12 o33_day→o33_watch [2106,135 2210,135]
-flow o33_f13 o33_watch→o33_state [2360,135 2400,135]
-flow o33_f14 o33_state→o33_measure [2550,135 2590,135]
-flow o33_f15 o33_measure→o33_map_cur [2740,135 2780,135]
-flow o33_f16 o33_map_cur→o33_map_an [2930,135 2970,135]
-flow o33_f17 o33_map_an→o33_loss_an [3120,135 3160,135]
-flow o33_f18 o33_loss_an→o33_improve [3310,135 3350,135]
-flow o33_f19 o33_improve→o33_map_ideal [3500,135 3540,135]
-flow o33_f20 o33_map_ideal→o33_feasible [3690,135 3730,135]
-flow o33_f21 o33_feasible→o33_map_target [3880,135 3920,135]
-flow o33_f22 o33_map_target→o33_m2 [4070,135 4160,135]
-flow o33_f23 o33_m2→o33_agree2 [4210,135 4300,135]
-flow o33_f24 o33_agree2→o33_ok2 [4450,135 4540,135]
-flow o33_f25 o33_ok2→o33_fix2 [4590,135 4680,135] «Нет»
-flow o33_f26 o33_fix2→o33_m2 [4755,90 4755,66 4185,66 4185,110]
-flow o33_f27 o33_ok2→o33_end [4565,110 4565,56 4938,56 4938,117] «Да»
-artifact o33_plan:store:s_word 1136,184 18×20 edge[1145,184 1145,180] «Microsoft Word»
-artifact o33_state:output:d_loss 2466,66 18×20 edge[2475,90 2475,86] «Карточка потерь»
-artifact o33_measure:output:d_loss 2656,66 18×20 edge[2665,90 2665,86] «Карточка потерь»
-artifact o33_map_cur:output:d_mapCur 2846,66 18×20 edge[2855,90 2855,86] «Текущая карта потока создания ценности»
-artifact o33_map_cur:store:s_visio 2846,184 18×20 edge[2855,184 2855,180] «Microsoft Visio»
-artifact o33_loss_an:output:d_loss 3226,66 18×20 edge[3235,90 3235,86] «Карточка потерь»
-artifact o33_loss_an:store:s_word 3226,184 18×20 edge[3235,184 3235,180] «Microsoft Word»
-artifact o33_map_ideal:output:d_mapIdeal 3606,66 18×20 edge[3615,90 3615,86] «Идеальная карта потока создания ценности»
-artifact o33_map_ideal:store:s_visio 3606,184 18×20 edge[3615,184 3615,180] «Microsoft Visio»
-artifact o33_map_target:output:d_mapTarget 3986,66 18×20 edge[3995,90 3995,86] «Целевая карта потока создания ценности»
-artifact o33_map_target:store:s_visio 3986,184 18×20 edge[3995,184 3995,180] «Microsoft Visio»
+shape o33_start1 event/start 180,117 36×36 «ФРД проведено»
+shape o33_start2 event/start 370,117 36×36 «Завершено моделирование текущего процесса»
+shape o33_join gateway/parallel 560,110 50×50 «Слияние потоков»
+shape o33_goal task/user 700,90 150×90 «Определить цель картирования»
+shape o33_docs task/user 890,90 150×90 «Собрать исходные документы по процессу»
+shape o33_plan task/user 1080,90 150×90 «Составить план проведения картирования»
+shape o33_m1 gateway/exclusive 1320,110 50×50 «Слияние потоков»
+shape o33_agree1 task/user 1460,90 150×90 «Согласовать план с владельцем процесса»
+shape o33_ok1 gateway/exclusive 1700,110 50×50 «План согласован?»
+shape o33_fix1 task/user 1840,90 150×90 «Скорректировать план проведения картирования»
+shape o33_day event/timer 2080,117 36×36 «День выезда»
+shape o33_watch task/user 2220,90 150×90 «Наблюдать за ходом процесса»
+shape o33_state task/user 2410,90 150×90 «Фиксировать текущее состояние потока»
+shape o33_measure task/user 2600,90 150×90 «Выполнить замер ключевых временных параметров»
+shape o33_map_cur task/user 2790,90 150×90 «Моделировать текущую карту потока создания ценности»
+shape o33_map_an task/user 2980,90 150×90 «Анализировать карту потока создания ценности»
+shape o33_loss_an task/user 3170,90 150×90 «Анализировать потери»
+shape o33_improve task/user 3360,90 150×90 «Сформировать точки улучшения»
+shape o33_map_ideal task/user 3550,90 150×90 «Моделировать идеальное состояние карты потока создания ценности»
+shape o33_feasible task/user 3740,90 150×90 «Анализировать возможности реализации»
+shape o33_map_target task/user 3930,90 150×90 «Моделировать целевое состояние карты потока создания ценности»
+shape o33_m2 gateway/exclusive 4170,110 50×50 «Слияние потоков»
+shape o33_agree2 task/user 4310,90 150×90 «Согласовать план с владельцем процесса»
+shape o33_ok2 gateway/exclusive 4550,110 50×50 «План согласован?»
+shape o33_fix2 task/user 4690,90 150×90 «Скорректировать план проведения картирования»
+shape o33_end event/end 4930,117 36×36 «Картирование проведено»
+flow o33_f1 o33_start1→o33_join [198,117 198,86 585,86 585,110]
+flow o33_f2 o33_start2→o33_join [406,135 560,135]
+flow o33_f3 o33_join→o33_goal [610,135 700,135]
+flow o33_f4 o33_goal→o33_docs [850,135 890,135]
+flow o33_f5 o33_docs→o33_plan [1040,135 1080,135]
+flow o33_f6 o33_plan→o33_m1 [1230,135 1320,135]
+flow o33_f7 o33_m1→o33_agree1 [1370,135 1460,135]
+flow o33_f8 o33_agree1→o33_ok1 [1610,135 1700,135]
+flow o33_f9 o33_ok1→o33_fix1 [1750,135 1840,135] «Нет»
+flow o33_f10 o33_fix1→o33_m1 [1915,90 1915,66 1345,66 1345,110]
+flow o33_f11 o33_ok1→o33_day [1725,110 1725,56 2098,56 2098,117] «Да»
+flow o33_f12 o33_day→o33_watch [2116,135 2220,135]
+flow o33_f13 o33_watch→o33_state [2370,135 2410,135]
+flow o33_f14 o33_state→o33_measure [2560,135 2600,135]
+flow o33_f15 o33_measure→o33_map_cur [2750,135 2790,135]
+flow o33_f16 o33_map_cur→o33_map_an [2940,135 2980,135]
+flow o33_f17 o33_map_an→o33_loss_an [3130,135 3170,135]
+flow o33_f18 o33_loss_an→o33_improve [3320,135 3360,135]
+flow o33_f19 o33_improve→o33_map_ideal [3510,135 3550,135]
+flow o33_f20 o33_map_ideal→o33_feasible [3700,135 3740,135]
+flow o33_f21 o33_feasible→o33_map_target [3890,135 3930,135]
+flow o33_f22 o33_map_target→o33_m2 [4080,135 4170,135]
+flow o33_f23 o33_m2→o33_agree2 [4220,135 4310,135]
+flow o33_f24 o33_agree2→o33_ok2 [4460,135 4550,135]
+flow o33_f25 o33_ok2→o33_fix2 [4600,135 4690,135] «Нет»
+flow o33_f26 o33_fix2→o33_m2 [4765,90 4765,66 4195,66 4195,110]
+flow o33_f27 o33_ok2→o33_end [4575,110 4575,56 4948,56 4948,117] «Да»
+artifact o33_plan:store:s_word 1146,184 18×20 edge[1155,184 1155,180] «Microsoft Word»
+artifact o33_state:output:d_loss 2476,66 18×20 edge[2485,90 2485,86] «Карточка потерь»
+artifact o33_measure:output:d_loss 2666,66 18×20 edge[2675,90 2675,86] «Карточка потерь»
+artifact o33_map_cur:output:d_mapCur 2856,66 18×20 edge[2865,90 2865,86] «Текущая карта потока создания ценности»
+artifact o33_map_cur:store:s_visio 2856,184 18×20 edge[2865,184 2865,180] «Microsoft Visio»
+artifact o33_loss_an:output:d_loss 3236,66 18×20 edge[3245,90 3245,86] «Карточка потерь»
+artifact o33_loss_an:store:s_word 3236,184 18×20 edge[3245,184 3245,180] «Microsoft Word»
+artifact o33_map_ideal:output:d_mapIdeal 3616,66 18×20 edge[3625,90 3625,86] «Идеальная карта потока создания ценности»
+artifact o33_map_ideal:store:s_visio 3616,184 18×20 edge[3625,184 3625,180] «Microsoft Visio»
+artifact o33_map_target:output:d_mapTarget 3996,66 18×20 edge[4005,90 4005,86] «Целевая карта потока создания ценности»
+artifact o33_map_target:store:s_visio 3996,184 18×20 edge[4005,184 4005,180] «Microsoft Visio»
 # редактор BPMN B002.03.04
-shape o34_start event/start 170,117 36×36 «Картирование проведено»
-shape o34_idef0_0 task/user 310,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
-shape o34_idef0_1 task/user 500,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
-shape o34_idef0_attach task/user 690,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
-shape o34_idef0_comment task/user 880,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
-shape o34_approve1 subprocess 1060,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
-shape o34_bpmn task/user 1260,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
-shape o34_atlas task/user 1450,90 150×90 «Создать атлас процессов»
-shape o34_wi task/user 1640,90 150×90 «Создать рабочую инструкцию»
-shape o34_wi_attach task/user 1830,90 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
-shape o34_wi_comment task/user 2020,90 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
-shape o34_approve2 subprocess 2200,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
-shape o34_end event/end 2450,117 36×36 «Завершено моделирование целевого процесса»
-flow o34_f1 o34_start→o34_idef0_0 [206,135 310,135]
-flow o34_f2 o34_idef0_0→o34_idef0_1 [460,135 500,135]
-flow o34_f3 o34_idef0_1→o34_idef0_attach [650,135 690,135]
-flow o34_f4 o34_idef0_attach→o34_idef0_comment [840,135 880,135]
-flow o34_f5 o34_idef0_comment→o34_approve1 [1030,135 1060,135]
-flow o34_f6 o34_approve1→o34_bpmn [1220,135 1260,135]
-flow o34_f7 o34_bpmn→o34_atlas [1410,135 1450,135]
-flow o34_f8 o34_atlas→o34_wi [1600,135 1640,135]
-flow o34_f9 o34_wi→o34_wi_attach [1790,135 1830,135]
-flow o34_f10 o34_wi_attach→o34_wi_comment [1980,135 2020,135]
-flow o34_f11 o34_wi_comment→o34_approve2 [2170,135 2200,135]
-flow o34_f12 o34_approve2→o34_end [2360,135 2450,135]
-artifact o34_idef0_0:output:d_idef0_0 376,66 18×20 edge[385,90 385,86] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o34_idef0_0:store:s_visio 341.3,184 18×20 edge[350.3,184 350.3,180] «Microsoft Visio»
-artifact o34_idef0_0:store:s_bs 410.7,184 18×20 edge[419.7,184 419.7,180] «Business studio»
-artifact o34_idef0_1:output:d_idef0_1 566,66 18×20 edge[575,90 575,86] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o34_idef0_1:store:s_visio 531.3,184 18×20 edge[540.3,184 540.3,180] «Microsoft Visio»
-artifact o34_idef0_1:store:s_bs 600.7,184 18×20 edge[609.7,184 609.7,180] «Business studio»
-artifact o34_idef0_attach:input:d_idef0_0 721.3,66 18×20 edge[730.3,86 730.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o34_idef0_attach:input:d_idef0_1 790.7,66 18×20 edge[799.7,86 799.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o34_idef0_attach:store:s_elma 756,184 18×20 edge[765,184 765,180] «ELMA365»
-artifact o34_idef0_comment:store:s_elma 946,184 18×20 edge[955,184 955,180] «ELMA365»
-artifact o34_bpmn:output:d_bpmn 1326,66 18×20 edge[1335,90 1335,86] «Диаграмма процесса BPMN 2.0»
-artifact o34_bpmn:store:s_visio 1291.3,184 18×20 edge[1300.3,184 1300.3,180] «Microsoft Visio»
-artifact o34_bpmn:store:s_bs 1360.7,184 18×20 edge[1369.7,184 1369.7,180] «Business studio»
-artifact o34_atlas:output:d_atlas 1516,66 18×20 edge[1525,90 1525,86] «Атлас процессов»
-artifact o34_atlas:store:s_visio 1516,184 18×20 edge[1525,184 1525,180] «Microsoft Visio»
-artifact o34_wi:input:d_wiTpl 1671.3,66 18×20 edge[1680.3,86 1680.3,90] «Шаблон рабочей инструкции»
-artifact o34_wi:output:d_wi 1740.7,66 18×20 edge[1749.7,90 1749.7,86] «Рабочая инструкция»
-artifact o34_wi:store:s_visio 1706,184 18×20 edge[1715,184 1715,180] «Microsoft Visio»
-artifact o34_wi_attach:input:d_wi 1896,66 18×20 edge[1905,86 1905,90] «Рабочая инструкция»
-artifact o34_wi_attach:store:s_elma 1896,184 18×20 edge[1905,184 1905,180] «ELMA365»
-artifact o34_wi_comment:store:s_elma 2086,184 18×20 edge[2095,184 2095,180] «ELMA365»
+shape o34_start event/start 180,117 36×36 «Картирование проведено»
+shape o34_idef0_0 task/user 320,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
+shape o34_idef0_1 task/user 510,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
+shape o34_idef0_attach task/user 700,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
+shape o34_idef0_comment task/user 890,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
+shape o34_approve1 subprocess 1070,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
+shape o34_bpmn task/user 1270,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
+shape o34_atlas task/user 1460,90 150×90 «Создать атлас процессов»
+shape o34_wi task/user 1650,90 150×90 «Создать рабочую инструкцию»
+shape o34_wi_attach task/user 1840,90 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
+shape o34_wi_comment task/user 2030,90 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
+shape o34_approve2 subprocess 2210,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
+shape o34_end event/end 2460,117 36×36 «Завершено моделирование целевого процесса»
+flow o34_f1 o34_start→o34_idef0_0 [216,135 320,135]
+flow o34_f2 o34_idef0_0→o34_idef0_1 [470,135 510,135]
+flow o34_f3 o34_idef0_1→o34_idef0_attach [660,135 700,135]
+flow o34_f4 o34_idef0_attach→o34_idef0_comment [850,135 890,135]
+flow o34_f5 o34_idef0_comment→o34_approve1 [1040,135 1070,135]
+flow o34_f6 o34_approve1→o34_bpmn [1230,135 1270,135]
+flow o34_f7 o34_bpmn→o34_atlas [1420,135 1460,135]
+flow o34_f8 o34_atlas→o34_wi [1610,135 1650,135]
+flow o34_f9 o34_wi→o34_wi_attach [1800,135 1840,135]
+flow o34_f10 o34_wi_attach→o34_wi_comment [1990,135 2030,135]
+flow o34_f11 o34_wi_comment→o34_approve2 [2180,135 2210,135]
+flow o34_f12 o34_approve2→o34_end [2370,135 2460,135]
+artifact o34_idef0_0:output:d_idef0_0 386,66 18×20 edge[395,90 395,86] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o34_idef0_0:store:s_visio 351.3,184 18×20 edge[360.3,184 360.3,180] «Microsoft Visio»
+artifact o34_idef0_0:store:s_bs 420.7,184 18×20 edge[429.7,184 429.7,180] «Business studio»
+artifact o34_idef0_1:output:d_idef0_1 576,66 18×20 edge[585,90 585,86] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o34_idef0_1:store:s_visio 541.3,184 18×20 edge[550.3,184 550.3,180] «Microsoft Visio»
+artifact o34_idef0_1:store:s_bs 610.7,184 18×20 edge[619.7,184 619.7,180] «Business studio»
+artifact o34_idef0_attach:input:d_idef0_0 731.3,66 18×20 edge[740.3,86 740.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o34_idef0_attach:input:d_idef0_1 800.7,66 18×20 edge[809.7,86 809.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o34_idef0_attach:store:s_elma 766,184 18×20 edge[775,184 775,180] «ELMA365»
+artifact o34_idef0_comment:store:s_elma 956,184 18×20 edge[965,184 965,180] «ELMA365»
+artifact o34_bpmn:output:d_bpmn 1336,66 18×20 edge[1345,90 1345,86] «Диаграмма процесса BPMN 2.0»
+artifact o34_bpmn:store:s_visio 1301.3,184 18×20 edge[1310.3,184 1310.3,180] «Microsoft Visio»
+artifact o34_bpmn:store:s_bs 1370.7,184 18×20 edge[1379.7,184 1379.7,180] «Business studio»
+artifact o34_atlas:output:d_atlas 1526,66 18×20 edge[1535,90 1535,86] «Атлас процессов»
+artifact o34_atlas:store:s_visio 1526,184 18×20 edge[1535,184 1535,180] «Microsoft Visio»
+artifact o34_wi:input:d_wiTpl 1681.3,66 18×20 edge[1690.3,86 1690.3,90] «Шаблон рабочей инструкции»
+artifact o34_wi:output:d_wi 1750.7,66 18×20 edge[1759.7,90 1759.7,86] «Рабочая инструкция»
+artifact o34_wi:store:s_visio 1716,184 18×20 edge[1725,184 1725,180] «Microsoft Visio»
+artifact o34_wi_attach:input:d_wi 1906,66 18×20 edge[1915,86 1915,90] «Рабочая инструкция»
+artifact o34_wi_attach:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
+artifact o34_wi_comment:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»

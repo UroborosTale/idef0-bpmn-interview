@@ -5,7 +5,7 @@ import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Id
 import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 import { tunnelArcs } from "../shared/idef0Layout.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
-import { flowLabelPoint } from "../shared/bpmnGeometry.js";
+import { LABEL_W, LANE_X } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
 import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
 import { visioFlowProps, visioShapeProps, type VisioPropOut } from "../shared/visioBpmn.js";
@@ -577,7 +577,20 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
  * автоматический лист накрывает пул целиком с полем, как в редакторе, а заданный вручную стоит по своим координатам.
  */
 /** Шрифт заголовка дорожки: 16 px (крупно, как в Business Studio), а длинное название уменьшается, чтобы уместиться по высоте дорожки (в две строки при 10,5 px). */
-const laneLabelFont = (text: string, laneH: number): number => (text.length * 7.7 <= laneH - 10 ? 16 : text.length * 6.6 <= laneH - 10 ? 13 : 10.5);
+const laneLabelFont = (text: string, laneH: number): number => (text.length * 8.7 <= laneH - 10 ? 18 : text.length * 7.4 <= laneH - 10 ? 14 : 11);
+
+/** Середина первого отрезка маршрута длиннее 40 px (иначе самого длинного): сюда ставится условие ветки. */
+function flowLabelMid(points: Pt[]): Pt {
+  let best: [Pt, Pt] | null = null;
+  let bestLen = -1;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const len = Math.abs(points[i + 1][0] - points[i][0]) + Math.abs(points[i + 1][1] - points[i][1]);
+    if (len >= 40) { best = [points[i], points[i + 1]]; break; }
+    if (len > bestLen) { best = [points[i], points[i + 1]]; bestLen = len; }
+  }
+  const [a, b] = best ?? [points[0], points[points.length - 1]];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}
 
 function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, scope: string | null, code: string): Page {
   const settings = model.bpmn_frames?.[scope ?? ""];
@@ -590,27 +603,23 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   // лист — под диаграммой: штамп и рамка рисуются первыми
   if (geo) drawSheet(page, geo);
   // полоса заголовка над пулом: код и название диаграммы (оформление — при чтении правок пропускается)
-  // двухстрочная полоса: код диаграммы и под ним название
-  page.rect(d.pool.x, 1, d.pool.w, 37, { fill: "#e8eef7", weightPt: 1, align: "left", text: code && sheetName ? `${code}
-${sheetName}` : `${code} ${sheetName}`.trim() || name, fontPx: 12, color: "#000000" });
+  // полоса заголовка: название с кодом в одну строку и пустая узкая полоса под ним, как в Business Studio
+  const bx0 = LANE_X; // пул начинается там же, где дорожки: узкой полосы с названием пула у Business Studio нет
+  const bw0 = d.pool.w - (LANE_X - d.pool.x);
+  page.rect(bx0, 1, bw0, 24, { fill: "#e8eef7", weightPt: 1, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
+  page.rect(bx0, 25, bw0, 12, { fill: "#e8eef7", weightPt: 1 });
   // пул и дорожки
-  page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
-  // название пула вертикально в полосе шириной 20 (повёрнутая фигура, иначе текст переносится по буквам)
-  page.add(
-    { x: d.pool.x + 10 - d.pool.h / 2, y: d.pool.y + d.pool.h / 2 - 10, w: d.pool.h, h: 20 },
-    [{ kind: "path", pts: [[0, 0], [d.pool.h, 0], [d.pool.h, 20], [0, 20]], closed: true }],
-    { fill: "#e8eef7", weightPt: 1, text: d.poolName, fontPx: 14, bold: false, angle: Math.PI / 2, tag: { pm_k: "poollabel" } }
-  );
+  page.rect(bx0, d.pool.y, bw0, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   for (const l of d.lanes) {
     const laneId = l.roleId ?? "__unassigned__";
     page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#000000", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });
     // подпись дорожки вертикально, по центру полосы шириной 30; текст редактируется — так переименовывается роль
     page.add(
-      { x: l.x + 15 - l.h / 2, y: l.y + l.h / 2 - 15, w: l.h, h: 30 },
-      [{ kind: "path", pts: [[0, 0], [l.h, 0], [l.h, 30], [0, 30]], closed: true }],
+      { x: l.x + LABEL_W / 2 - l.h / 2, y: l.y + l.h / 2 - LABEL_W / 2, w: l.h, h: LABEL_W },
+      [{ kind: "path", pts: [[0, 0], [l.h, 0], [l.h, LABEL_W], [0, LABEL_W]], closed: true }],
       { fill: "#e8eef7", line: null, text: l.name, fontPx: laneLabelFont(l.name, l.h), bold: false, angle: Math.PI / 2, tag: { pm_k: "lanelabel", pm_id: laneId, pm_n: l.name } }
     );
-    page.polyline([[l.x + 30, l.y], [l.x + 30, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
+    page.polyline([[l.x + LABEL_W, l.y], [l.x + LABEL_W, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
   }
   for (const e of d.extras) {
     if (e.link) page.polyline(e.link, { weightPt: 0.8, line: "#64748b", dash: true });
@@ -646,8 +655,8 @@ ${sheetName}` : `${code} ${sheetName}`.trim() || name, fontPx: 12, color: "#0000
   for (const edge of d.edges) {
     let textAt: Pt | undefined;
     if (edge.label) {
-      const l = flowLabelPoint(edge.points);
-      textAt = [l.x + (l.anchor === "start" ? 24 : 0), l.y - 4];
+      // как в Business Studio: подпись по центру первого заметного отрезка, на белой подложке поверх линии
+      textAt = flowLabelMid(edge.points);
     }
     page.connector({
       points: edge.points,

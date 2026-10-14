@@ -46,8 +46,8 @@ export function laneTops(heights: number[]): number[] {
 }
 /** Левый край дорожек; полоса подписи дорожки — LABEL_W, фигуры начинаются правее (MIN_X). */
 export const LANE_X = 80;
-export const LABEL_W = 30;
-export const MIN_X = LANE_X + LABEL_W + 20;
+export const LABEL_W = 37;
+export const MIN_X = LANE_X + LABEL_W + 23; // = 140: на сетке 10
 
 export const sizeOf = (n: { type: string }) => SIZE[n.type] ?? SIZE.task;
 

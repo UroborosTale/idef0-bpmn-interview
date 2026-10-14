@@ -314,14 +314,13 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
             <g data-lane-id={id} style={{ cursor: "pointer" }}>
               <rect x={LANE_X} y={top} width={LABEL_W} height={laneH} fill={selectedLaneId === id ? "#c7d2fe" : "#e8eef7"} stroke="#000" strokeWidth={1} />
               <text
-                transform={`translate(${LANE_X + LABEL_W / 2 + 4} ${top + laneH / 2}) rotate(-90)`}
+                transform={`translate(${LANE_X + LABEL_W / 2 + 5} ${top + laneH / 2}) rotate(-90)`}
                 textAnchor="middle"
-                fontSize={12}
-                fontWeight={600}
-                fill="#334155"
+                fontSize={15}
+                fill="#000000"
                 pointerEvents="none"
               >
-                {name.length > 20 ? name.slice(0, 19) + "…" : name}
+                {name.length > laneH / 8 ? name.slice(0, Math.floor(laneH / 8) - 1) + "…" : name}
               </text>
             </g>
           </g>
