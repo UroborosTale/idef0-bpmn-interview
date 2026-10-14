@@ -531,7 +531,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
       if (vb?.loop) node.loop = vb.loop;
     } else if (kind === "gateway") {
       const g = geo.glyph;
-      node.subtype = vb?.gateway ?? g ?? (/parallel|параллел|\band\b/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
+      node.subtype = vb?.gateway ?? g ?? (/parallel|параллел|\band\b|«и»/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
     } else if (kind === "event") {
       if (vb?.position) node.subtype = vb.position;
       else if (/start|начал|старт/.test(s.name) || (!s.name && /^(начало|старт|start)/.test(norm(text)))) node.subtype = "start";
@@ -815,13 +815,15 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
       const [cx, cy] = centre(n.box);
       const lane = leaves.filter((c) => cx >= c.box.x && cx <= c.box.x + c.box.w && cy >= c.box.y && cy <= c.box.y + c.box.h).sort((a, b) => area(a.box) - area(b.box))[0];
       const role = lane?.laneId && out.roles.some((r) => r.id === lane.laneId) ? lane.laneId : null;
+      // у шлюза из палитры Visio подпись — только значок («X», «+», «O»): это не название шага
+      const text = n.kind === "gateway" && /^[X+O×]$/i.test(n.text) ? "" : n.text;
       const node: ProcessNode = {
         id: `imp_${nanoid(8)}`,
         type: n.kind,
         subtype: n.subtype ?? (n.kind === "event" ? "intermediate" : undefined),
         ...(n.trigger ? { trigger: n.trigger } : {}),
         ...(n.loop ? { loop: n.loop } : {}),
-        name: n.text || "(без названия)",
+        name: text || "(без названия)",
         role_id: n.kind === "event" || n.kind === "gateway" ? null : role,
         system_ids: [],
         inputs: [],
@@ -831,8 +833,8 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
         frequency: null,
         idef0_parent: null,
         bpmn_scope: page.scope,
-        status: n.text ? "confirmed" : "hypothesis",
-        confidence: n.text ? 0.8 : 0.4,
+        status: text ? "confirmed" : "hypothesis",
+        confidence: text ? 0.8 : 0.4,
         source: [{ fragment_id: "diagram_import", quote: `${page.name}: ${n.shapeId}` }],
         requirement_ids: [],
         tags: ["from_diagram_import", "added_externally"],

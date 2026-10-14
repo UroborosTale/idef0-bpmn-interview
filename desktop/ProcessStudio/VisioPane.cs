@@ -23,6 +23,8 @@ internal sealed class VisioPane : Panel
     public string? LoadedSession { get; private set; }
     public string? LoadedUpdatedAt { get; private set; }
     public event Action<string>? Status;
+    /// <summary>Подробный журнал шагов (самопроверка пишет его в файл).</summary>
+    public static Action<string>? Trace;
 
     public VisioPane(string workDir)
     {
@@ -112,6 +114,84 @@ internal sealed class VisioPane : Panel
     /// <summary>Показать или скрыть сетку.</summary>
     public void ToggleGrid() => Try(() => { dynamic w = visio.Ocx.Window; w.ShowGrid = Convert.ToInt32(w.ShowGrid) == 0; });
 
+    /// <summary>Что рисует палитра: имя фигуры (по нему импорт опознаёт вид), форма, размер в пикселях, цвета и подпись.</summary>
+    private sealed record Spec(string Name, string Shape, double W, double H, string Fill, double Line, string Text, int FontPx);
+
+    private static Spec? SpecFor(string kind) => kind switch
+    {
+        "task" => new("Задача", "round", 150, 90, "RGB(232,238,247)", 1.3, "Новая задача", 12),
+        "subprocess" => new("Подпроцесс", "round", 160, 90, "RGB(232,238,247)", 1.3, "Новый подпроцесс", 12),
+        "gateway:exclusive" => new("Шлюз «или»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "X", 16),
+        "gateway:parallel" => new("Шлюз «и»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "+", 18),
+        "event:start" => new("Начальное событие", "oval", 36, 36, "RGB(153,255,102)", 1.3, "Начало", 11),
+        "event:intermediate" => new("Промежуточное событие", "oval", 36, 36, "RGB(255,153,51)", 1.3, "Событие", 11),
+        "event:end" => new("Конечное событие", "oval", 36, 36, "RGB(255,130,98)", 3.2, "Конец", 11),
+        _ => null,
+    };
+
+    private const double PxIn = 1.0 / 96.0; // пиксель диаграммы → дюймы Visio
+
+    /// <summary>
+    /// Рисует на текущей странице фигуру из палитры. Фигура — обычная (без мастера): мастера «Фигур документа» подвешивают
+    /// сохранение документа в окне Visio. client — точка в окне (пиксели); null — центр видимой части страницы.
+    /// Возвращает подпись созданной фигуры или null.
+    /// </summary>
+    public string? DropMaster(string kind, Point? client)
+    {
+        var spec = SpecFor(kind);
+        if (spec == null || LoadedSession == null) return null;
+        dynamic win = visio.Ocx.Window;
+        dynamic page = win.Page;
+
+        // видимая область страницы в дюймах: по ней точка окна переводится в координаты страницы (Visio: y вверх)
+        double left = 0, top = 0, width = 0, height = 0;
+        double x, y;
+        try
+        {
+            win.GetViewRect(ref left, ref top, ref width, ref height);
+            var p = client ?? new Point(visio.ClientSize.Width / 2, visio.ClientSize.Height / 2);
+            x = left + p.X / (double)Math.Max(1, visio.ClientSize.Width) * width;
+            y = top - p.Y / (double)Math.Max(1, visio.ClientSize.Height) * height;
+        }
+        catch
+        {
+            x = Convert.ToDouble(page.PageSheet.CellsU["PageWidth"].ResultIU) / 2;
+            y = Convert.ToDouble(page.PageSheet.CellsU["PageHeight"].ResultIU) / 2;
+        }
+
+        double hw = spec.W * PxIn / 2, hh = spec.H * PxIn / 2;
+        dynamic shape = spec.Shape switch
+        {
+            "oval" => page.DrawOval(x - hw, y - hh, x + hw, y + hh),
+            "diamond" => page.DrawPolyline(new[] { x, y + hh, x + hw, y, x, y - hh, x - hw, y, x, y + hh }, 0),
+            _ => page.DrawRectangle(x - hw, y - hh, x + hw, y + hh),
+        };
+        Try(() => shape.NameU = spec.Name);
+        Try(() => shape.CellsU["FillForegnd"].FormulaU = spec.Fill);
+        Try(() => shape.CellsU["LineColor"].FormulaU = "RGB(0,0,0)");
+        Try(() => shape.CellsU["LineWeight"].ResultIU = spec.Line / 72.0);
+        if (spec.Shape == "round") Try(() => shape.CellsU["Rounding"].ResultIU = 10 * PxIn);
+        shape.Text = spec.Text;
+        Try(() => shape.CellsU["Char.Size"].ResultIU = spec.FontPx * 0.75 / 72.0);
+        if (spec.Shape == "oval")
+        {
+            // подпись события — под фигурой, как в нашей выгрузке
+            Try(() => shape.CellsU["VerticalAlign"].ResultIU = 0);
+            Try(() => { shape.CellsU["TxtPinY"].FormulaU = $"-{(3 + 15) * PxIn}"; shape.CellsU["TxtWidth"].ResultIU = 120 * PxIn; shape.CellsU["TxtHeight"].ResultIU = 30 * PxIn; });
+        }
+        Try(() => win.DeselectAll());
+        return spec.Text;
+    }
+
+    /// <summary>Точка экрана в координатах окна Visio.</summary>
+    public Point ToClient(Point screen) => PointToClient(screen);
+
+    /// <summary>Число фигур на текущей странице (для самопроверки).</summary>
+    public int ShapeCount
+    {
+        get { try { return (int)visio.Ocx.Window.Page.Shapes.Count; } catch { return -1; } }
+    }
+
     /// <summary>Переключает окно на страницу нужной диаграммы; false — такой страницы в документе нет.</summary>
     public bool ShowDiagram(Diagram d)
     {
@@ -142,12 +222,26 @@ internal sealed class VisioPane : Panel
     public async Task<string> SendEditsAsync(ServerHost server)
     {
         if (LoadedSession == null) throw new InvalidOperationException("В Visio ничего не открыто");
+        await Task.Delay(100); // Visio заканчивает обработку только что созданных фигур в очереди окна; сохранение без паузы подвисает
         var file = Path.Combine(work, $"{LoadedSession}.edited.vsdx");
         if (File.Exists(file)) File.Delete(file);
-        visio.Ocx.Document.SaveAs(file);
+        // Окно прячется на время сохранения: пока оно видно, Visio при SaveAs зацикливается (рисует изменённую уже показанную
+        // страницу), а скрытому окну рисовать нечего — сохранение занимает доли секунды
+        var wasVisible = Visible;
+        Visible = false;
+        System.Windows.Forms.Application.DoEvents();
+        try
+        {
+            Trace?.Invoke("SaveAs: старт");
+            visio.Ocx.Document.SaveAs(file);
+            Trace?.Invoke("SaveAs: готово");
+        }
+        finally { Visible = wasVisible; }
         var content = Convert.ToBase64String(await File.ReadAllBytesAsync(file));
         var body = new StringContent(System.Text.Json.JsonSerializer.Serialize(new { content }), System.Text.Encoding.UTF8, "application/json");
+        Trace?.Invoke("POST правок: старт");
         var resp = await ServerHost.Http.PostAsync($"{server.Url}/api/sessions/{LoadedSession}/diagram-import/vsdx", body);
+        Trace?.Invoke("POST правок: ответ получен");
         var text = await resp.Content.ReadAsStringAsync();
         if (!resp.IsSuccessStatusCode) throw new InvalidOperationException($"Сервер ответил {(int)resp.StatusCode}: {text}");
         // документ теперь совпадает с моделью на сервере: новая версия принимается за загруженную, чтобы не открывать файл заново

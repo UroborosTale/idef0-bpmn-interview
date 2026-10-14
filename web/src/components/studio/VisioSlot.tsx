@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { postToShell, type VisioDiagram } from "../../desktop";
 import RibbonIcon from "./RibbonIcon";
+import ShapePalette from "./ShapePalette";
 
 const ZOOMS = [25, 50, 75, 100, 150, 200] as const;
 
@@ -118,8 +119,11 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
           </button>
         )}
       </div>
-      <div ref={ref} className="visio-slot" data-visio-slot>
-        Visio открывается на этом месте…
+      <div className="visio-body">
+        {diagram.kind === "bpmn" && <ShapePalette />}
+        <div ref={ref} className="visio-slot" data-visio-slot>
+          Visio открывается на этом месте…
+        </div>
       </div>
     </div>
   );

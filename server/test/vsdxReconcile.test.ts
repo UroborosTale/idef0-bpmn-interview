@@ -61,3 +61,45 @@ describe("правки из Visio в существующую модель", () 
     expect(model.nodes.some((n) => n.id === task.id)).toBe(true);
   });
 });
+
+describe("фигуры из палитры Visio (без меток pm_*)", () => {
+  /** Фигура, нарисованная в Visio без меток: форма и имя, как у палитры оболочки. */
+  const shape = (id: number, nameU: string, geometry: "rect" | "oval" | "diamond", text: string, cx: number, cy: number, w: number, h: number) => {
+    const W = w / 96;
+    const H = h / 96;
+    const rows =
+      geometry === "oval"
+        ? `<Row T="Ellipse" IX="1"><Cell N="X" V="${W / 2}"/><Cell N="Y" V="${H / 2}"/><Cell N="A" V="${W}"/><Cell N="B" V="${H / 2}"/><Cell N="C" V="${W / 2}"/><Cell N="D" V="${H}"/></Row>`
+        : geometry === "diamond"
+          ? [[W / 2, H], [W, H / 2], [W / 2, 0], [0, H / 2], [W / 2, H]].map(([x, y], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${x}"/><Cell N="Y" V="${y}"/></Row>`).join("")
+          : [[0, 0], [W, 0], [W, H], [0, H], [0, 0]].map(([x, y], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${x}"/><Cell N="Y" V="${y}"/></Row>`).join("");
+    return `<Shape ID="${id}" NameU="${nameU}" Type="Shape"><Cell N="PinX" V="${cx / 96}"/><Cell N="PinY" V="${cy / 96}"/><Cell N="Width" V="${W}"/><Cell N="Height" V="${H}"/><Cell N="LocPinX" V="${W / 2}"/><Cell N="LocPinY" V="${H / 2}"/><Section N="Geometry" IX="0"><Cell N="NoFill" V="0"/><Cell N="NoLine" V="0"/>${rows}</Section><Text>${text}</Text></Shape>`;
+  };
+
+  it("задача, шлюзы «или» и «и», начальное и конечное события становятся новыми шагами операции; значок шлюза — не название", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN B002.01.01");
+    const edited = await edit(buf, page, (xml) =>
+      xml.replace(
+        "</Shapes>",
+        shape(9001, "Задача.40", "rect", "Новая задача", 700, 300, 150, 90) +
+          shape(9002, "Шлюз «или».41", "diamond", "X", 900, 300, 50, 50) +
+          shape(9003, "Шлюз «и».42", "diamond", "+", 1000, 300, 50, 50) +
+          shape(9004, "Начальное событие.43", "oval", "Начало", 1100, 300, 36, 36) +
+          shape(9005, "Конечное событие.44", "oval", "Конец", 1200, 300, 36, 36) +
+          "</Shapes>"
+      )
+    );
+    const { model, changes } = reconcileVsdxEdit(m, await parseVsdx(edited));
+    expect(changes.added).toHaveLength(5);
+    const added = model.nodes.filter((n) => changes.added.includes(n.id));
+    const by = (type: string, subtype?: string) => added.find((n) => n.type === type && (subtype === undefined || n.subtype === subtype));
+    expect(by("task")!.name).toBe("Новая задача");
+    expect(by("gateway", "exclusive")!.name).toBe("(без названия)");
+    expect(by("gateway", "parallel")!.name).toBe("(без названия)");
+    expect(by("event", "start")!.name).toBe("Начало");
+    expect(by("event", "end")!.name).toBe("Конец");
+    expect(added.every((n) => n.bpmn_scope === "o1" && n.tags.includes("added_externally"))).toBe(true);
+  });
+});

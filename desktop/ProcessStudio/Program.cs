@@ -58,6 +58,7 @@ internal sealed class MainForm : Form
             case "zoom": visio.SetZoom(root.GetProperty("value").GetDouble()); break;
             case "fit": visio.FitPage(); break;
             case "grid": visio.ToggleGrid(); break;
+            case "drop": OnDrop(root); break;
         }
     }
 
@@ -94,6 +95,23 @@ internal sealed class MainForm : Form
         visio.Bounds = new Rectangle(web.Left + (int)(lastRect.X * s), web.Top + (int)(lastRect.Y * s), (int)(lastRect.Width * s), (int)(lastRect.Height * s));
         visio.Visible = lastRect.Width > 0 && lastRect.Height > 0;
         visio.BringToFront();
+    }
+
+    /// <summary>Фигура из палитры: при перетаскивании — в точку, где отпустили кнопку (если она над Visio), при щелчке — в центр.</summary>
+    private void OnDrop(JsonElement m)
+    {
+        if (!visio.Visible) return;
+        var kind = m.GetProperty("kind").GetString() ?? "";
+        var dragged = m.TryGetProperty("dragged", out var d) && d.GetBoolean();
+        Point? at = null;
+        if (dragged)
+        {
+            var c = visio.ToClient(Cursor.Position);
+            if (c.X < 0 || c.Y < 0 || c.X > visio.Width || c.Y > visio.Height) return; // отпустили вне диаграммы — отмена
+            at = c;
+        }
+        var made = visio.DropMaster(kind, at);
+        status.Text = made == null ? "Не удалось создать фигуру: в документе нет нужного мастера" : $"Создана фигура «{made}» — нажмите «Записать правки», чтобы она стала шагом модели";
     }
 
     /// <summary>«Перечитать»: открыть диаграмму из модели заново; непринятые правки Visio отбрасываются после подтверждения.</summary>
@@ -139,52 +157,71 @@ internal sealed class MainForm : Form
     public async Task<string> SelfTestAsync()
     {
         var sb = new System.Text.StringBuilder();
+        VisioPane.Trace = t => File.AppendAllText(Path.Combine(SelfTestDir, "progress.log"), "  · " + t + Environment.NewLine);
+        void L(string line) { sb.AppendLine(line); File.AppendAllText(Path.Combine(SelfTestDir, "progress.log"), line + Environment.NewLine); }
         var list = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions");
         var id = JsonDocument.Parse(list).RootElement.EnumerateArray().First().GetProperty("id").GetString()!;
-        sb.AppendLine($"сессия: {id}");
+        L($"сессия: {id}");
 
         // 1) студия открывается, сама сообщает место холста — Visio появляется на нём
         await coreReady.Task;
         var loaded = new TaskCompletionSource<bool>();
         web.NavigationCompleted += (_, e) => loaded.TrySetResult(e.IsSuccess);
         web.Source = new Uri($"{server.Url}/s/{id}");
-        if (!await loaded.Task) sb.AppendLine("ПРОВАЛ: студия не загрузилась в WebView2");
+        if (!await loaded.Task) L("ПРОВАЛ: студия не загрузилась в WebView2");
         for (var i = 0; i < 60 && !(visio.Visible && visio.LoadedSession == id && visio.CurrentPageName == "BPMN"); i++) await Task.Delay(500);
-        sb.AppendLine($"Visio на месте холста: видимо={visio.Visible}, область={visio.Bounds.Width}×{visio.Bounds.Height} в точке {visio.Bounds.X},{visio.Bounds.Y}, страница «{visio.CurrentPageName}»");
-        if (!visio.Visible || visio.Bounds.Width < 300 || visio.Bounds.Height < 200) sb.AppendLine("ПРОВАЛ: окно Visio не легло на место холста");
-        if (visio.CurrentPageName != "BPMN") sb.AppendLine("ПРОВАЛ: ожидалась страница «BPMN» (общая схема)");
-        sb.AppendLine($"линейки и ярлыки страниц скрыты: {visio.ChromeHidden}");
-        if (!visio.ChromeHidden) sb.AppendLine("ПРОВАЛ: линейки или ярлыки страниц Visio остались");
+        L($"Visio на месте холста: видимо={visio.Visible}, область={visio.Bounds.Width}×{visio.Bounds.Height} в точке {visio.Bounds.X},{visio.Bounds.Y}, страница «{visio.CurrentPageName}»");
+        if (!visio.Visible || visio.Bounds.Width < 300 || visio.Bounds.Height < 200) L("ПРОВАЛ: окно Visio не легло на место холста");
+        if (visio.CurrentPageName != "BPMN") L("ПРОВАЛ: ожидалась страница «BPMN» (общая схема)");
+        L($"линейки и ярлыки страниц скрыты: {visio.ChromeHidden}");
+        if (!visio.ChromeHidden) L("ПРОВАЛ: линейки или ярлыки страниц Visio остались");
+
+        // палитра: фигура создаётся на странице операции и после «Записать правки» становится шагом модели
+        var scope = JsonDocument.Parse(await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}")).RootElement.GetProperty("model").GetProperty("nodes").EnumerateArray()
+            .Select(n => n.TryGetProperty("bpmn_scope", out var b) && b.ValueKind == JsonValueKind.String ? b.GetString() : null).First(x => x != null)!;
+        visio.ShowDiagram(new Diagram("bpmn", scope));
+        var before = visio.ShapeCount;
+        var drops = new[] { "task", "gateway:exclusive", "event:end" };
+        var madeAll = drops.Select(k => visio.DropMaster(k, null)).ToList();
+        L($"палитра: создано {string.Join(", ", madeAll.Select(m => $"«{m}»"))}; фигур на странице {before} → {visio.ShapeCount}");
+        if (madeAll.Any(m => m == null) || visio.ShapeCount != before + drops.Length) L("ПРОВАЛ: фигуры из палитры не созданы");
+        var applied = await visio.SendEditsAsync(server);
+        using (var ad = JsonDocument.Parse(applied)) L($"после «Записать правки»: новых шагов {ad.RootElement.GetProperty("changes").GetProperty("added").GetArrayLength()}");
+        var nodesJson = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}");
+        var added = JsonDocument.Parse(nodesJson).RootElement.GetProperty("model").GetProperty("nodes").EnumerateArray().Where(n => n.TryGetProperty("tags", out var tg) && tg.EnumerateArray().Any(t => t.GetString() == "added_externally")).ToList();
+        L("новые шаги в модели: " + string.Join("; ", added.Select(n => $"{n.GetProperty("type").GetString()}:{n.GetProperty("name").GetString()}")));
+        if (added.Count != drops.Length || !added.Any(n => n.GetProperty("name").GetString() == "Новая задача" && n.GetProperty("type").GetString() == "task")) L("ПРОВАЛ: фигуры из палитры не стали шагами модели");
+        await Task.Delay(3500);
 
         // панель инструментов диаграммы: масштаб, вписать, сетка
         visio.SetZoom(0.5);
-        sb.AppendLine($"масштаб 50%: {visio.ZoomValue:0.00}");
-        if (Math.Abs(visio.ZoomValue - 0.5) > 0.02) sb.AppendLine("ПРОВАЛ: масштаб не применился");
+        L($"масштаб 50%: {visio.ZoomValue:0.00}");
+        if (Math.Abs(visio.ZoomValue - 0.5) > 0.02) L("ПРОВАЛ: масштаб не применился");
         var gridBefore = visio.GridShown;
         visio.ToggleGrid();
-        sb.AppendLine($"сетка: было {gridBefore}, стало {visio.GridShown}");
-        if (visio.GridShown == gridBefore) sb.AppendLine("ПРОВАЛ: сетка не переключилась");
+        L($"сетка: было {gridBefore}, стало {visio.GridShown}");
+        if (visio.GridShown == gridBefore) L("ПРОВАЛ: сетка не переключилась");
         visio.ToggleGrid();
         visio.FitPage();
 
         // 2) переход на вкладку IDEF0 в студии переключает страницу Visio
         await web.CoreWebView2.ExecuteScriptAsync("(() => { const t = [...document.querySelectorAll('.doc-tabs [role=tab]')].find(e => /^IDEF0/.test((e.textContent || '').trim())); if (t) t.click(); return !!t; })()");
         for (var i = 0; i < 20 && !visio.CurrentPageName.StartsWith("IDEF0"); i++) await Task.Delay(400);
-        sb.AppendLine($"после перехода на вкладку IDEF0: страница «{visio.CurrentPageName}»");
-        if (!visio.CurrentPageName.StartsWith("IDEF0")) sb.AppendLine("ПРОВАЛ: страница Visio не переключилась на IDEF0");
+        L($"после перехода на вкладку IDEF0: страница «{visio.CurrentPageName}»");
+        if (!visio.CurrentPageName.StartsWith("IDEF0")) L("ПРОВАЛ: страница Visio не переключилась на IDEF0");
         visio.ExportCurrentPage(Path.Combine(SelfTestDir, "visio-idef0.png"));
 
         // 3) правка в Visio → «Принять из Visio» (то же, что кнопка в ленте студии) → в модели
         const string mark = " ИЗ_VISIO";
-        sb.AppendLine("правка в Visio: " + visio.RenameFirstNode(mark));
+        L("правка в Visio: " + visio.RenameFirstNode(mark));
         await Apply();
         var model = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}");
-        sb.AppendLine(model.Contains(mark.Trim()) ? "OK: новое название есть в модели сессии" : "ПРОВАЛ: нового названия нет в модели");
+        L(model.Contains(mark.Trim()) ? "OK: новое название есть в модели сессии" : "ПРОВАЛ: нового названия нет в модели");
 
         // 4) после перезагрузки студия возвращается на ту же вкладку, а Visio не открывается заново
         await Task.Delay(5000);
-        sb.AppendLine($"после перезагрузки студии: страница «{visio.CurrentPageName}», непринятых правок: {(visio.IsDirty ? "есть" : "нет")}");
-        if (!visio.CurrentPageName.StartsWith("IDEF0")) sb.AppendLine("ПРОВАЛ: вкладка не восстановилась после перезагрузки");
+        L($"после перезагрузки студии: страница «{visio.CurrentPageName}», непринятых правок: {(visio.IsDirty ? "есть" : "нет")}");
+        if (!visio.CurrentPageName.StartsWith("IDEF0")) L("ПРОВАЛ: вкладка не восстановилась после перезагрузки");
 
         using (var fs = File.Create(Path.Combine(SelfTestDir, "web.png"))) await web.CoreWebView2.CapturePreviewAsync(Microsoft.Web.WebView2.Core.CoreWebView2CapturePreviewImageFormat.Png, fs);
         return sb.ToString();
