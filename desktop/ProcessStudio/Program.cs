@@ -54,6 +54,10 @@ internal sealed class MainForm : Form
         {
             case "slot": await OnSlot(root); break;
             case "apply": await Apply(); break;
+            case "reload": await Reload(); break;
+            case "zoom": visio.SetZoom(root.GetProperty("value").GetDouble()); break;
+            case "fit": visio.FitPage(); break;
+            case "grid": visio.ToggleGrid(); break;
         }
     }
 
@@ -90,6 +94,20 @@ internal sealed class MainForm : Form
         visio.Bounds = new Rectangle(web.Left + (int)(lastRect.X * s), web.Top + (int)(lastRect.Y * s), (int)(lastRect.Width * s), (int)(lastRect.Height * s));
         visio.Visible = lastRect.Width > 0 && lastRect.Height > 0;
         visio.BringToFront();
+    }
+
+    /// <summary>«Перечитать»: открыть диаграмму из модели заново; непринятые правки Visio отбрасываются после подтверждения.</summary>
+    private async Task Reload()
+    {
+        if (visio.LoadedSession == null) return;
+        if (visio.IsDirty && MessageBox.Show(this, "Отбросить непринятые правки Visio и перечитать диаграмму из модели?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+        await gate.WaitAsync();
+        try
+        {
+            await visio.OpenSessionAsync(server, visio.LoadedSession, visio.LoadedUpdatedAt ?? "");
+            if (wanted != null) visio.ShowDiagram(wanted);
+        }
+        finally { gate.Release(); }
     }
 
     private async Task Apply()
@@ -135,6 +153,19 @@ internal sealed class MainForm : Form
         sb.AppendLine($"Visio на месте холста: видимо={visio.Visible}, область={visio.Bounds.Width}×{visio.Bounds.Height} в точке {visio.Bounds.X},{visio.Bounds.Y}, страница «{visio.CurrentPageName}»");
         if (!visio.Visible || visio.Bounds.Width < 300 || visio.Bounds.Height < 200) sb.AppendLine("ПРОВАЛ: окно Visio не легло на место холста");
         if (visio.CurrentPageName != "BPMN") sb.AppendLine("ПРОВАЛ: ожидалась страница «BPMN» (общая схема)");
+        sb.AppendLine($"линейки и ярлыки страниц скрыты: {visio.ChromeHidden}");
+        if (!visio.ChromeHidden) sb.AppendLine("ПРОВАЛ: линейки или ярлыки страниц Visio остались");
+
+        // панель инструментов диаграммы: масштаб, вписать, сетка
+        visio.SetZoom(0.5);
+        sb.AppendLine($"масштаб 50%: {visio.ZoomValue:0.00}");
+        if (Math.Abs(visio.ZoomValue - 0.5) > 0.02) sb.AppendLine("ПРОВАЛ: масштаб не применился");
+        var gridBefore = visio.GridShown;
+        visio.ToggleGrid();
+        sb.AppendLine($"сетка: было {gridBefore}, стало {visio.GridShown}");
+        if (visio.GridShown == gridBefore) sb.AppendLine("ПРОВАЛ: сетка не переключилась");
+        visio.ToggleGrid();
+        visio.FitPage();
 
         // 2) переход на вкладку IDEF0 в студии переключает страницу Visio
         await web.CoreWebView2.ExecuteScriptAsync("(() => { const t = [...document.querySelectorAll('.doc-tabs [role=tab]')].find(e => /^IDEF0/.test((e.textContent || '').trim())); if (t) t.click(); return !!t; })()");

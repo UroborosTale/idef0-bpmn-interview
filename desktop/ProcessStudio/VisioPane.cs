@@ -18,6 +18,7 @@ internal sealed class VisioPane : Panel
 {
     private readonly VisioControl visio = new();
     private readonly string work;
+    private int openCount;
 
     public string? LoadedSession { get; private set; }
     public string? LoadedUpdatedAt { get; private set; }
@@ -48,13 +49,14 @@ internal sealed class VisioPane : Panel
     {
         Status?.Invoke("Выгрузка диаграмм в Visio…");
         var bytes = await ServerHost.Http.GetByteArrayAsync($"{server.Url}/api/sessions/{sessionId}/export/vsdx");
-        var file = Path.Combine(work, $"{sessionId}.vsdx");
+        var file = Path.Combine(work, $"{sessionId}.{++openCount}.vsdx"); // новое имя: Visio не перечитывает документ по прежнему пути
         await File.WriteAllBytesAsync(file, bytes);
         visio.Ocx.Src = file;
         LoadedSession = sessionId;
         LoadedUpdatedAt = updatedAt;
         visio.Ocx.Document.Saved = true;
         await Task.Delay(1500); // Visio загружает документ в фоне
+        HideChrome();
         Status?.Invoke($"Visio: страниц {(int)visio.Ocx.Document.Pages.Count}");
     }
 
@@ -67,6 +69,48 @@ internal sealed class VisioPane : Panel
         }
         catch { return null; }
     }
+
+    private static void Try(Action a) { try { a(); } catch { /* свойство недоступно в этой версии Visio — остаётся как есть */ } }
+
+    /// <summary>Убирает у окна Visio всё, чего нет в редакторе Business Studio: линейки и ярлыки страниц; сетка и полосы прокрутки остаются.</summary>
+    public void HideChrome()
+    {
+        dynamic w = visio.Ocx.Window;
+        Try(() => w.ShowRulers = false);
+        Try(() => w.ShowPageTabs = false);
+        Try(() => w.ShowScrollBars = 3); // visScrollBarsBoth
+        Try(() => w.ShowGrid = true);
+        Try(() => w.ShowGuides = false);
+    }
+
+    /// <summary>Линейки и ярлыки страниц скрыты (для самопроверки).</summary>
+    public bool ChromeHidden
+    {
+        get
+        {
+            try { dynamic w = visio.Ocx.Window; return Convert.ToInt32(w.ShowRulers) == 0 && Convert.ToInt32(w.ShowPageTabs) == 0; }
+            catch { return false; }
+        }
+    }
+
+    public double ZoomValue
+    {
+        get { try { return Convert.ToDouble(visio.Ocx.Window.Zoom); } catch { return -1; } }
+    }
+
+    public bool GridShown
+    {
+        get { try { return Convert.ToInt32(visio.Ocx.Window.ShowGrid) != 0; } catch { return false; } }
+    }
+
+    /// <summary>Масштаб окна: 1 = 100 %.</summary>
+    public void SetZoom(double zoom) => Try(() => visio.Ocx.Window.Zoom = zoom);
+
+    /// <summary>Вписать страницу в окно.</summary>
+    public void FitPage() => Try(() => visio.Ocx.Window.ViewFit = 1); // visFitPage
+
+    /// <summary>Показать или скрыть сетку.</summary>
+    public void ToggleGrid() => Try(() => { dynamic w = visio.Ocx.Window; w.ShowGrid = Convert.ToInt32(w.ShowGrid) == 0; });
 
     /// <summary>Переключает окно на страницу нужной диаграммы; false — такой страницы в документе нет.</summary>
     public bool ShowDiagram(Diagram d)
@@ -82,6 +126,7 @@ internal sealed class VisioPane : Panel
             // переход на страницу Visio считает изменением документа; настоящие правки пользователя от этого не теряются
             bool wasSaved = (bool)visio.Ocx.Document.Saved;
             visio.Ocx.Window.Page = page;
+            FitPage();
             if (wasSaved) visio.Ocx.Document.Saved = true;
             return true;
         }

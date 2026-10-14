@@ -884,7 +884,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="doc-area">
             {inDesktopShell() && (active.kind === "bpmn" || active.kind === "idef0") && (
-              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} />
+              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} toolbar={{ propsOpen, onToggleProps: () => setPropsOpen(!propsOpen), onFind: findInNavigator, onClose: liveDocs.length > 1 ? () => close(active.key) : undefined }} />
             )}
             {!inDesktopShell() && active.kind === "bpmn" && (
               <BpmnEditor key={active.key} display={display} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={hEdit} focus={focus} onSelectionChange={reportSelection} />
