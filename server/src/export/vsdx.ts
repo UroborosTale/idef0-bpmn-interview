@@ -450,10 +450,10 @@ const pageSize = (w: number, h: number, geo: FrameGeometry | null): [number, num
 
 /** Рамка и штамп — оформление (pm_k = deco): при чтении правок из Visio они пропускаются. Сетка в Visio не выгружается. */
 function drawSheet(page: Page, geo: FrameGeometry) {
-  page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef9", weightPt: 1 });
-  page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 1.2 });
-  for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 1 });
-  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 14, color: "#111827" });
+  page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#ffffff", weightPt: 0.75 });
+  page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 0.75 });
+  for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 0.75 });
+  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 10, color: "#000000" });
 }
 
 /** Ширина рамки подписи стрелки по самой длинной строке (кегль 10,5; прописные и цифры шире строчных). */
@@ -477,7 +477,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     // у блока подпись «код название», как в Business Studio; полное название хранится в метке pm_n
     const own = ownStyle(model, "idef0_block");
     const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
-    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
+    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
   }
 

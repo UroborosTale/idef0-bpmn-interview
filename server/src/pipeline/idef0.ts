@@ -249,9 +249,9 @@ function frameSvg(geo: FrameGeometry, grid: boolean): string {
 
 /** Ключ рамки и надписи штампа по умолчанию для диаграммы (A-0, A0 или вложенной функции). */
 export function frameInfo(d: Pick<Idef0DiagramData, "code" | "title">, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): { key: string; defaults: FrameDefaults } {
-  if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: d.title.replace(/ — /, " ").replace(" (контекстная диаграмма)", ""), no: "1.0" } };
-  if (kind === "root") return { key: frameKey(null), defaults: { node: "A0", title: `${processCodeOf(model)} ${model.process.name}`.trim(), no: "1.0" } };
-  return { key: frameKey(parentNodeId ?? null), defaults: { node: d.code, title: d.title.replace(/ — /, " "), no: "1.0" } };
+  if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: (d.title.includes(" — ") ? d.title.slice(d.title.indexOf(" — ") + 3) : d.title).replace(" (контекстная диаграмма)", ""), no: "1.0" } };
+  if (kind === "root") return { key: frameKey(null), defaults: { node: "A0", title: model.process.name, no: "1.0" } }; // в штампе Business Studio — только название, без кода
+  return { key: frameKey(parentNodeId ?? null), defaults: { node: d.code, title: d.title.includes(" — ") ? d.title.slice(d.title.indexOf(" — ") + 3) : d.title, no: "1.0" } };
 }
 
 function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefined; defaults: FrameDefaults }): string {
