@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { navRow } from "../test/harness";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { purchaseModel, session } from "../test/fixtures";
@@ -112,7 +113,7 @@ describe("страница сессии", () => {
     const rebuild = vi.spyOn(api, "rebuildDiagrams").mockResolvedValue({ ...s, updatedAt: "2026-10-02T10:00:00Z" });
     await screen.findByRole("heading", { name: "Закупка" });
     await waitFor(() => expect(document.querySelector(".studio")).toBeTruthy());
-    fireEvent.click(screen.getByText("Исполнители", { selector: ".nav-name" }));
+    fireEvent.click(navRow("Исполнители"));
     fireEvent.click(document.querySelector(".dict-table tbody tr")!);
     const desc = screen.getByLabelText("Описание");
     fireEvent.change(desc, { target: { value: "из страницы" } });
@@ -130,7 +131,7 @@ describe("страница сессии", () => {
     vi.spyOn(api, "putModel").mockRejectedValue(new Error("Модель изменилась после того, как вы начали правку"));
     await screen.findByRole("heading", { name: "Закупка" });
     await waitFor(() => expect(document.querySelector(".studio")).toBeTruthy());
-    fireEvent.click(screen.getByText("Исполнители", { selector: ".nav-name" }));
+    fireEvent.click(navRow("Исполнители"));
     fireEvent.click(document.querySelector(".dict-table tbody tr")!);
     const desc = screen.getByLabelText("Описание");
     fireEvent.change(desc, { target: { value: "правка" } });

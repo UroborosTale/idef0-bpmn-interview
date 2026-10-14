@@ -51,6 +51,13 @@ function loadNavState(key: string | undefined): { collapsed: string[]; closed: s
   }
 }
 
+type NavTab = "activity" | "dicts" | "reports";
+const NAV_TABS: { key: NavTab; title: string }[] = [
+  { key: "activity", title: "Деятельность" },
+  { key: "dicts", title: "Справочники" },
+  { key: "reports", title: "Отчёты" },
+];
+
 export default function Navigator({
   model,
   activeKey,
@@ -72,6 +79,7 @@ export default function Navigator({
   activeSet,
   onActiveSet,
   onSetOp,
+  onClose,
 }: {
   model: ProcessLogicModel;
   activeKey: string;
@@ -104,6 +112,8 @@ export default function Navigator({
   onActiveSet?: (id: string | null) => void;
   /** Создание, переименование, удаление наборов и состав; без обработчика наборы только фильтруют. */
   onSetOp?: (op: SetOp) => void;
+  /** Скрыть панель навигатора (кнопка × в шапке). */
+  onClose?: () => void;
 }) {
   const codes = idef0Codes(model);
   const nums = blockNumbers(model);
@@ -565,7 +575,11 @@ export default function Navigator({
       )}
     </div>
   );
-  const section = (id: string, title: string, body: React.ReactNode, action?: React.ReactNode) => (
+  /** Вертикальные вкладки панели (как в Business Studio): деятельность, справочники, отчёты. */
+  const [navTab, setNavTab] = useState<NavTab>("activity");
+  const sectionTab = (id: string): NavTab => (id === "dicts" ? "dicts" : id === "reports" ? "reports" : "activity");
+  const section = (id: string, title: string, body: React.ReactNode, action?: React.ReactNode) =>
+    sectionTab(id) !== navTab ? null : (
     <div className="nav-section">
       <div className="nav-section-head" onClick={() => toggleSection(id)}>
         <span>{closedSections.has(id) ? "▸" : "▾"}</span> {title}
@@ -599,6 +613,17 @@ export default function Navigator({
   return (
     <div className="nav" ref={rootRef} onKeyDown={onNavKey} onMouseDownCapture={markPicked}>
       {contextMenu}
+      <div className="nav-main">
+      <div className="nav-title">
+        <span>Навигатор ({NAV_TABS.find((t) => t.key === navTab)!.title})</span>
+        <span className="spacer" />
+        {onClose && (
+          <button className="nav-title-btn" onClick={onClose} aria-label="Скрыть навигатор" title="Скрыть навигатор">
+            ×
+          </button>
+        )}
+      </div>
+      <div className="nav-scroll">
       <div className="nav-search">
         <input ref={searchRef} type="search" placeholder="Найти функцию или запись…" aria-label="Поиск в навигаторе" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} />
       </div>
@@ -738,6 +763,15 @@ export default function Navigator({
       )}
         </>
       )}
+      </div>
+      </div>
+      <div className="nav-vtabs" role="tablist" aria-orientation="vertical" aria-label="Разделы навигатора">
+        {NAV_TABS.map((t) => (
+          <button key={t.key} role="tab" aria-selected={navTab === t.key} className="nav-vtab" onClick={() => setNavTab(t.key)} title={t.title}>
+            {t.title}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

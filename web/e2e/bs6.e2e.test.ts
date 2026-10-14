@@ -127,17 +127,20 @@ describe("студия: навигатор по образцу Business Studio, 
 
     // запись справочника: создаём исполнителя и кладём в набор (фильтр набора включён, поэтому снимаем его на время)
     await page.getByText("Снять", { exact: true }).click();
+    await page.locator(".nav-vtab", { hasText: "Справочники" }).click(); // вертикальные вкладки навигатора
     await page.locator(".nav-row", { hasText: "Исполнители" }).click();
     await page.locator(".dict-add input").fill("Аналитик");
     await page.locator(".dict-add input").press("Enter");
     await page.locator(".dict-add input").fill("Менеджер");
     await page.locator(".dict-add input").press("Enter");
     await page.getByLabel("Набор для записи «Аналитик»").selectOption({ label: "В набор «Анализ»" });
+    await page.locator(".nav-vtab", { hasText: "Деятельность" }).click(); // наборы — на этой вкладке
     await page.locator('[data-nav-set="set1"]').click(); // фильтр по набору
     await page.locator("[data-dict-filter]").waitFor();
     expect(await page.locator(".dict-table tbody tr td:nth-child(2) input").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value))).toEqual(["Аналитик"]);
 
     // матрица RACI — только функции набора
+    await page.locator(".nav-vtab", { hasText: "Отчёты" }).click();
     await page.locator(".nav-row", { hasText: "Матрица RACI" }).click();
     expect(await page.locator(".raci-table tbody tr").count()).toBe(1); // в наборе одна функция — o3
     await page.getByTitle("Сохранить (Ctrl+S)").click();

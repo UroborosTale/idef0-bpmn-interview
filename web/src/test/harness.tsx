@@ -4,6 +4,25 @@ import type { ProcessLogicModel } from "../types";
 
 type M = ProcessLogicModel;
 
+/**
+ * Строка навигатора по началу текста (или точному совпадению). Если она на другой вертикальной вкладке панели
+ * («Деятельность», «Справочники», «Отчёты»), вкладка открывается.
+ */
+/** Вертикальная вкладка навигатора по названию («Деятельность», «Справочники», «Отчёты»). */
+export const navTab = (title: string) => fireEvent.click(screen.getByRole("tab", { name: title }));
+
+export function navRow(text: string, exact = false): HTMLElement {
+  const find = () => [...document.querySelectorAll<HTMLElement>(".nav-row")].find((n) => (exact ? n.textContent?.trim() === text : n.textContent?.trim().startsWith(text)));
+  let row = find();
+  for (const tab of document.querySelectorAll(".nav-vtab")) {
+    if (row) break;
+    fireEvent.click(tab);
+    row = find();
+  }
+  if (!row) throw new Error(`В навигаторе нет строки «${text}»`);
+  return row;
+}
+
 /** Рендер компонента, который правит модель через onChange: модель живёт в состоянии, последняя доступна через model(). */
 export function renderWithModel(initial: M, ui: (m: M, onChange: (next: M) => void) => ReactElement) {
   const ref = { current: initial, changes: 0 };

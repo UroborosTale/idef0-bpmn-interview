@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { setNodeIds } from "@shared/objectSets";
 import { session, structuredModel } from "../../test/fixtures";
+import { navRow, navTab } from "../../test/harness";
 import DictionaryView from "./DictionaryView";
 import RaciMatrix from "./RaciMatrix";
 import Studio from "./Studio";
@@ -108,19 +109,22 @@ describe("окно студии: хвосты наборов", () => {
     const { model, id } = withSet();
     render(<Studio session={session(model)} busy={false} onSave={vi.fn(async () => true)} />);
     // справочник «Исполнители»: добавить запись в набор
-    fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.trim().startsWith("Исполнители"))!);
+    fireEvent.click(navRow("Исполнители"));
     fireEvent.change(screen.getByLabelText("Набор для записи «Директор»"), { target: { value: id } });
+    navTab("Деятельность"); // наборы — на вкладке «Деятельность»
     expect(document.querySelector(`[data-nav-set="${id}"] .nav-count`)!.textContent).toBe("4"); // три функции подпроцесса + запись
     // фильтр по набору: справочник показывает только запись набора
     fireEvent.click(document.querySelector(`[data-nav-set="${id}"]`)!);
     const names = () => [...document.querySelectorAll(".dict-table tbody tr")].map((tr) => (tr.querySelector("td input") as HTMLInputElement | null)?.value).filter(Boolean);
     expect(names()).toEqual(["Директор"]);
     // RACI: только функции набора
-    fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.trim().startsWith("Матрица RACI"))!);
+    fireEvent.click(navRow("Матрица RACI"));
     expect(document.querySelectorAll(".raci-table tbody tr")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("tab", { name: "Выгрузка и печать" })); // выгрузки — на второй вкладке ленты
     expect(screen.getByText("BPMN набора (zip)")).toBeTruthy();
     // отмена возвращает прежнее состояние набора
     fireEvent.keyDown(document.querySelector(".studio")!, { key: "z", ctrlKey: true });
+    navTab("Деятельность");
     expect(document.querySelector(`[data-nav-set="${id}"] .nav-count`)!.textContent).toBe("3");
   });
 });

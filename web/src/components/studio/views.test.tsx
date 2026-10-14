@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { purchaseModel } from "../../test/fixtures";
-import { renderWithModel } from "../../test/harness";
+import { navRow, renderWithModel } from "../../test/harness";
 import { validateModel } from "@shared/validate";
 import DictionaryView from "./DictionaryView";
 import Navigator from "./Navigator";
@@ -105,9 +105,9 @@ describe("навигатор", () => {
 
   it("счётчики справочников и сворачивание ветки", () => {
     render(<Navigator model={purchaseModel()} activeKey="bpmn" selectedId={null} onOpenDoc={() => {}} onSelectFn={() => {}} onAddFunction={() => {}} />);
-    expect(screen.getByText("Документы и данные").parentElement!.textContent).toMatch(/4$/);
     fireEvent.click(document.querySelectorAll("[data-nav-fn]")[1].querySelector(".nav-twisty")!);
     expect(document.querySelectorAll("[data-nav-fn]")).toHaveLength(3);
+    expect(navRow("Документы и данные").textContent).toMatch(/4$/);
   });
 });
 

@@ -120,6 +120,7 @@ describe("студия в браузере", () => {
     const id = await seedSession();
     const { ctx, page, errors } = await openContext(browser);
     await openStudio(page, id);
+    await page.locator(".nav-vtab", { hasText: "Справочники" }).click(); // вертикальная вкладка навигатора
     await page.locator(".nav-row", { hasText: "Информационные системы" }).click();
     await page.locator(".dict-add input").fill("СЭД «Дело»");
     await page.locator(".dict-add input").press("Enter");

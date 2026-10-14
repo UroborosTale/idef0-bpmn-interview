@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import { navRow } from "../../test/harness";
 import { describe, expect, it, vi } from "vitest";
 import { session, structuredModel } from "../../test/fixtures";
 import { DEFAULT_DISPLAY, loadDisplay, saveDisplay } from "../editor-core/display";
@@ -97,7 +98,7 @@ describe("окно студии: «Подписи» и «Номера»", () => 
 
   it("на диаграммах других видов кнопок нет", () => {
     open();
-    fireEvent.click(screen.getAllByText("Паспорт процесса")[0]);
+    fireEvent.click(navRow("Паспорт процесса"));
     expect(screen.queryByRole("button", { name: "Подписи" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Номера" })).toBeNull();
   });

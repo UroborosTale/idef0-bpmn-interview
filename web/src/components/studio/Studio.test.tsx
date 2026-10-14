@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { purchaseModel, session, structuredModel } from "../../test/fixtures";
-import { commit, field } from "../../test/harness";
+import { commit, field, navRow } from "../../test/harness";
 import type { ProcessLogicModel } from "../../types";
 import Studio from "./Studio";
 
@@ -10,7 +10,7 @@ type M = ProcessLogicModel;
 /** Окно студии целиком: одна модель на все вкладки, общая история, одно сохранение. */
 function studio(onSave = vi.fn(async (_: M) => true)) {
   const r = render(<Studio session={session()} busy={false} onSave={onSave} />);
-  const nav = (text: string) => fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.trim().startsWith(text))!);
+  const nav = (text: string) => fireEvent.click(navRow(text));
   const tabs = () => [...document.querySelectorAll(".doc-tab")].map((t) => t.firstChild!.textContent);
   const active = () => document.querySelector(".doc-tab.active")!.firstChild!.textContent;
   const status = () => document.querySelector(".statusbar")!.lastElementChild!.textContent;
@@ -202,7 +202,8 @@ describe("окно студии", () => {
 
   it("экспорт «эта диаграмма»: на вкладке справочника — понятное сообщение", () => {
     studio();
-    fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.startsWith("Исполнители"))!);
+    fireEvent.click(navRow("Исполнители"));
+    fireEvent.click(screen.getByRole("tab", { name: "Выгрузка и печать" }));
     fireEvent.click(screen.getByText("SVG"));
     expect(screen.getByRole("alert").textContent).toMatch(/Откройте диаграмму/);
   });

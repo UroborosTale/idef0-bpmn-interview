@@ -217,7 +217,7 @@ export default function WorkspacePage({
   const activeGroup = groups.find((g) => g.tabs.some((t) => t.key === tab)) ?? groups[0];
 
   return (
-    <div>
+    <div className="workspace">
       <div className="toolbar">
         <button onClick={onBack}>← Назад</button>
         <h2 style={{ margin: 0 }}>{session.title}</h2>

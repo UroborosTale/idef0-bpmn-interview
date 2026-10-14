@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { navRow } from "../../test/harness";
 import { describe, expect, it, vi } from "vitest";
 import { productStages } from "@shared/products";
 import { session, structuredModel, purchaseModel } from "../../test/fixtures";
@@ -327,7 +328,7 @@ describe("схема перехода статусов", () => {
 
   it("отчёт открывается из навигатора", () => {
     const s = studio();
-    fireEvent.click([...document.querySelectorAll(".nav-row")].find((n) => n.textContent?.trim() === "Схема перехода статусов")!);
+    fireEvent.click(navRow("Схема перехода статусов", true));
     expect(s.active()).toBe("Схема перехода статусов");
     expect(document.querySelector("svg.scheme-svg")).toBeTruthy();
   });

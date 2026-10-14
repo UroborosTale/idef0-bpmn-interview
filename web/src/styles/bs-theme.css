@@ -134,3 +134,32 @@ input[type="checkbox"], input[type="radio"] { width: auto; min-height: 0; }
 table { border-collapse: collapse; }
 th { background: #f4f6f9; font-weight: 600; text-align: left; border: 1px solid var(--bs-border); padding: 2px 6px; font-size: 12px; }
 td { border: 1px solid #e3e7ec; padding: 1px 4px; }
+
+/* ——— страница сессии: студия занимает всё окно ——— */
+.main-area:has(.workspace) { padding: 0; display: flex; flex-direction: column; overflow: auto; }
+.workspace { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.workspace > .toolbar { margin: 0; padding: 3px 8px; gap: 6px; background: var(--bs-window); border-bottom: 1px solid var(--bs-border); }
+.workspace > .toolbar h2 { font-size: 13px; font-weight: 600; }
+.workspace > .validation-item { margin: 4px 8px; }
+.workspace > .studio { flex: 1; height: auto; min-height: 0; border-left: 0; border-right: 0; border-bottom: 0; }
+.workspace > :not(.studio):not(.toolbar):not(.ws-groups):not(.ws-tabs):not(.validation-item) { margin-left: 8px; margin-right: 8px; }
+
+/* разделы сессии: плоские вкладки меню, как строка «Главная / Справочники / Отчёты…» в программе */
+.ws-groups { margin: 0; padding: 3px 6px 0; gap: 0; background: var(--bs-window); border-bottom: 1px solid var(--bs-border); }
+.ws-groups button { border-radius: 0; border: 1px solid transparent; border-bottom: none; background: none; color: var(--bs-text); padding: 3px 13px 4px; font-size: 12px; }
+.ws-groups button:hover:not(.active) { background: var(--bs-hover); }
+.ws-groups button.active { background: var(--bs-ribbon); border-color: var(--bs-border); color: var(--bs-text); font-weight: 600; position: relative; top: 1px; }
+.ws-tabs { margin: 0; background: var(--bs-ribbon); border-bottom: 1px solid var(--bs-border); padding: 0 6px; }
+.ws-tabs button { padding: 3px 12px; font-size: 12px; border-bottom: 2px solid transparent; }
+.ws-tabs button.active { border-bottom-color: var(--bs-select); color: var(--bs-text); font-weight: 600; }
+
+/* ——— навигатор: шапка панели и вертикальные вкладки справа ——— */
+.nav { display: flex; flex-direction: row; padding: 0; overflow: hidden; }
+.nav-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nav-scroll { flex: 1; min-height: 0; overflow: auto; }
+.nav-title { display: flex; align-items: center; gap: 4px; background: var(--bs-head); border-bottom: 1px solid var(--bs-border); padding: 2px 6px; font-size: 11px; color: var(--bs-text); white-space: nowrap; }
+.nav-title-btn { padding: 0 5px; font-size: 14px; line-height: 14px; border-radius: 0; }
+.nav-vtabs { flex: 0 0 24px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--bs-border); }
+.nav-vtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 3px; border: 1px solid transparent; border-radius: 0; font-size: 11px; color: var(--bs-text); white-space: nowrap; text-align: center; }
+.nav-vtab:hover:not([aria-selected="true"]) { background: var(--bs-hover); }
+.nav-vtab[aria-selected="true"] { background: var(--bs-head); border-color: var(--bs-border); font-weight: 600; }
