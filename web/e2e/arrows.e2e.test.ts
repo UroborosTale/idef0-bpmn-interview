@@ -141,6 +141,7 @@ describe("правка стрелок и триггеры блока в брау
     const [s0, a0] = [await shapes(), await arrows()];
 
     await page.locator('.studio g[data-node-id="t3"]').click();
+    await page.locator(".props-vtab", { hasText: "Дополнительно" }).click(); // раздел — на вкладке «Дополнительно»
     await page.locator("summary", { hasText: "Триггеры блока" }).click(); // раздел свёрнут, пока у блока нет триггеров
     await page.getByRole("button", { name: "+ Таймер" }).first().click();
     await page.locator('[data-marker]').waitFor();
@@ -149,6 +150,7 @@ describe("правка стрелок и триггеры блока в брау
     expect(await page.locator('[data-marker] [data-trigger="timer"]').count()).toBe(1);
 
     // параметры срока — в карточке события (значок выбран после добавления)
+    await page.locator(".props-vtab", { hasText: "Основные" }).click(); // карточка события — на вкладке «Основные»
     await page.getByLabel("Значение таймера").fill("P3D");
     await page.getByLabel("Значение таймера").press("Enter");
     await page.getByTitle("Сохранить (Ctrl+S)").click();

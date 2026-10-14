@@ -13,7 +13,7 @@ import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
 import { MessageCard, PoolCard } from "./PoolCards";
 import NodeProperties from "./NodeProperties";
-import { Section, SourceList } from "./PanelParts";
+import { PROP_TABS, Section, SourceList, type PropTab } from "./PanelParts";
 import { reportDoc, type StudioDoc } from "./docs";
 import { arrowEntry, selectionExists, type Selection } from "./selection";
 
@@ -101,6 +101,7 @@ export default function PropertiesPanel({
 
   // при переходе к другому объекту карточка открывается сверху
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [propTab, setPropTab] = useState<PropTab>("main");
   const [arrowMsg, setArrowMsg] = useState<string | null>(null);
   const selKey = sel ? (sel.kind === "arrow" ? `arrow:${sel.arrow.key}` : sel.kind === "entry" ? `entry:${sel.dict}:${sel.id}` : `${sel.kind}:${sel.id}`) : "process";
   useEffect(() => {
@@ -392,8 +393,17 @@ export default function PropertiesPanel({
   return (
     <aside className="props" aria-label="Свойства">
       {header(title)}
-      <div className="props-body" ref={bodyRef}>
-        {body}
+      <div className="props-split">
+        <div className="props-vtabs" role="tablist" aria-orientation="vertical" aria-label="Вкладки свойств">
+          {PROP_TABS.map((t) => (
+            <button key={t.key} role="tab" className="props-vtab" aria-selected={propTab === t.key} onClick={() => setPropTab(t.key)}>
+              {t.title}
+            </button>
+          ))}
+        </div>
+        <div className="props-body" ref={bodyRef} data-tab={propTab}>
+          {body}
+        </div>
       </div>
     </aside>
   );

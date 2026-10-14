@@ -4,10 +4,22 @@ import type { Fragment, HistoryEvent, SourceRef } from "../../types";
 import { TYPE_LABELS } from "../bpmn-editor/model-ops";
 import { KIND_OPTIONS, LEVEL_OPTIONS } from "./dict-ops";
 
+/** Вертикальные вкладки панели свойств, как в окнах свойств Business Studio: «Основные», «Дополнительно», «Связи». */
+export type PropTab = "main" | "more" | "links";
+export const PROP_TABS: { key: PropTab; title: string }[] = [
+  { key: "main", title: "Основные" },
+  { key: "more", title: "Дополнительно" },
+  { key: "links", title: "Связи" },
+];
+const LINKS_SECTIONS = new Set(["Источник в интервью", "Диаграммы", "Замечания проверки", "История"]);
+const MORE_SECTIONS = new Set(["Ролевая модель", "Ролевая модель процесса", "RACI", "Стороны блока IDEF0", "Триггеры блока", "Граничные события", "Потоки сообщений", "Внешние пулы"]);
+/** На какой вкладке показан раздел (по заголовку; остальные — на «Основных»). */
+export const tabOfSection = (title: string): PropTab => (LINKS_SECTIONS.has(title) ? "links" : MORE_SECTIONS.has(title) ? "more" : "main");
+
 /** Раздел панели свойств: сворачиваемый заголовок и тело. */
 export function Section({ title, count, open = true, onToggle, children }: { title: string; count?: number; open?: boolean; onToggle?: (open: boolean) => void; children: React.ReactNode }) {
   return (
-    <details className="prop-section" open={open} onToggle={onToggle ? (e) => onToggle((e.currentTarget as HTMLDetailsElement).open) : undefined}>
+    <details className="prop-section" data-tab={tabOfSection(title)} open={open} onToggle={onToggle ? (e) => onToggle((e.currentTarget as HTMLDetailsElement).open) : undefined}>
       <summary>
         {title}
         {count !== undefined && <span className="prop-count">{count}</span>}

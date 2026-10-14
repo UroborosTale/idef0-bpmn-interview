@@ -173,3 +173,13 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .ribbon-buttons button:disabled .ri { opacity: .45; }
 .ribbon-links a { color: var(--bs-text); text-decoration: none; }
 .ribbon-links a.disabled-link { opacity: .5; }
+
+/* ——— панель свойств: вертикальные вкладки слева, как в окнах свойств программы ——— */
+.props-split { flex: 1; min-height: 0; display: flex; }
+.props-vtabs { flex: 0 0 24px; display: flex; flex-direction: column; background: var(--bs-toolbar); border-right: 1px solid var(--bs-border); padding-top: 4px; }
+.props-vtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 3px; border: 1px solid transparent; border-radius: 0; font-size: 11px; color: var(--bs-text); white-space: nowrap; text-align: center; }
+.props-vtab:hover:not([aria-selected="true"]) { background: var(--bs-hover); }
+.props-vtab[aria-selected="true"] { background: #fff; border-color: var(--bs-border); border-right-color: #fff; font-weight: 600; margin-right: -1px; }
+.props-body[data-tab="main"] .prop-section:not([data-tab="main"]),
+.props-body[data-tab="more"] .prop-section:not([data-tab="more"]),
+.props-body[data-tab="links"] .prop-section:not([data-tab="links"]) { display: none; }
