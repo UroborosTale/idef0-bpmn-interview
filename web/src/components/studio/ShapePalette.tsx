@@ -128,7 +128,7 @@ export default function ShapePalette() {
               }}
             >
               <Glyph kind={p.kind} />
-              {type && <span className="palette-badge">{typeTitle?.[0]}</span>}
+              {type && <span className="palette-badge">{typeTitle?.slice(0, 2)}</span>}
             </button>
             {pos && (
               <>
@@ -142,13 +142,15 @@ export default function ShapePalette() {
                         key={t.type}
                         role="menuitemradio"
                         aria-checked={t.type === type}
+                        aria-label={t.title}
+                        title={t.title}
                         className={t.type === type ? "on" : ""}
                         onClick={() => {
                           setTypes((x) => ({ ...x, [pos]: t.type }));
                           setOpen(null);
                         }}
                       >
-                        {t.title}
+                        {t.type ? t.title.slice(0, 2) : "∅"}
                       </button>
                     ))}
                   </div>
