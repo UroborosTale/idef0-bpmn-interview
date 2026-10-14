@@ -159,18 +159,28 @@ export function triggerGlyph(trigger: TriggerType, throwing: boolean): Glyph[] {
   const f = throwing;
   switch (trigger) {
     case "message":
+      // как в Business Studio: конверт шире и ниже, клапан до середины
       return [
-        { kind: "poly", pts: [[-8, -5.5], [8, -5.5], [8, 5.5], [-8, 5.5]], closed: true, filled: f },
-        { kind: "poly", pts: [[-8, -5.5], [0, 1], [8, -5.5]], light: f },
+        { kind: "poly", pts: [[-9.5, -6], [9.5, -6], [9.5, 6], [-9.5, 6]], closed: true, filled: f },
+        { kind: "poly", pts: [[-9.5, -6], [0, 0.5], [9.5, -6]], light: f },
       ];
     case "timer":
+      // часы с двенадцатью делениями и двумя стрелками «Г», как в Business Studio
       return [
-        { kind: "circle", r: 9 },
-        { kind: "poly", pts: [[0, -6], [0, 0], [4, 3]] },
-        { kind: "poly", pts: [[0, -9], [0, -7]] },
-        { kind: "poly", pts: [[9, 0], [7, 0]] },
-        { kind: "poly", pts: [[0, 9], [0, 7]] },
-        { kind: "poly", pts: [[-9, 0], [-7, 0]] },
+        { kind: "circle", r: 8 },
+        { kind: "poly", pts: [[0, -5.2], [0, 0], [4.2, 0]] },
+        { kind: "poly", pts: [[0.00, -8.00], [0.00, -6.20]] },
+        { kind: "poly", pts: [[4.00, -6.93], [3.10, -5.37]] },
+        { kind: "poly", pts: [[6.93, -4.00], [5.37, -3.10]] },
+        { kind: "poly", pts: [[8.00, -0.00], [6.20, -0.00]] },
+        { kind: "poly", pts: [[6.93, 4.00], [5.37, 3.10]] },
+        { kind: "poly", pts: [[4.00, 6.93], [3.10, 5.37]] },
+        { kind: "poly", pts: [[0.00, 8.00], [0.00, 6.20]] },
+        { kind: "poly", pts: [[-4.00, 6.93], [-3.10, 5.37]] },
+        { kind: "poly", pts: [[-6.93, 4.00], [-5.37, 3.10]] },
+        { kind: "poly", pts: [[-8.00, 0.00], [-6.20, 0.00]] },
+        { kind: "poly", pts: [[-6.93, -4.00], [-5.37, -3.10]] },
+        { kind: "poly", pts: [[-4.00, -6.93], [-3.10, -5.37]] },
       ];
     case "conditional":
       return [
