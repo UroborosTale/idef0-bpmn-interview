@@ -29,6 +29,7 @@ import { acceptIssue, addOperationSkeleton, quickFixFor, revokeAcceptance, type 
 import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunction, pasteDestination, type MoveTarget } from "./structure-ops";
 import StructureWizard from "./StructureWizard";
 import VisioSlot from "./VisioSlot";
+import RibbonIcon from "./RibbonIcon";
 import { inDesktopShell, postToShell, recalledTabs, rememberTabs } from "../../desktop";
 
 type M = ProcessLogicModel;
@@ -608,6 +609,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
 
   const exportLink = (label: string, path: string) => (
     <a key={path} href={api.exportUrl(session.id, path)} target="_blank" rel="noreferrer" className={h.dirty ? "disabled-link" : ""} onClick={(e) => h.dirty && e.preventDefault()} title={h.dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
+      <RibbonIcon name="export" />
       {label}
     </a>
   );
@@ -649,18 +651,22 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
             {inDesktopShell() && (
-              <button className="primary" onClick={() => postToShell({ t: "apply" })} title="Сохранить правки, сделанные в Visio, в модель процесса">
+              <button className="rb big" onClick={() => postToShell({ t: "apply" })} title="Сохранить правки, сделанные в Visio, в модель процесса">
+                <RibbonIcon name="apply" />
                 Принять из Visio
               </button>
             )}
-            <button className="primary" disabled={!h.dirty || busy} onClick={() => void save()} title="Сохранить (Ctrl+S)">
+            <button className="rb big" disabled={!h.dirty || busy} onClick={() => void save()} title="Сохранить (Ctrl+S)">
+              <RibbonIcon name="save" />
               {busy ? "Сохранение…" : "Сохранить"}
             </button>
-            <button disabled={!h.canUndo} onClick={h.undo} title="Отменить (Ctrl+Z)">
-              ↶ Отменить
+            <button className="rb big" disabled={!h.canUndo} onClick={h.undo} title="Отменить (Ctrl+Z)">
+              <RibbonIcon name="undo" />
+              Отменить
             </button>
-            <button disabled={!h.canRedo} onClick={h.redo} title="Повторить (Ctrl+Y)">
-              ↷ Повторить
+            <button className="rb big" disabled={!h.canRedo} onClick={h.redo} title="Повторить (Ctrl+Y)">
+              <RibbonIcon name="redo" />
+              Повторить
             </button>
           </div>
           <div className="ribbon-caption">Файл</div>
@@ -668,24 +674,24 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
             <button className="ribbon-icon" aria-label="Предыдущая диаграмма" disabled={histTarget(-1) === null} onClick={() => goHist(-1)} title="Предыдущая открытая диаграмма (Alt+←)">
-              ‹
+              <RibbonIcon name="prev" />
             </button>
             <button className="ribbon-icon" aria-label="Следующая диаграмма" disabled={histTarget(1) === null} onClick={() => goHist(1)} title="Следующая открытая диаграмма (Alt+→)">
-              ›
+              <RibbonIcon name="next" />
             </button>
             <button className="ribbon-icon" aria-label="Вверх: диаграмма выше" disabled={!upTarget()} onClick={goUp} title="Вверх: диаграмма, на которой стоит функция этой диаграммы">
-              ↑
+              <RibbonIcon name="up" />
             </button>
             <button className="ribbon-icon" aria-label="Вниз: диаграмма ниже" disabled={!downTarget()} onClick={goDown} title="Вниз: декомпозиция выбранной функции или диаграмма BPMN её операции">
-              ↓
+              <RibbonIcon name="down" />
             </button>
             <button className="ribbon-icon" onClick={findInNavigator} aria-label="Найти в навигаторе" title="Найти в навигаторе: показать в дереве выбранный элемент или текущую диаграмму">
-              ⌖
+              <RibbonIcon name="find" />
             </button>
             {(active.kind === "bpmn" || active.kind === "idef0") && (
               <>
                 <button className={`ribbon-icon ${display.labels ? "toggled" : ""}`} aria-label="Подписи" aria-pressed={display.labels} onClick={() => setDisplay({ labels: !display.labels })} title="Слой подписей: названия событий и шлюзов, условия и подписи стрелок. Названия внутри задач и блоков остаются">
-                  Аб
+                  <RibbonIcon name="labels" />
                 </button>
                 <button
                   className={`ribbon-icon ${(active.kind === "bpmn" ? display.bpmnNumbers : display.idef0Numbers) ? "toggled" : ""}`}
@@ -694,19 +700,28 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                   onClick={() => setDisplay(active.kind === "bpmn" ? { bpmnNumbers: !display.bpmnNumbers } : { idef0Numbers: !display.idef0Numbers })}
                   title={active.kind === "bpmn" ? "Номера: код функции или шага на задачах диаграммы" : "Номера: код функции на блоках диаграммы"}
                 >
-                  №
+                  <RibbonIcon name="numbers" />
                 </button>
               </>
             )}
-            <button onClick={() => open(bpmnDoc())}>Диаграмма BPMN</button>
-            <button onClick={() => open(idef0Doc(null))}>Диаграмма IDEF0</button>
-            <button onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
+            <button className="rb" onClick={() => open(bpmnDoc())}>
+              <RibbonIcon name="bpmn" />
+              Диаграмма BPMN
+            </button>
+            <button className="rb" onClick={() => open(idef0Doc(null))}>
+              <RibbonIcon name="idef0" />
+              Диаграмма IDEF0
+            </button>
+            <button className="rb" onClick={() => addFn(active.kind === "idef0" ? active.parent : null)} title="Добавить функцию на текущую диаграмму IDEF0 (A0, если открыта другая вкладка)">
+              <RibbonIcon name="addfn" />
               + Функция
             </button>
-            <button onClick={() => setWizardOpen(true)} title="Подпроцессы и операции списком: коды по Соглашению и заготовки диаграмм">
+            <button className="rb" onClick={() => setWizardOpen(true)} title="Подпроцессы и операции списком: коды по Соглашению и заготовки диаграмм">
+              <RibbonIcon name="wizard" />
               Мастер структуры…
             </button>
-            <button disabled={locked || selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
+            <button className="rb" disabled={locked || selection?.kind !== "node"} onClick={duplicate} title="Копия выбранной функции или шага (Ctrl+D на диаграмме)">
+              <RibbonIcon name="duplicate" />
               Дублировать
             </button>
           </div>
@@ -714,26 +729,31 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         </div>
         <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
-            <button className={navOpen ? "toggled" : ""} onClick={() => setNavOpen(!navOpen)}>
+            <button className={`rb big ${navOpen ? "toggled" : ""}`} onClick={() => setNavOpen(!navOpen)}>
+              <RibbonIcon name="navigator" />
               Навигатор
             </button>
-            <button className={propsOpen ? "toggled" : ""} onClick={() => setPropsOpen(!propsOpen)}>
+            <button className={`rb big ${propsOpen ? "toggled" : ""}`} onClick={() => setPropsOpen(!propsOpen)}>
+              <RibbonIcon name="properties" />
               Свойства
             </button>
-            <button className={full ? "toggled" : ""} onClick={() => setFull(!full)} title="Окно студии на весь экран — больше места для диаграммы">
+            <button className={`rb big ${full ? "toggled" : ""}`} onClick={() => setFull(!full)} title="Окно студии на весь экран — больше места для диаграммы">
+              <RibbonIcon name="fullscreen" />
               {full ? "Свернуть окно" : "На весь экран"}
             </button>
-            <button className={problemsOpen ? "toggled" : ""} onClick={() => setProblemsOpen(!problemsOpen)}>
+            <button className={`rb big ${problemsOpen ? "toggled" : ""}`} onClick={() => setProblemsOpen(!problemsOpen)}>
+              <RibbonIcon name="checks" />
               Проверки{errors + warnings > 0 ? ` (${errors + warnings})` : ""}
             </button>
             <button
-              className={proposals.length > 0 ? "attention" : ""}
+              className={`rb big ${proposals.length > 0 ? "attention" : ""}`}
               onClick={() => {
                 setProblemsOpen(true);
                 setProblemsTab({ tab: "proposals", nonce: ++nonce.current });
               }}
               title="Правки, которые предложил агент (Cline): вы решаете, применить их или отклонить"
             >
+              <RibbonIcon name="suggest" />
               Предложения{proposals.length > 0 ? ` (${proposals.length})` : ""}
             </button>
           </div>
@@ -769,9 +789,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                       <option value="A2">A2</option>
                     </select>
                     <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.pdf${q}`)} target="_blank" rel="noreferrer" {...guard}>
+                      <RibbonIcon name="pdf" />
                       Лист в PDF
                     </a>
                     <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.print.html${q}`)} target="_blank" rel="noreferrer" {...guard}>
+                      <RibbonIcon name="print" />
                       Печать…
                     </a>
                   </>
@@ -791,9 +813,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                 <option value="A2">A2</option>
               </select>
               <button onClick={() => void printBpmnSheet("pdf")} title="Лист как на экране (включите рамку в меню «Лист» редактора), в том числе с несохранёнными правками">
+                <RibbonIcon name="pdf" />
                 Лист в PDF
               </button>
               <button onClick={() => void printBpmnSheet("print")} title="Страница печати листа как на экране: Ctrl+P или «Сохранить как PDF»">
+                <RibbonIcon name="print" />
                 Печать…
               </button>
             </div>
@@ -804,6 +828,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           <div className="ribbon-group" data-tab="export">
             <div className="ribbon-buttons">
               <button onClick={onOpenImport} title="Загрузить правки из bpmn.io, Camunda Modeler или draw.io: переименования применятся, новые элементы появятся как гипотезы. Новую модель из Visio, Excel или изображения создают на странице «Новая сессия».">
+                <RibbonIcon name="import" />
                 Импорт…
               </button>
             </div>
@@ -813,9 +838,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         <div className="ribbon-group" data-tab="export">
           <div className="ribbon-buttons">
             <button onClick={() => void exportDiagram("svg")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">
+              <RibbonIcon name="image" />
               SVG
             </button>
             <button onClick={() => void exportDiagram("png")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">
+              <RibbonIcon name="image" />
               PNG
             </button>
           </div>

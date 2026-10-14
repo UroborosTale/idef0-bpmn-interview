@@ -206,8 +206,9 @@ describe("задания агенту: панель", () => {
     expect(screen.getByText(/ожидает решения/)).toBeTruthy();
     fireEvent.click(screen.getByText("Добавить шаги"));
     expect(onShowProposals).toHaveBeenCalled();
-    expect(screen.getAllByText("Отменить")).toHaveLength(1); // только у задания в работе
-    fireEvent.click(screen.getByText("Отменить"));
+    const cancels = () => [...document.querySelectorAll("button")].filter((b) => b.textContent === "Отменить" && !b.closest(".ribbon")); // кнопка задания, не «Отменить» ленты
+    expect(cancels()).toHaveLength(1); // только у задания в работе
+    fireEvent.click(cancels()[0]);
     expect(onCancel).toHaveBeenCalledWith(expect.objectContaining({ id: "t1" }));
     expect(document.querySelectorAll(".task-meta")).toHaveLength(3);
     expect(document.querySelector(".task-meta")!.textContent).toMatch(/^функция «o2» · /);
@@ -243,7 +244,7 @@ describe("студия: задания агенту", () => {
     fireEvent.click(tab());
     expect(screen.getByText("Проверь роли")).toBeTruthy();
     expect(screen.getByText(/функция B002\.01\.02 «Проведение интервью»/)).toBeTruthy(); // подпись с кодом по Соглашению
-    await act(async () => fireEvent.click(screen.getByText("Отменить")));
+    await act(async () => fireEvent.click([...document.querySelectorAll("button")].find((b) => b.textContent === "Отменить" && !b.closest(".ribbon"))!));
     expect(cancel).toHaveBeenCalledWith("task_1");
   });
 });

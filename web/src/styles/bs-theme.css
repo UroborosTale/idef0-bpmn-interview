@@ -160,6 +160,16 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .nav-title { display: flex; align-items: center; gap: 4px; background: var(--bs-head); border-bottom: 1px solid var(--bs-border); padding: 2px 6px; font-size: 11px; color: var(--bs-text); white-space: nowrap; }
 .nav-title-btn { padding: 0 5px; font-size: 14px; line-height: 14px; border-radius: 0; }
 .nav-vtabs { flex: 0 0 24px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid var(--bs-border); }
-.nav-vtab { writing-mode: vertical-rl; transform: rotate(180deg); padding: 8px 3px; border: 1px solid transparent; border-radius: 0; font-size: 11px; color: var(--bs-text); white-space: nowrap; text-align: center; }
+.nav-vtab { writing-mode: vertical-rl; padding: 8px 3px; border: 1px solid transparent; border-radius: 0; font-size: 11px; color: var(--bs-text); white-space: nowrap; text-align: center; }
 .nav-vtab:hover:not([aria-selected="true"]) { background: var(--bs-hover); }
 .nav-vtab[aria-selected="true"] { background: var(--bs-head); border-color: var(--bs-border); font-weight: 600; }
+
+/* ——— значки ленты: контурные, мелкие слева от подписи, крупные над подписью ——— */
+.ri { width: 16px; height: 16px; flex: 0 0 auto; }
+.ribbon-buttons button, .ribbon-links a { display: inline-flex; align-items: center; gap: 4px; }
+.ribbon-buttons button.ribbon-icon { padding: 3px 5px; }
+.ribbon-buttons button.rb.big { flex-direction: column; justify-content: flex-start; gap: 1px; min-width: 56px; padding: 2px 8px 1px; font-size: 11.5px; line-height: 1.15; text-align: center; }
+.ribbon-buttons button.rb.big .ri { width: 30px; height: 30px; }
+.ribbon-buttons button:disabled .ri { opacity: .45; }
+.ribbon-links a { color: var(--bs-text); text-decoration: none; }
+.ribbon-links a.disabled-link { opacity: .5; }
