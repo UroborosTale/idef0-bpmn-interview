@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 export type RibbonIconName =
   | "save" | "apply" | "undo" | "redo" | "prev" | "next" | "up" | "down" | "find" | "labels" | "numbers"
   | "bpmn" | "idef0" | "addfn" | "wizard" | "duplicate" | "navigator" | "properties" | "fullscreen" | "checks"
-  | "suggest" | "export" | "print" | "pdf" | "import" | "image" | "paper";
+  | "suggest" | "export" | "print" | "pdf" | "import" | "image" | "paper" | "refresh" | "reports" | "actions";
 
 const INK = "#3b4a5a";
 const ACC = "#1a6fc4";
@@ -136,6 +136,24 @@ const ICONS: Record<RibbonIconName, ReactNode> = {
       <rect x="3.5" y="5" width="17" height="14" />
       <circle cx="9" cy="10" r="1.6" fill={ACC} stroke="none" />
       <path d="m4 18 5-5 3 3 3.5-4.5 4.5 5.5" fill={TINT} />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5" />
+      <path d="M19.5 4.5v4.5H15" stroke={ACC} strokeWidth="1.8" />
+    </>
+  ),
+  reports: (
+    <>
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M14 3.5v4h4" />
+      <path d="M8.5 17v-3M11.5 17v-5.5M14.5 17v-2" stroke={ACC} strokeWidth="1.8" />
+    </>
+  ),
+  actions: (
+    <>
+      <path d="M4.5 7h15M4.5 12h15M4.5 17h15" strokeWidth="1.8" />
     </>
   ),
   paper: (

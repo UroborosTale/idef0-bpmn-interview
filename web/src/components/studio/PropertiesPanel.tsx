@@ -14,7 +14,8 @@ import { PoolsEditor } from "./MessagesEditor";
 import { MessageCard, PoolCard } from "./PoolCards";
 import NodeProperties from "./NodeProperties";
 import { PROP_TABS, Section, SourceList, type PropTab } from "./PanelParts";
-import { reportDoc, type StudioDoc } from "./docs";
+import RibbonIcon from "./RibbonIcon";
+import { REPORT_TITLES, reportDoc, type ReportKind, type StudioDoc } from "./docs";
 import { arrowEntry, selectionExists, type Selection } from "./selection";
 
 type M = ProcessLogicModel;
@@ -51,6 +52,16 @@ const HELP: Record<StudioDoc["kind"], string[]> = {
  * Панель «Свойства» окна студии: одна для всех документов. Показывает карточку выделенного объекта —
  * шага или функции, связи, стрелки IDEF0 или записи справочника, а когда ничего не выбрано, — атрибуты процесса.
  */
+/** Действия панели инструментов окна свойств: их выполняет студия. */
+export interface PanelToolbar {
+  dirty: boolean;
+  busy: boolean;
+  onSave: () => void;
+  onRefresh: () => void;
+  onFind: () => void;
+  onDuplicate?: () => void;
+}
+
 export default function PropertiesPanel({
   model,
   selection,
@@ -64,6 +75,7 @@ export default function PropertiesPanel({
   onOpenDecomposition,
   onOpenDoc,
   onClose,
+  toolbar,
 }: {
   model: M;
   selection: Selection;
@@ -78,6 +90,8 @@ export default function PropertiesPanel({
   onOpenDecomposition: (id: string) => void;
   onOpenDoc: (doc: StudioDoc) => void;
   onClose: () => void;
+  /** Панель инструментов окна свойств (сохранить, обновить, отчёты, действия); без неё не показывается. */
+  toolbar?: PanelToolbar;
 }) {
   const sel = selectionExists(model, selection) ? selection : null;
   const codes = idef0Codes(model);
@@ -98,6 +112,72 @@ export default function PropertiesPanel({
     </div>
   );
   const stamp = session.updatedAt;
+  // меню панели инструментов: пункты есть в разметке, только пока меню открыто; щелчок вне меню закрывает его
+  const [menu, setMenu] = useState<"reports" | "actions" | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const away = (e: MouseEvent) => {
+      if (!toolbarRef.current?.contains(e.target as Node)) setMenu(null);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [menu]);
+  const pick = (run: () => void) => () => {
+    setMenu(null);
+    run();
+  };
+  const toolbarRow = toolbar && (
+    <div className="props-toolbar" role="toolbar" aria-label="Панель инструментов свойств" ref={toolbarRef}>
+      <button className="tb-btn" disabled={!toolbar.dirty || toolbar.busy} onClick={toolbar.onSave} aria-label="Записать правки" title="Записать правки в модель (Ctrl+S)">
+        <RibbonIcon name="save" />
+      </button>
+      <button className="tb-btn" onClick={toolbar.onRefresh} aria-label="Перечитать" title="Перечитать модель: вернуть сохранённую версию, несохранённые правки будут отброшены">
+        <RibbonIcon name="refresh" />
+      </button>
+      <span className="tb-sep" />
+      <div className="tb-menu">
+        <button className={`tb-menu-head ${menu === "reports" ? "open" : ""}`} aria-haspopup="menu" aria-expanded={menu === "reports"} onClick={() => setMenu(menu === "reports" ? null : "reports")}>
+          <RibbonIcon name="reports" />
+          Отчёты
+        </button>
+        {menu === "reports" && (
+          <div className="tb-menu-list" role="menu">
+            {(Object.keys(REPORT_TITLES) as ReportKind[]).map((k) => (
+              <button key={k} role="menuitem" onClick={pick(() => onOpenDoc(reportDoc(k)))}>
+                {REPORT_TITLES[k]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="tb-menu">
+        <button className={`tb-menu-head ${menu === "actions" ? "open" : ""}`} aria-haspopup="menu" aria-expanded={menu === "actions"} onClick={() => setMenu(menu === "actions" ? null : "actions")}>
+          <RibbonIcon name="actions" />
+          Действия
+        </button>
+        {menu === "actions" && (
+          <div className="tb-menu-list" role="menu">
+            <button role="menuitem" disabled={sel?.kind !== "node" || !toolbar.onDuplicate} onClick={pick(() => toolbar.onDuplicate?.())}>
+              Дублировать
+            </button>
+            <button role="menuitem" onClick={pick(toolbar.onFind)}>
+              Найти в навигаторе
+            </button>
+            <button role="menuitem" disabled={sel?.kind !== "node"} onClick={pick(() => sel?.kind === "node" && onOpenDecomposition(sel.id))}>
+              Открыть декомпозицию
+            </button>
+            <button role="menuitem" disabled={sel?.kind !== "node"} onClick={pick(() => sel?.kind === "node" && onReveal(sel.id, "bpmn"))}>
+              Показать на BPMN
+            </button>
+            <button role="menuitem" disabled={sel?.kind !== "node"} onClick={pick(() => sel?.kind === "node" && onReveal(sel.id, "idef0"))}>
+              Показать на IDEF0
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   // при переходе к другому объекту карточка открывается сверху
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -393,6 +473,7 @@ export default function PropertiesPanel({
   return (
     <aside className="props" aria-label="Свойства">
       {header(title)}
+      {toolbarRow}
       <div className="props-split">
         <div className="props-vtabs" role="tablist" aria-orientation="vertical" aria-label="Вкладки свойств">
           {PROP_TABS.map((t) => (

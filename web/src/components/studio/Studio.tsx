@@ -589,6 +589,14 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     }
   };
 
+  /** «Обновить» панели свойств: вернуть сохранённую модель; несохранённые правки отбрасываются после подтверждения. */
+  const refreshFromServer = () => {
+    if (h.dirty && !window.confirm("Отбросить несохранённые правки и вернуть сохранённую модель?")) return;
+    const s = seed(model, session.bpmnXml);
+    h.setDraft(s);
+    h.markSaved(s);
+  };
+
   const save = async () => {
     const snapshot = h.draftRef.current;
     if (await onSave(snapshot)) h.markSaved(snapshot);
@@ -931,6 +939,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
             onOpenDecomposition={(id) => open(idef0Doc(id))}
             onOpenDoc={open}
             onClose={() => setPropsOpen(false)}
+            toolbar={{ dirty: h.dirty, busy, onSave: () => void save(), onRefresh: refreshFromServer, onFind: findInNavigator, onDuplicate: locked ? undefined : duplicate }}
           />
           </fieldset>
         )}
