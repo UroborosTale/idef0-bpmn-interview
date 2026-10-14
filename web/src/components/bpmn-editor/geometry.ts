@@ -1,6 +1,7 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, routeFlowsDetailed, routeQuality } from "@shared/bpmnRouting";
 import { rankColumns } from "@shared/bpmnRank";
+import { ROW_PITCH, branchRows, collinearOverlaps } from "@shared/bpmnRows";
 import { diagramTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
@@ -200,11 +201,27 @@ export function autoLayout(m: ProcessLogicModel): Map<string, { x: number; y: nu
  * воспроизводим, а кнопка не подвисает на больших схемах. Исходная раскладка — запасной вариант: хуже неё результат не бывает.
  */
 export function optimizedLayout(m: ProcessLogicModel): Map<string, { x: number; y: number }> {
+  return optimizedLayoutWithRows(m).positions;
+}
+
+/** Модель с заданными высотами дорожек (роли — lane_height, «Без исполнителя» — настройка процесса). */
+const withLaneHeights = (m: ProcessLogicModel, heights: number[]): ProcessLogicModel => ({
+  ...m,
+  roles: m.roles.map((r, i) => ({ ...r, lane_height: heights[i] ?? r.lane_height })),
+  process: { ...m.process, unassigned_lane_height: heights[m.roles.length] ?? m.process.unassigned_lane_height },
+});
+
+/**
+ * Авто-раскладка с подбором (optimizedLayout) и рядами веток внутри дорожки (shared/bpmnRows.ts), как у серверной раскладки:
+ * из трёх вариантов — без рядов, первая ветка вниз, первая вверх, а также со сжатием столбцов — берётся тот, у которого
+ * стрелки лучше. Дорожки при этом могут стать выше: тогда возвращаются и их новые высоты (laneHeights), иначе null.
+ */
+export function optimizedLayoutWithRows(m: ProcessLogicModel): { positions: Map<string, { x: number; y: number }>; laneHeights: number[] | null } {
   const ranked = rankLayout(m);
   const start = placeRanks(ranked, ranked.rank);
   const flowCount = visibleFlows(m).length;
   const maxEvals = evaluationsFor(flowCount);
-  if (ranked.shown.length < 4 || flowCount < 3 || maxEvals < MIN_EVALUATIONS) return start;
+  if (ranked.shown.length < 4 || flowCount < 3 || maxEvals < MIN_EVALUATIONS) return { positions: start, laneHeights: null };
 
   const score = (rank: Map<string, number>): number => {
     const pos = placeRanks(ranked, rank);
@@ -264,7 +281,56 @@ export function optimizedLayout(m: ProcessLogicModel): Map<string, { x: number; 
     }
     if (!improved) break;
   }
-  return placeRanks(ranked, rank);
+  const plain = placeRanks(ranked, rank);
+
+  // ряды веток шлюза: варианты оцениваются той же прокладкой стрелок, что и подбор столбцов
+  const scoreModel = (candidate: ProcessLogicModel): number => {
+    const d = diagramLayout(candidate);
+    const nodes = d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)!, label: n.name }));
+    const q = routeQuality(nodes, d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes, d.extras.artifacts.map(artifactObstacle));
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(d.routes) * 60;
+  };
+  const withPositions = (base: ProcessLogicModel, pos: Map<string, { x: number; y: number }>): ProcessLogicModel => ({ ...base, nodes: base.nodes.map((n) => (pos.has(n.id) ? { ...n, layout: pos.get(n.id)! } : n)) });
+  const rowNodes = ranked.shown.map((n) => ({ id: n.id, laneIndex: ranked.laneOf.get(n.id)!, type: n.type }));
+  const rowEdges = [...ranked.fwd].flatMap(([u, vs]) => vs.map((v) => ({ from: u, to: v })));
+  const baseHeights = ranked.lanes.heights;
+  let bestPos = plain;
+  let bestHeights: number[] | null = null;
+  let bestScore = scoreModel(withPositions(m, plain));
+  const xOf = new Map([...plain].map(([id, p]) => [id, { x: p.x }] as const));
+  for (const compress of [false, true]) {
+    for (const firstDown of [true, false]) {
+      const rows = branchRows(rowNodes, rowEdges, xOf, firstDown);
+      if (rows.size === 0) continue;
+      const span = new Map<number, [number, number]>();
+      for (const n of rowNodes) {
+        const r = rows.get(n.id) ?? 0;
+        const [lo, hi] = span.get(n.laneIndex) ?? [0, 0];
+        span.set(n.laneIndex, [Math.min(lo, r), Math.max(hi, r)]);
+      }
+      const heights = baseHeights.map((h, i) => {
+        const [lo, hi] = span.get(i) ?? [0, 0];
+        return clampLaneHeight(Math.max(h, LANE_H + (hi - lo) * ROW_PITCH));
+      });
+      const rank2 = compress
+        ? rankColumns({ ids: ranked.shown.map((n) => n.id), lane: new Map(rowNodes.map((n) => [n.id, n.laneIndex * 100 + (rows.get(n.id) ?? 0) + 50] as const)), edges: rowEdges }).rank
+        : rank;
+      const tops = laneTops(heights);
+      const pos = new Map<string, { x: number; y: number }>();
+      for (const n of ranked.shown) {
+        const s = sizeOf(n);
+        const lane = ranked.laneOf.get(n.id)!;
+        const [lo, hi] = span.get(lane) ?? [0, 0];
+        const cx = MIN_X + 60 + (rank2.get(n.id) ?? 0) * COL_W;
+        pos.set(n.id, { x: snap(cx - s.w / 2), y: snap(tops[lane] + (heights[lane] - s.h) / 2 + ((rows.get(n.id) ?? 0) - (lo + hi) / 2) * ROW_PITCH) });
+      }
+      const candidate = withPositions(withLaneHeights(m, heights), pos);
+      const widthGain = compress ? (Math.max(...[...plain].map(([, p]) => p.x)) - Math.max(...[...pos].map(([, p]) => p.x))) / 100 : 0;
+      const sc = scoreModel(candidate) - Math.max(0, widthGain) * 10;
+      if (sc < bestScore - 1e-9) (bestScore = sc, bestPos = pos, bestHeights = heights);
+    }
+  }
+  return { positions: bestPos, laneHeights: bestHeights };
 }
 /**
  * Позиции фигур из BPMN, сгенерированного сервером (раскладка ELK): id узла → левый верхний угол.
@@ -286,9 +352,12 @@ export function positionsFromBpmnXml(xml: string | null | undefined): Map<string
 export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>, optimize = false): ProcessLogicModel {
   const all = visibleNodes(m);
   if (!force && all.every((n) => n.layout || isBoundary(n, all))) return m;
-  const auto = optimize && force ? optimizedLayout(m) : autoLayout(m);
+  const res = optimize && force ? optimizedLayoutWithRows(m) : { positions: autoLayout(m), laneHeights: null };
+  const auto = res.positions;
   const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
-  return { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
+  const laid: ProcessLogicModel = { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
+  // ряды веток сделали дорожки выше — высоты сохраняются в модели вместе с позициями
+  return res.laneHeights ? withLaneHeights(laid, res.laneHeights) : laid;
 }
 
 /** Расставляет шаги диаграмм операций, у которых нет позиций (например, модель пришла с сервера или из импорта). */

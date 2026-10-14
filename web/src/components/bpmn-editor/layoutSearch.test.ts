@@ -6,7 +6,8 @@ import { b002Model } from "../../../../server/src/reference/b002";
 import { c025Model } from "../../../../server/src/reference/c025";
 import { demoModel } from "../../../../server/src/reference/demo";
 import type { ProcessLogicModel } from "../../types";
-import { autoLayout, diagramLayout, optimizedLayout, withLayout } from "./geometry";
+import { autoLayout, diagramLayout, laneHeights, laneTop, optimizedLayout, optimizedLayoutWithRows, withLayout } from "./geometry";
+import { sizeOf } from "./geometry";
 
 type M = ProcessLogicModel;
 
@@ -60,4 +61,25 @@ describe("кнопка «Расставить»: подбор по числу п
     expect(withLayout(unlaid, false, undefined, true).nodes.map((n) => n.layout)).toEqual(withLayout(unlaid, false).nodes.map((n) => n.layout));
     expect(withLayout(unlaid, true, undefined, true).nodes.every((n) => n.layout || n.attached_to)).toBe(true);
   });
+
+  it("ряды веток: «Расставить» с подбором оставляет фигуры внутри дорожек, дорожки не становятся ниже, результат воспроизводим", () => {
+    for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) {
+      for (const h of bpmnHosts(m)) {
+        const view = scopeView(m as M, h.id);
+        const a = optimizedLayoutWithRows(view);
+        expect([...optimizedLayoutWithRows(view).positions], `${name} ${h.id}`).toEqual([...a.positions]);
+        const laid = withLayout(view, true, undefined, true);
+        const heights = laneHeights(laid);
+        laneHeights(view).forEach((was, i) => expect(heights[i], `${name} ${h.id} дорожка ${i}`).toBeGreaterThanOrEqual(was));
+        for (const n of laid.nodes) {
+          if (!n.layout || n.type === "event" && n.attached_to) continue;
+          const lane = n.role_id ? laid.roles.findIndex((r) => r.id === n.role_id) : laid.roles.length;
+          if (lane < 0 || !(n.bpmn_scope === h.id || n.id === h.id)) continue;
+          const top = laneTop(laid, lane);
+          expect(n.layout.y, `${name} ${h.id} ${n.id}`).toBeGreaterThanOrEqual(top - 1);
+          expect(n.layout.y + sizeOf(n).h, `${name} ${h.id} ${n.id}`).toBeLessThanOrEqual(top + heights[lane] + 1);
+        }
+      }
+    }
+  }, 180_000);
 });
