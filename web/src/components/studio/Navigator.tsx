@@ -315,7 +315,7 @@ export default function Navigator({
               if (expandable) toggle(n.id);
             }}
           >
-            {expandable ? (open ? "▾" : "▸") : ""}
+            {expandable ? (open ? "−" : "+") : ""}
           </span>
           <NavIcon kind={n.idef0_parent ? "operation" : "subprocess"} />
           <span className="nav-code">{labelOf(n.id)}</span>
@@ -371,7 +371,7 @@ export default function Navigator({
         if (show) toggle(id);
       }}
     >
-      {show ? (collapsed.has(id) ? "▸" : "▾") : ""}
+      {show ? (collapsed.has(id) ? "+" : "−") : ""}
     </span>
   );
   const tree = (

@@ -1,0 +1,136 @@
+/*
+ * Внешний вид «как в Business Studio 6»: светлый плоский стиль Office. Цвета и размеры измерены по работающей программе
+ * (скриншоты интерфейса); значки, шрифты и ресурсы Business Studio не используются — всё нарисовано здесь заново.
+ * Файл подключается после global.css и переопределяет его значения.
+ */
+:root {
+  --bs-window: #e3e6e8;      /* фон окна и полосы вкладок ленты */
+  --bs-ribbon: #f9fafb;      /* тело ленты */
+  --bs-caption: #e8ecf0;     /* подписи групп, промежутки между панелями */
+  --bs-head: #e9edf1;        /* шапка панели */
+  --bs-toolbar: #f4f5f7;     /* панель инструментов */
+  --bs-border: #ced4db;      /* рамки панелей */
+  --bs-input: #abadb3;       /* рамка поля ввода */
+  --bs-select: #0078d7;      /* выделение */
+  --bs-hover: #e5f1fb;       /* наведение на кнопку */
+  --bs-hover-border: #a8c5e6;
+  --bs-press: #cce4f7;
+  --bs-subtab: #d9dde2;      /* вкладки внутри панелей */
+  --bs-status: #cbcfd3;
+  --bs-text: #1b1f23;
+  --bs-muted: #5d6670;
+
+  --bg: var(--bs-window);
+  --border: var(--bs-border);
+  --text: var(--bs-text);
+  --muted: var(--bs-muted);
+  --accent: var(--bs-select);
+  --accent-soft: var(--bs-hover);
+  --radius: 2px;
+  --bs-blue: #1f5c99;
+  --bs-light: var(--bs-head);
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+body { font-size: 12px; background: var(--bs-window); color: var(--bs-text); }
+
+/* ——— кнопки: плоские, рамка и подсветка появляются при наведении ——— */
+button {
+  font-size: 12px;
+  border-radius: 2px;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 3px 9px;
+  color: var(--bs-text);
+}
+button:hover:not(:disabled) { background: var(--bs-hover); border-color: var(--bs-hover-border); }
+button:active:not(:disabled) { background: var(--bs-press); }
+button:disabled { opacity: 0.45; }
+button.primary { background: var(--bs-select); border-color: #005a9e; color: #fff; }
+button.primary:hover:not(:disabled) { background: #1a86de; border-color: #005a9e; }
+button.danger { border-color: transparent; }
+
+/* ——— поля ввода: белые, строгая рамка, невысокие ——— */
+input, textarea, select {
+  font-size: 12px;
+  border: 1px solid var(--bs-input);
+  border-radius: 0;
+  padding: 2px 5px;
+  min-height: 22px;
+}
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--bs-select); box-shadow: 0 0 0 1px var(--bs-select) inset; }
+input[type="checkbox"], input[type="radio"] { width: auto; min-height: 0; }
+
+/* ——— верхняя панель страницы ——— */
+.topbar { padding: 4px 10px; background: var(--bs-window); border-bottom: 1px solid var(--bs-border); }
+.topbar .brand { font-size: 13px; }
+.nav-link { border-radius: 2px; border: 1px solid transparent; padding: 3px 9px; font-size: 12px; }
+.nav-link:hover { background: var(--bs-hover); border-color: var(--bs-hover-border); }
+.nav-link.active { border-color: var(--bs-hover-border); background: var(--bs-hover); color: var(--bs-text); }
+.nav-link.primary { background: var(--bs-select); border-color: #005a9e; }
+.main-area { padding: 8px; }
+.card, .session-row { border-radius: 0; background: #fff; }
+.card { padding: 10px; }
+.pill { border-radius: 2px; }
+
+/* ——— окно студии: рамка во всю область, как главное окно программы ——— */
+.studio { border-radius: 0; border: 1px solid var(--bs-border); background: var(--bs-window); }
+
+/* вкладки ленты */
+.ribbon-tabs { display: flex; gap: 0; background: var(--bs-window); padding: 3px 6px 0; border-bottom: 1px solid var(--bs-border); }
+.ribbon-tab { border: 1px solid transparent; border-bottom: none; border-radius: 0; background: none; padding: 3px 13px 4px; font-size: 12px; color: var(--bs-text); }
+.ribbon-tab:hover:not(:disabled) { background: var(--bs-hover); border-color: transparent; }
+.ribbon-tab[aria-selected="true"] { background: var(--bs-ribbon); border-color: var(--bs-border); position: relative; top: 1px; font-weight: 600; }
+
+/* тело ленты: группы с подписью внизу */
+.ribbon { background: linear-gradient(#fefefe, var(--bs-ribbon)); border-bottom: 1px solid var(--bs-border); padding: 3px 4px 0; }
+.ribbon[data-tab="main"] .ribbon-group:not([data-tab="main"]),
+.ribbon[data-tab="export"] .ribbon-group:not([data-tab="export"]) { display: none; }
+.ribbon-group { padding: 0 6px; border-right: 1px solid #d6dbe0; }
+.ribbon-buttons { min-height: 30px; gap: 1px; padding: 1px 0 2px; }
+.ribbon-buttons button, .ribbon-links a { font-size: 12px; padding: 3px 8px; border: 1px solid transparent; border-radius: 2px; background: transparent; }
+.ribbon-links a:hover { background: var(--bs-hover); border-color: var(--bs-hover-border); }
+.ribbon-buttons button.toggled { background: var(--bs-press); border-color: var(--bs-hover-border); color: var(--bs-text); }
+.ribbon-buttons button.attention { background: #fff4ce; border-color: #e0b84c; color: #6d5200; }
+.ribbon-buttons select { font-size: 12px; padding: 1px 4px; }
+.ribbon-caption { background: var(--bs-caption); color: var(--bs-muted); font-size: 11px; letter-spacing: 0; padding: 1px 0 2px; margin: 0 -6px; }
+
+/* ——— закреплённые панели: шапка, панель инструментов, рамка ——— */
+.studio-body { grid-template-columns: 330px 1fr; gap: 3px; background: var(--bs-caption); padding: 3px 0 0; }
+.nav, .props, .studio-main { background: #fff; border: 1px solid var(--bs-border); }
+.nav { font-size: 12px; padding-bottom: 0; }
+.nav-search { background: var(--bs-toolbar); border-bottom: 1px solid var(--bs-border); padding: 3px 4px; }
+.nav-section-head { background: var(--bs-head); color: var(--bs-text); border-bottom: 1px solid var(--bs-border); padding: 2px 6px; font-weight: 400; font-size: 11px; }
+.props-head { background: var(--bs-head); color: var(--bs-text); border-bottom: 1px solid var(--bs-border); padding: 2px 6px; font-size: 11px; }
+.props-head button { font-size: 14px; }
+.props { border-left: 1px solid var(--bs-border); background: #fff; font-size: 12px; }
+
+/* дерево: плотные строки, выделение синим, раскрытие в рамке [+] / [−] */
+.nav-row { padding: 1px 6px; gap: 4px; }
+.nav-row:hover { background: var(--bs-hover); }
+.nav-row.selected { background: var(--bs-select); color: #fff; }
+.nav-row.selected .nav-code, .nav-row.selected .nav-num, .nav-row.selected .nav-badge { color: #fff; }
+.nav-row.active-doc { background: var(--bs-press); font-weight: 400; }
+.nav-row.active-doc.selected { background: var(--bs-select); }
+.nav-twisty { width: 9px; height: 9px; flex: 0 0 9px; border: 1px solid #919191; background: #fff; color: #333; font-size: 9px; line-height: 7px; text-align: center; }
+.nav-twisty:empty { border-color: transparent; background: none; }
+.nav-code { color: var(--bs-text); font-weight: 400; font-size: 12px; }
+.nav-count { background: var(--bs-caption); border-radius: 2px; }
+
+/* вкладки документов и вкладки внутри панелей */
+.doc-tabs { background: var(--bs-head); border-bottom: 1px solid var(--bs-border); padding: 2px 4px 0; }
+.doc-tab { border: 1px solid var(--bs-border); border-bottom: none; border-radius: 0; background: var(--bs-subtab); font-size: 12px; padding: 3px 10px; }
+.doc-tab.active { background: #fff; color: var(--bs-text); font-weight: 400; }
+.doc-area { padding: 0; }
+
+/* строка состояния: серая, как в программе */
+.statusbar { background: linear-gradient(var(--bs-status), #c1c5ca); color: var(--bs-text); font-size: 11px; padding: 2px 8px; gap: 12px; border-top: 1px solid #b4b9be; }
+.statusbar .muted { color: var(--bs-muted); }
+.statusbar .st-err { color: #a4262c; }
+.statusbar .st-dirty { color: #8a5a00; }
+.statusbar .st-ok { color: #107c10; }
+
+/* таблицы: шапка светлая, линии тонкие */
+table { border-collapse: collapse; }
+th { background: #f4f6f9; font-weight: 600; text-align: left; border: 1px solid var(--bs-border); padding: 2px 6px; font-size: 12px; }
+td { border: 1px solid #e3e7ec; padding: 1px 4px; }

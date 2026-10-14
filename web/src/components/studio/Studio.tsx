@@ -80,6 +80,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
+  const [ribbonTab, setRibbonTab] = useState<"main" | "export">("main");
   useEffect(() => {
     if (inDesktopShell()) rememberTabs(session.id, { docs, active: activeKey });
   }, [docs, activeKey, session.id]);
@@ -637,8 +638,15 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         onRestoreStale={persisted.restoreStale}
       />
 
-      <div className="ribbon">
-        <div className="ribbon-group">
+      <div className="ribbon-tabs" role="tablist" aria-label="Лента">
+        {([["main", "Главная"], ["export", "Выгрузка и печать"]] as const).map(([key, title]) => (
+          <button key={key} role="tab" className="ribbon-tab" aria-selected={ribbonTab === key} onClick={() => setRibbonTab(key)}>
+            {title}
+          </button>
+        ))}
+      </div>
+      <div className="ribbon" data-tab={ribbonTab}>
+        <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
             {inDesktopShell() && (
               <button className="primary" onClick={() => postToShell({ t: "apply" })} title="Сохранить правки, сделанные в Visio, в модель процесса">
@@ -657,7 +665,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="ribbon-caption">Файл</div>
         </div>
-        <div className="ribbon-group">
+        <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
             <button className="ribbon-icon" aria-label="Предыдущая диаграмма" disabled={histTarget(-1) === null} onClick={() => goHist(-1)} title="Предыдущая открытая диаграмма (Alt+←)">
               ‹
@@ -704,7 +712,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="ribbon-caption">Модель</div>
         </div>
-        <div className="ribbon-group">
+        <div className="ribbon-group" data-tab="main">
           <div className="ribbon-buttons">
             <button className={navOpen ? "toggled" : ""} onClick={() => setNavOpen(!navOpen)}>
               Навигатор
@@ -731,7 +739,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="ribbon-caption">Вид</div>
         </div>
-        <div className="ribbon-group">
+        <div className="ribbon-group" data-tab="export">
           <div className="ribbon-buttons ribbon-links">
             {exportLink("BPMN", "bpmn")}
             {active.kind === "bpmn" && active.scope && hasOperationDiagram(draft, active.scope) && exportLink("BPMN операции", `bpmn?scope=${encodeURIComponent(active.scope)}`)}
@@ -744,7 +752,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           <div className="ribbon-caption">Выгрузка</div>
         </div>
         {active.kind === "idef0" && (
-          <div className="ribbon-group">
+          <div className="ribbon-group" data-tab="export">
             <div className="ribbon-buttons ribbon-links">
               {(() => {
                 // адрес диаграммы в выгрузке: верхняя — decomposition, диаграмма функции — её код
@@ -774,7 +782,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
         )}
         {active.kind === "bpmn" && (
-          <div className="ribbon-group">
+          <div className="ribbon-group" data-tab="export">
             <div className="ribbon-buttons ribbon-links">
               <select aria-label="Бумага для печати" value={paper} onChange={(e) => setPaper(e.target.value)} title="Бумага: «По листу» берёт формат рамки листа (A4, A3, A2), иначе A4">
                 <option value="">Бумага: по листу</option>
@@ -793,7 +801,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
         )}
         {onOpenImport && (
-          <div className="ribbon-group">
+          <div className="ribbon-group" data-tab="export">
             <div className="ribbon-buttons">
               <button onClick={onOpenImport} title="Загрузить правки из bpmn.io, Camunda Modeler или draw.io: переименования применятся, новые элементы появятся как гипотезы. Новую модель из Visio, Excel или изображения создают на странице «Новая сессия».">
                 Импорт…
@@ -802,7 +810,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
             <div className="ribbon-caption">Импорт</div>
           </div>
         )}
-        <div className="ribbon-group">
+        <div className="ribbon-group" data-tab="export">
           <div className="ribbon-buttons">
             <button onClick={() => void exportDiagram("svg")} title="Открытая диаграмма как на экране, в том числе с несохранёнными правками">
               SVG

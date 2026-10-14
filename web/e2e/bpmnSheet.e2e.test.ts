@@ -48,7 +48,6 @@ describe("рамка листа BPMN и печать, в браузере", () =
     await page.locator('[data-nav-fn="o1"]').click();
     await page.getByLabel("Вниз: диаграмма ниже").click();
     await page.locator('.studio svg.bpe-svg [data-node-id="t1"]').waitFor();
-    const ribbonH = (await page.locator(".ribbon").boundingBox())!.height;
 
     expect(await page.locator(".studio [data-frame]").count()).toBe(0);
     await page.locator(".studio summary", { hasText: "Лист" }).click();
@@ -91,6 +90,9 @@ describe("рамка листа BPMN и печать, в браузере", () =
     await page.keyboard.press("Control+z");
     expect(await sheetX()).toBe(x0);
 
+    // печать — на вкладке ленты «Выгрузка и печать»; её высота — образец для проверок ниже
+    await page.getByRole("tab", { name: "Выгрузка и печать" }).click();
+    const ribbonH = (await page.locator(".ribbon").boundingBox())!.height;
     // печать: страница с листом в новой вкладке
     const [popup] = await Promise.all([ctx.waitForEvent("page"), page.getByRole("button", { name: "Печать…" }).click()]);
     await popup.waitForLoadState();
@@ -116,6 +118,7 @@ describe("рамка листа BPMN и печать, в браузере", () =
     await page.locator(".ribbon-caption", { hasText: "Печать листа IDEF0" }).waitFor();
     expect(ribbonH).toBeLessThanOrEqual((await page.locator(".ribbon").boundingBox())!.height);
 
+    await page.getByRole("tab", { name: "Главная" }).click(); // «Сохранить» — на вкладке ленты «Главная»
     await page.getByTitle("Сохранить (Ctrl+S)").click();
     await page.waitForFunction(() => !document.querySelector(".studio .dirty-dot, .studio [data-dirty='true']"));
     await page.waitForTimeout(500);

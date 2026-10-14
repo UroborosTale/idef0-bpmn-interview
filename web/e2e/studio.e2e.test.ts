@@ -216,6 +216,7 @@ describe("студия в браузере", () => {
     await expect.poll(() => page.locator(".studio g[data-node-id]").count()).toBe(3);
 
     // выгрузка с экрана — до сохранения
+    await page.getByRole("tab", { name: "Выгрузка и печать" }).click();
     const svgDownload = page.waitForEvent("download");
     await page.getByRole("button", { name: "SVG", exact: true }).click();
     const svgFile = await (await svgDownload).createReadStream();
@@ -233,7 +234,8 @@ describe("студия в браузере", () => {
     expect([...png.subarray(0, 4)]).toEqual([0x89, 0x50, 0x4e, 0x47]);
     expect(png.length).toBeGreaterThan(2000);
 
-    // сохранение и проверка на сервере
+    // сохранение и проверка на сервере (кнопка — на вкладке ленты «Главная»)
+    await page.getByRole("tab", { name: "Главная" }).click();
     await page.getByRole("button", { name: "Сохранить" }).first().click();
     await page.locator(".statusbar", { hasText: "✓ сохранено" }).waitFor();
     const id = new URL(page.url()).pathname.split("/").pop()!;
