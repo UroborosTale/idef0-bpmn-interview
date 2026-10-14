@@ -20,7 +20,7 @@ async function crossingsOf(m: ReturnType<typeof b002Model>, host: string): Promi
 // Пересечения до подбора раскладки (замер до введения подбора): подбор может только уменьшать их.
 const BEFORE: Record<string, number> = {
   "b002:o11": 1, "b002:o21": 2, "b002:o22": 2, "b002:o33": 7,
-  "c025:o11": 1, "c025:o12": 2, "c025:o13": 8, "c025:o21": 1, "c025:o22": 6,
+  "c025:o11": 1, "c025:o12": 3, "c025:o13": 8, "c025:o21": 1, "c025:o22": 6,
   "demo:o11": 4, "demo:o12": 5, "demo:o22": 4, "demo:o32": 1,
 };
 
@@ -37,8 +37,8 @@ describe("подбор раскладки: меньше пересечений �
         after += c;
       }
     }
-    expect(before).toBe(44);
-    expect(after).toBeLessThanOrEqual(11); // замер: 10 (колонки 190 вместо 220; задачи 150×90, как в Business Studio; до перехода было 6)
+    expect(before).toBe(45);
+    expect(after).toBeLessThanOrEqual(12); // замер: 11 (колонки 190 вместо 220; задачи 150×90, как в Business Studio; до перехода было 6)
   }, 120_000);
 
   it("на всех диаграммах эталонов фигуры не налезают друг на друга и не выходят за левый край дорожек", async () => {

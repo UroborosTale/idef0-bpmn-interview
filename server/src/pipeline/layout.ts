@@ -370,6 +370,21 @@ function branchRows(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], boxes: Map<str
   return rows;
 }
 
+/** Пары стрелок, идущих по одной прямой на общем участке: две линии сливаются в одну, и не видно, куда какая ведёт. */
+function collinearOverlaps(routes: Map<string, [number, number][]>): number {
+  const segs: { id: string; axis: "x" | "y"; at: number; a: number; b: number }[] = [];
+  for (const [id, pts] of routes) {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [p, q] = [pts[i], pts[i + 1]];
+      if (Math.abs(p[1] - q[1]) < 1e-6) segs.push({ id, axis: "y", at: p[1], a: Math.min(p[0], q[0]), b: Math.max(p[0], q[0]) });
+      else if (Math.abs(p[0] - q[0]) < 1e-6) segs.push({ id, axis: "x", at: p[0], a: Math.min(p[1], q[1]), b: Math.max(p[1], q[1]) });
+    }
+  }
+  let n = 0;
+  for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) if (segs[i].id !== segs[j].id && segs[i].axis === segs[j].axis && Math.abs(segs[i].at - segs[j].at) < 3 && Math.min(segs[i].b, segs[j].b) - Math.max(segs[i].a, segs[j].a) > 2) n++;
+  return n;
+}
+
 /** lanes — высоты дорожек сверху вниз (их число — число дорожек) или просто число дорожек стандартной высоты. */
 export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], laneSpec: number[] | number, extras?: LayoutExtras): Promise<LayoutResult> {
   const laneHeights = typeof laneSpec === "number" ? Array.from({ length: laneSpec }, () => LANE_H) : laneSpec;
@@ -417,10 +432,11 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     });
     const all = [...routeNodes, ...(ex?.extraNodes ?? [])];
     const allFlows = [...flowsForScore, ...(ex?.extraFlows ?? [])];
-    const q = routeQuality(all, allFlows, routeFlows(all, allFlows, ex?.obstacles ?? []), ex?.obstacles ?? []);
-    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400;
+    const routes = routeFlows(all, allFlows, ex?.obstacles ?? []);
+    const q = routeQuality(all, allFlows, routes, ex?.obstacles ?? []);
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(routes) * 60;
   };
-  const withRows = (firstDown: boolean): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
+  const withRows = (firstDown: boolean, compress: boolean): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
     const rows = branchRows(nodes, edgeList, boxes, firstDown);
     if (rows.size === 0) return null;
     const heights = [...laneHeights];
@@ -431,7 +447,15 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
       span.set(n.laneIndex, [Math.min(lo, r), Math.max(hi, r)]);
     }
     for (const [lane, [lo, hi]] of span) heights[lane] = Math.max(heights[lane], LANE_H + (hi - lo) * ROW_PITCH);
-    const placed = placeBoxes(nodes, best.rawX, best.rank, lanesOf(heights));
+    // сжатие: ряд — отдельная «строка», поэтому ветка делит столбцы с основной линией (ячейка «столбец × дорожка × ряд»)
+    let rawX = best.rawX;
+    if (compress) {
+      const lane = new Map(nodes.map((n) => [n.id, n.laneIndex * 100 + (rows.get(n.id) ?? 0) + 50] as const));
+      const { rank } = rankColumns({ ids: nodes.map((n) => n.id), lane, edges: edgeList.map((e) => ({ from: e.from, to: e.to })) });
+      rawX = new Map(nodes.map((n) => [n.id, COLUMN_X0 + (rank.get(n.id) ?? 0) * COLUMN_W] as const));
+      for (const n of nodes) if (n.fixed) rawX.set(n.id, best.rawX.get(n.id) ?? 0);
+    }
+    const placed = placeBoxes(nodes, rawX, best.rank, lanesOf(heights));
     for (const n of nodes) {
       const b = placed.get(n.id)!;
       const [lo, hi] = span.get(n.laneIndex) ?? [0, 0];
@@ -442,11 +466,15 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
   let heightsFinal = [...laneHeights];
   if (process.env.LAYOUT_SEARCH !== "0" && nodes.length >= 4 && edgeList.length >= 3) {
     let bestScore = scoreBoxes(boxes);
-    for (const firstDown of [true, false]) {
-      const cand = withRows(firstDown);
-      if (!cand) continue;
-      const sc = scoreBoxes(cand.boxes);
-      if (sc < bestScore - 1e-9) (bestScore = sc, boxes = cand.boxes, heightsFinal = cand.heights);
+    for (const compress of [false, true]) {
+      for (const firstDown of [true, false]) {
+        const cand = withRows(firstDown, compress);
+        if (!cand) continue;
+        // сжатая раскладка короче и ближе к Business Studio: ей прощаются несколько пересечений (за каждые 100 px ширины — одно)
+        const widthGain = compress ? (Math.max(...[...boxes.values()].map((b) => b.x + b.width)) - Math.max(...[...cand.boxes.values()].map((b) => b.x + b.width))) / 100 : 0;
+        const sc = scoreBoxes(cand.boxes) - Math.max(0, widthGain) * 10;
+        if (sc < bestScore - 1e-9) (bestScore = sc, boxes = cand.boxes, heightsFinal = cand.heights);
+      }
     }
   }
 
