@@ -153,6 +153,33 @@ internal sealed class VisioPane : Panel
         ["error"] = "ошибка", ["escalation"] = "эскалация", ["terminate"] = "завершение процесса",
     };
 
+    /// <summary>
+    /// Команды меню «Действия», как в Business Studio: окна и диалоги самого Visio (выравнивание, распределение, привязка, параметры
+    /// страницы, панорама, размер и положение, формат по образцу, печать), размер страницы по содержимому и масштаб 100 %.
+    /// Возвращает false, если команда неизвестна или Visio её не выполнил.
+    /// </summary>
+    public bool RunCommand(string name)
+    {
+        var ids = new Dictionary<string, int>
+        {
+            ["align"] = 1049, ["distribute"] = 1230, ["snapglue"] = 1084, ["pagesetup"] = 1076,
+            ["panzoom"] = 1653, ["sizepos"] = 1670, ["formatpainter"] = 1271, ["print"] = 1010,
+        };
+        try
+        {
+            if (name == "zoom100") { SetZoom(1); return true; }
+            if (name == "fitcontent") { visio.Ocx.Window.Page.ResizeToFitContents(); return true; }
+            if (!ids.TryGetValue(name, out var id)) return false;
+            dynamic app = visio.Ocx.Window.Application;
+            app.DoCmd((short)id);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Фокус клавиатуры — в окне Visio (тогда горячие клавиши «Действий» относятся к диаграмме).</summary>
+    public bool HasFocusWithin => visio.ContainsFocus || ContainsFocus;
+
     /// <summary>Включает инструмент окна Visio: «connector» — соединительная линия, иначе обычный указатель.</summary>
     public void SetTool(string tool) => Try(() =>
     {

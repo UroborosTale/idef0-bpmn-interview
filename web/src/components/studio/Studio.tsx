@@ -494,12 +494,21 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   // выбранный в студии (навигатор, проверки, свойства), выделяется на диаграмме Visio. Последний id, пришедший из Visio, не
   // отправляется обратно, чтобы не было эха.
   const shellSelected = useRef<string | null>(null);
+  const [syncNav, setSyncNav] = useState(false);
+  const syncNavRef = useRef(false);
+  syncNavRef.current = syncNav;
   useEffect(() => {
     if (!inDesktopShell()) return;
     return onShellMessage((m) => {
+      if (m.t === "props") {
+        setPropsOpen(true); // Ctrl+E в окне Visio — свойства объекта, как в Business Studio
+        return;
+      }
       if (m.t !== "visio-select") return;
       shellSelected.current = m.id;
       reportSelection({ kind: m.kind, id: m.id });
+      // включённая синхронизация показывает выбранную фигуру в дереве навигатора
+      if (syncNavRef.current && m.kind === "node") setNavReveal((r) => ({ id: m.id, n: r.n + 1 }));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -628,6 +637,12 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && !isTextInput(e.target)) {
       e.preventDefault();
       goHist(e.key === "ArrowLeft" ? -1 : 1);
+      return;
+    }
+    // Ctrl+E — свойства объекта, как в Business Studio
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "e" || e.code === "KeyE")) {
+      e.preventDefault();
+      setPropsOpen(true);
       return;
     }
     // диаграммы обрабатывают клавиши сами; остальное (справочники, отчёты, панель свойств) — здесь
@@ -904,7 +919,19 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="doc-area">
             {inDesktopShell() && (active.kind === "bpmn" || active.kind === "idef0") && (
-              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} toolbar={{ propsOpen, onToggleProps: () => setPropsOpen(!propsOpen), onFind: findInNavigator, onClose: liveDocs.length > 1 ? () => close(active.key) : undefined }} />
+              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} toolbar={{
+                  propsOpen,
+                  onToggleProps: () => setPropsOpen(!propsOpen),
+                  onFind: findInNavigator,
+                  onClose: liveDocs.length > 1 ? () => close(active.key) : undefined,
+                  onUp: upTarget() ? goUp : undefined,
+                  onDown: downTarget() ? goDown : undefined,
+                  onPrev: histTarget(-1) !== null ? () => goHist(-1) : undefined,
+                  onNext: histTarget(1) !== null ? () => goHist(1) : undefined,
+                  syncNav,
+                  onToggleSync: () => setSyncNav((v) => !v),
+                }}
+              />
             )}
             {!inDesktopShell() && active.kind === "bpmn" && (
               <BpmnEditor key={active.key} display={display} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={hEdit} focus={focus} onSelectionChange={reportSelection} />

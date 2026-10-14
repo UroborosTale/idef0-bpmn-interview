@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 export type RibbonIconName =
   | "save" | "apply" | "undo" | "redo" | "prev" | "next" | "up" | "down" | "find" | "labels" | "numbers"
   | "bpmn" | "idef0" | "addfn" | "wizard" | "duplicate" | "navigator" | "properties" | "fullscreen" | "checks"
-  | "suggest" | "export" | "print" | "pdf" | "import" | "image" | "paper" | "refresh" | "reports" | "actions";
+  | "suggest" | "export" | "print" | "pdf" | "import" | "image" | "paper" | "refresh" | "reports" | "actions" | "sync" | "zoom100";
 
 const INK = "#3b4a5a";
 const ACC = "#1a6fc4";
@@ -31,6 +31,19 @@ const ICONS: Record<RibbonIconName, ReactNode> = {
   undo: <path d="M9 5 4 10l5 5M4 10h9.5a5.5 5.5 0 0 1 0 11H10" stroke={ACC} />,
   redo: <path d="M15 5l5 5-5 5M20 10h-9.5a5.5 5.5 0 0 0 0 11H14" stroke={ACC} />,
   prev: <path d="M14.5 5.5 8 12l6.5 6.5" strokeWidth="2" />,
+  sync: (
+    <>
+      <path d="M10 14l4-4" stroke={ACC} strokeWidth="1.8" />
+      <path d="M11 7.5l1.8-1.8a3.5 3.5 0 0 1 5 5L16 12.5M13 16.5l-1.8 1.8a3.5 3.5 0 0 1-5-5L8 11.5" />
+    </>
+  ),
+  zoom100: (
+    <>
+      <circle cx="10.5" cy="10.5" r="6" fill={TINT} />
+      <path d="m15 15 5 5" strokeWidth="2" />
+      <path d="M8.5 8.5 10 7.5v6" stroke={ACC} strokeWidth="1.4" />
+    </>
+  ),
   next: <path d="M9.5 5.5 16 12l-6.5 6.5" strokeWidth="2" />,
   up: <path d="M12 19V6M6 11.5 12 5.5l6 6" strokeWidth="1.8" />,
   down: <path d="M12 5v13M6 12.5l6 6 6-6" strokeWidth="1.8" />,

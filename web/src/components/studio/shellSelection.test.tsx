@@ -46,4 +46,12 @@ describe("выделение между студией и Visio", () => {
     fromShell(null);
     expect(title()).toBe("Свойства процесса");
   });
+
+  it("Ctrl+E в окне Visio (сообщение props) открывает скрытую панель свойств, как в Business Studio", () => {
+    render(<Studio session={session()} busy={false} onSave={vi.fn(async () => true)} />);
+    fireEvent.click(document.querySelector('[title="Скрыть панель"]')!);
+    expect(document.querySelector(".props-head")).toBeNull();
+    fromShell({ t: "props" });
+    expect(document.querySelector(".props-head")).not.toBeNull();
+  });
 });

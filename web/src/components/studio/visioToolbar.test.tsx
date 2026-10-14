@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import VisioSlot from "./VisioSlot";
 
@@ -60,5 +60,58 @@ describe("панель инструментов диаграммы в насто
   it("у последней вкладки кнопки «Закрыть» нет", () => {
     mount(toolbar({ onClose: undefined }));
     expect(screen.queryByRole("button", { name: /Закрыть/ })).toBeNull();
+  });
+
+  it("«Действия» как в Business Studio: команды Visio уходят оболочке, «Открыть в MS Visio» — отдельной командой", () => {
+    mount();
+    const run = (name: RegExp) => {
+      fireEvent.click(screen.getByRole("button", { name: "Действия" }));
+      fireEvent.click(screen.getByRole("menuitem", { name }));
+    };
+    run(/Выравнивание фигур/);
+    run(/Распределение фигур/);
+    run(/Привязка фигур/);
+    run(/Параметры страницы/);
+    run(/Изменить размеры по содержимому/);
+    run(/Формат по образцу/);
+    run(/Панорама и масштаб/);
+    run(/Размер и положение/);
+    run(/Печать/);
+    const names = post.mock.calls.map((c) => c[0] as { t: string; name?: string }).filter((m) => m.t === "cmd").map((m) => m.name);
+    expect(names).toEqual(["align", "distribute", "snapglue", "pagesetup", "fitcontent", "formatpainter", "panzoom", "sizepos", "print"]);
+    run(/Открыть диаграмму в MS Visio/);
+    expect(sent().some((m) => m.t === "open-visio")).toBe(true);
+  });
+
+  it("переходы и синхронизация: недоступные кнопки выключены, доступные вызывают студию; 100 % — масштаб 1", () => {
+    const t = mount(toolbar({ onUp: vi.fn(), onPrev: vi.fn(), syncNav: false, onToggleSync: vi.fn() }));
+    expect((screen.getByRole("button", { name: "Вниз" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Следующая диаграмма" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Вверх" }));
+    fireEvent.click(screen.getByRole("button", { name: "Предыдущая диаграмма" }));
+    fireEvent.click(screen.getByRole("button", { name: "Синхронизировать с текущей фигурой" }));
+    expect(t.onUp).toHaveBeenCalled();
+    expect(t.onPrev).toHaveBeenCalled();
+    expect(t.onToggleSync).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Масштаб по умолчанию" }));
+    expect(post).toHaveBeenCalledWith({ t: "zoom", value: 1 });
+  });
+
+  it("в окне приложения меню показывает оболочка (меню Windows поверх Visio): выбранный пункт выполняется", async () => {
+    const listeners: ((e: { data: unknown }) => void)[] = [];
+    (window as unknown as { chrome: unknown }).chrome = { webview: { postMessage: post, addEventListener: (_: string, h: (e: { data: unknown }) => void) => listeners.push(h), removeEventListener: () => undefined } };
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "Действия" }));
+    expect(screen.queryByRole("menu")).toBeNull(); // HTML-меню не рисуется — его закрыло бы окно Visio
+    const req = post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: { id?: string; group?: string }[] }).find((m) => m.t === "menu")!;
+    expect(req.items!.some((i) => i.id === "align")).toBe(true);
+    expect(req.items!.some((i) => i.group === "Положение фигур")).toBe(true);
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: req.id, item: "align" } })));
+    expect(post).toHaveBeenCalledWith({ t: "cmd", name: "align" });
+    // список масштабов — тоже меню оболочки
+    fireEvent.click(screen.getByRole("button", { name: "Список масштабов" }));
+    const zreq = post.mock.calls.map((c) => c[0] as { t: string; id?: string }).filter((m) => m.t === "menu").at(-1)!;
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: zreq.id, item: "50" } })));
+    expect(post).toHaveBeenCalledWith({ t: "zoom", value: 0.5 });
   });
 });

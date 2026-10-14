@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { postToShell, type VisioDiagram } from "../../desktop";
+import { postToShell, shellHasMenus, showShellMenu, type VisioDiagram } from "../../desktop";
 import RibbonIcon from "./RibbonIcon";
 import ShapePalette from "./ShapePalette";
 
@@ -12,6 +12,14 @@ export interface VisioToolbar {
   onFind: () => void;
   /** Закрыть вкладку диаграммы; не задан, если вкладка последняя. */
   onClose?: () => void;
+  /** Переходы, как в Business Studio: вверх по декомпозиции, вниз (выбранная функция), предыдущая и следующая открытая диаграмма; undefined — недоступно. */
+  onUp?: () => void;
+  onDown?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  /** Синхронизация навигатора с выбранной фигурой диаграммы (переключатель). */
+  syncNav?: boolean;
+  onToggleSync?: () => void;
 }
 
 /**
@@ -63,6 +71,40 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
     setMenu(false);
     run();
   };
+  /** Команда Visio из меню «Действия» (выравнивание, параметры страницы…): её выполняет оболочка. */
+  const cmd = (name: string) => postToShell({ t: "cmd", name });
+  /** Меню «Действия», как в Business Studio: команды самого Visio выполняет оболочка. */
+  const actions: ({ group: string } | { id: string; label: string; kbd?: string; run: () => void })[] = [
+    { id: "open-visio", label: "Открыть диаграмму в MS Visio", run: () => postToShell({ t: "open-visio" }) },
+    { id: "print", label: "Печать…", run: () => cmd("print") },
+    { group: "Страница" },
+    { id: "pagesetup", label: "Параметры страницы…", kbd: "Shift+F5", run: () => cmd("pagesetup") },
+    { id: "fitcontent", label: "Изменить размеры по содержимому", run: () => cmd("fitcontent") },
+    { id: "grid", label: "Сетка: показать или скрыть", run: () => postToShell({ t: "grid" }) },
+    { group: "Положение фигур" },
+    { id: "align", label: "Выравнивание фигур…", kbd: "F8", run: () => cmd("align") },
+    { id: "distribute", label: "Распределение фигур…", run: () => cmd("distribute") },
+    { id: "snapglue", label: "Привязка фигур…", kbd: "Alt+F9", run: () => cmd("snapglue") },
+    { id: "formatpainter", label: "Формат по образцу", kbd: "Shift+Ctrl+P", run: () => cmd("formatpainter") },
+    { group: "Дополнительно" },
+    { id: "panzoom", label: "Панорама и масштаб", run: () => cmd("panzoom") },
+    { id: "sizepos", label: "Размер и положение", run: () => cmd("sizepos") },
+    { id: "fit", label: "Вписать страницу в окно", run: () => changeZoom("fit") },
+    { id: "find", label: "Найти в навигаторе", run: toolbar.onFind },
+  ];
+  /** В окне приложения меню показывает оболочка (меню Windows поверх Visio): HTML-меню над холстом закрыло бы окно Visio. */
+  const openActions = (anchor: Element) => {
+    if (!shellHasMenus()) return setMenu(!menu);
+    void showShellMenu(anchor, actions.map((a) => ("group" in a ? a : { id: a.id, label: a.label, kbd: a.kbd }))).then((picked) => {
+      const a = actions.find((x) => "id" in x && x.id === picked);
+      if (a && "run" in a) a.run();
+    });
+  };
+  const openZoomList = (anchor: Element) => {
+    if (!shellHasMenus()) return setZoomList(!zoomList);
+    const items = [{ id: "fit", label: "По странице", checked: zoom === "fit" }, ...ZOOMS.map((z) => ({ id: String(z), label: `${z}%`, checked: zoom === String(z) }))];
+    void showShellMenu(anchor, items).then((picked) => picked && changeZoom(picked));
+  };
   const changeZoom = (value: string) => {
     setZoom(value);
     setZoomText(value === "fit" ? "По странице" : `${value}%`);
@@ -103,7 +145,7 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
             }}
             title="Масштаб: введите значение и нажмите Enter"
           />
-          <button className="tb-zoom-drop" aria-label="Список масштабов" aria-haspopup="listbox" aria-expanded={zoomList} onClick={() => setZoomList(!zoomList)}>
+          <button className="tb-zoom-drop" aria-label="Список масштабов" aria-haspopup="listbox" aria-expanded={zoomList} onClick={(e) => openZoomList(e.currentTarget)}>
             ▾
           </button>
           {zoomList && (
@@ -119,23 +161,47 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
             </div>
           )}
         </div>
+        <button className="tb-btn" onClick={() => changeZoom("100")} aria-label="Масштаб по умолчанию" title="Масштаб по умолчанию (100 %)">
+          <RibbonIcon name="zoom100" />
+        </button>
+        <span className="tb-sep" />
+        <button className="tb-btn" disabled={!toolbar.onUp} onClick={toolbar.onUp} aria-label="Вверх" title="Вверх: диаграмма, на которой стоит функция этой диаграммы">
+          <RibbonIcon name="up" />
+        </button>
+        <button className="tb-btn" disabled={!toolbar.onDown} onClick={toolbar.onDown} aria-label="Вниз" title="Вниз: декомпозиция выбранной функции или диаграмма BPMN её операции">
+          <RibbonIcon name="down" />
+        </button>
+        <button className="tb-btn" disabled={!toolbar.onPrev} onClick={toolbar.onPrev} aria-label="Предыдущая диаграмма" title="Предыдущая диаграмма (Alt+←)">
+          <RibbonIcon name="prev" />
+        </button>
+        <button className="tb-btn" disabled={!toolbar.onNext} onClick={toolbar.onNext} aria-label="Следующая диаграмма" title="Следующая диаграмма (Alt+→)">
+          <RibbonIcon name="next" />
+        </button>
+        {toolbar.onToggleSync && (
+          <button className={`tb-btn ${toolbar.syncNav ? "toggled" : ""}`} onClick={toolbar.onToggleSync} aria-label="Синхронизировать с текущей фигурой" aria-pressed={!!toolbar.syncNav} title="Синхронизировать навигатор с текущей фигурой диаграммы">
+            <RibbonIcon name="sync" />
+          </button>
+        )}
         <span className="tb-sep" />
         <div className="tb-menu">
-          <button className={`tb-menu-head ${menu ? "open" : ""}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
+          <button className={`tb-menu-head ${menu ? "open" : ""}`} aria-haspopup="menu" aria-expanded={menu} onClick={(e) => openActions(e.currentTarget)}>
             <RibbonIcon name="actions" />
             Действия
           </button>
           {menu && (
             <div className="tb-menu-list" role="menu">
-              <button role="menuitem" onClick={pick(() => postToShell({ t: "grid" }))}>
-                Сетка: показать или скрыть
-              </button>
-              <button role="menuitem" onClick={pick(() => changeZoom("fit"))}>
-                Вписать страницу в окно
-              </button>
-              <button role="menuitem" onClick={pick(toolbar.onFind)}>
-                Найти в навигаторе
-              </button>
+              {actions.map((a, i) =>
+                "group" in a ? (
+                  <div key={`g${i}`} className="tb-menu-group">
+                    {a.group}
+                  </div>
+                ) : (
+                  <button key={a.id} role="menuitem" onClick={pick(a.run)}>
+                    {a.label}
+                    {a.kbd && <span className="tb-kbd">{a.kbd}</span>}
+                  </button>
+                )
+              )}
             </div>
           )}
         </div>

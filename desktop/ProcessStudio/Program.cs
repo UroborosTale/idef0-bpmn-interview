@@ -51,7 +51,8 @@ internal sealed class MainForm : Form
             }
             status.Text = $"Сервер: {server.Url}";
         });
-        FormClosed += (_, _) => server.Dispose();
+        var hotkeys = new Hotkeys(this);
+        FormClosed += (_, _) => { hotkeys.Dispose(); server.Dispose(); };
     }
 
     private async Task OnMessage(string json)
@@ -65,6 +66,9 @@ internal sealed class MainForm : Form
             case "reload": await Reload(); break;
             case "zoom": visio.SetZoom(root.GetProperty("value").GetDouble()); break;
             case "fit": visio.FitPage(); break;
+            case "menu": ShowMenu(root); break;
+            case "cmd": RunCommand(root.GetProperty("name").GetString() ?? ""); break;
+            case "open-visio": await OpenInVisio(); break;
             case "tool": visio.SetTool(root.GetProperty("tool").GetString() ?? ""); break;
             case "grid": visio.ToggleGrid(); break;
             case "drop": await OnDrop(root); break;
@@ -108,6 +112,114 @@ internal sealed class MainForm : Form
         visio.Bounds = new Rectangle(web.Left + (int)(lastRect.X * s), web.Top + (int)(lastRect.Y * s), (int)(lastRect.Width * s), (int)(lastRect.Height * s));
         visio.Visible = lastRect.Width > 0 && lastRect.Height > 0;
         visio.BringToFront();
+    }
+
+    /// <summary>
+    /// Выпадающее меню студии («Действия», список масштабов) показывается меню Windows: HTML-меню студии оказалось бы под окном Visio.
+    /// Выбранный пункт возвращается студии сообщением menu-pick, закрытие без выбора — menu-closed.
+    /// </summary>
+    private void ShowMenu(JsonElement m)
+    {
+        var id = m.GetProperty("id").GetString() ?? "";
+        var r = m.GetProperty("rect");
+        var s = web.DeviceDpi / 96f;
+        var at = web.PointToScreen(new Point((int)(r.GetProperty("x").GetDouble() * s), (int)((r.GetProperty("y").GetDouble() + r.GetProperty("h").GetDouble()) * s)));
+        var menu = new ContextMenuStrip { ShowImageMargin = false, Font = new Font("Segoe UI", 9f) };
+        string? picked = null;
+        foreach (var it in m.GetProperty("items").EnumerateArray())
+        {
+            if (it.TryGetProperty("group", out var g) && g.ValueKind == JsonValueKind.String)
+            {
+                if (menu.Items.Count > 0) menu.Items.Add(new ToolStripSeparator());
+                continue;
+            }
+            var item = new ToolStripMenuItem(it.GetProperty("label").GetString())
+            {
+                Tag = it.GetProperty("id").GetString(),
+                ShortcutKeyDisplayString = it.TryGetProperty("kbd", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null,
+                Checked = it.TryGetProperty("checked", out var c) && c.ValueKind == JsonValueKind.True,
+                Enabled = !(it.TryGetProperty("disabled", out var d) && d.ValueKind == JsonValueKind.True),
+            };
+            item.Click += (_, _) => picked = (string?)item.Tag;
+            menu.Items.Add(item);
+        }
+        menu.Closed += (_, _) => BeginInvoke(() =>
+        {
+            PostToWeb(picked != null ? JsonSerializer.Serialize(new { t = "menu-pick", id, item = picked }) : JsonSerializer.Serialize(new { t = "menu-closed", id }));
+            menu.Dispose();
+        });
+        menu.Show(at);
+    }
+
+    private void RunCommand(string name)
+    {
+        if (!visio.Visible) return;
+        if (!visio.RunCommand(name)) status.Text = "Visio не выполнил команду — выберите фигуры на диаграмме и повторите";
+    }
+
+    /// <summary>«Открыть диаграмму в MS Visio»: выгрузка модели в файл и открытие его в полном Visio (правки там в модель не возвращаются).</summary>
+    private async Task OpenInVisio()
+    {
+        if (visio.LoadedSession == null) return;
+        if (visio.IsDirty && MessageBox.Show(this, "В окне Visio есть непринятые правки. Записать их в модель перед открытием в MS Visio?", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            await Apply();
+        var bytes = await ServerHost.Http.GetByteArrayAsync($"{server.Url}/api/sessions/{visio.LoadedSession}/export/vsdx");
+        var file = Path.Combine(Path.GetTempPath(), $"Процесс {DateTime.Now:yyyy-MM-dd HH-mm-ss}.vsdx");
+        await File.WriteAllBytesAsync(file, bytes);
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file) { UseShellExecute = true });
+        status.Text = $"Открыто в MS Visio: {file} — правки в этом файле в модель не возвращаются";
+    }
+
+    /// <summary>
+    /// Горячие клавиши, как в Business Studio, пока фокус в окне Visio: Ctrl+E — свойства объекта, Shift+Ctrl+P — формат по образцу.
+    /// F8 (выравнивание), Alt+F9 (привязка) и Shift+F5 (параметры страницы) Visio обрабатывает сам. Клавиши окна Visio не проходят
+    /// через фильтр сообщений WinForms, поэтому используется перехватчик клавиатуры потока (WH_KEYBOARD).
+    /// </summary>
+    private sealed class Hotkeys : IDisposable
+    {
+        private delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr SetWindowsHookEx(int idHook, HookProc fn, IntPtr hMod, uint threadId);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+        [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern short GetKeyState(int key);
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+        private const int WH_KEYBOARD = 2;
+        private readonly MainForm form;
+        private readonly HookProc proc; // держим делегат, иначе его соберёт сборщик мусора
+        private readonly IntPtr hook;
+
+        public Hotkeys(MainForm form)
+        {
+            this.form = form;
+            proc = OnKey;
+            hook = SetWindowsHookEx(WH_KEYBOARD, proc, IntPtr.Zero, GetCurrentThreadId());
+        }
+
+        private IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
+        {
+            // code 0 — клавиша снимается с очереди; бит 31 lParam — отпускание
+            if (code == 0 && ((long)lParam & 0x80000000) == 0 && form.visio.Visible && form.visio.HasFocusWithin)
+            {
+                var key = (Keys)(int)wParam;
+                bool down(int vk) => (GetKeyState(vk) & 0x8000) != 0;
+                var ctrl = down(0x11);
+                var shift = down(0x10);
+                var alt = down(0x12);
+                if (key == Keys.E && ctrl && !shift && !alt)
+                {
+                    form.BeginInvoke(() => form.PostToWeb("{\"t\":\"props\"}"));
+                    return (IntPtr)1;
+                }
+                if (key == Keys.P && ctrl && shift && !alt)
+                {
+                    form.BeginInvoke(() => form.RunCommand("formatpainter"));
+                    return (IntPtr)1;
+                }
+            }
+            return CallNextHookEx(hook, code, wParam, lParam);
+        }
+
+        public void Dispose() => UnhookWindowsHookEx(hook);
     }
 
     /// <summary>Фигура из палитры: при перетаскивании — в точку, где отпустили кнопку (если она над Visio), при щелчке — в центр.</summary>
