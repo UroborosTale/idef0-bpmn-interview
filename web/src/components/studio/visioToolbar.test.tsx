@@ -34,9 +34,11 @@ describe("панель инструментов диаграммы в насто
 
   it("масштаб: выбор процентов отправляет долю, «По странице» — fit", () => {
     mount();
-    fireEvent.change(screen.getByLabelText("Масштаб диаграммы"), { target: { value: "150" } });
+    fireEvent.click(screen.getByRole("button", { name: "Список масштабов" }));
+    fireEvent.click(screen.getByRole("option", { name: "150%" }));
     expect(post).toHaveBeenCalledWith({ t: "zoom", value: 1.5 });
-    fireEvent.change(screen.getByLabelText("Масштаб диаграммы"), { target: { value: "fit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Список масштабов" }));
+    fireEvent.click(screen.getByRole("option", { name: "По странице" }));
     expect(sent().filter((m) => m.t === "fit").length).toBeGreaterThan(0);
   });
 

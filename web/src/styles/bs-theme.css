@@ -209,7 +209,10 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .diagram-toolbar .tb-btn .ri { width: 18px; height: 18px; }
 .diagram-toolbar .tb-btn.toggled { background: var(--bs-press); border-color: var(--bs-hover-border); }
 .diagram-toolbar .tb-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--bs-border); }
-.diagram-toolbar .tb-zoom { width: auto; min-height: 22px; padding: 1px 4px; }
+.diagram-toolbar .tb-zoombox { position: relative; display: inline-flex; align-items: stretch; border: 1px solid #c9ced4; background: #fff; }
+.diagram-toolbar .tb-zoom { width: 78px; min-height: 20px; padding: 1px 4px; border: 0; background: #fff; font-size: 12px; }
+.diagram-toolbar .tb-zoom-drop { width: 16px; padding: 0; border: 0; border-left: 1px solid #e2c85a; border-radius: 0; background: #ffe98a; font-size: 9px; color: #333; }
+.diagram-toolbar .tb-zoom-list { top: 100%; left: 0; min-width: 100%; }
 .diagram-toolbar .spacer { flex: 1; }
 
 /* ——— палитра фигур слева от диаграммы ——— */

@@ -28,8 +28,11 @@ internal sealed class MainForm : Form
         visio.Status += s => status.Text = s;
 
         web.Dock = DockStyle.Fill;
-        var strip = new StatusStrip();
+        // строка состояния как в Business Studio: слева сообщения, справа язык, дата и период
+        var strip = new StatusStrip { BackColor = Color.FromArgb(0xD6, 0xDA, 0xDE), SizingGrip = false };
         strip.Items.Add(status);
+        foreach (var text in new[] { System.Globalization.CultureInfo.CurrentUICulture.NativeName.Replace("русский", "Русский"), DateTime.Today.ToString("dd.MM.yyyy"), "Период: сегодня" })
+            strip.Items.Add(new ToolStripStatusLabel(text) { BorderSides = ToolStripStatusLabelBorderSides.Left, BorderStyle = Border3DStyle.Etched, Padding = new Padding(4, 0, 4, 0) });
         Controls.Add(web);
         Controls.Add(visio); // поверх студии: окно Visio закрывает область холста
         Controls.Add(strip);

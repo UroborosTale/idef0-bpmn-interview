@@ -23,6 +23,8 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
   const diagramKey = JSON.stringify(diagram);
   const [zoom, setZoom] = useState<string>("fit");
   const [menu, setMenu] = useState(false);
+  const [zoomList, setZoomList] = useState(false);
+  const [zoomText, setZoomText] = useState("По странице");
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,13 +51,13 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
 
   // меню «Действия» закрывается щелчком вне панели
   useEffect(() => {
-    if (!menu) return;
+    if (!menu && !zoomList) return;
     const away = (e: MouseEvent) => {
-      if (!barRef.current?.contains(e.target as Node)) setMenu(false);
+      if (!barRef.current?.contains(e.target as Node)) (setMenu(false), setZoomList(false));
     };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
-  }, [menu]);
+  }, [menu, zoomList]);
 
   const pick = (run: () => void) => () => {
     setMenu(false);
@@ -63,6 +65,8 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
   };
   const changeZoom = (value: string) => {
     setZoom(value);
+    setZoomText(value === "fit" ? "По странице" : `${value}%`);
+    setZoomList(false);
     postToShell(value === "fit" ? { t: "fit" } : { t: "zoom", value: Number(value) / 100 });
   };
 
@@ -84,14 +88,37 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
         <button className="tb-btn" onClick={() => changeZoom("fit")} aria-label="Вписать в окно" title="Вписать страницу в окно">
           <RibbonIcon name="fullscreen" />
         </button>
-        <select className="tb-zoom" aria-label="Масштаб диаграммы" value={zoom} onChange={(e) => changeZoom(e.target.value)} title="Масштаб">
-          <option value="fit">По странице</option>
-          {ZOOMS.map((z) => (
-            <option key={z} value={z}>
-              {z}%
-            </option>
-          ))}
-        </select>
+        <div className="tb-zoombox">
+          <input
+            className="tb-zoom"
+            aria-label="Масштаб диаграммы"
+            value={zoomText}
+            onChange={(e) => setZoomText(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const n = Number(zoomText.replace(/[^\d.,]/g, "").replace(",", "."));
+              if (n >= 5 && n <= 400) changeZoom(String(n));
+              else setZoomText(zoom === "fit" ? "По странице" : `${zoom}%`);
+            }}
+            title="Масштаб: введите значение и нажмите Enter"
+          />
+          <button className="tb-zoom-drop" aria-label="Список масштабов" aria-haspopup="listbox" aria-expanded={zoomList} onClick={() => setZoomList(!zoomList)}>
+            ▾
+          </button>
+          {zoomList && (
+            <div className="tb-menu-list tb-zoom-list" role="listbox">
+              <button role="option" aria-selected={zoom === "fit"} onClick={() => changeZoom("fit")}>
+                По странице
+              </button>
+              {ZOOMS.map((z) => (
+                <button key={z} role="option" aria-selected={zoom === String(z)} onClick={() => changeZoom(String(z))}>
+                  {z}%
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <span className="tb-sep" />
         <div className="tb-menu">
           <button className={`tb-menu-head ${menu ? "open" : ""}`} aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
