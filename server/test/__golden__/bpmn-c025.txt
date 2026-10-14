@@ -35,218 +35,218 @@ extra annotation 1200,1320 180×60 «Список формируется исх�
 extra annotation 1420,1320 180×60 «Список необходимых полей для заполнения»
 extra annotation 1640,1320 180×60 «Согласование не требуется при выполнении обоих условий»
 extra annotation 1860,1320 180×60 «Напоминание об обучении приходит за 1 день до и в день занятия»
-# BPMN C025.01.01 4361×520
-lane r_elma 80,60 4181×150
-lane r_initiator 80,210 4181×150
+# BPMN C025.01.01 3821×520
+lane r_elma 80,60 3641×150
+lane r_initiator 80,210 3641×150
 shape Node_o11_start1 event/start 165,267 36×36 «Необходимость в повышении квалификации выявлена»
-shape Node_o11_start2 event/start 385,267 36×36 «Поручение руководства получено»
-shape Node_o11_m1 gateway/exclusive 605,260 50×50 «Слияние потоков»
-shape Node_o11_enter task/user 825,240 150×90 «Зайти в раздел “Заявки на обучение”»
-shape Node_o11_create task/user 1045,240 150×90 «Нажать кнопку “Создать заявку”»
-shape Node_o11_many gateway/exclusive 1265,260 50×50 «Направленных сотрудников на обучение >1?»
-shape Node_o11_all task/user 1485,240 150×90 «Указать всех сотрудников направленных на обучение»
-shape Node_o11_m2 gateway/exclusive 1705,260 50×50 «Слияние потоков»
-shape Node_o11_list task/service 1925,90 150×90 «Выдать список подходящих направлений»
-shape Node_o11_chosen gateway/exclusive 2145,260 50×50 «Программа обучения выбрана?»
-shape Node_o11_continue task/user 2365,240 150×90 «Нажать “Продолжить создание заявки”»
-shape Node_o11_write task/user 2585,240 150×90 «Написать в поле “Напишите вашу желаемую программу обучения”»
-shape Node_o11_fill task/user 2805,240 150×90 «Заполнить обязательные поля»
-shape Node_o11_m3 gateway/exclusive 3025,260 50×50 «Слияние потоков»
-shape Node_o11_approver task/service 3245,90 150×90 «Заполнить первое согласующее лицо – руководителя инициатора заявки»
-shape Node_o11_send task/user 3465,240 150×90 «Нажать кнопку “Отправить на согласование”»
-shape Node_o11_fromList gateway/exclusive 3685,260 50×50 «Программа выбрана из списка?»
-shape Node_o11_end1 event/end 3905,267 36×36 «Программа выбрана из списка»
-shape Node_o11_end2 event/end 4125,267 36×36 «Программа предложена сотрудником»
-edge Flow_o11_f1 Node_o11_start1→Node_o11_m1 [183,303 183,334 630,334 630,310]
-edge Flow_o11_f2 Node_o11_start2→Node_o11_m1 [421,285 605,285]
-edge Flow_o11_f3 Node_o11_m1→Node_o11_enter [655,285 825,285]
-edge Flow_o11_f4 Node_o11_enter→Node_o11_create [975,285 1045,285]
-edge Flow_o11_f5 Node_o11_create→Node_o11_many [1195,285 1265,285]
-edge Flow_o11_f6 Node_o11_many→Node_o11_all [1315,285 1485,285] «Да»
-edge Flow_o11_f7 Node_o11_all→Node_o11_m2 [1635,285 1705,285]
-edge Flow_o11_f8 Node_o11_many→Node_o11_m2 [1290,260 1290,216 1730,216 1730,260] «Нет»
-edge Flow_o11_f9 Node_o11_m2→Node_o11_list [1755,285 1852,285 1852,135 1925,135]
-edge Flow_o11_f10 Node_o11_list→Node_o11_chosen [2075,135 2170,135 2170,260]
-edge Flow_o11_f11 Node_o11_chosen→Node_o11_continue [2195,285 2365,285] «Да»
-edge Flow_o11_f12 Node_o11_continue→Node_o11_m3 [2440,240 2440,216 3050,216 3050,260]
-edge Flow_o11_f13 Node_o11_chosen→Node_o11_write [2170,310 2170,354 2660,354 2660,330] «Нет»
-edge Flow_o11_f14 Node_o11_write→Node_o11_fill [2735,285 2805,285]
-edge Flow_o11_f15 Node_o11_fill→Node_o11_m3 [2955,285 3025,285]
-edge Flow_o11_f16 Node_o11_m3→Node_o11_approver [3075,285 3172,285 3172,135 3245,135]
-edge Flow_o11_f17 Node_o11_approver→Node_o11_send [3395,135 3442,135 3442,285 3465,285]
-edge Flow_o11_f18 Node_o11_send→Node_o11_fromList [3615,285 3685,285]
-edge Flow_o11_f19 Node_o11_fromList→Node_o11_end1 [3735,285 3905,285] «Да»
-edge Flow_o11_f20 Node_o11_fromList→Node_o11_end2 [3710,260 3710,236 4143,236 4143,267] «Нет»
-extra annotation 100,420 180×60 «Список формируется исходя из нынешних компетенций сотрудника и должности» link[2000,180 190,420]
-extra annotation 320,420 180×60 «Список необходимых полей для заполнения» link[2880,330 410,420]
-# BPMN C025.01.02 6341×820
-lane r_elma 80,60 6161×150
-lane r_mgr 80,210 6161×150
-lane r_dird 80,360 6161×150
-lane r_dirhr 80,510 6161×150
+shape Node_o11_start2 event/start 355,267 36×36 «Поручение руководства получено»
+shape Node_o11_m1 gateway/exclusive 545,260 50×50 «Слияние потоков»
+shape Node_o11_enter task/user 735,240 150×90 «Зайти в раздел “Заявки на обучение”»
+shape Node_o11_create task/user 925,240 150×90 «Нажать кнопку “Создать заявку”»
+shape Node_o11_many gateway/exclusive 1115,260 50×50 «Направленных сотрудников на обучение >1?»
+shape Node_o11_all task/user 1305,240 150×90 «Указать всех сотрудников направленных на обучение»
+shape Node_o11_m2 gateway/exclusive 1495,260 50×50 «Слияние потоков»
+shape Node_o11_list task/service 1685,90 150×90 «Выдать список подходящих направлений»
+shape Node_o11_chosen gateway/exclusive 1875,260 50×50 «Программа обучения выбрана?»
+shape Node_o11_continue task/user 2065,240 150×90 «Нажать “Продолжить создание заявки”»
+shape Node_o11_write task/user 2255,240 150×90 «Написать в поле “Напишите вашу желаемую программу обучения”»
+shape Node_o11_fill task/user 2445,240 150×90 «Заполнить обязательные поля»
+shape Node_o11_m3 gateway/exclusive 2635,260 50×50 «Слияние потоков»
+shape Node_o11_approver task/service 2825,90 150×90 «Заполнить первое согласующее лицо – руководителя инициатора заявки»
+shape Node_o11_send task/user 3015,240 150×90 «Нажать кнопку “Отправить на согласование”»
+shape Node_o11_fromList gateway/exclusive 3205,260 50×50 «Программа выбрана из списка?»
+shape Node_o11_end1 event/end 3395,267 36×36 «Программа выбрана из списка»
+shape Node_o11_end2 event/end 3585,267 36×36 «Программа предложена сотрудником»
+edge Flow_o11_f1 Node_o11_start1→Node_o11_m1 [183,303 183,334 570,334 570,310]
+edge Flow_o11_f2 Node_o11_start2→Node_o11_m1 [391,285 545,285]
+edge Flow_o11_f3 Node_o11_m1→Node_o11_enter [595,285 735,285]
+edge Flow_o11_f4 Node_o11_enter→Node_o11_create [885,285 925,285]
+edge Flow_o11_f5 Node_o11_create→Node_o11_many [1075,285 1115,285]
+edge Flow_o11_f6 Node_o11_many→Node_o11_all [1165,285 1305,285] «Да»
+edge Flow_o11_f7 Node_o11_all→Node_o11_m2 [1455,285 1495,285]
+edge Flow_o11_f8 Node_o11_many→Node_o11_m2 [1140,260 1140,216 1520,216 1520,260] «Нет»
+edge Flow_o11_f9 Node_o11_m2→Node_o11_list [1545,285 1627,285 1627,135 1685,135]
+edge Flow_o11_f10 Node_o11_list→Node_o11_chosen [1835,135 1900,135 1900,260]
+edge Flow_o11_f11 Node_o11_chosen→Node_o11_continue [1925,285 2065,285] «Да»
+edge Flow_o11_f12 Node_o11_continue→Node_o11_m3 [2140,240 2140,216 2660,216 2660,260]
+edge Flow_o11_f13 Node_o11_chosen→Node_o11_write [1900,310 1900,354 2330,354 2330,330] «Нет»
+edge Flow_o11_f14 Node_o11_write→Node_o11_fill [2405,285 2445,285]
+edge Flow_o11_f15 Node_o11_fill→Node_o11_m3 [2595,285 2635,285]
+edge Flow_o11_f16 Node_o11_m3→Node_o11_approver [2685,285 2767,285 2767,135 2825,135]
+edge Flow_o11_f17 Node_o11_approver→Node_o11_send [2975,135 2997,135 2997,285 3015,285]
+edge Flow_o11_f18 Node_o11_send→Node_o11_fromList [3165,285 3205,285]
+edge Flow_o11_f19 Node_o11_fromList→Node_o11_end1 [3255,285 3395,285] «Да»
+edge Flow_o11_f20 Node_o11_fromList→Node_o11_end2 [3230,260 3230,236 3603,236 3603,267] «Нет»
+extra annotation 100,420 180×60 «Список формируется исходя из нынешних компетенций сотрудника и должности» link[1760,180 190,420]
+extra annotation 320,420 180×60 «Список необходимых полей для заполнения» link[2520,330 410,420]
+# BPMN C025.01.02 5531×820
+lane r_elma 80,60 5351×150
+lane r_mgr 80,210 5351×150
+lane r_dird 80,360 5351×150
+lane r_dirhr 80,510 5351×150
 shape Node_o12_start1 event/start 165,117 36×36 «Программа обучения и организация подобраны из списка»
-shape Node_o12_start2 event/start 385,117 36×36 «Инициатор предложил свой вариант программы»
-shape Node_o12_m1 gateway/exclusive 605,110 50×50 «Слияние потоков»
-shape Node_o12_need task/service 825,90 150×90 «Определить необходимость согласования»
-shape Node_o12_req gateway/exclusive 1045,110 50×50 «Требуется согласование?»
-shape Node_o12_skip event/end 1265,117 36×36 «Заявка согласована»
-shape Node_o12_c1 task/service 1485,90 150×90 «Создать задачу на согласование руководителю инициатора заявки»
-shape Node_o12_msg1 event/intermediate 1705,267 36×36 «Уведомление о необходимости согласования заявки получено»
-shape Node_o12_open1 task/user 1925,240 150×90 «Открыть карточку согласования заявки»
-shape Node_o12_dec1 task/user 2145,240 150×90 «Принять решение о согласовании»
-shape Node_o12_ok1 gateway/exclusive 2365,110 50×50 «Согласовано?»
-shape Node_o12_rew1 task/service 2585,90 150×90 «Создать заявку на доработку заявки»
-shape Node_o12_endRew1 event/end 2805,117 36×36 «Заявка отправлена на доработку»
-shape Node_o12_c2 task/service 3025,90 150×90 «Создать задачу на согласование директору дирекции по операционной эффективности»
-shape Node_o12_msg2 event/intermediate 3245,417 36×36 «Уведомление о необходимости согласования заявки получено»
-shape Node_o12_open2 task/user 3465,390 150×90 «Открыть карточку согласования заявки»
-shape Node_o12_dec2 task/user 3685,390 150×90 «Принять решение о согласовании»
-shape Node_o12_ok2 gateway/exclusive 3905,110 50×50 «Согласовано?»
-shape Node_o12_rew2 task/service 4125,90 150×90 «Создать заявку на доработку заявки»
-shape Node_o12_endRew2 event/end 4345,117 36×36 «Заявка отправлена на доработку»
-shape Node_o12_c3 task/service 4565,90 150×90 «Создать задачу на согласование директору по персоналу и операционной эффективности»
-shape Node_o12_msg3 event/intermediate 4785,567 36×36 «Копия уведомления о необходимости согласования заявки получена»
-shape Node_o12_open3 task/user 5005,540 150×90 «Открыть карточку согласования заявки»
-shape Node_o12_dec3 task/user 5225,540 150×90 «Принять решение о согласовании»
-shape Node_o12_ok3 gateway/exclusive 5445,110 50×50 «Согласовано?»
-shape Node_o12_rew3 task/service 5665,90 150×90 «Создать заявку на доработку заявки»
-shape Node_o12_endRew3 event/end 5885,117 36×36 «Заявка отправлена на доработку»
-shape Node_o12_end event/end 6105,117 36×36 «Заявка согласована»
-edge Flow_o12_f1 Node_o12_start1→Node_o12_m1 [183,117 183,86 630,86 630,110]
-edge Flow_o12_f2 Node_o12_start2→Node_o12_m1 [421,135 605,135]
-edge Flow_o12_f3 Node_o12_m1→Node_o12_need [655,135 825,135]
-edge Flow_o12_f4 Node_o12_need→Node_o12_req [975,135 1045,135]
-edge Flow_o12_f5 Node_o12_req→Node_o12_skip [1095,135 1265,135] «Нет»
-edge Flow_o12_f6 Node_o12_req→Node_o12_c1 [1070,110 1070,66 1560,66 1560,90] «Да»
-edge Flow_o12_f7 Node_o12_c1→Node_o12_msg1 [1635,135 1682,135 1682,285 1705,285]
-edge Flow_o12_f8 Node_o12_msg1→Node_o12_open1 [1741,285 1925,285]
-edge Flow_o12_f9 Node_o12_open1→Node_o12_dec1 [2075,285 2145,285]
-edge Flow_o12_f10 Node_o12_dec1→Node_o12_ok1 [2295,285 2390,285 2390,160]
-edge Flow_o12_f11 Node_o12_ok1→Node_o12_rew1 [2415,135 2585,135] «Нет»
-edge Flow_o12_f12 Node_o12_rew1→Node_o12_endRew1 [2735,135 2805,135]
-edge Flow_o12_f13 Node_o12_ok1→Node_o12_c2 [2390,110 2390,66 3100,66 3100,90] «Да»
-edge Flow_o12_f14 Node_o12_c2→Node_o12_msg2 [3175,135 3222,135 3222,435 3245,435]
-edge Flow_o12_f15 Node_o12_msg2→Node_o12_open2 [3281,435 3465,435]
-edge Flow_o12_f16 Node_o12_open2→Node_o12_dec2 [3615,435 3685,435]
-edge Flow_o12_f17 Node_o12_dec2→Node_o12_ok2 [3835,435 3930,435 3930,160]
-edge Flow_o12_f18 Node_o12_ok2→Node_o12_rew2 [3955,135 4125,135] «Нет»
-edge Flow_o12_f19 Node_o12_rew2→Node_o12_endRew2 [4275,135 4345,135]
-edge Flow_o12_f20 Node_o12_ok2→Node_o12_c3 [3930,110 3930,66 4640,66 4640,90] «Да»
-edge Flow_o12_f21 Node_o12_c3→Node_o12_msg3 [4715,135 4762,135 4762,585 4785,585]
-edge Flow_o12_f22 Node_o12_msg3→Node_o12_open3 [4821,585 5005,585]
-edge Flow_o12_f23 Node_o12_open3→Node_o12_dec3 [5155,585 5225,585]
-edge Flow_o12_f24 Node_o12_dec3→Node_o12_ok3 [5375,585 5470,585 5470,160]
-edge Flow_o12_f25 Node_o12_ok3→Node_o12_rew3 [5495,135 5665,135] «Нет»
-edge Flow_o12_f26 Node_o12_rew3→Node_o12_endRew3 [5815,135 5885,135]
-edge Flow_o12_f27 Node_o12_ok3→Node_o12_end [5470,110 5470,66 6123,66 6123,117] «Да»
-extra annotation 100,720 180×60 «Согласование не требуется при выполнении обоих условий» link[900,180 190,720]
-# BPMN C025.01.03 3815×590
-lane r_elma 80,60 3635×150
-lane r_spec 80,210 3635×150
+shape Node_o12_start2 event/start 355,117 36×36 «Инициатор предложил свой вариант программы»
+shape Node_o12_m1 gateway/exclusive 545,110 50×50 «Слияние потоков»
+shape Node_o12_need task/service 735,90 150×90 «Определить необходимость согласования»
+shape Node_o12_req gateway/exclusive 925,110 50×50 «Требуется согласование?»
+shape Node_o12_skip event/end 1115,117 36×36 «Заявка согласована»
+shape Node_o12_c1 task/service 1305,90 150×90 «Создать задачу на согласование руководителю инициатора заявки»
+shape Node_o12_msg1 event/intermediate 1495,267 36×36 «Уведомление о необходимости согласования заявки получено»
+shape Node_o12_open1 task/user 1685,240 150×90 «Открыть карточку согласования заявки»
+shape Node_o12_dec1 task/user 1875,240 150×90 «Принять решение о согласовании»
+shape Node_o12_ok1 gateway/exclusive 2065,110 50×50 «Согласовано?»
+shape Node_o12_rew1 task/service 2255,90 150×90 «Создать заявку на доработку заявки»
+shape Node_o12_endRew1 event/end 2445,117 36×36 «Заявка отправлена на доработку»
+shape Node_o12_c2 task/service 2635,90 150×90 «Создать задачу на согласование директору дирекции по операционной эффективности»
+shape Node_o12_msg2 event/intermediate 2825,417 36×36 «Уведомление о необходимости согласования заявки получено»
+shape Node_o12_open2 task/user 3015,390 150×90 «Открыть карточку согласования заявки»
+shape Node_o12_dec2 task/user 3205,390 150×90 «Принять решение о согласовании»
+shape Node_o12_ok2 gateway/exclusive 3395,110 50×50 «Согласовано?»
+shape Node_o12_rew2 task/service 3585,90 150×90 «Создать заявку на доработку заявки»
+shape Node_o12_endRew2 event/end 3775,117 36×36 «Заявка отправлена на доработку»
+shape Node_o12_c3 task/service 3965,90 150×90 «Создать задачу на согласование директору по персоналу и операционной эффективности»
+shape Node_o12_msg3 event/intermediate 4155,567 36×36 «Копия уведомления о необходимости согласования заявки получена»
+shape Node_o12_open3 task/user 4345,540 150×90 «Открыть карточку согласования заявки»
+shape Node_o12_dec3 task/user 4535,540 150×90 «Принять решение о согласовании»
+shape Node_o12_ok3 gateway/exclusive 4725,110 50×50 «Согласовано?»
+shape Node_o12_rew3 task/service 4915,90 150×90 «Создать заявку на доработку заявки»
+shape Node_o12_endRew3 event/end 5105,117 36×36 «Заявка отправлена на доработку»
+shape Node_o12_end event/end 5295,117 36×36 «Заявка согласована»
+edge Flow_o12_f1 Node_o12_start1→Node_o12_m1 [183,117 183,86 570,86 570,110]
+edge Flow_o12_f2 Node_o12_start2→Node_o12_m1 [391,135 545,135]
+edge Flow_o12_f3 Node_o12_m1→Node_o12_need [595,135 735,135]
+edge Flow_o12_f4 Node_o12_need→Node_o12_req [885,135 925,135]
+edge Flow_o12_f5 Node_o12_req→Node_o12_skip [975,135 1115,135] «Нет»
+edge Flow_o12_f6 Node_o12_req→Node_o12_c1 [950,110 950,66 1380,66 1380,90] «Да»
+edge Flow_o12_f7 Node_o12_c1→Node_o12_msg1 [1455,135 1477,135 1477,285 1495,285]
+edge Flow_o12_f8 Node_o12_msg1→Node_o12_open1 [1531,285 1685,285]
+edge Flow_o12_f9 Node_o12_open1→Node_o12_dec1 [1835,285 1875,285]
+edge Flow_o12_f10 Node_o12_dec1→Node_o12_ok1 [2025,285 2090,285 2090,160]
+edge Flow_o12_f11 Node_o12_ok1→Node_o12_rew1 [2115,135 2255,135] «Нет»
+edge Flow_o12_f12 Node_o12_rew1→Node_o12_endRew1 [2405,135 2445,135]
+edge Flow_o12_f13 Node_o12_ok1→Node_o12_c2 [2090,110 2090,66 2710,66 2710,90] «Да»
+edge Flow_o12_f14 Node_o12_c2→Node_o12_msg2 [2785,135 2807,135 2807,435 2825,435]
+edge Flow_o12_f15 Node_o12_msg2→Node_o12_open2 [2861,435 3015,435]
+edge Flow_o12_f16 Node_o12_open2→Node_o12_dec2 [3165,435 3205,435]
+edge Flow_o12_f17 Node_o12_dec2→Node_o12_ok2 [3355,435 3420,435 3420,160]
+edge Flow_o12_f18 Node_o12_ok2→Node_o12_rew2 [3445,135 3585,135] «Нет»
+edge Flow_o12_f19 Node_o12_rew2→Node_o12_endRew2 [3735,135 3775,135]
+edge Flow_o12_f20 Node_o12_ok2→Node_o12_c3 [3420,110 3420,66 4040,66 4040,90] «Да»
+edge Flow_o12_f21 Node_o12_c3→Node_o12_msg3 [4115,135 4137,135 4137,585 4155,585]
+edge Flow_o12_f22 Node_o12_msg3→Node_o12_open3 [4191,585 4345,585]
+edge Flow_o12_f23 Node_o12_open3→Node_o12_dec3 [4495,585 4535,585]
+edge Flow_o12_f24 Node_o12_dec3→Node_o12_ok3 [4685,585 4750,585 4750,160]
+edge Flow_o12_f25 Node_o12_ok3→Node_o12_rew3 [4775,135 4915,135] «Нет»
+edge Flow_o12_f26 Node_o12_rew3→Node_o12_endRew3 [5065,135 5105,135]
+edge Flow_o12_f27 Node_o12_ok3→Node_o12_end [4750,110 4750,66 5313,66 5313,117] «Да»
+extra annotation 100,720 180×60 «Согласование не требуется при выполнении обоих условий» link[810,180 190,720]
+# BPMN C025.01.03 3365×590
+lane r_elma 80,60 3185×150
+lane r_spec 80,210 3185×150
 shape Node_o13_start event/start 165,117 36×36 «Заявка на обучение согласована»
-shape Node_o13_task task/service 385,90 150×90 «Создать задачу специалисту на проверку направления»
-shape Node_o13_assign task/service 605,90 150×90 «Назначить специалиста на задачу»
-shape Node_o13_m1 gateway/exclusive 825,260 50×50 «Слияние потоков»
-shape Node_o13_open task/user 1045,240 150×90 «Открыть задачу и изучить контекст заявки»
-shape Node_o13_pick task/user 1265,240 150×90 «Выбрать программу обучения из списка под целевой результат»
-shape Node_o13_found gateway/exclusive 1485,260 50×50 «Удалось подобрать программу обучения?»
-shape Node_o13_contract gateway/exclusive 1925,260 50×50 «Договор с учебной организацией заключен?»
-shape Node_o13_confirm task/user 2145,240 150×90 «Подтвердить программу обучения и организацию»
-shape Node_o13_notify task/service 2145,90 150×90 «Отправить уведомление сотруднику о подтверждении заявки»
-shape Node_o13_endOk event/end 2365,117 36×36 «Заявка на обучение подтверждена»
-shape Node_o13_search task/user 1705,240 150×90 «Поиск программы во внешнем контуре»
-shape Node_o13_tender gateway/exclusive 2365,260 50×50 «Возможно провести тендерную процедуру?»
-shape Node_o13_docs task/user 2585,240 150×90 «Подготовка документов для проведения тендерной закупки»
-shape Node_o13_buy task/user 2805,240 150×90 «Проведение тендерной закупки»
-shape Node_o13_endBuy event/end 3025,267 36×36 «Необходимая программа обучения куплена, заявка подтверждена»
-shape Node_o13_fail task/user 3245,240 150×90 «Нажать кнопку “Не удалось подобрать направление”»
-shape Node_o13_again task/service 3465,90 150×90 «Отправить заявку на дополнительную проработку»
-edge Flow_o13_f1 Node_o13_start→Node_o13_task [201,135 385,135]
-edge Flow_o13_f2 Node_o13_task→Node_o13_assign [535,135 605,135]
-edge Flow_o13_f3 Node_o13_assign→Node_o13_m1 [755,135 802,135 802,285 825,285]
-edge Flow_o13_f4 Node_o13_m1→Node_o13_open [875,285 1045,285]
-edge Flow_o13_f5 Node_o13_open→Node_o13_pick [1195,285 1265,285]
-edge Flow_o13_f6 Node_o13_pick→Node_o13_found [1415,285 1485,285]
-edge Flow_o13_f7 Node_o13_found→Node_o13_contract [1510,260 1510,216 1950,216 1950,260] «Да»
-edge Flow_o13_f8 Node_o13_found→Node_o13_search [1535,285 1705,285] «Нет»
-edge Flow_o13_f9 Node_o13_search→Node_o13_tender [1780,240 1780,206 2383.5,206 2383.5,266.5]
-edge Flow_o13_f10 Node_o13_contract→Node_o13_confirm [1975,285 2145,285] «Да»
-edge Flow_o13_f11 Node_o13_contract→Node_o13_tender [1950,310 1950,354 2390,354 2390,310] «Нет»
-edge Flow_o13_f12 Node_o13_confirm→Node_o13_notify [2220,240 2220,180]
-edge Flow_o13_f13 Node_o13_notify→Node_o13_endOk [2295,135 2365,135]
-edge Flow_o13_f14 Node_o13_tender→Node_o13_docs [2415,285 2585,285] «Да»
-edge Flow_o13_f15 Node_o13_docs→Node_o13_buy [2735,285 2805,285]
-edge Flow_o13_f16 Node_o13_buy→Node_o13_endBuy [2955,285 3025,285]
-edge Flow_o13_f17 Node_o13_tender→Node_o13_fail [2396.5,266.5 2396.5,216 3320,216 3320,240] «Нет»
-edge Flow_o13_f18 Node_o13_fail→Node_o13_again [3395,285 3442,285 3442,135 3465,135]
-edge Flow_o13_f19 Node_o13_again→Node_o13_m1 [3540,90 3540,66 850,66 850,260]
-pool Pool_p_search 1695,510 170×40
-message Msg_o13_m1 Node_o13_search→Pool_p_search [1760.5,330 1760.2,510]
-message Msg_o13_m2 Pool_p_search→Node_o13_search [1720.5,510 1720.5,432 1799.5,432 1799.5,330]
-message Msg_o13_m3 Node_o13_buy→Pool_p_search [2860.5,330 2860.5,432 1839.5,432 1839.5,510]
-message Msg_o13_m4 Pool_p_search→Node_o13_buy [1799.8,510 1799.8,442 2899.5,442 2899.5,330]
-# BPMN C025.02.01 3481×520
-lane r_elma 80,60 3301×150
-lane r_spec 80,210 3301×150
+shape Node_o13_task task/service 355,90 150×90 «Создать задачу специалисту на проверку направления»
+shape Node_o13_assign task/service 545,90 150×90 «Назначить специалиста на задачу»
+shape Node_o13_m1 gateway/exclusive 735,260 50×50 «Слияние потоков»
+shape Node_o13_open task/user 925,240 150×90 «Открыть задачу и изучить контекст заявки»
+shape Node_o13_pick task/user 1115,240 150×90 «Выбрать программу обучения из списка под целевой результат»
+shape Node_o13_found gateway/exclusive 1305,260 50×50 «Удалось подобрать программу обучения?»
+shape Node_o13_contract gateway/exclusive 1685,260 50×50 «Договор с учебной организацией заключен?»
+shape Node_o13_confirm task/user 1875,240 150×90 «Подтвердить программу обучения и организацию»
+shape Node_o13_notify task/service 1875,90 150×90 «Отправить уведомление сотруднику о подтверждении заявки»
+shape Node_o13_endOk event/end 2065,117 36×36 «Заявка на обучение подтверждена»
+shape Node_o13_search task/user 1495,240 150×90 «Поиск программы во внешнем контуре»
+shape Node_o13_tender gateway/exclusive 2065,260 50×50 «Возможно провести тендерную процедуру?»
+shape Node_o13_docs task/user 2255,240 150×90 «Подготовка документов для проведения тендерной закупки»
+shape Node_o13_buy task/user 2445,240 150×90 «Проведение тендерной закупки»
+shape Node_o13_endBuy event/end 2635,267 36×36 «Необходимая программа обучения куплена, заявка подтверждена»
+shape Node_o13_fail task/user 2825,240 150×90 «Нажать кнопку “Не удалось подобрать направление”»
+shape Node_o13_again task/service 3015,90 150×90 «Отправить заявку на дополнительную проработку»
+edge Flow_o13_f1 Node_o13_start→Node_o13_task [201,135 355,135]
+edge Flow_o13_f2 Node_o13_task→Node_o13_assign [505,135 545,135]
+edge Flow_o13_f3 Node_o13_assign→Node_o13_m1 [695,135 717,135 717,285 735,285]
+edge Flow_o13_f4 Node_o13_m1→Node_o13_open [785,285 925,285]
+edge Flow_o13_f5 Node_o13_open→Node_o13_pick [1075,285 1115,285]
+edge Flow_o13_f6 Node_o13_pick→Node_o13_found [1265,285 1305,285]
+edge Flow_o13_f7 Node_o13_found→Node_o13_contract [1330,260 1330,216 1710,216 1710,260] «Да»
+edge Flow_o13_f8 Node_o13_found→Node_o13_search [1355,285 1495,285] «Нет»
+edge Flow_o13_f9 Node_o13_search→Node_o13_tender [1570,240 1570,206 2083.5,206 2083.5,266.5]
+edge Flow_o13_f10 Node_o13_contract→Node_o13_confirm [1735,285 1875,285] «Да»
+edge Flow_o13_f11 Node_o13_contract→Node_o13_tender [1710,310 1710,354 2090,354 2090,310] «Нет»
+edge Flow_o13_f12 Node_o13_confirm→Node_o13_notify [1950,240 1950,180]
+edge Flow_o13_f13 Node_o13_notify→Node_o13_endOk [2025,135 2065,135]
+edge Flow_o13_f14 Node_o13_tender→Node_o13_docs [2115,285 2255,285] «Да»
+edge Flow_o13_f15 Node_o13_docs→Node_o13_buy [2405,285 2445,285]
+edge Flow_o13_f16 Node_o13_buy→Node_o13_endBuy [2595,285 2635,285]
+edge Flow_o13_f17 Node_o13_tender→Node_o13_fail [2096.5,266.5 2096.5,216 2900,216 2900,240] «Нет»
+edge Flow_o13_f18 Node_o13_fail→Node_o13_again [2975,285 2997,285 2997,135 3015,135]
+edge Flow_o13_f19 Node_o13_again→Node_o13_m1 [3090,90 3090,66 760,66 760,260]
+pool Pool_p_search 1485,510 170×40
+message Msg_o13_m1 Node_o13_search→Pool_p_search [1550.5,330 1550.2,510]
+message Msg_o13_m2 Pool_p_search→Node_o13_search [1510.5,510 1510.5,432 1589.5,432 1589.5,330]
+message Msg_o13_m3 Node_o13_buy→Pool_p_search [2500.5,330 2500.5,432 1629.5,432 1629.5,510]
+message Msg_o13_m4 Pool_p_search→Node_o13_buy [1589.8,510 1589.8,442 2539.5,442 2539.5,330]
+# BPMN C025.02.01 3061×520
+lane r_elma 80,60 2881×150
+lane r_spec 80,210 2881×150
 shape Node_o21_start event/start 165,117 36×36 «Программа обучения и организации подтверждены»
-shape Node_o21_calendar task/service 385,90 150×90 «Создать событие в календаре за 1 день до начала обучения и направить уведомление сотруднику о начале обучения»
-shape Node_o21_begin event/intermediate 605,117 36×36 «Дата начала обучения»
-shape Node_o21_auto task/service 825,90 150×90 «Автоматическое подтверждение начала обучения и установка статуса “Обучение идёт”»
-shape Node_o21_m2 gateway/exclusive 1045,260 50×50 «Слияние потоков»
-shape Node_o21_finish event/intermediate 1265,267 36×36 «Дата окончания обучения»
-shape Node_o21_ask task/user 1485,240 150×90 «Запросить у организации сведения о прохождении обучения»
-shape Node_o21_check task/user 1705,240 150×90 «Проверить прохождение обучения»
-shape Node_o21_done gateway/exclusive 1925,260 50×50 «Сотрудник закончил обучение?»
-shape Node_o21_endDone event/end 2145,267 36×36 «Сотрудник закончил обучение»
-shape Node_o21_extended gateway/exclusive 2365,260 50×50 «Обучение было продлено?»
-shape Node_o21_dismissalStart event/start 825,267 36×36 «Уведомление об отчислении сотрудника от образовательной организации получено»
-shape Node_o21_m3 gateway/exclusive 2585,110 50×50 «Слияние потоков»
-shape Node_o21_notify task/service 2805,90 150×90 «Направить уведомление об отчислении сотруднику»
-shape Node_o21_close task/service 3025,90 150×90 «Внести запись “Обучение не завершено”, статус заявки ”Закрыта”»
-shape Node_o21_endDismissed event/end 3245,117 36×36 «Сотруднику направлено уведомление о его отчислении»
-edge Flow_o21_f1 Node_o21_start→Node_o21_calendar [201,135 385,135]
-edge Flow_o21_f2 Node_o21_calendar→Node_o21_begin [535,135 605,135]
-edge Flow_o21_f3 Node_o21_begin→Node_o21_auto [641,135 825,135]
-edge Flow_o21_f4 Node_o21_auto→Node_o21_m2 [975,135 1070,135 1070,260]
-edge Flow_o21_f5 Node_o21_m2→Node_o21_finish [1095,285 1265,285]
-edge Flow_o21_f6 Node_o21_finish→Node_o21_ask [1301,285 1485,285]
-edge Flow_o21_f7 Node_o21_ask→Node_o21_check [1635,285 1705,285]
-edge Flow_o21_f8 Node_o21_check→Node_o21_done [1855,285 1925,285]
-edge Flow_o21_f9 Node_o21_done→Node_o21_endDone [1975,285 2145,285] «Да»
-edge Flow_o21_f10 Node_o21_done→Node_o21_extended [1950,260 1950,236 2390,236 2390,260] «Нет»
-edge Flow_o21_f11 Node_o21_extended→Node_o21_m2 [2390,310 2390,354 1070,354 1070,310] «Да»
-edge Flow_o21_f12 Node_o21_extended→Node_o21_m3 [2415,285 2512,285 2512,135 2585,135] «Нет»
-edge Flow_o21_f13 Node_o21_dismissalStart→Node_o21_m3 [843,303 843,364 2610,364 2610,160]
-edge Flow_o21_f14 Node_o21_m3→Node_o21_notify [2635,135 2805,135]
-edge Flow_o21_f15 Node_o21_notify→Node_o21_close [2955,135 3025,135]
-edge Flow_o21_f16 Node_o21_close→Node_o21_endDismissed [3175,135 3245,135]
-extra annotation 100,420 180×60 «Напоминание об обучении приходит за 1 день до и в день занятия» link[460,180 190,420]
-# BPMN C025.02.02 2821×650
-lane r_elma 80,60 2641×150
-lane r_emp 80,210 2641×150
-lane r_spec 80,360 2641×150
+shape Node_o21_calendar task/service 355,90 150×90 «Создать событие в календаре за 1 день до начала обучения и направить уведомление сотруднику о начале обучения»
+shape Node_o21_begin event/intermediate 545,117 36×36 «Дата начала обучения»
+shape Node_o21_auto task/service 735,90 150×90 «Автоматическое подтверждение начала обучения и установка статуса “Обучение идёт”»
+shape Node_o21_m2 gateway/exclusive 925,260 50×50 «Слияние потоков»
+shape Node_o21_finish event/intermediate 1115,267 36×36 «Дата окончания обучения»
+shape Node_o21_ask task/user 1305,240 150×90 «Запросить у организации сведения о прохождении обучения»
+shape Node_o21_check task/user 1495,240 150×90 «Проверить прохождение обучения»
+shape Node_o21_done gateway/exclusive 1685,260 50×50 «Сотрудник закончил обучение?»
+shape Node_o21_endDone event/end 1875,267 36×36 «Сотрудник закончил обучение»
+shape Node_o21_extended gateway/exclusive 2065,260 50×50 «Обучение было продлено?»
+shape Node_o21_dismissalStart event/start 735,267 36×36 «Уведомление об отчислении сотрудника от образовательной организации получено»
+shape Node_o21_m3 gateway/exclusive 2255,110 50×50 «Слияние потоков»
+shape Node_o21_notify task/service 2445,90 150×90 «Направить уведомление об отчислении сотруднику»
+shape Node_o21_close task/service 2635,90 150×90 «Внести запись “Обучение не завершено”, статус заявки ”Закрыта”»
+shape Node_o21_endDismissed event/end 2825,117 36×36 «Сотруднику направлено уведомление о его отчислении»
+edge Flow_o21_f1 Node_o21_start→Node_o21_calendar [201,135 355,135]
+edge Flow_o21_f2 Node_o21_calendar→Node_o21_begin [505,135 545,135]
+edge Flow_o21_f3 Node_o21_begin→Node_o21_auto [581,135 735,135]
+edge Flow_o21_f4 Node_o21_auto→Node_o21_m2 [885,135 950,135 950,260]
+edge Flow_o21_f5 Node_o21_m2→Node_o21_finish [975,285 1115,285]
+edge Flow_o21_f6 Node_o21_finish→Node_o21_ask [1151,285 1305,285]
+edge Flow_o21_f7 Node_o21_ask→Node_o21_check [1455,285 1495,285]
+edge Flow_o21_f8 Node_o21_check→Node_o21_done [1645,285 1685,285]
+edge Flow_o21_f9 Node_o21_done→Node_o21_endDone [1735,285 1875,285] «Да»
+edge Flow_o21_f10 Node_o21_done→Node_o21_extended [1710,260 1710,236 2090,236 2090,260] «Нет»
+edge Flow_o21_f11 Node_o21_extended→Node_o21_m2 [2090,310 2090,354 950,354 950,310] «Да»
+edge Flow_o21_f12 Node_o21_extended→Node_o21_m3 [2115,285 2197,285 2197,135 2255,135] «Нет»
+edge Flow_o21_f13 Node_o21_dismissalStart→Node_o21_m3 [753,303 753,364 2280,364 2280,160]
+edge Flow_o21_f14 Node_o21_m3→Node_o21_notify [2305,135 2445,135]
+edge Flow_o21_f15 Node_o21_notify→Node_o21_close [2595,135 2635,135]
+edge Flow_o21_f16 Node_o21_close→Node_o21_endDismissed [2785,135 2825,135]
+extra annotation 100,420 180×60 «Напоминание об обучении приходит за 1 день до и в день занятия» link[430,180 190,420]
+# BPMN C025.02.02 2491×650
+lane r_elma 80,60 2311×150
+lane r_emp 80,210 2311×150
+lane r_spec 80,360 2311×150
 shape Node_o22_start event/start 165,117 36×36 «Обучение завершено»
-shape Node_o22_m1 gateway/exclusive 385,110 50×50 «Слияние потоков»
-shape Node_o22_remind task/service 605,90 150×90 «Автоматическое ежедневное напоминание о прикреплении корректного документа»
-shape Node_o22_create task/service 825,90 150×90 «Создать задачу сотруднику на загрузку документа в КЭДО»
-shape Node_o22_open task/user 1045,240 150×90 «Открыть задачу»
-shape Node_o22_attach task/user 1265,240 150×90 «Прикрепить документ об окончании обучения и заполнить реквизиты документа об окончании»
-shape Node_o22_inTime gateway/exclusive 1485,260 50×50 «Документ загружен в срок?»
-shape Node_o22_taskSpec task/service 1705,90 150×90 «Создать задачу специалисту на проверку документа»
-shape Node_o22_verify task/user 1925,390 150×90 «Открыть задачу, проверить документ и реквизиты»
-shape Node_o22_correct gateway/exclusive 2145,110 50×50 «Документ корректный?»
-shape Node_o22_update task/service 2365,90 150×90 «Актуализировать раздел об обучении сотрудника»
-shape Node_o22_end event/end 2585,117 36×36 «Раздел об образовании актуализирован»
-edge Flow_o22_f1 Node_o22_start→Node_o22_m1 [201,135 385,135]
-edge Flow_o22_f2 Node_o22_m1→Node_o22_remind [435,135 605,135]
-edge Flow_o22_f3 Node_o22_remind→Node_o22_create [755,135 825,135]
-edge Flow_o22_f4 Node_o22_create→Node_o22_open [975,135 1022,135 1022,285 1045,285]
-edge Flow_o22_f5 Node_o22_open→Node_o22_attach [1195,285 1265,285]
-edge Flow_o22_f6 Node_o22_attach→Node_o22_inTime [1415,285 1485,285]
-edge Flow_o22_f7 Node_o22_inTime→Node_o22_m1 [1510,310 1510,354 410,354 410,160] «Нет»
-edge Flow_o22_f8 Node_o22_inTime→Node_o22_taskSpec [1510,260 1510,135 1705,135] «Да»
-edge Flow_o22_f9 Node_o22_taskSpec→Node_o22_verify [1855,135 1902,135 1902,435 1925,435]
-edge Flow_o22_f10 Node_o22_verify→Node_o22_correct [2075,435 2170,435 2170,160]
-edge Flow_o22_f11 Node_o22_correct→Node_o22_m1 [2170,110 2170,66 410,66 410,110] «Нет»
-edge Flow_o22_f12 Node_o22_correct→Node_o22_update [2195,135 2365,135] «Да»
-edge Flow_o22_f13 Node_o22_update→Node_o22_end [2515,135 2585,135]
+shape Node_o22_m1 gateway/exclusive 355,110 50×50 «Слияние потоков»
+shape Node_o22_remind task/service 545,90 150×90 «Автоматическое ежедневное напоминание о прикреплении корректного документа»
+shape Node_o22_create task/service 735,90 150×90 «Создать задачу сотруднику на загрузку документа в КЭДО»
+shape Node_o22_open task/user 925,240 150×90 «Открыть задачу»
+shape Node_o22_attach task/user 1115,240 150×90 «Прикрепить документ об окончании обучения и заполнить реквизиты документа об окончании»
+shape Node_o22_inTime gateway/exclusive 1305,260 50×50 «Документ загружен в срок?»
+shape Node_o22_taskSpec task/service 1495,90 150×90 «Создать задачу специалисту на проверку документа»
+shape Node_o22_verify task/user 1685,390 150×90 «Открыть задачу, проверить документ и реквизиты»
+shape Node_o22_correct gateway/exclusive 1875,110 50×50 «Документ корректный?»
+shape Node_o22_update task/service 2065,90 150×90 «Актуализировать раздел об обучении сотрудника»
+shape Node_o22_end event/end 2255,117 36×36 «Раздел об образовании актуализирован»
+edge Flow_o22_f1 Node_o22_start→Node_o22_m1 [201,135 355,135]
+edge Flow_o22_f2 Node_o22_m1→Node_o22_remind [405,135 545,135]
+edge Flow_o22_f3 Node_o22_remind→Node_o22_create [695,135 735,135]
+edge Flow_o22_f4 Node_o22_create→Node_o22_open [885,135 907,135 907,285 925,285]
+edge Flow_o22_f5 Node_o22_open→Node_o22_attach [1075,285 1115,285]
+edge Flow_o22_f6 Node_o22_attach→Node_o22_inTime [1265,285 1305,285]
+edge Flow_o22_f7 Node_o22_inTime→Node_o22_m1 [1330,310 1330,354 380,354 380,160] «Нет»
+edge Flow_o22_f8 Node_o22_inTime→Node_o22_taskSpec [1330,260 1330,135 1495,135] «Да»
+edge Flow_o22_f9 Node_o22_taskSpec→Node_o22_verify [1645,135 1667,135 1667,435 1685,435]
+edge Flow_o22_f10 Node_o22_verify→Node_o22_correct [1835,435 1900,435 1900,160]
+edge Flow_o22_f11 Node_o22_correct→Node_o22_m1 [1900,110 1900,66 380,66 380,110] «Нет»
+edge Flow_o22_f12 Node_o22_correct→Node_o22_update [1925,135 2065,135] «Да»
+edge Flow_o22_f13 Node_o22_update→Node_o22_end [2215,135 2255,135]
