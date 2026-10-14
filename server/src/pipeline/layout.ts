@@ -315,6 +315,61 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], el
  * внутри столбца переопределяется по дорожке-роли (swimlane), т.к.
  * дорожки — это семантика BPMN, которую сам ELK не знает.
  */
+/** Расстояние между рядами фигур внутри одной дорожки (задача 90 + зазор 20). */
+const ROW_PITCH = 110;
+
+/**
+ * Ряды внутри дорожки, как у Business Studio: у шлюза с несколькими выходами основная ветка (самая длинная) остаётся на линии
+ * дорожки, остальные уходят выше и ниже неё: вторая уходит вверх, первая («Нет») вниз. Ряд получает первая фигура ветки в той же дорожке и вся цепочка
+ * за ней, пока не встретится слияние, шлюз или другая дорожка. Закреплённые в редакторе фигуры не двигаются.
+ */
+function branchRows(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], boxes: Map<string, LayoutBox>, firstDown: boolean): Map<string, number> {
+  const byId = new Map(nodes.map((n) => [n.id, n] as const));
+  const out = new Map<string, string[]>();
+  const into = new Map<string, number>();
+  for (const e of edges) {
+    if (e.from === e.to || !byId.has(e.from) || !byId.has(e.to)) continue;
+    out.set(e.from, [...(out.get(e.from) ?? []), e.to]);
+    into.set(e.to, (into.get(e.to) ?? 0) + 1);
+  }
+  // сколько фигур достижимо из фигуры вперёд (по x), чтобы найти основную ветку
+  const reach = (start: string): number => {
+    const seen = new Set<string>([start]);
+    const stack = [start];
+    while (stack.length) {
+      const u = stack.pop()!;
+      for (const v of out.get(u) ?? []) if (!seen.has(v) && boxes.get(v)!.x > boxes.get(u)!.x) (seen.add(v), stack.push(v));
+    }
+    return seen.size;
+  };
+  const rows = new Map<string, number>();
+  const gateways = nodes.filter((n) => n.type === "gateway" && !n.fixed && (out.get(n.id)?.length ?? 0) >= 2).sort((a, b) => boxes.get(a.id)!.x - boxes.get(b.id)!.x);
+  for (const g of gateways) {
+    const targets = (out.get(g.id) ?? []).filter((t) => byId.get(t)!.laneIndex === g.laneIndex && !byId.get(t)!.fixed && !rows.has(t) && (into.get(t) ?? 0) === 1);
+    if (targets.length < 2) continue;
+    // основная — самая длинная ветка (при равенстве — ближняя)
+    const main = [...targets].sort((a, b) => reach(b) - reach(a) || boxes.get(a)!.x - boxes.get(b)!.x)[0];
+    let k = 0;
+    for (const t of targets) {
+      if (t === main) continue;
+      k++;
+      const row = (k % 2 === 1 === firstDown ? 1 : -1) * Math.ceil(k / 2); // первая — ниже основной (обычно «Нет»), вторая — выше
+      let cur = t;
+      const guard = new Set<string>();
+      while (!guard.has(cur)) {
+        guard.add(cur);
+        rows.set(cur, row);
+        const nexts = out.get(cur) ?? [];
+        if (nexts.length !== 1) break;
+        const nx = byId.get(nexts[0])!;
+        if (nx.type === "gateway" || nx.laneIndex !== g.laneIndex || nx.fixed || (into.get(nx.id) ?? 0) !== 1 || rows.has(nx.id)) break;
+        cur = nx.id;
+      }
+    }
+  }
+  return rows;
+}
+
 /** lanes — высоты дорожек сверху вниз (их число — число дорожек) или просто число дорожек стандартной высоты. */
 export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], laneSpec: number[] | number, extras?: LayoutExtras): Promise<LayoutResult> {
   const laneHeights = typeof laneSpec === "number" ? Array.from({ length: laneSpec }, () => LANE_H) : laneSpec;
@@ -349,14 +404,59 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     start = { rawX: elkX, rank: new Map(nodes.map((n, i) => [n.id, i] as const)) };
   }
   const best = await improvePlacement(nodes, edgeList, start, lanes, extras);
-  const boxes = placeBoxes(nodes, best.rawX, best.rank, lanes);
+  let boxes = placeBoxes(nodes, best.rawX, best.rank, lanes);
+
+  // ветки шлюза — рядами внутри дорожки; дорожка растёт, чтобы вместить ряды. Из трёх вариантов (без рядов, первая ветвь вниз,
+  // первая ветвь вверх) берётся тот, у которого стрелки лучше по той же оценке, что и при подборе столбцов.
+  const flowsForScore: RouteFlow[] = edgeList.map((e) => ({ id: e.id, from: e.viaBoundary ?? e.from, to: e.to }));
+  const scoreBoxes = (bx: Map<string, LayoutBox>): number => {
+    const ex = extras?.(bx);
+    const routeNodes: RouteNode[] = nodes.map((n) => {
+      const b = bx.get(n.id)!;
+      return { id: n.id, type: defaultType(n), box: { x: b.x, y: b.y, w: b.width, h: b.height }, artifacts: ex?.withArtifacts.has(n.id), stores: ex?.withStores.has(n.id), label: n.label };
+    });
+    const all = [...routeNodes, ...(ex?.extraNodes ?? [])];
+    const allFlows = [...flowsForScore, ...(ex?.extraFlows ?? [])];
+    const q = routeQuality(all, allFlows, routeFlows(all, allFlows, ex?.obstacles ?? []), ex?.obstacles ?? []);
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400;
+  };
+  const withRows = (firstDown: boolean): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
+    const rows = branchRows(nodes, edgeList, boxes, firstDown);
+    if (rows.size === 0) return null;
+    const heights = [...laneHeights];
+    const span = new Map<number, [number, number]>();
+    for (const n of nodes) {
+      const r = rows.get(n.id) ?? 0;
+      const [lo, hi] = span.get(n.laneIndex) ?? [0, 0];
+      span.set(n.laneIndex, [Math.min(lo, r), Math.max(hi, r)]);
+    }
+    for (const [lane, [lo, hi]] of span) heights[lane] = Math.max(heights[lane], LANE_H + (hi - lo) * ROW_PITCH);
+    const placed = placeBoxes(nodes, best.rawX, best.rank, lanesOf(heights));
+    for (const n of nodes) {
+      const b = placed.get(n.id)!;
+      const [lo, hi] = span.get(n.laneIndex) ?? [0, 0];
+      if (!n.fixed) b.y += ((rows.get(n.id) ?? 0) - (lo + hi) / 2) * ROW_PITCH;
+    }
+    return { boxes: placed, heights };
+  };
+  let heightsFinal = [...laneHeights];
+  if (process.env.LAYOUT_SEARCH !== "0" && nodes.length >= 4 && edgeList.length >= 3) {
+    let bestScore = scoreBoxes(boxes);
+    for (const firstDown of [true, false]) {
+      const cand = withRows(firstDown);
+      if (!cand) continue;
+      const sc = scoreBoxes(cand.boxes);
+      if (sc < bestScore - 1e-9) (bestScore = sc, boxes = cand.boxes, heightsFinal = cand.heights);
+    }
+  }
 
   let maxRight = 0;
   for (const b of boxes.values()) maxRight = Math.max(maxRight, b.x + b.width);
   const totalWidth = maxRight + 80;
-  const totalHeight = START_Y + laneHeights.reduce((s, h) => s + h, 0) + 40;
+  const lanesOut = lanesOf(heightsFinal);
+  const totalHeight = START_Y + heightsFinal.reduce((s, h) => s + h, 0) + 40;
 
-  const laneBounds = laneHeights.map((height, i) => ({ laneIndex: i, y: lanes.tops[i], height }));
+  const laneBounds = heightsFinal.map((height, i) => ({ laneIndex: i, y: lanesOut.tops[i], height }));
   return { boxes, laneBounds, totalWidth, totalHeight };
 }
 

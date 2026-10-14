@@ -109,41 +109,41 @@ extra data 1641,66 18×20 «Согласованная заявка на зак�
 extra store 1641,184 18×20 «ERP «Закупки»» link[1650,184 1650,180]
 extra annotation 100,570 180×60 «Бюджет закупок на год» link[820,480 190,570]
 extra annotation 320,570 180×60 «Бюджет достаточен, если сумма заявки не превышает остаток по статье расходов» link[820,480 410,570]
-# BPMN C090.02.01 2501×610
+# BPMN C090.02.01 2501×720
 lane r_erp 80,60 2321×150
-lane r_buyer 80,210 2321×150
+lane r_buyer 80,210 2321×260
 shape Node_o21_start event/start 365,267 36×36 «Заявка на закупку согласована»
 shape Node_o21_retry event/intermediate 431,293 36×36 «Рассылка запроса возобновлена»
 shape Node_o21_m1 gateway/exclusive 555,260 50×50 «Слияние потоков»
 shape Node_o21_send task/send 745,240 150×90 «Разослать запрос предложений поставщикам»
 shape Node_o21_wait gateway/event_based 935,260 50×50 «Что наступит раньше?»
-shape Node_o21_got event/intermediate 1125,267 36×36 «Предложения получены»
+shape Node_o21_got event/intermediate 1125,377 36×36 «Предложения получены»
 shape Node_o21_timeout event/intermediate 1315,267 36×36 «Срок приёма предложений истёк»
-shape Node_o21_compare task/user 1505,240 150×90 «Сравнить предложения и выбрать победителя»
-shape Node_o21_end event/end 1695,267 36×36 «Поставщик выбран»
+shape Node_o21_compare task/user 1505,350 150×90 «Сравнить предложения и выбрать победителя»
+shape Node_o21_end event/end 1695,377 36×36 «Поставщик выбран»
 shape Node_o21_noOffers task/service 1505,90 150×90 «Зафиксировать отсутствие предложений»
 shape Node_o21_again gateway/exclusive 1885,260 50×50 «Повторить запрос?»
 shape Node_o21_jump event/intermediate 2075,267 36×36 «Повторный запрос инициирован»
-shape Node_o21_cancel event/end 2265,267 36×36 «Закупка прекращена»
+shape Node_o21_cancel event/end 2265,377 36×36 «Закупка прекращена»
 edge Flow_o21_f1 Node_o21_start→Node_o21_m1 [401,285 555,285]
 edge Flow_o21_f2 Node_o21_retry→Node_o21_m1 [449,329 449,353 580,353 580,310]
 edge Flow_o21_f3 Node_o21_m1→Node_o21_send [605,285 745,285]
 edge Flow_o21_f4 Node_o21_send→Node_o21_wait [895,285 935,285]
-edge Flow_o21_f5 Node_o21_wait→Node_o21_got [985,285 1125,285]
-edge Flow_o21_f6 Node_o21_wait→Node_o21_timeout [960,260 960,236 1333,236 1333,267]
-edge Flow_o21_f7 Node_o21_got→Node_o21_compare [1147.7,302.4 1147.7,354 1580,354 1580,330]
-edge Flow_o21_f8 Node_o21_compare→Node_o21_end [1655,285 1695,285]
+edge Flow_o21_f5 Node_o21_wait→Node_o21_got [960,310 960,395 1125,395]
+edge Flow_o21_f6 Node_o21_wait→Node_o21_timeout [985,285 1315,285]
+edge Flow_o21_f7 Node_o21_got→Node_o21_compare [1161,395 1505,395]
+edge Flow_o21_f8 Node_o21_compare→Node_o21_end [1655,395 1695,395]
 edge Flow_o21_f9 Node_o21_timeout→Node_o21_noOffers [1351,285 1440,285 1440,135 1505,135]
 edge Flow_o21_f10 Node_o21_noOffers→Node_o21_again [1655,135 1910,135 1910,260]
 edge Flow_o21_f11 Node_o21_again→Node_o21_jump [1935,285 2075,285] «Да»
-edge Flow_o21_f12 Node_o21_again→Node_o21_cancel [1910,310 1910,334 2283,334 2283,303] «Нет»
+edge Flow_o21_f12 Node_o21_again→Node_o21_cancel [1910,310 1910,395 2265,395] «Нет»
 extra data 811,216 18×20 «Согласованная заявка на закупку» link[820,236 820,240]
 extra store 832,334 18×20 «Система электронного документооборота» link[841,334 841,330]
-extra data 1571,216 18×20 «Выбранное коммерческое предложение» link[1580,240 1580,236]
-extra annotation 100,420 180×60 «Регламент закупочных процедур» link[820,330 190,420]
-pool Pool_p_suppl 735,530 170×40
-message Msg_o21_m1 Node_o21_send→Pool_p_suppl [820,330 820,442 798.8,442 798.8,530]
-message Msg_o21_m2 Pool_p_suppl→Node_o21_got [841.3,530 841.3,428 1138.3,428 1138.3,302.4]
+extra data 1571,326 18×20 «Выбранное коммерческое предложение» link[1580,350 1580,346]
+extra annotation 100,530 180×60 «Регламент закупочных процедур» link[820,330 190,530]
+pool Pool_p_suppl 735,640 170×40
+message Msg_o21_m1 Node_o21_send→Pool_p_suppl [820,330 820,497 798.8,497 798.8,640]
+message Msg_o21_m2 Pool_p_suppl→Node_o21_got [841.3,640 841.3,538.5 1143,538.5 1143,413]
 # BPMN C090.02.02 2311×910
 lane r_erp 80,60 2131×150
 lane r_fin 80,210 2131×150

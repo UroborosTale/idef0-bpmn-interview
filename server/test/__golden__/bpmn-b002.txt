@@ -28,8 +28,8 @@ extra annotation 100,720 180×60 ««Соглашение о моделиров�
 extra annotation 320,720 180×60 ««Методика картирования процессов» (Протокол № КК-06-2026 от 19.05.2026)» link[820,630 410,720]
 extra annotation 540,720 180×60 ««Методика стандартизации процессов» (Протокол № КК-06-2026 от 19.05.2026)» link[440,630 630,720]
 extra annotation 760,720 180×60 «СТП 113-01-2025 «Процессное управление»» link[440,630 850,720]
-# BPMN B002.01.01 2691×350
-lane r_spec 80,60 2511×150
+# BPMN B002.01.01 2691×460
+lane r_spec 80,60 2511×260
 shape Node_o11_start1 event/start 175,117 36×36 «Информация о вновь выявленном процессе получена»
 shape Node_o11_start2 event/start 365,117 36×36 «Пункт протокола совещания получен»
 shape Node_o11_m1 gateway/exclusive 555,110 50×50 «Слияние потоков»
@@ -42,7 +42,7 @@ shape Node_o11_status task/user 1695,90 150×90 «Вносить в реестр
 shape Node_o11_m2 gateway/exclusive 1885,110 50×50 «Слияние потоков»
 shape Node_o11_need gateway/exclusive 2075,110 50×50 «Необходимо предоставить актуальный реестр процессов?»
 shape Node_o11_load task/user 2265,90 150×90 «Загрузить последнюю версию реестра процессов ООО «РУ КМЗ»»
-shape Node_o11_end event/end 2455,117 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
+shape Node_o11_end event/end 2455,227 36×36 «Актуализирован реестр процессов ООО «РУ КМЗ»»
 edge Flow_o11_f1 Node_o11_start1→Node_o11_m1 [193,153 193,184 580,184 580,160]
 edge Flow_o11_f2 Node_o11_start2→Node_o11_m1 [401,135 555,135]
 edge Flow_o11_f3 Node_o11_m1→Node_o11_open [605,135 745,135]
@@ -53,9 +53,9 @@ edge Flow_o11_f7 Node_o11_owner→Node_o11_author [1465,135 1505,135]
 edge Flow_o11_f8 Node_o11_author→Node_o11_status [1655,135 1695,135]
 edge Flow_o11_f9 Node_o11_status→Node_o11_m2 [1845,135 1885,135]
 edge Flow_o11_f10 Node_o11_m2→Node_o11_need [1935,135 2075,135]
-edge Flow_o11_f11 Node_o11_need→Node_o11_end [2100,110 2100,31 2473,31 2473,117] «Нет»
+edge Flow_o11_f11 Node_o11_need→Node_o11_end [2100,160 2100,245 2455,245] «Нет»
 edge Flow_o11_f12 Node_o11_need→Node_o11_load [2125,135 2265,135] «Да»
-edge Flow_o11_f13 Node_o11_load→Node_o11_m2 [2340,90 2340,21 1910,21 1910,110]
+edge Flow_o11_f13 Node_o11_load→Node_o11_m2 [2340,90 2340,31 1910,31 1910,110]
 extra data 811,66 18×20 «Реестр процессов ООО «РУ КМЗ»» link[820,86 820,90]
 extra store 811,184 18×20 «Excel» link[820,184 820,180]
 extra data 1001,66 18×20 «Актуальный реестр процессов ООО «РУ КМЗ»» link[1010,90 1010,86]
@@ -214,8 +214,8 @@ extra data 4801,66 18×20 «Рабочая инструкция» link[4810,86 4
 extra data 4870.4,66 18×20 «Проект свода знаний процесса» link[4875,90 4879.4,86]
 extra store 4801,184 18×20 «Microsoft Word» link[4810,184 4810,180]
 extra store 4991,184 18×20 «ELMA365» link[5000,184 5000,180]
-# BPMN B002.02.01 4021×350
-lane r_spec 80,60 3841×150
+# BPMN B002.02.01 4021×460
+lane r_spec 80,60 3841×260
 shape Node_o21_start event/start 175,117 36×36 «Направлена информация об итогах реализации процессов»
 shape Node_o21_get task/receive 365,90 150×90 «Получить информацию по процессу ООО «РУ КМЗ»»
 shape Node_o21_enough gateway/exclusive 555,110 50×50 «Исходных данных достаточно для анализа процесса?»
@@ -227,9 +227,9 @@ shape Node_o21_study_model task/user 1505,90 150×90 «Изучить утвер
 shape Node_o21_compare task/user 1695,90 150×90 «Сопоставить фактическую реализацию процесса с утвержденной моделью»
 shape Node_o21_find task/user 1885,90 150×90 «Выявить отклонения по качеству брака»
 shape Node_o21_found gateway/exclusive 2075,110 50×50 «Отклонения выявлены?»
-shape Node_o21_fix_ok task/user 2265,90 150×90 «Зафиксировать соответствие фактической реализации процесса с утвержденной моделью»
-shape Node_o21_approve subprocess 2455,90 160×90 «Согласовать с начальником отдела корпоративных технологий»
-shape Node_o21_end_ok event/end 2645,117 36×36 «Составлена информация об эффективности реализации процесса»
+shape Node_o21_fix_ok task/user 2265,200 150×90 «Зафиксировать соответствие фактической реализации процесса с утвержденной моделью»
+shape Node_o21_approve subprocess 2455,200 160×90 «Согласовать с начальником отдела корпоративных технологий»
+shape Node_o21_end_ok event/end 2645,227 36×36 «Составлена информация об эффективности реализации процесса»
 shape Node_o21_by_object task/user 2835,90 150×90 «Классифицировать брак по объекту отклонения»
 shape Node_o21_by_weight task/user 3025,90 150×90 «Классифицировать брак по значимости»
 shape Node_o21_by_freq task/user 3215,90 150×90 «Классифицировать брак по частоте возникновения»
@@ -247,10 +247,10 @@ edge Flow_o21_f8 Node_o21_study_reg→Node_o21_study_model [1465,135 1505,135]
 edge Flow_o21_f9 Node_o21_study_model→Node_o21_compare [1655,135 1695,135]
 edge Flow_o21_f10 Node_o21_compare→Node_o21_find [1845,135 1885,135]
 edge Flow_o21_f11 Node_o21_find→Node_o21_found [2035,135 2075,135]
-edge Flow_o21_f12 Node_o21_found→Node_o21_fix_ok [2125,135 2265,135] «Нет»
-edge Flow_o21_f13 Node_o21_fix_ok→Node_o21_approve [2415,135 2455,135]
-edge Flow_o21_f14 Node_o21_approve→Node_o21_end_ok [2615,135 2645,135]
-edge Flow_o21_f15 Node_o21_found→Node_o21_by_object [2100,110 2100,31 2910,31 2910,90] «Да»
+edge Flow_o21_f12 Node_o21_found→Node_o21_fix_ok [2100,160 2100,245 2265,245] «Нет»
+edge Flow_o21_f13 Node_o21_fix_ok→Node_o21_approve [2415,245 2455,245]
+edge Flow_o21_f14 Node_o21_approve→Node_o21_end_ok [2615,245 2645,245]
+edge Flow_o21_f15 Node_o21_found→Node_o21_by_object [2125,135 2835,135] «Да»
 edge Flow_o21_f16 Node_o21_by_object→Node_o21_by_weight [2985,135 3025,135]
 edge Flow_o21_f17 Node_o21_by_weight→Node_o21_by_freq [3175,135 3215,135]
 edge Flow_o21_f18 Node_o21_by_freq→Node_o21_by_impact [3365,135 3405,135]
@@ -264,23 +264,23 @@ extra store 1381,184 18×20 «Microsoft Word» link[1390,184 1390,180]
 extra store 1571,184 18×20 «Microsoft Word» link[1580,184 1580,180]
 extra data 1761,66 18×20 «Атлас процессов» link[1770,86 1770,90]
 extra store 1761,184 18×20 «Microsoft Word» link[1770,184 1770,180]
-extra data 2331,66 18×20 «Отчет о результатах анализа соответствия» link[2340,90 2340,86]
-extra store 2331,184 18×20 «Microsoft Word» link[2340,184 2340,180]
+extra data 2331,176 18×20 «Отчет о результатах анализа соответствия» link[2340,200 2340,196]
+extra store 2331,294 18×20 «Microsoft Word» link[2340,294 2340,290]
 extra store 2901,184 18×20 «Microsoft Word» link[2910,184 2910,180]
 extra store 3091,184 18×20 «Microsoft Word» link[3100,184 3100,180]
 extra store 3281,184 18×20 «Microsoft Word» link[3290,184 3290,180]
 extra store 3471,184 18×20 «Microsoft Word» link[3480,184 3480,180]
 extra data 3661,66 18×20 «Реестр отклонений» link[3670,90 3670,86]
 extra store 3661,184 18×20 «Microsoft Word» link[3670,184 3670,180]
-# BPMN B002.02.02 2691×350
-lane r_spec 80,60 2511×150
+# BPMN B002.02.02 2691×460
+lane r_spec 80,60 2511×260
 shape Node_o22_start event/start 175,117 36×36 «Составлен перечень выявленных отклонений»
 shape Node_o22_factors task/user 365,90 150×90 «Анализировать факторы, обеспечивающие неэффективную реализацию процесса»
 shape Node_o22_split gateway/exclusive 555,110 50×50 «Какой метод анализа применить?»
 shape Node_o22_model_ishikawa task/user 745,90 150×90 «Моделировать диаграмму Исикавы»
 shape Node_o22_analyze_ishikawa task/user 935,90 150×90 «Анализировать с помощью диаграммы Исикавы»
-shape Node_o22_model_5why task/user 1125,90 150×90 «Моделировать с помощью метода «5 Почему»»
-shape Node_o22_analyze_5why task/user 1315,90 150×90 «Анализировать с помощью метода «5 Почему»»
+shape Node_o22_model_5why task/user 1125,200 150×90 «Моделировать с помощью метода «5 Почему»»
+shape Node_o22_analyze_5why task/user 1315,200 150×90 «Анализировать с помощью метода «5 Почему»»
 shape Node_o22_join gateway/exclusive 1505,110 50×50 «Слияние потоков»
 shape Node_o22_causes task/user 1695,90 150×90 «Определить возможные причины выявленных отклонений»
 shape Node_o22_prepare task/user 1885,90 150×90 «Подготовить информацию о неэффективности реализации процесса»
@@ -291,10 +291,10 @@ edge Flow_o22_f1 Node_o22_start→Node_o22_factors [211,135 365,135]
 edge Flow_o22_f2 Node_o22_factors→Node_o22_split [515,135 555,135]
 edge Flow_o22_f3 Node_o22_split→Node_o22_model_ishikawa [605,135 745,135] «Метод Исикавы»
 edge Flow_o22_f4 Node_o22_model_ishikawa→Node_o22_analyze_ishikawa [895,135 935,135]
-edge Flow_o22_f5 Node_o22_analyze_ishikawa→Node_o22_join [1010,90 1010,66 1530,66 1530,110]
-edge Flow_o22_f6 Node_o22_split→Node_o22_model_5why [580,110 580,56 1200,56 1200,90] «Метод «5 Почему»»
-edge Flow_o22_f7 Node_o22_model_5why→Node_o22_analyze_5why [1275,135 1315,135]
-edge Flow_o22_f8 Node_o22_analyze_5why→Node_o22_join [1465,135 1505,135]
+edge Flow_o22_f5 Node_o22_analyze_ishikawa→Node_o22_join [1085,135 1505,135]
+edge Flow_o22_f6 Node_o22_split→Node_o22_model_5why [580,160 580,245 1125,245] «Метод «5 Почему»»
+edge Flow_o22_f7 Node_o22_model_5why→Node_o22_analyze_5why [1275,245 1315,245]
+edge Flow_o22_f8 Node_o22_analyze_5why→Node_o22_join [1465,245 1530,245 1530,160]
 edge Flow_o22_f9 Node_o22_join→Node_o22_causes [1555,135 1695,135]
 edge Flow_o22_f10 Node_o22_causes→Node_o22_prepare [1845,135 1885,135]
 edge Flow_o22_f11 Node_o22_prepare→Node_o22_approve1 [2035,135 2075,135]
@@ -303,7 +303,7 @@ edge Flow_o22_f13 Node_o22_approve2→Node_o22_end [2425,135 2455,135]
 extra data 431,66 18×20 «Реестр отклонений» link[440,86 440,90]
 extra store 431,184 18×20 «Microsoft Word» link[440,184 440,180]
 extra store 811,184 18×20 «Microsoft Visio» link[820,184 820,180]
-extra store 1191,184 18×20 «Microsoft Visio» link[1200,184 1200,180]
+extra store 1191,294 18×20 «Microsoft Visio» link[1200,294 1200,290]
 extra data 1951,66 18×20 «Отчет о результатах анализа соответствия» link[1960,90 1960,86]
 extra store 1951,184 18×20 «Microsoft Word» link[1960,184 1960,180]
 # BPMN B002.03.01 3261×350
@@ -408,8 +408,8 @@ extra store 2901,184 18×20 «ELMA365» link[2910,184 2910,180]
 extra store 3091,184 18×20 «ELMA365» link[3100,184 3100,180]
 extra data 3471,66 18×20 «Результаты ФРД ООО «РУ КМЗ»» link[3480,90 3480,86]
 extra store 3471,184 18×20 «PowerPoint» link[3480,184 3480,180]
-# BPMN B002.03.03 5275×350
-lane r_spec 80,60 5095×150
+# BPMN B002.03.03 5275×460
+lane r_spec 80,60 5095×260
 shape Node_o33_start1 event/start 365,117 36×36 «ФРД проведено»
 shape Node_o33_start2 event/start 431,143 36×36 «Завершено моделирование текущего процесса»
 shape Node_o33_join gateway/parallel 555,110 50×50 «Слияние потоков»
@@ -419,7 +419,7 @@ shape Node_o33_plan task/user 1125,90 150×90 «Составить план пр
 shape Node_o33_m1 gateway/exclusive 1315,110 50×50 «Слияние потоков»
 shape Node_o33_agree1 task/user 1505,90 150×90 «Согласовать план с владельцем процесса»
 shape Node_o33_ok1 gateway/exclusive 1695,110 50×50 «План согласован?»
-shape Node_o33_fix1 task/user 1885,90 150×90 «Скорректировать план проведения картирования»
+shape Node_o33_fix1 task/user 1885,200 150×90 «Скорректировать план проведения картирования»
 shape Node_o33_day event/timer 2075,117 36×36 «День выезда»
 shape Node_o33_watch task/user 2265,90 150×90 «Наблюдать за ходом процесса»
 shape Node_o33_state task/user 2455,90 150×90 «Фиксировать текущее состояние потока»
@@ -434,7 +434,7 @@ shape Node_o33_map_target task/user 3975,90 150×90 «Моделировать �
 shape Node_o33_m2 gateway/exclusive 4165,110 50×50 «Слияние потоков»
 shape Node_o33_agree2 task/user 4355,90 150×90 «Согласовать план с владельцем процесса»
 shape Node_o33_ok2 gateway/exclusive 4545,110 50×50 «План согласован?»
-shape Node_o33_fix2 task/user 4925,90 150×90 «Скорректировать план проведения картирования»
+shape Node_o33_fix2 task/user 4925,200 150×90 «Скорректировать план проведения картирования»
 shape Node_o33_end event/end 4735,117 36×36 «Картирование проведено»
 edge Flow_o33_f1 Node_o33_start1→Node_o33_join [401,135 555,135]
 edge Flow_o33_f2 Node_o33_start2→Node_o33_join [449,179 449,203 580,203 580,160]
@@ -444,9 +444,9 @@ edge Flow_o33_f5 Node_o33_docs→Node_o33_plan [1085,135 1125,135]
 edge Flow_o33_f6 Node_o33_plan→Node_o33_m1 [1275,135 1315,135]
 edge Flow_o33_f7 Node_o33_m1→Node_o33_agree1 [1365,135 1505,135]
 edge Flow_o33_f8 Node_o33_agree1→Node_o33_ok1 [1655,135 1695,135]
-edge Flow_o33_f9 Node_o33_ok1→Node_o33_fix1 [1745,135 1885,135] «Нет»
-edge Flow_o33_f10 Node_o33_fix1→Node_o33_m1 [1960,90 1960,66 1340,66 1340,110]
-edge Flow_o33_f11 Node_o33_ok1→Node_o33_day [1720,110 1720,56 2093,56 2093,117] «Да»
+edge Flow_o33_f9 Node_o33_ok1→Node_o33_fix1 [1720,160 1720,245 1885,245] «Нет»
+edge Flow_o33_f10 Node_o33_fix1→Node_o33_m1 [1960,290 1960,314 1340,314 1340,160]
+edge Flow_o33_f11 Node_o33_ok1→Node_o33_day [1745,135 2075,135] «Да»
 edge Flow_o33_f12 Node_o33_day→Node_o33_watch [2111,135 2265,135]
 edge Flow_o33_f13 Node_o33_watch→Node_o33_state [2415,135 2455,135]
 edge Flow_o33_f14 Node_o33_state→Node_o33_measure [2605,135 2645,135]
@@ -460,8 +460,8 @@ edge Flow_o33_f21 Node_o33_feasible→Node_o33_map_target [3935,135 3975,135]
 edge Flow_o33_f22 Node_o33_map_target→Node_o33_m2 [4125,135 4165,135]
 edge Flow_o33_f23 Node_o33_m2→Node_o33_agree2 [4215,135 4355,135]
 edge Flow_o33_f24 Node_o33_agree2→Node_o33_ok2 [4505,135 4545,135]
-edge Flow_o33_f25 Node_o33_ok2→Node_o33_fix2 [4570,110 4570,66 5000,66 5000,90] «Нет»
-edge Flow_o33_f26 Node_o33_fix2→Node_o33_m2 [5000,180 5000,204 4190,204 4190,160]
+edge Flow_o33_f25 Node_o33_ok2→Node_o33_fix2 [4570,160 4570,245 4925,245] «Нет»
+edge Flow_o33_f26 Node_o33_fix2→Node_o33_m2 [5000,200 5000,66 4190,66 4190,110]
 edge Flow_o33_f27 Node_o33_ok2→Node_o33_end [4595,135 4735,135] «Да»
 extra store 1191,184 18×20 «Microsoft Word» link[1200,184 1200,180]
 extra data 2521,66 18×20 «Карточка потерь» link[2530,90 2530,86]
