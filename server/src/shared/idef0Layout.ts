@@ -247,6 +247,7 @@ const rectsHit = (a: LabelRect, b: LabelRect) => a.x0 < b.x1 + LABEL_GAP && b.x0
 export function assignLabelRows(items: { x: number; label: string }[], opts: { obstacles?: LabelRect[]; /** y первой строки подписи из `lines` строк, поставленной в ряд `row`. */ y?: (item: number, row: number, lines: number) => number } = {}): number[] {
   const order = items.map((_, i) => i).sort((i, j) => items[i].x - items[j].x);
   const rows: { x: number; w: number }[][] = [];
+  const placed: LabelRect[] = [];
   const out: number[] = new Array(items.length).fill(0);
   for (const i of order) {
     const wrapped = wrapLabel(items[i].label, true); // в рядах — подписи над блоком и под ним: длинная строка
@@ -255,14 +256,21 @@ export function assignLabelRows(items: { x: number; label: string }[], opts: { o
     const h = wrapped.split("\n").length;
     let r = 0;
     const blocked = (row: number) => {
+      if (opts.y) {
+        // высоты строк заданы: подписи сравниваются настоящими прямоугольниками (начала стрелок могут стоять на разной глубине)
+        const y = opts.y(i, row, h);
+        const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
+        return placed.some((o) => rectsHit(mine, o)) || (opts.obstacles ?? []).some((o) => rectsHit(mine, o));
+      }
       for (let k = row; k < row + h; k++) if ((rows[k] ?? []).some((q) => Math.abs(items[i].x - q.x) < (w + q.w) / 2 + LABEL_GAP)) return true;
-      if (!opts.y || !opts.obstacles) return false;
-      const y = opts.y(i, row, h);
-      const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
-      return opts.obstacles.some((o) => rectsHit(mine, o));
+      return false;
     };
     while (r < MAX_LABEL_ROWS - h && blocked(r)) r++;
     for (let k = r; k < r + h; k++) (rows[k] ??= []).push({ x: items[i].x, w });
+    if (opts.y) {
+      const y = opts.y(i, r, h);
+      placed.push({ x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H });
+    }
     out[i] = r;
   }
   return out;
