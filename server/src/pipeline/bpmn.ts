@@ -409,7 +409,8 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     annotationXml.push(`<bpmn:textAnnotation id="${annId}"><bpmn:text>${esc(c.name)}</bpmn:text></bpmn:textAnnotation>`);
     const y = layout.totalHeight + 20;
     const x = 100 + i * 220;
-    diagramExtras.push({ kind: "annotation", name: c.name, x, y, w: 180, h: 60 });
+    const annotation: BpmnDiagramData["extras"][number] = { kind: "annotation", name: c.name, x, y, w: 180, h: 60 };
+    diagramExtras.push(annotation);
     annotationShapesXml.push(
       `<bpmndi:BPMNShape id="${annId}_di" bpmnElement="${annId}"><dc:Bounds x="${x}" y="${y}" width="180" height="60" /></bpmndi:BPMNShape>`
     );
@@ -420,6 +421,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
         `<bpmn:association id="${assocId}" sourceRef="${nodeIdOf(referencingNode.id)}" targetRef="${annId}" />`
       );
       const hb = hostBoxes.get(referencingNode.id);
+      if (hb) annotation.link = [[hb.x + hb.w / 2, hb.y + hb.h], [x + 90, y]];
       if (hb) annotationShapesXml.push(`<bpmndi:BPMNEdge id="${assocId}_di" bpmnElement="${assocId}">${wp([[hb.x + hb.w / 2, hb.y + hb.h], [x + 90, y]])}</bpmndi:BPMNEdge>`);
     }
   });

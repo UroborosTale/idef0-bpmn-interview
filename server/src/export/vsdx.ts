@@ -576,8 +576,8 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
  * Страница BPMN; scope — операция диаграммы (null — общая схема процесса). Лист (model.bpmn_frames) по умолчанию выключен;
  * автоматический лист накрывает пул целиком с полем, как в редакторе, а заданный вручную стоит по своим координатам.
  */
-/** Шрифт заголовка дорожки: 14 px, а длинное название уменьшается, чтобы уместиться по высоте дорожки (в две строки при 10,5 px). */
-const laneLabelFont = (text: string, laneH: number): number => (text.length * 7.7 <= laneH - 10 ? 14 : text.length * 6.1 <= laneH - 10 ? 12 : 10.5);
+/** Шрифт заголовка дорожки: 16 px (крупно, как в Business Studio), а длинное название уменьшается, чтобы уместиться по высоте дорожки (в две строки при 10,5 px). */
+const laneLabelFont = (text: string, laneH: number): number => (text.length * 7.7 <= laneH - 10 ? 16 : text.length * 6.6 <= laneH - 10 ? 13 : 10.5);
 
 function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, scope: string | null, code: string): Page {
   const settings = model.bpmn_frames?.[scope ?? ""];
@@ -590,7 +590,9 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   // лист — под диаграммой: штамп и рамка рисуются первыми
   if (geo) drawSheet(page, geo);
   // полоса заголовка над пулом: код и название диаграммы (оформление — при чтении правок пропускается)
-  page.rect(d.pool.x, 6, d.pool.w, 30, { fill: "#e8eef7", weightPt: 1.2, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
+  // двухстрочная полоса: код диаграммы и под ним название
+  page.rect(d.pool.x, 1, d.pool.w, 37, { fill: "#e8eef7", weightPt: 1, align: "left", text: code && sheetName ? `${code}
+${sheetName}` : `${code} ${sheetName}`.trim() || name, fontPx: 12, color: "#000000" });
   // пул и дорожки
   page.rect(d.pool.x, d.pool.y, d.pool.w, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   // название пула вертикально в полосе шириной 20 (повёрнутая фигура, иначе текст переносится по буквам)
@@ -621,12 +623,17 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
       page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1, roundingPx: r }, [{ kind: "path", pts: [[0, r * 1.6], [e.w, r * 1.6]] }]);
       page.label(e.name, { x: e.x + e.w / 2, y: e.y - 14, w: 90 }, { fontPx: 9 });
     } else {
-      page.rect(e.x, e.y, e.w, e.h, { fill: null, line: "#94a3b8", dash: true, weightPt: 1, text: e.name, fontPx: 10 });
+      // аннотация — скобка «[» с названием справа от неё; привязка к задаче — пунктиром (выше)
+      page.add(
+        { x: e.x, y: e.y, w: e.w, h: e.h },
+        [{ kind: "path", pts: [[Math.min(10, e.w / 4), 0], [0, 0], [0, e.h], [Math.min(10, e.w / 4), e.h]] }],
+        { fill: null, line: "#000000", weightPt: 0.75, text: e.name, fontPx: 11, align: "left" }
+      );
     }
   }
 
   // свёрнутые внешние пулы и потоки сообщений
-  for (const q of d.pools) page.rect(q.x, q.y, q.w, q.h, { fill: "#f8fafc", weightPt: 1.3, text: q.name, fontPx: 11, bold: true, tag: { pm_k: "extpool", pm_id: q.id } });
+  for (const q of d.pools) page.rect(q.x, q.y, q.w, q.h, { fill: "#ffffff", weightPt: 0.75, text: q.name, fontPx: 12, bold: false, tag: { pm_k: "extpool", pm_id: q.id } });
   for (const m of d.messages) {
     page.polyline(m.points, { weightPt: 1, line: "#334155", dash: true });
     if (m.label) {
