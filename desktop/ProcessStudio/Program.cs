@@ -67,7 +67,7 @@ internal sealed class MainForm : Form
             case "fit": visio.FitPage(); break;
             case "tool": visio.SetTool(root.GetProperty("tool").GetString() ?? ""); break;
             case "grid": visio.ToggleGrid(); break;
-            case "drop": OnDrop(root); break;
+            case "drop": await OnDrop(root); break;
             case "select":
                 // студия выбрала шаг — выделяем его фигуру в Visio; выделение не эхом возвращается в студию
                 if (visio.Visible && visio.SelectNode(root.GetProperty("id").GetString() ?? "")) lastSel = visio.SelectedTag();
@@ -111,7 +111,7 @@ internal sealed class MainForm : Form
     }
 
     /// <summary>Фигура из палитры: при перетаскивании — в точку, где отпустили кнопку (если она над Visio), при щелчке — в центр.</summary>
-    private void OnDrop(JsonElement m)
+    private async Task OnDrop(JsonElement m)
     {
         if (!visio.Visible) return;
         var kind = m.GetProperty("kind").GetString() ?? "";
@@ -123,6 +123,7 @@ internal sealed class MainForm : Form
             if (c.X < 0 || c.Y < 0 || c.X > visio.Width || c.Y > visio.Height) return; // отпустили вне диаграммы — отмена
             at = c;
         }
+        if (kind.Split(':').Length > 2) await visio.PrepareEventShapesAsync(server);
         var made = visio.DropMaster(kind, at);
         status.Text = made == null ? "Не удалось создать фигуру: в документе нет нужного мастера" : $"Создана фигура «{made}» — нажмите «Записать правки», чтобы она стала шагом модели";
     }
@@ -239,7 +240,8 @@ internal sealed class MainForm : Form
             .Select(n => n.TryGetProperty("bpmn_scope", out var b) && b.ValueKind == JsonValueKind.String ? b.GetString() : null).First(x => x != null)!;
         visio.ShowDiagram(new Diagram("bpmn", scope));
         var before = visio.ShapeCount;
-        var drops = new[] { "task", "gateway:exclusive", "event:end" };
+        var drops = new[] { "task", "gateway:exclusive", "event:end", "event:intermediate:timer" };
+        await visio.PrepareEventShapesAsync(server);
         var madeAll = drops.Select(k => visio.DropMaster(k, null)).ToList();
         L($"палитра: создано {string.Join(", ", madeAll.Select(m => $"«{m}»"))}; фигур на странице {before} → {visio.ShapeCount}");
         if (madeAll.Any(m => m == null) || visio.ShapeCount != before + drops.Length) L("ПРОВАЛ: фигуры из палитры не созданы");
@@ -248,6 +250,7 @@ internal sealed class MainForm : Form
         var nodesJson = await ServerHost.Http.GetStringAsync($"{server.Url}/api/sessions/{id}");
         var added = JsonDocument.Parse(nodesJson).RootElement.GetProperty("model").GetProperty("nodes").EnumerateArray().Where(n => n.TryGetProperty("tags", out var tg) && tg.EnumerateArray().Any(t => t.GetString() == "added_externally")).ToList();
         L("новые шаги в модели: " + string.Join("; ", added.Select(n => $"{n.GetProperty("type").GetString()}:{n.GetProperty("name").GetString()}")));
+        if (!added.Any(n => n.GetProperty("type").GetString() == "event" && n.TryGetProperty("trigger", out var tr) && tr.ValueKind == JsonValueKind.Object && tr.GetProperty("type").GetString() == "timer")) L("ПРОВАЛ: событие-таймер из палитры не стало событием с триггером «таймер»");
         if (added.Count != drops.Length || !added.Any(n => n.GetProperty("name").GetString() == "Новая задача" && n.GetProperty("type").GetString() == "task")) L("ПРОВАЛ: фигуры из палитры не стали шагами модели");
         // повторный приём без правок не должен создавать шаги заново: новые фигуры помечены id созданных шагов
         var again = await Apply();

@@ -730,9 +730,10 @@ function drawPoolsAndMessages(page: Page, d: BpmnDiagramData) {
   }
 }
 
-function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel) {
+function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = false) {
   const { x, y, w, h } = s;
-  const tag: Record<string, string> = s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
+  // plain — фигура для палитры оболочки: без меток модели (метки ставит приём правок, когда фигура становится шагом)
+  const tag: Record<string, string> = plain ? {} : s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
   const props = visioShapeProps(s);
   // оформление вида из модели (shape_styles) ложится поверх значений выгрузки по умолчанию
   const pos = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");
@@ -755,6 +756,32 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel) {
   } else {
     drawBlock(page, s, x, y, w, h, tag, props, look);
   }
+}
+
+/** Названия триггеров в именах фигур палитры (по ним импорт опознаёт тип); те же слова в оболочке (VisioPane.TriggerNames). */
+const PALETTE_EVENTS: Record<string, string[]> = {
+  start: ["none", "message", "timer", "conditional", "signal"],
+  intermediate: ["none", "message", "timer", "conditional", "signal", "escalation"],
+  end: ["none", "message", "error", "escalation", "signal", "terminate"],
+};
+
+/**
+ * Документ с готовыми событиями для палитры оболочки: по странице на каждое сочетание «положение:тип» (например «intermediate:timer»),
+ * на странице одна фигура — та же, что рисует выгрузка (значок внутри круга). Оболочка копирует фигуру со страницы на диаграмму:
+ * значок нарисован нашим кодом, а не вручную через COM.
+ */
+export async function buildEventShapesVsdx(): Promise<Buffer> {
+  const pages: Page[] = [];
+  const model = { nodes: [], roles: [], flows: [] } as unknown as ProcessLogicModel;
+  for (const [position, triggers] of Object.entries(PALETTE_EVENTS)) {
+    for (const trigger of triggers) {
+      const page = new Page(`${position}:${trigger}`, 200, 120);
+      const shape: Shape = { id: "e", kind: "event", subtype: position === "start" ? "start" : position === "end" ? "end" : "intermediate", event: { position: position as "start", trigger: trigger as never, throwing: false }, name: "", x: 20, y: 20, w: 36, h: 36 } as Shape;
+      drawBpmnShape(page, shape, model, true);
+      pages.push(page);
+    }
+  }
+  return packVsdx(pages, {}, []);
 }
 
 /** Маркер цикличности внизу блока (локальные координаты, y вниз): круговая стрелка, три вертикальные или три горизонтальные черты. */

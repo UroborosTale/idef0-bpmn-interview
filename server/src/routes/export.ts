@@ -2,7 +2,7 @@ import { Router } from "express";
 import { getSession } from "../repo.js";
 import { idef0ToDrawio } from "../pipeline/idef0.js";
 import { buildAlbumHtml } from "../export/album.js";
-import { buildVsdx } from "../export/vsdx.js";
+import { buildEventShapesVsdx, buildVsdx } from "../export/vsdx.js";
 import { launchPdfBrowser } from "../export/pdfBrowser.js";
 import { PAPER_MM, idef0PrintHtml, type Orientation } from "../export/idef0Print.js";
 import { cleanSheetSvg, sheetPrintHtml } from "../shared/sheetPrint.js";
@@ -222,6 +222,15 @@ exportRouter.post("/sessions/:id/export/sheet.pdf", async (req, res) => {
     }
   } catch (e) {
     res.status(501).json({ error: "PDF-рендеринг недоступен в этом окружении (нет Chromium). Воспользуйтесь «Печать…» и сохраните лист в PDF из браузера.", details: (e as Error).message });
+  }
+});
+
+/** События для палитры настольного приложения (по странице на сочетание положения и типа). */
+exportRouter.get("/visio/event-shapes", async (_req, res) => {
+  try {
+    res.type("application/vnd.ms-visio.drawing").send(await buildEventShapesVsdx());
+  } catch (e) {
+    res.status(500).json({ error: `не удалось собрать фигуры событий: ${(e as Error).message}` });
   }
 });
 

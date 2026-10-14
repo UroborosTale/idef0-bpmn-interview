@@ -172,6 +172,9 @@ internal sealed class VisioPane : Panel
     {
         var spec = SpecFor(kind);
         if (spec == null || LoadedSession == null) return null;
+        // событие с типом (сообщение, таймер…) копируется из документа готовых фигур: значок внутри круга нарисован нашим кодом
+        var typed = kind.Split(':').Length > 2 ? DropTypedEvent(kind, spec, client) : null;
+        if (typed != null) return typed;
         dynamic win = visio.Ocx.Window;
         dynamic page = win.Page;
 
@@ -213,6 +216,60 @@ internal sealed class VisioPane : Panel
         }
         Try(() => win.DeselectAll());
         return spec.Text;
+    }
+
+    private dynamic? eventDoc;
+
+    /// <summary>Скачивает у сервера документ с готовыми событиями палитры (страница на каждое сочетание положения и типа) и открывает его скрытым.</summary>
+    public async Task PrepareEventShapesAsync(ServerHost server)
+    {
+        if (eventDoc != null) return;
+        try
+        {
+            var bytes = await ServerHost.Http.GetByteArrayAsync($"{server.Url}/api/visio/event-shapes");
+            var file = Path.Combine(work, $"event-shapes.{Environment.ProcessId}.vsdx");
+            await File.WriteAllBytesAsync(file, bytes);
+            const short visOpenRO = 2, visOpenHidden = 64;
+            eventDoc = visio.Ocx.Application.Documents.OpenEx(file, (short)(visOpenRO | visOpenHidden));
+        }
+        catch { eventDoc = null; /* без документа событие рисуется без значка внутри */ }
+    }
+
+    /// <summary>Копирует готовое событие со страницы «положение:тип» на текущую страницу в точку client; null — документа или страницы нет.</summary>
+    private string? DropTypedEvent(string kind, Spec spec, Point? client)
+    {
+        if (eventDoc == null) return null;
+        try
+        {
+            var parts = kind.Split(':');
+            dynamic win = visio.Ocx.Window;
+            dynamic page = win.Page;
+            dynamic src = eventDoc.Pages.ItemU[$"{parts[1]}:{parts[2]}"];
+            src.Shapes[1].Copy();
+            page.Paste();
+            dynamic shape = win.Selection[1];
+            double left = 0, top = 0, width = 0, height = 0;
+            double x, y;
+            try
+            {
+                win.GetViewRect(ref left, ref top, ref width, ref height);
+                var p = client ?? new Point(visio.ClientSize.Width / 2, visio.ClientSize.Height / 2);
+                x = left + p.X / (double)Math.Max(1, visio.ClientSize.Width) * width;
+                y = top - p.Y / (double)Math.Max(1, visio.ClientSize.Height) * height;
+            }
+            catch
+            {
+                x = Convert.ToDouble(page.PageSheet.CellsU["PageWidth"].ResultIU) / 2;
+                y = Convert.ToDouble(page.PageSheet.CellsU["PageHeight"].ResultIU) / 2;
+            }
+            shape.CellsU["PinX"].ResultIU = x;
+            shape.CellsU["PinY"].ResultIU = y;
+            Try(() => shape.NameU = spec.Name);
+            shape.Text = spec.Text;
+            Try(() => win.DeselectAll());
+            return spec.Text;
+        }
+        catch { return null; }
     }
 
     /// <summary>Записывает пользовательскую ячейку фигуры (User.имя): фигура получает метку модели, как у фигур нашей выгрузки.</summary>
