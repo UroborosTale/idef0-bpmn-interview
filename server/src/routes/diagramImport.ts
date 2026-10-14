@@ -9,7 +9,7 @@ import {
   reconcileDrawioIdef0Edit,
   buildModelFromParsedDrawio,
 } from "../pipeline/diagramImport.js";
-import { parseVsdx, buildModelFromParsedVsdx } from "../pipeline/vsdxImport.js";
+import { parseVsdx, buildModelFromParsedVsdx, reconcileVsdxEdit } from "../pipeline/vsdxImport.js";
 import { parseXlsx, buildModelFromTable } from "../pipeline/xlsxImport.js";
 import { stepsTemplateXlsx } from "../pipeline/xlsxTemplate.js";
 import { detectGaps } from "../pipeline/gaps.js";
@@ -55,6 +55,36 @@ diagramImportRouter.post("/sessions/:id/diagram-import/bpmn", (req, res) => {
   updateSession(req.params.id, { model, validation, diagramsStale: true });
   logAudit(req.params.id, "analyst", "diagram_bpmn_reimported", { renamed: changes.renamed.length, added: changes.added.length, missing: changes.missing.length });
   const updated = addVersion(req.params.id, "Правки из внешнего BPMN-редактора");
+  res.json({ session: updated, changes, warnings: parsed.warnings });
+});
+
+/** Правки из Visio (встроенный редактор настольного приложения или внешний Visio): .vsdx нашей выгрузки, файл в base64. */
+diagramImportRouter.post("/sessions/:id/diagram-import/vsdx", async (req, res) => {
+  const session = requireReady(req, res);
+  if (!session) return;
+  const block = editBlockReason(session);
+  if (block) {
+    res.status(409).json({ error: block });
+    return;
+  }
+  const { content } = req.body as { content: string };
+  if (typeof content !== "string" || !content) {
+    res.status(400).json({ error: "content (файл .vsdx в base64) обязателен" });
+    return;
+  }
+  let parsed: Awaited<ReturnType<typeof parseVsdx>>;
+  try {
+    parsed = await parseVsdx(Buffer.from(content, "base64"));
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+    return;
+  }
+  const { model, changes } = reconcileVsdxEdit(session.model!, parsed);
+  model.gaps = detectGaps(model);
+  const validation = validateModel(model);
+  updateSession(req.params.id, { model, validation, diagramsStale: true });
+  logAudit(req.params.id, "analyst", "diagram_vsdx_reimported", { renamed: changes.renamed.length, added: changes.added.length, addedFlows: changes.addedFlows.length, missing: changes.missing.length });
+  const updated = addVersion(req.params.id, "Правки из Visio");
   res.json({ session: updated, changes, warnings: parsed.warnings });
 });
 

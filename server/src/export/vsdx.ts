@@ -572,7 +572,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   const world = bpmnSheetWorld({ w: d.pool.x + d.pool.w, h: d.height - BPMN_SHEET_MARGIN / 2 });
   const geo = bpmnFrameShown(settings) ? sheetOnPage(world, settings, bpmnFrameDefaults(code, sheetName)) : null;
   const [pw, ph] = pageSize(d.width, d.height, geo);
-  const page = new Page(name, pw, ph, { pm_page: "bpmn" });
+  const page = new Page(name, pw, ph, { pm_page: "bpmn", ...(scope ? { pm_scope: scope } : {}) });
   // лист — под диаграммой: штамп и рамка рисуются первыми
   if (geo) drawSheet(page, geo);
   // пул и дорожки

@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import { nanoid } from "nanoid";
-import { EventTriggerSchema, type ProcessFlow, type ProcessNode, type Role } from "../types/model.js";
+import { EventTriggerSchema, type ProcessFlow, type ProcessLogicModel, type ProcessNode, type Role } from "../types/model.js";
 import type { SessionMeta } from "../repo.js";
 import type { EventTrigger, TriggerType } from "../shared/events.js";
 import { importedModel } from "./diagramImport.js";
@@ -49,6 +49,8 @@ export interface VsdxNode {
   nonInterrupting?: boolean;
   text: string;
   box: VsdxBox;
+  /** id шага модели у собственной выгрузки (метка pm_id): по нему правки из Visio возвращаются в существующую модель. */
+  pmId?: string;
 }
 export interface VsdxContainer {
   /** id роли собственной выгрузки; у чужих файлов не задан. */
@@ -62,9 +64,17 @@ export interface VsdxEdge {
   label: string;
   /** Ветка «по умолчанию» (свойство BpmnConditionType). */
   isDefault?: boolean;
+  /** id потока модели у собственной выгрузки (метка pm_id). */
+  pmId?: string;
 }
 export interface VsdxPage {
   name: string;
+  /** Операция, диаграмму которой изображает страница собственной выгрузки (метка pm_scope); у общей схемы и чужих файлов не задана. */
+  scope?: string;
+  /** Страница нарисована нашим экспортом (метка pm_page = bpmn). */
+  own?: boolean;
+  /** Шаги и потоки, нарисованные при выгрузке (метка pm_manifest): по ним видно, что удалили в Visio. */
+  manifest?: { nodes: string[]; flows: string[] };
   nodes: VsdxNode[];
   containers: VsdxContainer[];
   edges: VsdxEdge[];
@@ -386,6 +396,16 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
       continue;
     }
     const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings);
+    if (pageUser.pm_page === "bpmn") {
+      page.own = true;
+      if (pageUser.pm_scope) page.scope = pageUser.pm_scope;
+      try {
+        const m = JSON.parse(pageUser.pm_manifest ?? "null") as { n?: string[]; f?: string[] } | null;
+        if (m) page.manifest = { nodes: m.n ?? [], flows: m.f ?? [] };
+      } catch {
+        /* повреждённая метка — как будто её нет */
+      }
+    }
     if (page.nodes.length) pages.push(page);
   }
   if (skippedIdef0) warnings.push(`Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`);
@@ -501,8 +521,9 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
     if (kind === "ignore" || kind === "data") continue;
     if (!s.box.w || !s.box.h) continue;
-    const text = pk ? clean(s.user.pm_n ?? textDeep(s)) : textDeep(s);
-    const node: VsdxNode = { key: `${pageIndex}:${s.id}`, shapeId: s.id, kind, text, box: s.box };
+    // у собственной выгрузки название — текущий текст фигуры (его правят в Visio); метка pm_n — запасное, если текст стёрт
+    const text = pk ? clean(textDeep(s) || (s.user.pm_n ?? "")) : textDeep(s);
+    const node: VsdxNode = { key: `${pageIndex}:${s.id}`, shapeId: s.id, kind, text, box: s.box, ...(pk === "node" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) };
     if (vb) lost.push(...vb.lost);
     if (kind === "task" || kind === "subprocess") {
       const sub = vb?.taskType ?? TASK_SUBTYPES.find(([re]) => re.test(s.name))?.[1];
@@ -569,7 +590,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
     // стрелка на начале, а не на конце — направление обратное
     if (numOf(c, "BeginArrow") > 0 && numOf(c, "EndArrow") === 0) [from, to] = [to, from];
-    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), ...(s.bpmn.condition === "default" ? { isDefault: true } : {}) });
+    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), ...(s.bpmn.condition === "default" ? { isDefault: true } : {}), ...(s.user.pm_k === "flow" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) });
   }
   if (loose) warnings.push(`На странице «${pageName}» ${loose} соедин. не привязаны к шагам — пропущены.`);
   if (skippedFlows.association) warnings.push(`На странице «${pageName}» ассоциации (${skippedFlows.association}) пропущены: они связывают шаги с примечаниями и данными, а не задают порядок.`);
@@ -741,4 +762,109 @@ export function buildModelFromParsedVsdx(parsed: ParsedVsdx, meta: SessionMeta) 
   if (operations > 0) warnings.push(`Страниц с диаграммами: ${parsed.pages.length} — каждая стала диаграммой операции (функция с названием страницы); исполнители с одинаковым названием объединены.`);
   if (nodes.length && flows.length === 0) warnings.push("Соединителей между фигурами не найдено — шаги импортированы без связей.");
   return { model: importedModel(meta, { nodes, flows, roles }), warnings };
+}
+
+// --- правки из Visio в существующую модель ---
+
+export interface VsdxReconcileChanges {
+  renamed: { nodeId: string; from: string; to: string }[];
+  /** Новые шаги, нарисованные в Visio, и новые стрелки между шагами. */
+  added: string[];
+  addedFlows: string[];
+  /** Условия стрелок, изменённые в Visio. */
+  flowsRenamed: { flowId: string; from: string; to: string }[];
+  /** Нарисованное при выгрузке, но не найденное в файле (удалено в Visio): модель не меняется, аналитик решает сам. */
+  missing: string[];
+  missingFlows: string[];
+}
+
+/**
+ * Применяет правки, сделанные в Visio, к существующей модели (файл — собственная выгрузка, фигуры опознаются по меткам pm_id):
+ * переименованные шаги и условия стрелок, новые шаги (на странице своей операции, исполнитель — по дорожке) и стрелки.
+ * Удалённые в Visio шаги и стрелки только перечисляются — как и при правках из .bpmn. Страницы чужих файлов не читаются.
+ */
+export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx): { model: ProcessLogicModel; changes: VsdxReconcileChanges } {
+  const out: ProcessLogicModel = JSON.parse(JSON.stringify(model));
+  const changes: VsdxReconcileChanges = { renamed: [], added: [], addedFlows: [], flowsRenamed: [], missing: [], missingFlows: [] };
+  const nodeById = new Map(out.nodes.map((n) => [n.id, n] as const));
+  const flowById = new Map(out.flows.map((f) => [f.id, f] as const));
+  const seenNodes = new Set<string>();
+  const seenFlows = new Set<string>();
+  const flowKeys = new Set(out.flows.map((f) => `${f.from}|${f.to}`));
+  const tag = (n: ProcessNode, t: string) => {
+    if (!n.tags.includes(t)) n.tags = [...n.tags, t];
+  };
+
+  for (const page of parsed.pages.filter((p) => p.own)) {
+    const idByKey = new Map<string, string>();
+    const leaves = page.containers.filter((c) => c.laneId && !page.containers.some((o) => o !== c && area(o.box) < area(c.box) && contains(c.box, o.box)));
+    for (const n of page.nodes) {
+      const known = n.pmId ? nodeById.get(n.pmId) : undefined;
+      if (known) {
+        seenNodes.add(known.id);
+        idByKey.set(n.key, known.id);
+        if (n.text && n.text !== known.name) {
+          changes.renamed.push({ nodeId: known.id, from: known.name, to: n.text });
+          known.name = n.text;
+          tag(known, "edited_externally");
+        }
+        continue;
+      }
+      if (n.pmId || !page.scope || !nodeById.has(page.scope)) continue; // чужая метка или страница без операции — не угадываем
+      // новая фигура, нарисованная в Visio на странице операции
+      const [cx, cy] = centre(n.box);
+      const lane = leaves.filter((c) => cx >= c.box.x && cx <= c.box.x + c.box.w && cy >= c.box.y && cy <= c.box.y + c.box.h).sort((a, b) => area(a.box) - area(b.box))[0];
+      const role = lane?.laneId && out.roles.some((r) => r.id === lane.laneId) ? lane.laneId : null;
+      const node: ProcessNode = {
+        id: `imp_${nanoid(8)}`,
+        type: n.kind,
+        subtype: n.subtype ?? (n.kind === "event" ? "intermediate" : undefined),
+        ...(n.trigger ? { trigger: n.trigger } : {}),
+        ...(n.loop ? { loop: n.loop } : {}),
+        name: n.text || "(без названия)",
+        role_id: n.kind === "event" || n.kind === "gateway" ? null : role,
+        system_ids: [],
+        inputs: [],
+        outputs: [],
+        controls: [],
+        duration: null,
+        frequency: null,
+        idef0_parent: null,
+        bpmn_scope: page.scope,
+        status: n.text ? "confirmed" : "hypothesis",
+        confidence: n.text ? 0.8 : 0.4,
+        source: [{ fragment_id: "diagram_import", quote: `${page.name}: ${n.shapeId}` }],
+        requirement_ids: [],
+        tags: ["from_diagram_import", "added_externally"],
+        confirmed_by: [],
+      };
+      out.nodes.push(node);
+      nodeById.set(node.id, node);
+      seenNodes.add(node.id);
+      idByKey.set(n.key, node.id);
+      changes.added.push(node.id);
+    }
+
+    for (const e of page.edges) {
+      const flow = e.pmId ? flowById.get(e.pmId) : undefined;
+      if (flow) {
+        seenFlows.add(flow.id);
+        if (e.label !== (flow.condition ?? "")) {
+          changes.flowsRenamed.push({ flowId: flow.id, from: flow.condition ?? "", to: e.label });
+          flow.condition = e.label || null;
+        }
+        continue;
+      }
+      const [from, to] = [idByKey.get(e.from), idByKey.get(e.to)];
+      if (!from || !to || flowKeys.has(`${from}|${to}`)) continue;
+      const added: ProcessFlow = { id: `flow_${nanoid(8)}`, from, to, condition: e.label || null, ...(e.isDefault ? { is_default: true } : {}), source: [{ fragment_id: "diagram_import", quote: page.name }], confirmed_by: [] };
+      out.flows.push(added);
+      flowKeys.add(`${from}|${to}`);
+      changes.addedFlows.push(added.id);
+    }
+
+    for (const id of page.manifest?.nodes ?? []) if (!seenNodes.has(id) && nodeById.has(id)) changes.missing.push(id);
+    for (const id of page.manifest?.flows ?? []) if (!seenFlows.has(id) && flowById.has(id)) changes.missingFlows.push(id);
+  }
+  return { model: out, changes };
 }
