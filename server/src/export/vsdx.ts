@@ -67,6 +67,9 @@ interface Style {
   dash?: boolean;
   roundingPx?: number;
   endArrow?: boolean;
+  /** Номера наконечников Visio для потоков сообщений: 20 — кружок, 14 — полый треугольник (перекрывают endArrow). */
+  beginArrowId?: number;
+  endArrowId?: number;
   /** Размер наконечника Visio: 0 — самый мелкий (стрелки IDEF0), по умолчанию 1. */
   arrowSize?: number;
   text?: string;
@@ -205,7 +208,8 @@ export class Page {
       `<Cell N="LineWeight" V="${num((style.weightPt ?? 1.2) / 72)}"/>`,
       `<Cell N="Rounding" V="${num((style.roundingPx ?? 0) * PX)}"/>`,
     ];
-    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="${style.arrowSize ?? 1}"/>`);
+    if (style.endArrow || style.endArrowId) cells.push(`<Cell N="EndArrow" V="${style.endArrowId ?? 13}"/>`, `<Cell N="EndArrowSize" V="${style.arrowSize ?? 1}"/>`);
+    if (style.beginArrowId) cells.push(`<Cell N="BeginArrow" V="${style.beginArrowId}"/>`, `<Cell N="BeginArrowSize" V="${style.arrowSize ?? 1}"/>`);
     if (style.noMargins) cells.push(`<Cell N="LeftMargin" V="0"/>`, `<Cell N="RightMargin" V="0"/>`, `<Cell N="TopMargin" V="0"/>`, `<Cell N="BottomMargin" V="0"/>`);
     if (style.textBelow) {
       // блок текста под фигурой, выровненный по верху: так подпись остаётся частью фигуры и двигается вместе с ней
@@ -642,14 +646,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   }
 
   // свёрнутые внешние пулы и потоки сообщений
-  for (const q of d.pools) page.rect(q.x, q.y, q.w, q.h, { fill: "#ffffff", weightPt: 0.75, text: q.name, fontPx: 12, bold: false, tag: { pm_k: "extpool", pm_id: q.id } });
-  for (const m of d.messages) {
-    page.polyline(m.points, { weightPt: 1, line: "#334155", dash: true });
-    if (m.label) {
-      const i = Math.floor((m.points.length - 1) / 2);
-      page.label(m.label, { x: (m.points[i][0] + m.points[i + 1][0]) / 2 + 4, y: (m.points[i][1] + m.points[i + 1][1]) / 2 - 6, anchor: "start" }, { fontPx: 9 });
-    }
-  }
+  drawPoolsAndMessages(page, d);
 
   // стрелки под фигурами: соединители, приклеенные к фигурам
   for (const edge of d.edges) {
@@ -673,6 +670,64 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   // что было нарисовано: по этому списку импорт отличает удалённое в Visio от появившегося в модели позже
   page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId ? [e.flowId] : [])) });
   return page;
+}
+
+/**
+ * Свёрнутые внешние пулы и потоки сообщений, как в Business Studio: у каждой задачи, связанной с пулом, пул стоит прямо под ней
+ * (копия по числу задач), а потоки идут вертикально: от задачи вниз — с кружком у задачи и полым треугольником у пула, вверх к
+ * задаче — наоборот. Пул без потоков к шагам рисуется один раз на своём месте.
+ */
+function drawPoolsAndMessages(page: Page, d: BpmnDiagramData) {
+  const shapeById = new Map(d.shapes.map((s) => [s.id, s] as const));
+  const draw = (q: { id: string; name: string }, box: { x: number; y: number; w: number; h: number }, first: boolean) =>
+    page.rect(box.x, box.y, box.w, box.h, { fill: "#ffffff", weightPt: 0.75, text: q.name, fontPx: 12, bold: false, tag: { pm_k: first ? "extpool" : "extpool_copy", pm_id: q.id } });
+  const unplaced = d.messages.filter((m) => !d.pools.some((q) => q.id === m.from || q.id === m.to));
+  const flowLine = (points: Pt[], begin: boolean, label?: string) => {
+    page.polyline(points, { weightPt: 0.75, line: "#000000", dash: true, ...(begin ? { beginArrowId: 20, endArrowId: 14 } : { endArrowId: 14 }), arrowSize: 1 });
+    if (label) {
+      const i = Math.floor((points.length - 1) / 2);
+      page.label(label, { x: (points[i][0] + points[i + 1][0]) / 2 + 4, y: (points[i][1] + points[i + 1][1]) / 2 - 6, anchor: "start" }, { fontPx: 9 });
+    }
+  };
+  for (const m of unplaced) flowLine(m.points, true, m.label);
+
+  let right = -Infinity;
+  const ordered = d.pools
+    .flatMap((q) => {
+      const msgs = d.messages.filter((m) => (m.from === q.id && shapeById.has(m.to)) || (m.to === q.id && shapeById.has(m.from)));
+      const byShape = new Map<string, typeof msgs>();
+      for (const m of msgs) {
+        const sid = m.from === q.id ? m.to : m.from;
+        byShape.set(sid, [...(byShape.get(sid) ?? []), m]);
+      }
+      if (byShape.size === 0) return [{ q, shape: null as null | { x: number; y: number; w: number; h: number }, msgs: [] as typeof msgs, first: true }];
+      return [...byShape].map(([sid, list], i) => ({ q, shape: shapeById.get(sid)!, msgs: list, first: i === 0 }));
+    })
+    .sort((a, b) => (a.shape ? a.shape.x + a.shape.w / 2 : Infinity) - (b.shape ? b.shape.x + b.shape.w / 2 : Infinity));
+  for (const it of ordered) {
+    if (!it.shape) {
+      draw(it.q, it.q, it.first);
+      continue;
+    }
+    const w = Math.max(it.q.w, 190);
+    const cx = it.shape.x + it.shape.w / 2;
+    const x = Math.max(cx - w / 2, right + 24);
+    right = x + w;
+    const box = { x, y: it.q.y, w, h: it.q.h };
+    draw(it.q, box, it.first);
+    const outs = it.msgs.filter((m) => m.from !== it.q.id);
+    const ins = it.msgs.filter((m) => m.from === it.q.id);
+    const bottom = it.shape.y + it.shape.h;
+    const place = (list: typeof outs, centre: number, outgoing: boolean) =>
+      list.forEach((m, i) => {
+        const px = Math.min(Math.max(centre + (i - (list.length - 1) / 2) * 16, box.x + 10), box.x + box.w - 10);
+        const tx = Math.min(Math.max(px, it.shape!.x + 8), it.shape!.x + it.shape!.w - 8);
+        const pts: Pt[] = Math.abs(tx - px) < 1 ? [[tx, bottom], [px, box.y]] : [[tx, bottom], [tx, (bottom + box.y) / 2], [px, (bottom + box.y) / 2], [px, box.y]];
+        flowLine(outgoing ? pts : [...pts].reverse(), true, m.label);
+      });
+    place(outs, it.shape.x + it.shape.w * 0.3, true);
+    place(ins, it.shape.x + it.shape.w * 0.7, false);
+  }
 }
 
 function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel) {
