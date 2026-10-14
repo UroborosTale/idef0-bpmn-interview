@@ -77,12 +77,12 @@ describe("подбор раскладки: меньше пересечений �
     expect(rankColumns({ ids: ["x"], lane: new Map([["x", 0]]), edges: [{ from: "x", to: "x" }, { from: "x", to: "нет" }] }).rank.get("x")).toBe(0);
   });
 
-  it("LAYOUT_SEARCH=0 возвращает раскладку без подбора: ровно 49 пересечений на тех же диаграммах (прокладка с парным пересмотром сторон, обходом подписей и значками данных: документы над задачами, хранилища под ними)", async () => {
+  it("LAYOUT_SEARCH=0 возвращает раскладку без подбора: ровно 59 пересечений на тех же диаграммах (прокладка с парным пересмотром сторон, обходом подписей и значками данных: документы над задачами, хранилища под ними)", async () => {
     process.env.LAYOUT_SEARCH = "0";
     try {
       let total = 0;
       for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) for (const h of bpmnHosts(m)) total += await crossingsOf(m, h.id);
-      expect(total).toBe(49);
+      expect(total).toBe(59);
     } finally {
       delete process.env.LAYOUT_SEARCH;
     }

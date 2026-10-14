@@ -109,3 +109,19 @@ export function markerCenters(box: { x: number; y: number; w: number; h: number 
   return out;
 }
 export const MARKER_R = 11;
+
+/**
+ * Сворачивать ли ожидающие события в значки на блоке. В Business Studio таймеры и сообщения — отдельные фигуры на диаграмме,
+ * поэтому по умолчанию выключено; свёртка остаётся доступной (collapseTriggers) для режима «компактно».
+ */
+let collapseOn = false;
+/** Включает или выключает свёртку (для режима «компактно» и тестов). */
+export const setCollapseTriggers = (on: boolean): void => {
+  collapseOn = on;
+};
+
+/** Вид триггеров диаграммы: свёрнутый или, при выключенной свёртке, пустой (все события остаются фигурами). */
+export function diagramTriggers<N extends NodeLike, F extends FlowLike>(nodes: N[], flows: F[]): TriggerView<F> {
+  if (collapseOn) return collapseTriggers(nodes, flows);
+  return { hidden: new Set(), markers: new Map(), flows: [...flows], links: new Map() };
+}

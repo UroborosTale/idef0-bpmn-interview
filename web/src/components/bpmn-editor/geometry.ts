@@ -1,7 +1,7 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
 import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, routeFlowsDetailed, routeQuality } from "@shared/bpmnRouting";
 import { rankColumns } from "@shared/bpmnRank";
-import { collapseTriggers, type TriggerView } from "@shared/bpmnTriggers";
+import { diagramTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
 import { mergeScope, scopeView } from "@shared/scope";
@@ -26,7 +26,7 @@ export function triggerView(m: ProcessLogicModel): TriggerView<ProcessFlow> {
   if (!v) {
     const base = m.nodes.filter((n) => !n.idef0_parent && !n.bpmn_scope);
     const ids = new Set(base.map((n) => n.id));
-    v = collapseTriggers(base, m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)));
+    v = diagramTriggers(base, m.flows.filter((f) => ids.has(f.from) && ids.has(f.to)));
     triggerCache.set(m, v);
   }
   return v;

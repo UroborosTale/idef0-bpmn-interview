@@ -3,7 +3,7 @@ import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_H, LANE_X, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
-import { collapseTriggers } from "../shared/bpmnTriggers.js";
+import { diagramTriggers } from "../shared/bpmnTriggers.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
@@ -185,7 +185,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const visibleIds = new Set(nodes.map((n) => n.id));
   const flows = view.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to));
   // ожидающие события, ведущие прямо в блок действия, на диаграмме — значки на блоке (shared/bpmnTriggers.ts); в XML они остаются событиями
-  const tview = collapseTriggers(nodes, flows);
+  const tview = diagramTriggers(nodes, flows);
   const isHidden = (nodeId: string) => tview.hidden.has(nodeId.replace(/^Node_/, ""));
 
   // синтетические старт/конец, если явных событий нет в модели (только для рендера)

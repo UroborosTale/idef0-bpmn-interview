@@ -1,13 +1,17 @@
 import JSZip from "jszip";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildVsdx } from "../src/export/vsdx.js";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
 import { demoModel } from "../src/reference/demo.js";
-import { collapseTriggers, markerCenters } from "../src/shared/bpmnTriggers.js";
+import { collapseTriggers, markerCenters, setCollapseTriggers } from "../src/shared/bpmnTriggers.js";
 import { fixedRoute, routeFlowsDetailed, type RouteFlow, type RouteNode } from "../src/shared/bpmnRouting.js";
 import { SIZE, type Pt } from "../src/shared/bpmnGeometry.js";
 import { ProcessLogicModel } from "../src/types/model.js";
 import { structuredModel } from "./fixtures.js";
+
+// эти тесты — про режим «компактно» со свёрнутыми в значки событиями
+beforeAll(() => setCollapseTriggers(true));
+afterAll(() => setCollapseTriggers(false));
 
 const n = (id: string, type: string, extra: Record<string, unknown> = {}) => ({ id, type, name: id, subtype: undefined as string | undefined, ...extra });
 const ev = (id: string, subtype: string, trigger: Record<string, unknown> | null, extra: Record<string, unknown> = {}) => n(id, "event", { subtype, trigger, ...extra });

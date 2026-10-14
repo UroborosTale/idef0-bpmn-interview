@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { scopeView } from "@shared/scope";
+import { setCollapseTriggers } from "@shared/bpmnTriggers";
 import { session, structuredModel } from "../../test/fixtures";
 import { renderWithModel } from "../../test/harness";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
@@ -9,6 +10,10 @@ import Studio from "../studio/Studio";
 import { diagramLayout, triggerView, visibleFlows, visibleNodes } from "./geometry";
 import { attachTrigger, deleteNode, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute } from "./model-ops";
 import { copyFragment, pasteFragment } from "./selection-ops";
+
+// эти тесты — про режим «компактно» со свёрнутыми в значки событиями
+beforeAll(() => setCollapseTriggers(true));
+afterAll(() => setCollapseTriggers(false));
 
 type M = ProcessLogicModel;
 const get = (m: M, id: string) => m.nodes.find((n) => n.id === id)!;
