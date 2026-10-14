@@ -5,6 +5,7 @@ import { buildAlbumHtml } from "../export/album.js";
 import { buildVsdx } from "../export/vsdx.js";
 import { launchPdfBrowser } from "../export/pdfBrowser.js";
 import { PAPER_MM, idef0PrintHtml, type Orientation } from "../export/idef0Print.js";
+import { cleanSheetSvg, sheetPrintHtml } from "../shared/sheetPrint.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { bpmnHosts } from "../shared/codes.js";
@@ -185,6 +186,42 @@ exportRouter.get("/sessions/:id/export/idef0/:diagram.pdf", async (req, res) => 
       error: `PDF-рендеринг недоступен в этом окружении (нет Chromium). Откройте /export/idef0/${req.params.diagram}.print.html и сохраните страницу в PDF из браузера.`,
       details: (e as Error).message,
     });
+  }
+});
+
+/**
+ * Лист диаграммы BPMN в PDF. Рисунок присылает редактор (как на экране, с рамкой листа): серверной отрисовки,
+ * совпадающей с редактором, у BPMN нет. Тело: { svg, title?, paper, orientation }. В браузере для PDF
+ * сценарии выключены и сеть закрыта: печатается только присланная разметка.
+ */
+exportRouter.post("/sessions/:id/export/sheet.pdf", async (req, res) => {
+  const session = getSession(req.params.id);
+  if (!session) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const { svg, title, paper, orientation } = (req.body ?? {}) as Record<string, unknown>;
+  const clean = typeof svg === "string" ? cleanSheetSvg(svg) : null;
+  if (!clean || typeof paper !== "string" || !PAPER_MM[paper] || (orientation !== "landscape" && orientation !== "portrait")) {
+    res.status(400).json({ error: "нужны svg (рисунок листа), paper (A4, A3, A2) и orientation (landscape, portrait)" });
+    return;
+  }
+  const name = typeof title === "string" && title.trim() ? title.trim().slice(0, 200) : session.meta.processName;
+  try {
+    const browser = await launchPdfBrowser();
+    try {
+      const ctx = await browser.newContext({ javaScriptEnabled: false });
+      await ctx.route("**/*", (r) => r.abort());
+      const p = await ctx.newPage();
+      await p.setContent(sheetPrintHtml(clean, name, paper, orientation), { waitUntil: "load" });
+      const pdf = await p.pdf({ format: paper as "A4", landscape: orientation === "landscape", printBackground: true, preferCSSPageSize: true, margin: { top: "0", bottom: "0", left: "0", right: "0" } });
+      attachment(res, `${name}.${paper}.pdf`);
+      res.type("application/pdf").send(pdf);
+    } finally {
+      await browser.close();
+    }
+  } catch (e) {
+    res.status(501).json({ error: "PDF-рендеринг недоступен в этом окружении (нет Chromium). Воспользуйтесь «Печать…» и сохраните лист в PDF из браузера.", details: (e as Error).message });
   }
 });
 

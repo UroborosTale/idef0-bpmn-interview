@@ -39,6 +39,14 @@ const LABELS: Record<"nodeLabel" | "titleLabel" | "noLabel", string> = { nodeLab
 export const frameKey = (parentId: string | null) => parentId ?? "";
 
 export const frameShown = (f: IdefFrame | undefined) => f?.show !== false;
+/** На диаграммах BPMN рамка листа по умолчанию выключена: её включают в меню «Лист» для нужной диаграммы. */
+export const bpmnFrameShown = (f: IdefFrame | undefined) => f?.show === true;
+
+/** Поле вокруг диаграммы BPMN под автоматическим листом: края листа не совпадают с краями дорожек и их ручками. */
+export const BPMN_SHEET_MARGIN = 40;
+
+/** «Мир» диаграммы BPMN для листа: содержимое с полем справа и снизу. */
+export const bpmnSheetWorld = (world: { w: number; h: number }) => ({ w: world.w + BPMN_SHEET_MARGIN, h: world.h + BPMN_SHEET_MARGIN / 2 });
 export const gridShown = (f: IdefFrame | undefined) => f?.grid !== false;
 
 /** Тексты штампа: заданные вручную, иначе автоматические (пустое значение возвращает автоматическое). */

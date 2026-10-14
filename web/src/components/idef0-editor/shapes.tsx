@@ -1,75 +1,10 @@
-import type { FrameGeometry } from "@shared/idef0Frame";
 import { type ResolvedStyle } from "@shared/shapeStyles";
 import { FREE_END, tunnelArcs } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 
-const clip = (s: string, n: number) => (s.length > n ? s.slice(0, Math.max(1, n - 1)) + "…" : s);
-
-/** Рамка листа: клетчатое поле, контур, штамп (NODE / TITLE / NO.). Надписи штампа правятся двойным щелчком. */
-/** Края и углы листа: id, курсор, доля положения по x и y (0 — левый/верхний, 1 — правый/нижний, 0.5 — вдоль края), занимает ли край всю сторону. */
-const EDGES: [string, string, number, number][] = [
-  ["n", "ns-resize", 0.5, 0],
-  ["s", "ns-resize", 0.5, 1],
-  ["w", "ew-resize", 0, 0.5],
-  ["e", "ew-resize", 1, 0.5],
-  ["nw", "nwse-resize", 0, 0],
-  ["ne", "nesw-resize", 1, 0],
-  ["sw", "nesw-resize", 0, 1],
-  ["se", "nwse-resize", 1, 1],
-];
-
-export function FrameLayer({ geo, grid }: { geo: FrameGeometry; grid: boolean }) {
-  const { sheet, footer } = geo;
-  return (
-    <g data-frame>
-      <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="#fff" pointerEvents="none" />
-      {grid && (
-        <g data-frame-grid pointerEvents="none">
-          {geo.gridXs.map((l) => (
-            <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
-          ))}
-          {geo.gridYs.map((l) => (
-            <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
-          ))}
-        </g>
-      )}
-      <rect x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="#e8eef9" stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
-      {geo.dividers.map((x) => (
-        <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
-      ))}
-      <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#1f2937" strokeWidth={1.2} pointerEvents="none" />
-      {/* лист двигают за штамп, а растягивают за любой край и угол */}
-      <rect data-frame-move x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="transparent" style={{ cursor: "move" }}>
-        <title>Потяните штамп, чтобы подвинуть лист</title>
-      </rect>
-      {EDGES.map(([id, cursor, fx, fy]) => (
-        <rect
-          key={id}
-          data-frame-resize={id}
-          x={fx === 0.5 ? sheet.x + 6 : sheet.x + fx * sheet.w - 5}
-          y={fy === 0.5 ? sheet.y + 6 : sheet.y + fy * sheet.h - 5}
-          width={fx === 0.5 ? sheet.w - 12 : 10}
-          height={fy === 0.5 ? sheet.h - 12 : 10}
-          fill={id.length === 2 ? "#94a3b8" : "transparent"}
-          opacity={id.length === 2 ? 0.55 : 1}
-          style={{ cursor }}
-        >
-          <title>Потяните, чтобы изменить размер листа</title>
-        </rect>
-      ))}
-      {geo.cells.map((c) => (
-        <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
-          <title>Двойной щелчок — изменить надпись</title>
-          <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="transparent" />
-          <text x={c.tx} y={c.y + c.h / 2 + 5} textAnchor={c.anchor} fontSize={15} fontFamily="Arial, sans-serif" fill="#111827" pointerEvents="none">
-            {clip(c.text, Math.floor(c.w / 8))}
-          </text>
-        </g>
-      ))}
-    </g>
-  );
-}
+/** Рамка листа (клетки, контур, штамп NODE / TITLE / NO.) — общая с редактором BPMN. */
+export { FrameLayer } from "../editor-core/sheetFrame";
 
 const INK = "#1f2937";
 const ACCENT = "#4338ca";

@@ -385,6 +385,17 @@ export const AcceptedIssue = z.object({
 });
 export type AcceptedIssue = z.infer<typeof AcceptedIssue>;
 
+// Рамка листа диаграммы (shared/idef0Frame.ts): показать, сетка, положение и размер, надписи штампа.
+const SheetFrame = z.object({
+  show: z.boolean().optional(),
+  grid: z.boolean().optional(),
+  x: z.number().min(-20000).max(20000).optional(),
+  y: z.number().min(-20000).max(20000).optional(),
+  w: z.number().min(200).max(20000).optional(),
+  h: z.number().min(200).max(20000).optional(),
+  texts: z.record(z.enum(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]), z.string().max(500)).optional(),
+});
+
 // Оформление фигур по видам (shared/shapeStyles.ts): заливка, линия, цвет и размер текста; чего нет — значения по умолчанию.
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const ShapeStyleSchema = z.object({
@@ -425,20 +436,9 @@ export const ProcessLogicModel = z.object({
   // Ширина дорожек диаграмм BPMN (правый край, px): ключ — id операции, пустая строка — общая схема процесса. Это нижняя граница:
   // шире содержимого дорожки растягивают, чтобы оставить место для новых фигур; без записи ширина по содержимому.
   // Рамка листа и сетка диаграмм IDEF0 (shared/idef0Frame.ts): ключ — id функции, "" — верхняя диаграмма, "ctx" — контекстная.
-  idef0_frames: z
-    .record(
-      z.string(),
-      z.object({
-        show: z.boolean().optional(),
-        grid: z.boolean().optional(),
-        x: z.number().min(-20000).max(20000).optional(),
-        y: z.number().min(-20000).max(20000).optional(),
-        w: z.number().min(200).max(20000).optional(),
-        h: z.number().min(200).max(20000).optional(),
-        texts: z.record(z.enum(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]), z.string().max(500)).optional(),
-      })
-    )
-    .optional(),
+  idef0_frames: z.record(z.string(), SheetFrame).optional(),
+  // То же для диаграмм BPMN: ключ — id операции, "" — общая схема процесса.
+  bpmn_frames: z.record(z.string(), SheetFrame).optional(),
   diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
   // Наборы объектов для фильтра навигатора и выгрузки; без поля наборов нет.

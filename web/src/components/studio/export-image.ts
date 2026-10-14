@@ -18,6 +18,7 @@ export function diagramSvg(canvas: SVGSVGElement, bbox?: { x: number; y: number;
   const g = clone.querySelector<SVGGElement>(":scope > g[transform]")!;
   g.setAttribute("transform", `translate(${PAD - box.x} ${PAD - box.y})`);
   clone.querySelectorAll("[data-connect]").forEach((el) => el.remove()); // «ручка» протягивания стрелки
+  clone.querySelectorAll("[data-frame-resize]").forEach((el) => el.remove()); // ручки размера листа
   clone.removeAttribute("class");
   clone.removeAttribute("style");
   clone.setAttribute("width", String(width));
@@ -29,6 +30,13 @@ export function diagramSvg(canvas: SVGSVGElement, bbox?: { x: number; y: number;
   bg.setAttribute("fill", "#ffffff");
   clone.insertBefore(bg, g); // под диаграммой, после <defs>
   return { svg: new XMLSerializer().serializeToString(clone), width, height };
+}
+
+/** Лист, включённый на диаграмме (белая подложка рамки), — в координатах диаграммы; без листа — null. */
+export function sheetBox(canvas: SVGSVGElement): { x: number; y: number; width: number; height: number } | null {
+  const back = canvas.querySelector<SVGRectElement>("[data-frame-back] > rect");
+  if (!back) return null;
+  return { x: Number(back.getAttribute("x")), y: Number(back.getAttribute("y")), width: Number(back.getAttribute("width")), height: Number(back.getAttribute("height")) };
 }
 
 /** SVG → PNG через canvas браузера (масштаб 2× для чёткости). */

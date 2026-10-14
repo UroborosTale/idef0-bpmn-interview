@@ -16,7 +16,8 @@ import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from
 import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
-import { diagramSvg, download, svgToPng } from "./export-image";
+import { diagramSvg, download, sheetBox, svgToPng } from "./export-image";
+import { sheetPrintHtml, sheetPrintSetup } from "@shared/sheetPrint";
 import Navigator, { type SetOp } from "./Navigator";
 import ProblemsPanel from "./ProblemsPanel";
 import DictionaryView from "./DictionaryView";
@@ -552,6 +553,33 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     }
   };
 
+  /**
+   * Печать листа BPMN: рисунок с экрана (как SVG/PNG) — включённый лист с рамкой или вся диаграмма.
+   * «Печать…» открывает страницу печати в новой вкладке, «Лист в PDF» собирает PDF на сервере.
+   */
+  const printBpmnSheet = async (to: "pdf" | "print") => {
+    setExportError(null);
+    const canvas = document.querySelector<SVGSVGElement>(".doc-area svg.bpe-svg");
+    const out = canvas && diagramSvg(canvas, sheetBox(canvas) ?? undefined);
+    if (active.kind !== "bpmn" || !out) {
+      setExportError("Откройте диаграмму BPMN — печатать нечего.");
+      return;
+    }
+    const frame = draft.bpmn_frames?.[active.scope ?? ""];
+    const { paper: p, orientation } = sheetPrintSetup(frame?.show ? frame : undefined, { w: out.width, h: out.height }, { paper: paper || undefined });
+    const title = `${draft.process.name} — ${docTitle(active, draft)}`;
+    if (to === "print") {
+      const win = window.open(URL.createObjectURL(new Blob([sheetPrintHtml(out.svg, title, p, orientation)], { type: "text/html" })), "_blank");
+      if (!win) setExportError("Браузер не дал открыть вкладку печати — разрешите всплывающие окна для этого сайта.");
+      return;
+    }
+    try {
+      download(await api.sheetPdf(session.id, { svg: out.svg, title, paper: p, orientation }), `${title}.${p}.pdf`);
+    } catch (e) {
+      setExportError((e as Error).message);
+    }
+  };
+
   const save = async () => {
     const snapshot = h.draftRef.current;
     if (await onSave(snapshot)) h.markSaved(snapshot);
@@ -731,6 +759,25 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
               })()}
             </div>
             <div className="ribbon-caption">Печать листа IDEF0</div>
+          </div>
+        )}
+        {active.kind === "bpmn" && (
+          <div className="ribbon-group">
+            <div className="ribbon-buttons ribbon-links">
+              <select aria-label="Бумага для печати" value={paper} onChange={(e) => setPaper(e.target.value)} title="Бумага: «По листу» берёт формат рамки листа (A4, A3, A2), иначе A4">
+                <option value="">Бумага: по листу</option>
+                <option value="A4">A4</option>
+                <option value="A3">A3</option>
+                <option value="A2">A2</option>
+              </select>
+              <button onClick={() => void printBpmnSheet("pdf")} title="Лист как на экране (включите рамку в меню «Лист» редактора), в том числе с несохранёнными правками">
+                Лист в PDF
+              </button>
+              <button onClick={() => void printBpmnSheet("print")} title="Страница печати листа как на экране: Ctrl+P или «Сохранить как PDF»">
+                Печать…
+              </button>
+            </div>
+            <div className="ribbon-caption">Печать листа BPMN</div>
           </div>
         )}
         {onOpenImport && (

@@ -78,6 +78,12 @@ export const api = {
   setReportStatus: (rid: string, status: AgentReportRow["status"]) => req<AgentReportRow>("POST", `/agent-reports/${rid}/status`, { status }),
 
   exportUrl: (id: string, path: string) => `${BASE}/sessions/${id}/export/${path}`,
+  /** Лист диаграммы в PDF по рисунку с экрана (BPMN: серверной отрисовки, как в редакторе, нет). */
+  sheetPdf: async (id: string, body: { svg: string; title: string; paper: string; orientation: string }): Promise<Blob> => {
+    const res = await fetch(`${BASE}/sessions/${id}/export/sheet.pdf`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error || res.statusText);
+    return res.blob();
+  },
 
   // --- М3.1 Реестр процессов ---
   listRegistry: (filters?: { level?: string; classification?: string; department?: string; status?: string; q?: string }) => {

@@ -326,6 +326,8 @@ export interface ProcessLogicModel {
   diagram_widths?: Record<string, number>;
   /** Рамка листа и сетка диаграмм IDEF0: ключ — id функции, "" — верхняя диаграмма. */
   idef0_frames?: Record<string, IdefFrame>;
+  /** Рамка листа и сетка диаграмм BPMN: ключ — id операции, "" — общая схема процесса. */
+  bpmn_frames?: Record<string, IdefFrame>;
   accepted_issues: AcceptedIssue[];
   /** Наборы объектов для фильтра навигатора и выгрузки. */
   object_sets?: ObjectSet[];

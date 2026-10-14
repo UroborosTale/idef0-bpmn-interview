@@ -9,7 +9,8 @@ import { processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
-import { frameGeometry, FRAME_GRID, FRAME_MIN_H, FRAME_MIN_W, SHEET_FORMATS, sheetFormatOf, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { frameGeometry, frameKey, frameShown, gridShown, withFrameHeight, type FrameField } from "@shared/idef0Frame";
+import { FrameMenu, dragRect, startFrameDrag, type FrameDrag } from "../editor-core/sheetFrame";
 import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, snap, withIdef0Layout, type Arrow } from "./geometry";
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
@@ -27,7 +28,7 @@ type Drag =
   | { kind: "fn"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
   | { kind: "marquee"; x0: number; y0: number; add: boolean }
   // лист двигают (edge = "move") или растягивают за край и угол (n, s, e, w, ne…): r0 — лист в начале жеста (x, y, w, h поля без штампа)
-  | { kind: "frame"; edge: string; r0: { x: number; y: number; w: number; h: number }; x0: number; y0: number; startModel: M; moved: boolean }
+  | ({ kind: "frame"; startModel: M } & FrameDrag)
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
   | { kind: "connect"; from: string }
   // правка выбранной стрелки: a — стрелка в начале жеста (от её ломаной пересчитывается каждый шаг), start — модель до жеста
@@ -335,18 +336,9 @@ export default function Idef0Editor({
       return;
     }
     // лист: край или угол растягивают, штамп двигает (щелчок по надписи без движения — только выбор для двойного щелчка)
-    const frameEl = t.closest("[data-frame-resize], [data-frame-move], [data-frame-field]");
-    if (frameEl && e.button === 0) {
-      const [wx, wy] = toWorld(e.clientX, e.clientY);
-      dragRef.current = {
-        kind: "frame",
-        edge: frameEl.getAttribute("data-frame-resize") ?? "move",
-        r0: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: frameGeo.sheet.w, h: frameGeo.footer.y - frameGeo.sheet.y },
-        x0: wx,
-        y0: wy,
-        startModel: draftRef.current,
-        moved: false,
-      };
+    const frameDrag = e.button === 0 ? startFrameDrag(t, toWorld(e.clientX, e.clientY), frameGeo) : null;
+    if (frameDrag) {
+      dragRef.current = { kind: "frame", ...frameDrag, startModel: draftRef.current };
       svgRef.current!.setPointerCapture(e.pointerId);
       return;
     }
@@ -436,25 +428,7 @@ export default function Idef0Editor({
       const [wx, wy] = toWorld(e.clientX, e.clientY);
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 3) return;
       d.moved = true;
-      const grid = (v: number) => Math.round(v / FRAME_GRID) * FRAME_GRID;
-      const [dx, dy] = [wx - d.x0, wy - d.y0];
-      const { x, y, w, h } = d.r0;
-      let r = { x, y, w, h };
-      if (d.edge === "move") r = { x: grid(x + dx), y: grid(y + dy), w, h };
-      else {
-        // сторона, за которую тянут, двигается; противоположная стоит на месте, размер не меньше FRAME_MIN_W × FRAME_MIN_H (по ширине помещается штамп)
-        if (d.edge.includes("e")) r.w = Math.max(FRAME_MIN_W, grid(w + dx));
-        if (d.edge.includes("s")) r.h = Math.max(FRAME_MIN_H, grid(h + dy));
-        if (d.edge.includes("w")) {
-          const nx = Math.min(grid(x + dx), x + w - FRAME_MIN_W);
-          r = { ...r, x: nx, w: x + w - nx };
-        }
-        if (d.edge.includes("n")) {
-          const ny = Math.min(grid(y + dy), y + h - FRAME_MIN_H);
-          r = { ...r, y: ny, h: y + h - ny };
-        }
-      }
-      setDraft((m) => setFrame(m, frameKey(cur), { rect: r }));
+      setDraft((m) => setFrame(m, frameKey(cur), { rect: dragRect(d, wx - d.x0, wy - d.y0) }));
       return;
     }
     if (d.kind === "pan") {
@@ -701,7 +675,6 @@ export default function Idef0Editor({
     title: cur ? `${codes.get(cur) ?? ""} ${parentNode?.name ?? ""}`.trim() : `${processCodeOf(draft)} ${draft.process.name}`.trim(),
     no: "1.0",
   });
-  const sheetFormat = frame?.w !== undefined && frame?.h !== undefined ? sheetFormatOf(frame.w, frame.h) : null;
   // функции, не помещающиеся на лист: лист заданный вручную не подгоняется под диаграмму
   const outside = frameOn && frame?.w !== undefined ? layout.functions.filter((f) => f.box.x < frameGeo.sheet.x || f.box.y < frameGeo.sheet.y || f.box.x + f.box.w > frameGeo.sheet.x + frameGeo.sheet.w || f.box.y + f.box.h > frameGeo.footer.y).length : 0;
   const editingFrame = editing?.startsWith("frame:") ? frameGeo.cells.find((c) => c.field === (editing.slice(6) as FrameField)) : undefined;
@@ -742,57 +715,7 @@ export default function Idef0Editor({
             <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">
               Миникарта
             </button>
-            <details className="bpe-menu">
-              <summary title="Рамка листа: рамка и сетка, формат, поворот, авторазмер">Лист{outside > 0 ? " ⚠" : ""}</summary>
-              <div className="bpe-menu-body">
-            <button className={frameOn ? "on" : ""} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { show: !frameOn }))} title="Рамка листа со штампом: NODE, TITLE, NO. (надписи правятся двойным щелчком)">
-              Рамка
-            </button>
-            <select
-              aria-label="Формат листа"
-              disabled={!frameOn}
-              value={sheetFormat?.id ?? (frame?.w === undefined ? "auto" : "custom")}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "auto") commit(setFrame(draftRef.current, frameKey(cur), { rect: null }));
-                else {
-                  const f = SHEET_FORMATS.find((x) => x.id === v);
-                  if (!f) return;
-                  const portrait = !!sheetFormat?.portrait;
-                  commit(setFrame(draftRef.current, frameKey(cur), { rect: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: portrait ? f.h : f.w, h: portrait ? f.w : f.h } }));
-                }
-              }}
-              title="Формат листа: A4, A3 или A2 (поле листа без штампа); «Авто» — лист по размеру диаграммы"
-            >
-              <option value="auto">Лист: авто</option>
-              {frame?.w !== undefined && !sheetFormat && <option value="custom">Лист: свой размер</option>}
-              {SHEET_FORMATS.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.label}
-                  {sheetFormat?.id === f.id ? (sheetFormat.portrait ? " книжная" : " альбомная") : ""}
-                </option>
-              ))}
-            </select>
-            <button
-              disabled={!frameOn || frame?.w === undefined}
-              onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: { x: frameGeo.sheet.x, y: frameGeo.sheet.y, w: frameGeo.footer.y - frameGeo.sheet.y, h: frameGeo.sheet.w } }))}
-              title="Повернуть лист: альбомная ↔ книжная"
-            >
-              ⟳
-            </button>
-            <button disabled={!frameOn || frame?.w === undefined} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { rect: null }))} title="Вернуть лист на всю диаграмму: размер и положение снова автоматические">
-              Авторазмер
-            </button>
-            <button className={frameOn && gridShown(frame) ? "on" : ""} disabled={!frameOn} onClick={() => commit(setFrame(draftRef.current, frameKey(cur), { grid: !gridShown(frame) }))} title="Клетчатая разметка листа">
-              Сетка
-            </button>
-              </div>
-            </details>
-            {outside > 0 && (
-              <span className="bpe-warn" role="status" title="Часть функций лежит за пределами листа: растяните или подвиньте лист, либо нажмите «Лист: авто»">
-                ⚠ Вне листа: {outside}
-              </span>
-            )}
+            <FrameMenu frame={frame} geo={frameGeo} outside={outside} onChange={(patch) => commit(setFrame(draftRef.current, frameKey(cur), patch))} />
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
             </button>

@@ -1,3 +1,7 @@
+import { bpmnFrameShown, bpmnSheetWorld, frameGeometry, gridShown, type FrameField } from "@shared/idef0Frame";
+import { processCodeOf } from "@shared/codes";
+import { setSheetFrame, type FramePatch } from "../editor-core/sheet-ops";
+import { FrameLayer, FrameMenu, dragRect, startFrameDrag, type FrameDrag } from "../editor-core/sheetFrame";
 import { DEFAULT_DISPLAY, type DisplayOptions } from "../editor-core/display";
 import { stepCodes } from "@shared/codes";
 import { idef0Codes } from "../idef0-editor/geometry";
@@ -32,7 +36,11 @@ type Drag =
   | { kind: "flowSeg"; id: string; i: number; axis: "x" | "y"; g: FlowGeometry; startModel: M; moved: boolean; x0: number; y0: number }
   | { kind: "flowCorner"; id: string; i: number; v: Pt; g: FlowGeometry; startModel: M; moved: boolean; x0: number; y0: number }
   | { kind: "flowEnd"; id: string; end: "from" | "to" }
-  | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean; keep: { x: boolean; y: boolean } };
+  | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean; keep: { x: boolean; y: boolean } }
+  | ({ kind: "frame"; startModel: M } & FrameDrag);
+
+/** Лист по умолчанию накрывает дорожки целиком (их ширина не меньше 1400) и всё, что ниже, с полем вокруг. */
+const sheetWorld = (m: M) => bpmnSheetWorld({ w: diagramWidth(m), h: modelExtents(m).h });
 
 export default function BpmnEditor({
   model,
@@ -98,7 +106,7 @@ export default function BpmnEditor({
   // другая диаграмма — инструмент начинается заново: начало, выбранное на прежней, к этой не относится
   useEffect(() => setMsgTool(null), [scope]);
   /** Правка текста стрелки (условие ветки) или значка-триггера на блоке; at — где открыть поле, в координатах диаграммы. */
-  const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker" | "artifact" | "pool" | "message"; id: string; dict?: "data" | "systems"; at: Pt } | null>(null);
+  const [editSpot, setEditSpot] = useState<{ kind: "flow" | "marker" | "artifact" | "pool" | "message" | "frame"; id: string; dict?: "data" | "systems"; at: Pt } | null>(null);
   const [hotLane, setHotLane] = useState<number | null>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
   const [connectHot, setConnectHot] = useState<string | null>(null);
@@ -108,7 +116,20 @@ export default function BpmnEditor({
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<Drag | null>(null);
-  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, () => modelExtents(viewRef.current));
+  // рамка листа (по умолчанию выключена) хранится в полной модели по ключу операции, "" — общая схема процесса
+  const frameKeyBpmn = scopeId ?? "";
+  const frame = h.draft.bpmn_frames?.[frameKeyBpmn];
+  const frameRef = useRef(frame);
+  frameRef.current = frame;
+  /** Всё, что показывает «Вписать»: содержимое и включённый лист со штампом. */
+  const fitWorld = () => {
+    const ext = modelExtents(viewRef.current);
+    if (!bpmnFrameShown(frameRef.current)) return ext;
+    const s = frameGeometry(sheetWorld(viewRef.current), frameRef.current, { node: "", title: "", no: "" }).sheet;
+    return { w: Math.max(ext.w, s.x + s.w), h: Math.max(ext.h, s.y + s.h) };
+  };
+  const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, fitWorld);
+  const setSheet = (patch: FramePatch) => h.commit(setSheetFrame(h.draftRef.current, "bpmn_frames", frameKeyBpmn, patch));
   useBeforeUnload(h.dirty && !embedded);
 
   // переход к элементу по запросу извне
@@ -192,6 +213,13 @@ export default function BpmnEditor({
       }
       setMsgTool(null);
       commit(r.model, { kind: "message", id: r.id! });
+      return;
+    }
+    // лист: штамп двигает, края и углы растягивают
+    const frameDrag = frameOn && e.button === 0 ? startFrameDrag(t, toWorld(e.clientX, e.clientY), frameGeo) : null;
+    if (frameDrag) {
+      dragRef.current = { kind: "frame", ...frameDrag, startModel: draftRef.current };
+      svgRef.current!.setPointerCapture(e.pointerId);
       return;
     }
     const connectEl = t.closest("[data-connect]");
@@ -339,6 +367,13 @@ export default function BpmnEditor({
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     const d = dragRef.current;
     if (!d) return;
+    if (d.kind === "frame") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 3) return;
+      d.moved = true;
+      h.setDraft((m) => setSheetFrame(m, "bpmn_frames", frameKeyBpmn, { rect: dragRect(d, wx - d.x0, wy - d.y0) }));
+      return;
+    }
     if (d.kind === "pan") {
       setView((v) => ({ ...v, tx: d.tx + e.clientX - d.sx, ty: d.ty + e.clientY - d.sy }));
     } else if (d.kind === "node") {
@@ -486,6 +521,10 @@ export default function BpmnEditor({
     setGuides([]);
     if (svgRef.current?.hasPointerCapture(e.pointerId)) svgRef.current.releasePointerCapture(e.pointerId);
     if (!d) return;
+    if (d.kind === "frame") {
+      if (d.moved) h.recordPast(d.startModel);
+      return;
+    }
     if (d.kind === "node" && d.moved) {
       h.recordPast(d.startModel);
       setDraft((m) => dropNodeIntoLane(m, d.id, d.keep));
@@ -557,6 +596,11 @@ export default function BpmnEditor({
     const under = document.elementFromPoint?.(e.clientX, e.clientY) ?? null;
     const t = (under && svgRef.current?.contains(under) ? under : e.target) as Element;
     const at = toWorld(e.clientX, e.clientY);
+    const frameField = frameOn ? t.closest("[data-frame-field]")?.getAttribute("data-frame-field") : null;
+    if (frameField) {
+      setEditSpot({ kind: "frame", id: frameField, at });
+      return;
+    }
     const handle = t.closest("[data-flow-handle]")?.getAttribute("data-flow-handle");
     if (routedId && handle?.startsWith("corner:")) {
       const g = flowGeometry(routedId);
@@ -792,6 +836,19 @@ export default function BpmnEditor({
   };
   const selectedNode = curSel?.kind === "node" ? draft.nodes.find((n) => n.id === curSel.id) : undefined;
   const editingNode = editing ? draft.nodes.find((n) => n.id === editing) : undefined;
+  // лист: штамп по умолчанию — код и название операции (или процесса), номер листа
+  const frameOn = bpmnFrameShown(frame);
+  const sheetCode = scopeId ? idef0Codes(h.draft).get(scopeId) ?? "" : processCodeOf(h.draft);
+  const sheetName = scopeId ? h.draft.nodes.find((n) => n.id === scopeId)?.name ?? "" : h.draft.process.name;
+  const frameGeo = frameGeometry(sheetWorld(draft), frame, { node: sheetCode || "BPMN", title: `${sheetCode} ${sheetName}`.trim(), no: "1.0" });
+  // фигуры за пределами листа, заданного вручную (лист по размеру диаграммы их и так вмещает)
+  const outside =
+    frameOn && frame?.w !== undefined
+      ? shown.filter((n) => {
+          const b = boxes.get(n.id);
+          return b && (b.x < frameGeo.sheet.x || b.y < frameGeo.sheet.y || b.x + b.w > frameGeo.sheet.x + frameGeo.sheet.w || b.y + b.h > frameGeo.footer.y);
+        }).length
+      : 0;
 
   return (
     <div className="bpe" ref={rootRef} tabIndex={-1} onKeyDown={onKeyDown}>
@@ -828,6 +885,7 @@ export default function BpmnEditor({
             <button className={showMap ? "on" : ""} onClick={() => setShowMap((v) => !v)} title="Миникарта диаграммы">
               Миникарта
             </button>
+            <FrameMenu frame={frame} geo={frameGeo} outside={outside} shown={frameOn} onChange={setSheet} />
           </>
         }
       />
@@ -889,7 +947,9 @@ export default function BpmnEditor({
           >
             <ArrowDefs />
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
+              {frameOn && <FrameLayer geo={frameGeo} grid={gridShown(frame)} layers="back" />}
               <LanesLayer model={draft} width={W} hotLane={hotLane} selectedLaneId={curSel?.kind === "lane" ? curSel.id : null} />
+              {frameOn && <FrameLayer geo={frameGeo} grid={gridShown(frame)} layers="front" />}
 
               {vflows.map((f) => {
                 const points = routes.get(f.id);
@@ -1018,6 +1078,22 @@ export default function BpmnEditor({
           {editSpot &&
             (() => {
               const box = { x: editSpot.at[0] - 90, y: editSpot.at[1] - 12, w: 180, h: 24 };
+              if (editSpot.kind === "frame") {
+                const cell = frameGeo.cells.find((c) => c.field === editSpot.id);
+                if (!cell) return null;
+                return (
+                  <RenameOverlay
+                    key={`frame-${cell.field}`}
+                    name={cell.text}
+                    box={{ x: cell.x, y: cell.y + 3, w: Math.max(cell.w, 120), h: cell.h - 6 }}
+                    view={view}
+                    allowEmpty
+                    placeholder="Пусто — надпись по умолчанию"
+                    onCommit={(v) => setSheet({ text: { field: cell.field as FrameField, value: v } })}
+                    onDone={() => setEditSpot(null)}
+                  />
+                );
+              }
               if (editSpot.kind === "pool") {
                 const pool = (viewRef.current.pools ?? []).find((p) => p.id === editSpot.id);
                 if (!pool) return null;

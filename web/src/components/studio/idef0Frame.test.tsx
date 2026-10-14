@@ -220,8 +220,9 @@ describe("студия: печать листа IDEF0", () => {
     expect(click.defaultPrevented).toBe(true);
   });
 
-  it("на диаграмме BPMN блока печати нет", () => {
+  it("на диаграмме BPMN печать своя — кнопками по рисунку с экрана, а не ссылками на сервер", () => {
     render(<Studio session={session(purchaseModel())} busy={false} onSave={vi.fn(async () => true)} />);
-    expect(screen.queryByText("Лист в PDF")).toBeNull();
+    expect(screen.getByText("Лист в PDF").closest("a")).toBeNull();
+    expect(screen.getByText("Печать листа BPMN")).toBeTruthy();
   });
 });

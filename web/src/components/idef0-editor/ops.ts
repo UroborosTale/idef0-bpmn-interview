@@ -1,4 +1,4 @@
-import type { FrameField, IdefFrame } from "@shared/idef0Frame";
+import { setSheetFrame, type FramePatch } from "../editor-core/sheet-ops";
 import type { ProcessLogicModel, ProcessNode } from "../../types";
 import { nextId, setNodeRole, updateNode, type OpResult } from "../bpmn-editor/model-ops";
 import { BLOCK_H, BLOCK_W, functionsOf, snap, MIN_POS, type Arrow } from "./geometry";
@@ -6,34 +6,8 @@ import { setArrowRoute, shiftRoutes } from "./arrow-edit";
 
 type M = ProcessLogicModel;
 
-/** Настройки рамки листа диаграммы: показать или скрыть рамку и сетку, переопределить надпись штампа (пустая — вернуть автоматическую). */
-export function setFrame(m: M, key: string, patch: { show?: boolean; grid?: boolean; rect?: { x: number; y: number; w: number; h: number } | null; text?: { field: FrameField; value: string } }): M {
-  const cur: IdefFrame = m.idef0_frames?.[key] ?? {};
-  const next: IdefFrame = { ...cur };
-  if (patch.show !== undefined) next.show = patch.show;
-  if (patch.grid !== undefined) next.grid = patch.grid;
-  if (patch.rect !== undefined) {
-    // null — вернуть автоматический лист (по содержимому диаграммы)
-    for (const k of ["x", "y", "w", "h"] as const) {
-      if (patch.rect === null) delete next[k];
-      else next[k] = Math.round(patch.rect[k]);
-    }
-  }
-  if (patch.text) {
-    const texts = { ...(cur.texts ?? {}) };
-    if (patch.text.value.trim()) texts[patch.text.field] = patch.text.value.trim();
-    else delete texts[patch.text.field];
-    next.texts = Object.keys(texts).length ? texts : undefined;
-  }
-  if (next.show === true) delete next.show; // значения по умолчанию не храним
-  if (next.grid === true) delete next.grid;
-  if (!next.texts) delete next.texts;
-  const frames = { ...(m.idef0_frames ?? {}) };
-  if (Object.keys(next).length) frames[key] = next;
-  else delete frames[key];
-  if (JSON.stringify(frames[key]) === JSON.stringify(m.idef0_frames?.[key])) return m;
-  return { ...m, idef0_frames: Object.keys(frames).length ? frames : undefined };
-}
+/** Настройки рамки листа диаграммы IDEF0 (см. editor-core/sheet-ops.ts). */
+export const setFrame = (m: M, key: string, patch: FramePatch): M => setSheetFrame(m, "idef0_frames", key, patch);
 
 /**
  * Какие поля функции образуют стороны блока IDEF0: вход/выход — данные, управление — регламенты
