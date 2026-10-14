@@ -177,6 +177,10 @@ export interface Arrow {
   tunnelDown?: boolean;
   /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
   manual?: boolean;
+  /** Подпись не рисуется: механизм общий для нескольких блоков, подпись стоит на «шине» у одной из его стрелок. */
+  labelHidden?: boolean;
+  /** Стрелка общего механизма с подписью: подпись одной строкой над «шиной», от её начала. */
+  bus?: boolean;
 }
 
 export interface FunctionBlock<N extends NodeLike = NodeLike> {
@@ -403,6 +407,59 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       arrows.push(finish({ key: `${mm.kind}:${n.id}:${mm.id}`, kind: mm.kind, entityId: mm.id, label: mm.name, nodeId: n.id, points: [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]], side: "bottom", labelRow: rowOf(i, mech.length) }, route));
     });
   }
+  // Общий механизм (одна должность или система у нескольких блоков), как в Business Studio: под блоками идёт горизонтальная «шина»
+  // на своей глубине, от её начала стрелки поднимаются в каждый блок, подпись одна — над шиной. Чем левее вертикаль в первом
+  // блоке, тем глубже шина, а в следующих блоках порядок обратный — так «лесенки» не пересекаются.
+  {
+    const entityKey = (a: Arrow) => `${a.kind}:${a.entityId}`;
+    const bottoms = new Map<string, Arrow[]>();
+    for (const a of arrows) if (a.side === "bottom") bottoms.set(a.nodeId, [...(bottoms.get(a.nodeId) ?? []), a]);
+    const holders = new Map<string, Arrow[]>();
+    for (const list of bottoms.values()) for (const a of list) holders.set(entityKey(a), [...(holders.get(entityKey(a)) ?? []), a]);
+    const sharedKeys = [...holders].filter(([, list]) => list.length >= 2 && list.every((a) => !a.manual)).map(([k]) => k);
+    if (sharedKeys.length > 0) {
+      const boxOf = (a: Arrow) => blockOf.get(a.nodeId)!.box;
+      const headOf = (key: string) => [...holders.get(key)!].sort((p, q) => boxOf(p).x - boxOf(q).x)[0].nodeId;
+      // глубина шины: по возрасту — первый в списке блока самый глубокий
+      const order = [...sharedKeys].sort((k1, k2) => {
+        const [h1, h2] = [headOf(k1), headOf(k2)];
+        if (h1 !== h2) return boxOf(holders.get(k1)!.find((a) => a.nodeId === h1)!).x - boxOf(holders.get(k2)!.find((a) => a.nodeId === h2)!).x;
+        return (bottoms.get(h1)!.findIndex((a) => entityKey(a) === k1)) - (bottoms.get(h1)!.findIndex((a) => entityKey(a) === k2));
+      });
+      const depth = new Map(order.map((k, i) => [k, i] as const)); // 0 — самая глубокая
+      const involved = new Set(order.flatMap((k) => holders.get(k)!.map((a) => a.nodeId)));
+      const lowest = Math.max(...[...involved].map((id) => blockOf.get(id)!.box.y + blockOf.get(id)!.box.h));
+      const busY = (k: string) => lowest + 24 + (order.length - 1 - depth.get(k)!) * 18;
+      // порядок вертикалей по низу каждого блока: сначала общие, у которых блок не первый (по возрастанию глубины), потом свои,
+      // потом общие, у которых блок первый (по убыванию глубины — самая глубокая шина слева)
+      for (const [nodeId, list] of bottoms) {
+        const b = blockOf.get(nodeId)!.box;
+        const kindOf = (a: Arrow) => (sharedKeys.includes(entityKey(a)) ? (headOf(entityKey(a)) === nodeId ? 2 : 0) : 1);
+        const sorted = [...list].sort((p, q) => kindOf(p) - kindOf(q) || (kindOf(p) === 2 ? depth.get(entityKey(p))! - depth.get(entityKey(q))! : kindOf(p) === 0 ? depth.get(entityKey(q))! - depth.get(entityKey(p))! : 0));
+        const step = spread(b.w, sorted.length, 40, 20);
+        sorted.forEach((a, i) => {
+          if (a.manual) return;
+          const x = b.x + 20 + i * step;
+          a.points = [[x, b.y + b.h + STUB_MECH], [x, b.y + b.h]];
+        });
+      }
+      for (const key of order) {
+        const list = [...holders.get(key)!].sort((p, q) => boxOf(p).x - boxOf(q).x);
+        const head = list[0];
+        const tee: Pt = [head.points[0][0], busY(key)];
+        head.points = [tee, head.points[1]];
+        head.labelHidden = true;
+        list.slice(1).forEach((a, i) => {
+          const end = a.points[1];
+          a.points = [tee, [end[0], tee[1]], end];
+          a.side = "mid";
+          if (i > 0) a.labelHidden = true;
+        });
+        // подпись — над шиной, у первой стрелки после головной
+        if (list.length > 1) (list[1].labelHidden = false, (list[1].bus = true));
+      }
+    }
+  }
   // строки подписей управления и механизмов — по ширине подписей, отдельно для каждого блока и стороны
   // чужие подписи, которые строка не должна задевать: связи между блоками, внешние входы и выходы (их места не зависят от строк)
   const obstacles: LabelRect[] = [];
@@ -416,7 +473,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
   }
   for (const side of ["top", "bottom"] as const) {
     const groups = new Map<string, typeof arrows>();
-    for (const a of arrows) if (a.side === side && a.label) (groups.get(a.nodeId) ?? groups.set(a.nodeId, []).get(a.nodeId)!).push(a);
+    for (const a of arrows) if (a.side === side && a.label && !a.labelHidden) (groups.get(a.nodeId) ?? groups.set(a.nodeId, []).get(a.nodeId)!).push(a);
     for (const list of groups.values()) {
       const rows = assignLabelRows(
         list.map((a) => ({ x: a.points[0][0], label: a.label })),
@@ -445,18 +502,20 @@ export function idef0Extents(layout: Idef0Layout<NodeLike>): { w: number; h: num
 }
 
 /** Положение подписи стрелки: у начала слева/сверху/снизу, у конца справа или над самым длинным горизонтальным отрезком; плюс ручной сдвиг. */
-export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number; labelOffset?: Pt }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number; labelOffset?: Pt; labelHidden?: boolean; bus?: boolean }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+  if (a.labelHidden) return null;
   const spec = baseLabelSpec(a);
   if (!spec || !a.labelOffset) return spec;
   return { ...spec, x: spec.x + a.labelOffset[0], y: spec.y + a.labelOffset[1] };
 }
 
-function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
+function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number; bus?: boolean }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
   if (!a.label) return null;
-  const text = wrapLabel(a.label, a.side === "top" || a.side === "bottom");
+  const text = a.bus ? wrapText(a.label, 60, 1).join("") : wrapLabel(a.label, a.side === "top" || a.side === "bottom");
   const extra = (text.split("\n").length - 1) * LABEL_ROW_H; // подпись над линией растёт вверх: первая строка поднимается
   const first = a.points[0];
   const last = a.points[a.points.length - 1];
+  if (a.bus) return { x: first[0] + 8, y: first[1] - 4, anchor: "start", text };
   switch (a.side) {
     // как в Business Studio, подпись внешней стрелки лежит над самой линией, у блока: вход слева прижат к блоку справа, выход
     // (выходы стоят вплотную друг к другу, их подписи — за концом стрелки); длинная подпись входа выходит за свободный конец, но не в блок

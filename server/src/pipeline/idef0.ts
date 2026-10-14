@@ -33,6 +33,9 @@ export interface Idef0Arrow {
   labelRow?: number;
   /** Ручной сдвиг подписи. */
   labelOffset?: Pt;
+  /** Подпись скрыта (общий механизм) или стоит над «шиной» (bus). */
+  labelHidden?: boolean;
+  bus?: boolean;
   /** Какая связь модели нарисована: функция, сущность и вид (для обратного чтения правок из Visio). */
   ref?: { kind: ArrowKind; nodeId: string; entityId: string };
   /** Блоки, к которым приклеены начало и конец стрелки (в Visio — концы соединителя). */
@@ -116,6 +119,8 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     side: a.side,
     labelRow: a.labelRow,
     labelOffset: a.labelOffset,
+    ...(a.labelHidden ? { labelHidden: true } : {}),
+    ...(a.bus ? { bus: true } : {}),
     ref: { kind: a.kind, nodeId: a.nodeId, entityId: a.entityId },
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
     startNode: a.fromId ?? (a.kind === "output" ? a.nodeId : undefined),

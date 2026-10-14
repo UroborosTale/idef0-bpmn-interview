@@ -64,6 +64,6 @@ export function withIdef0Layout(m: ProcessLogicModel, force = false, parentId: s
 }
 
 /** Подпись стрелки (общая функция; у стрелки редактора подпись есть всегда). */
-export function labelSpec(a: Pick<Arrow, "points" | "side" | "label">): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } {
+export function labelSpec(a: Pick<Arrow, "points" | "side" | "label" | "labelHidden" | "bus" | "labelRow" | "labelOffset">): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } {
   return sharedLabelSpec(a) ?? { x: a.points[0][0], y: a.points[0][1], anchor: "start", text: "" };
 }
