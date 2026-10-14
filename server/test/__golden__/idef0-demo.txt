@@ -4,7 +4,7 @@ fn s2 400,320 170×90
 fn s3 630,470 170×90
 arrow control:s1:c_policy [190,124 190,170] label@190,120/middle «Положение о закупках»
 arrow control:s1:c_budget [216,124 216,170] label@216,108/middle «Бюджет закупок на год»
-arrow input:s1:d_need [110,184 170,184] label@106,188/end «Потребность в оборудовании»
+arrow input:s1:d_need [110,184 170,184] label@164,180/end «Потребность в оборудовании»
 arrow output:s1:d_rejectedReq [340,202 400,202] label@404,206/start «Отклонённая заявка на закупку»
 arrow role:s1:r_chief [190,300 190,260] label@190,314/middle «Начальник отдела закупок»
 arrow role:s1:r_init [222.5,300 222.5,260] label@222.5,326/middle «Инициатор закупки»
@@ -32,7 +32,7 @@ arrow system:s3:s_erp [770,600 770,560] label@770,626/middle «ERP «Закуп�
 fn o11 170,170 170×90
 fn o12 400,320 170×90
 arrow control:o11:c_policy [190,124 190,170] label@190,120/middle «Положение о закупках»
-arrow input:o11:d_need [110,184 170,184] label@106,188/end «Потребность в оборудовании»
+arrow input:o11:d_need [110,184 170,184] label@164,180/end «Потребность в оборудовании»
 arrow role:o11:r_init [190,300 190,260] label@190,314/middle «Инициатор закупки»
 arrow role:o11:r_erp [230,300 230,260] label@230,326/middle «ERP «Закупки»»
 arrow system:o11:s_erp [270,300 270,260] label@270,338/middle «ERP «Закупки»»
@@ -49,7 +49,7 @@ arrow system:o12:s_erp [540,450 540,410] label@540,500/middle «ERP «Закуп
 fn o21 170,170 170×90
 fn o22 400,320 170×90
 arrow control:o21:c_tender [190,124 190,170] label@190,120/middle «Регламент закупочных процедур»
-arrow input:o21:d_approvedReq [110,184 170,184] label@106,188/end «Согласованная заявка на закупку»
+arrow input:o21:d_approvedReq [110,184 170,184] label@164,180/end «Согласованная заявка на закупку»
 arrow role:o21:r_buyer [190,300 190,260] label@190,314/middle «Специалист по закупкам»
 arrow role:o21:r_erp [230,300 230,260] label@230,350/middle «ERP «Закупки»»
 arrow system:o21:s_erp [270,300 270,260] label@270,362/middle «ERP «Закупки»»
@@ -65,7 +65,7 @@ arrow system:o22:s_erp [550,450 550,410] label@550,464/middle «ERP «Закуп
 fn o31 170,170 170×90
 fn o32 400,320 170×90
 arrow control:o31:c_delivSched [190,124 190,170] label@190,120/middle «График поставки по договору»
-arrow input:o31:d_contract [110,184 170,184] label@106,188/end «Договор поставки»
+arrow input:o31:d_contract [110,184 170,184] label@164,180/end «Договор поставки»
 arrow role:o31:r_logist [190,300 190,260] label@190,314/middle «Логист»
 arrow role:o31:r_store [230,300 230,260] label@230,326/middle «Кладовщик»
 arrow role:o31:r_erp [270,300 270,260] label@270,314/middle «ERP «Закупки»»

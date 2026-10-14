@@ -450,10 +450,12 @@ function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; label
   const first = a.points[0];
   const last = a.points[a.points.length - 1];
   switch (a.side) {
+    // как в Business Studio, подпись внешней стрелки лежит над самой линией, у блока: вход слева прижат к блоку справа, выход
+    // (выходы стоят вплотную друг к другу, их подписи — за концом стрелки); длинная подпись входа выходит за свободный конец, но не в блок
     case "left":
-      return { x: first[0] - 4, y: first[1] + 4, anchor: "end", text };
+      return { x: last[0] - 6, y: last[1] - 4 - extra, anchor: "end", text };
     case "right":
-      return { x: last[0] + 4, y: last[1] + 4, anchor: "start", text };
+      return { x: last[0] + 4, y: last[1] + 4 - extra / 2, anchor: "start", text }; // у выходов стрелки идут вплотную: подпись за концом, по центру строк
     case "top":
       return { x: first[0], y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
     case "bottom":
