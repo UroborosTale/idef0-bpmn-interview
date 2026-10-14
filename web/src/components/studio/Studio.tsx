@@ -28,6 +28,8 @@ import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from
 import { acceptIssue, addOperationSkeleton, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
 import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunction, pasteDestination, type MoveTarget } from "./structure-ops";
 import StructureWizard from "./StructureWizard";
+import VisioSlot from "./VisioSlot";
+import { inDesktopShell, postToShell, recalledTabs, rememberTabs } from "../../desktop";
 
 type M = ProcessLogicModel;
 
@@ -71,11 +73,16 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [model]);
 
-  const [docs, setDocs] = useState<StudioDoc[]>(() => [bpmnDoc(), idef0Doc(null)]);
-  const [activeKey, setActiveKey] = useState("bpmn");
+  // в настольном приложении вкладки переживают перезагрузку студии (после приёма правок из Visio)
+  const recalled = inDesktopShell() ? recalledTabs<{ docs: StudioDoc[]; active: string }>(session.id) : null;
+  const [docs, setDocs] = useState<StudioDoc[]>(() => (recalled?.docs?.length ? recalled.docs : [bpmnDoc(), idef0Doc(null)]));
+  const [activeKey, setActiveKey] = useState(recalled?.active ?? "bpmn");
   const [focus, setFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [navOpen, setNavOpen] = useState(true);
+  useEffect(() => {
+    if (inDesktopShell()) rememberTabs(session.id, { docs, active: activeKey });
+  }, [docs, activeKey, session.id]);
   // вид диаграмм: слой подписей и номера (запоминается по сессии)
   const displayKey = `display:${session.id}`;
   const [display, setDisplayState] = useState<DisplayOptions>(() => loadDisplay(displayKey));
@@ -633,6 +640,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
       <div className="ribbon">
         <div className="ribbon-group">
           <div className="ribbon-buttons">
+            {inDesktopShell() && (
+              <button className="primary" onClick={() => postToShell({ t: "apply" })} title="Сохранить правки, сделанные в Visio, в модель процесса">
+                Принять из Visio
+              </button>
+            )}
             <button className="primary" disabled={!h.dirty || busy} onClick={() => void save()} title="Сохранить (Ctrl+S)">
               {busy ? "Сохранение…" : "Сохранить"}
             </button>
@@ -828,10 +840,13 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
             ))}
           </div>
           <div className="doc-area">
-            {active.kind === "bpmn" && (
+            {inDesktopShell() && (active.kind === "bpmn" || active.kind === "idef0") && (
+              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} />
+            )}
+            {!inDesktopShell() && active.kind === "bpmn" && (
               <BpmnEditor key={active.key} display={display} scope={active.scope} model={draft} busy={busy} onSave={onSave} draftId={`${session.id}:studio`} draftBase={session.updatedAt} bpmnXml={session.bpmnXml} history={hEdit} focus={focus} onSelectionChange={reportSelection} />
             )}
-            {active.kind === "idef0" && (
+            {!inDesktopShell() && active.kind === "idef0" && (
               <Idef0Editor
                 key={active.key}
                 display={display}
