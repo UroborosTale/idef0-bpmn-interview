@@ -67,6 +67,8 @@ interface Style {
   dash?: boolean;
   roundingPx?: number;
   endArrow?: boolean;
+  /** Размер наконечника Visio: 0 — самый мелкий (стрелки IDEF0), по умолчанию 1. */
+  arrowSize?: number;
   text?: string;
   runs?: Run[]; // несколько отрезков текста с разным оформлением (вместо text)
   fontPx?: number;
@@ -203,7 +205,7 @@ export class Page {
       `<Cell N="LineWeight" V="${num((style.weightPt ?? 1.2) / 72)}"/>`,
       `<Cell N="Rounding" V="${num((style.roundingPx ?? 0) * PX)}"/>`,
     ];
-    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="1"/>`);
+    if (style.endArrow) cells.push(`<Cell N="EndArrow" V="13"/>`, `<Cell N="EndArrowSize" V="${style.arrowSize ?? 1}"/>`);
     if (style.noMargins) cells.push(`<Cell N="LeftMargin" V="0"/>`, `<Cell N="RightMargin" V="0"/>`, `<Cell N="TopMargin" V="0"/>`, `<Cell N="BottomMargin" V="0"/>`);
     if (style.textBelow) {
       // блок текста под фигурой, выровненный по верху: так подпись остаётся частью фигуры и двигается вместе с ней
@@ -269,7 +271,7 @@ export class Page {
    * переносе фигуры в Visio стрелка следует за ней. Нарисованный путь points совпадает с раскладкой генератора;
    * при переносе фигур Visio перестроит его собственной маршрутизацией.
    */
-  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean; props?: VisioPropOut[]; color?: string }): number {
+  connector(opts: { points: Pt[]; from?: Endpoint; to?: Endpoint; tag?: Record<string, string>; text?: string; textAt?: Pt; fontPx?: number; weightPt?: number; dash?: boolean; props?: VisioPropOut[]; color?: string; arrowSize?: number }): number {
     const id = this.nextId++;
     const H = this.heightPx;
     const [bx, by] = opts.points[0];
@@ -287,6 +289,10 @@ export class Page {
 
     const fontPx = opts.fontPx ?? 10.5;
     const text = opts.text ? esc(opts.text) : "";
+    // рамка текста: по самой длинной строке (с запасом на прописные буквы и цифры, иначе «ELMA365» ломается) и по числу строк
+    const textLines = (opts.text ?? "").split("\n");
+    const txtW = Math.max(0.5, (Math.max(...textLines.map((l) => l.length)) * fontPx * 0.72 + 8) * PX);
+    const txtH = textLines.length * fontPx * 1.4 * PX + 2 * PX;
     // положение подписи — в координатах соединителя (начало — точка Begin)
     const ctrlX = opts.textAt ? (opts.textAt[0] - bx) * PX : w / 2;
     const ctrlY = opts.textAt ? (by - opts.textAt[1]) * PX : h / 2;
@@ -309,10 +315,10 @@ export class Page {
       `<Cell N="EndTrigger" V="2"${toId ? ` F="_XFTRIGGER(Sheet.${toId}!EventXFMod)"` : ""}/>`,
       `<Cell N="TxtPinX" V="${num(ctrlX)}" F="SETATREF(Controls.TextPosition)"/>`,
       `<Cell N="TxtPinY" V="${num(ctrlY)}" F="SETATREF(Controls.TextPosition.Y)"/>`,
-      `<Cell N="TxtWidth" V="${num(Math.max(0.5, (opts.text ?? "").length * fontPx * 0.6 * PX))}"/>`,
-      `<Cell N="TxtHeight" V="${num(fontPx * 1.5 * PX)}"/>`,
-      `<Cell N="TxtLocPinX" V="${num(Math.max(0.5, (opts.text ?? "").length * fontPx * 0.6 * PX) / 2)}" F="TxtWidth*0.5"/>`,
-      `<Cell N="TxtLocPinY" V="${num((fontPx * 1.5 * PX) / 2)}" F="TxtHeight*0.5"/>`,
+      `<Cell N="TxtWidth" V="${num(txtW)}"/>`,
+      `<Cell N="TxtHeight" V="${num(txtH)}"/>`,
+      `<Cell N="TxtLocPinX" V="${num(txtW / 2)}" F="TxtWidth*0.5"/>`,
+      `<Cell N="TxtLocPinY" V="${num(txtH / 2)}" F="TxtHeight*0.5"/>`,
       `<Cell N="TxtAngle" V="0"/>`,
       `<Cell N="LockHeight" V="1"/>`,
       `<Cell N="LockCalcWH" V="1"/>`,
@@ -326,7 +332,7 @@ export class Page {
       `<Cell N="LinePattern" V="${opts.dash ? 2 : 1}"/>`,
       `<Cell N="LineWeight" V="${num((opts.weightPt ?? 0.9) / 72)}"/>`,
       `<Cell N="EndArrow" V="13"/>`,
-      `<Cell N="EndArrowSize" V="1"/>`,
+      `<Cell N="EndArrowSize" V="${opts.arrowSize ?? 1}"/>`,
       `<Cell N="TextBkgnd" V="#ffffff"/>`,
       `<Cell N="TextBkgndTrans" V="0"/>`,
     ];
@@ -450,6 +456,9 @@ function drawSheet(page: Page, geo: FrameGeometry) {
   for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 14, color: "#111827" });
 }
 
+/** Ширина рамки подписи стрелки по самой длинной строке (кегль 10,5; прописные и цифры шире строчных). */
+const labelBoxW = (text: string): number => Math.max(24, Math.max(...text.split("\n").map((l) => l.length)) * 10.5 * 0.72 + 8);
+
 function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): Page {
   const editable = d.code !== "A-0";
   const fi = frameInfo(d, model, kind, parentNodeId);
@@ -465,10 +474,9 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const big = b.w >= 200;
     const pp = editable ? blockPorts(b, d) : { ports: [], indexOf: () => 0 };
     portsOf.set(b.nodeId, pp);
-    // код блока — вторым отрезком текста: при переименовании в Visio он остаётся на месте и при импорте отбрасывается
+    // у блока подпись «код название», как в Business Studio; полное название хранится в метке pm_n
     const own = ownStyle(model, "idef0_block");
-    const runs: Run[] = [{ text: b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
-    if (editable) runs.push({ text: `\n${b.code}${b.hasChildren ? " ⊞" : ""}`, fontPx: 11, color: "#374151" });
+    const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
     page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1.4, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
   }
@@ -477,8 +485,8 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const lab = arrowLabelPlacement(a);
     if (!a.ref || (!a.startNode && !a.endNode)) {
       // стрелки контекстной диаграммы — только оформление
-      page.polyline(a.points, { endArrow: true, weightPt: 0.9, line: "#4677bf" });
-      if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor }, { fontPx: 10.5, color: "#374151" });
+      page.polyline(a.points, { endArrow: true, weightPt: 0.75, line: "#4677bf", arrowSize: 0 });
+      if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor, w: labelBoxW(lab.text), h: lab.text.split("\n").length * 14.5 }, { fontPx: 10.5, color: "#000000" });
       continue;
     }
     const first = a.points[0];
@@ -487,9 +495,9 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const to = a.endNode ? { key: blockKey(a.endNode), port: portsOf.get(a.endNode)?.indexOf(last) } : undefined;
     let textAt: Pt | undefined;
     if (lab) {
-      const w = Math.max(24, lab.text.length * 10.5 * 0.6);
+      const w = labelBoxW(lab.text);
       const cx = lab.anchor === "end" ? lab.x - w / 2 : lab.anchor === "start" ? lab.x + w / 2 : lab.x;
-      textAt = [cx, lab.y - 12 + (10.5 * 1.5) / 2];
+      textAt = [cx, lab.y - 12 + (lab.text.split("\n").length * 14.5) / 2];
     }
     page.connector({
       points: a.points,
@@ -497,9 +505,10 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       to,
       text: lab?.text,
       textAt,
-      tag: { pm_k: "arrow", pm_id: a.ref.entityId, pm_a: `${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`, pm_n: lab?.text ?? "" },
-      weightPt: 0.9,
+      tag: { pm_k: "arrow", pm_id: a.ref.entityId, pm_a: `${a.ref.kind}|${a.ref.nodeId}|${a.ref.entityId}`, pm_n: a.label ?? "" },
+      weightPt: 0.75,
       color: "#4677bf",
+      arrowSize: 0,
     });
     // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
     for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) {

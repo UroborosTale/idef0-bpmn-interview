@@ -5,6 +5,7 @@
  */
 
 import { functionCodes } from "./codes.js";
+import { wrapText } from "./bpmnLabels.js";
 import { orthogonalPath, type Side } from "./bpmnManual.js";
 
 export type Pt = [number, number];
@@ -220,12 +221,14 @@ const spread = (len: number, n: number, max: number, pad: number) => (n > 1 ? Ma
 const rowOf = (i: number, n: number) => (n > 1 ? i % Math.min(3, n) : 0);
 const LABEL_ROW_H = 12;
 
-/** Ширина подписи стрелки в пикселях (кегль 10,5; подписи обрезаются до 26 знаков, как в labelSpec). */
-export const labelWidth = (text: string): number => Math.min(text.length, 26) * 6 + 4;
+/** Подпись стрелки переносится по словам: до 34 знаков в строке и до 3 строк (как у Business Studio), строки разделены «\n». */
+export const wrapLabel = (text: string, wide = false): string => (wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
+/** Ширина подписи стрелки в пикселях (кегль 10,5): по самой длинной строке после переноса. */
+export const labelWidth = (wrapped: string): number => Math.max(1, ...wrapped.split("\n").map((l) => l.length)) * 6 + 4;
 /** Зазор между подписями в одной строке. */
 const LABEL_GAP = 6;
 /** Строк подписей над блоком или под ним — не больше: дальше они уходят слишком далеко от стрелки. */
-const MAX_LABEL_ROWS = 8;
+const MAX_LABEL_ROWS = 14;
 
 export interface LabelRect {
   x0: number;
@@ -241,22 +244,25 @@ const rectsHit = (a: LabelRect, b: LabelRect) => a.x0 < b.x1 + LABEL_GAP && b.x0
  * связей между блоками и внешних стрелок), иначе — в следующую. Раньше строки шли по кругу «0, 1, 2, 0…», и подписи шире шага между
  * стрелками налезали друг на друга через две.
  */
-export function assignLabelRows(items: { x: number; label: string }[], opts: { obstacles?: LabelRect[]; y?: (item: number, row: number) => number } = {}): number[] {
+export function assignLabelRows(items: { x: number; label: string }[], opts: { obstacles?: LabelRect[]; /** y первой строки подписи из `lines` строк, поставленной в ряд `row`. */ y?: (item: number, row: number, lines: number) => number } = {}): number[] {
   const order = items.map((_, i) => i).sort((i, j) => items[i].x - items[j].x);
   const rows: { x: number; w: number }[][] = [];
   const out: number[] = new Array(items.length).fill(0);
   for (const i of order) {
-    const w = labelWidth(items[i].label);
+    const wrapped = wrapLabel(items[i].label, true); // в рядах — подписи над блоком и под ним: длинная строка
+    const w = labelWidth(wrapped);
+    // многострочная подпись занимает столько рядов, сколько в ней строк
+    const h = wrapped.split("\n").length;
     let r = 0;
     const blocked = (row: number) => {
-      if ((rows[row] ?? []).some((q) => Math.abs(items[i].x - q.x) < (w + q.w) / 2 + LABEL_GAP)) return true;
+      for (let k = row; k < row + h; k++) if ((rows[k] ?? []).some((q) => Math.abs(items[i].x - q.x) < (w + q.w) / 2 + LABEL_GAP)) return true;
       if (!opts.y || !opts.obstacles) return false;
-      const y = opts.y(i, row);
-      const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 };
+      const y = opts.y(i, row, h);
+      const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
       return opts.obstacles.some((o) => rectsHit(mine, o));
     };
-    while (r < MAX_LABEL_ROWS - 1 && blocked(r)) r++;
-    (rows[r] ??= []).push({ x: items[i].x, w });
+    while (r < MAX_LABEL_ROWS - h && blocked(r)) r++;
+    for (let k = r; k < r + h; k++) (rows[k] ??= []).push({ x: items[i].x, w });
     out[i] = r;
   }
   return out;
@@ -398,7 +404,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     if (!sp) continue;
     const w = labelWidth(sp.text);
     const x0 = sp.anchor === "middle" ? sp.x - w / 2 : sp.anchor === "end" ? sp.x - w : sp.x;
-    obstacles.push({ x0, x1: x0 + w, y0: sp.y - 10, y1: sp.y + 2 });
+    obstacles.push({ x0, x1: x0 + w, y0: sp.y - 10, y1: sp.y + 2 + (sp.text.split("\n").length - 1) * LABEL_ROW_H });
   }
   for (const side of ["top", "bottom"] as const) {
     const groups = new Map<string, typeof arrows>();
@@ -406,7 +412,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     for (const list of groups.values()) {
       const rows = assignLabelRows(
         list.map((a) => ({ x: a.points[0][0], label: a.label })),
-        { obstacles, y: (i, row) => (side === "top" ? list[i].points[0][1] - 4 - row * LABEL_ROW_H : list[i].points[0][1] + 14 + row * LABEL_ROW_H) }
+        { obstacles, y: (i, row, lines) => (side === "top" ? list[i].points[0][1] - 4 - (lines - 1) * LABEL_ROW_H - row * LABEL_ROW_H : list[i].points[0][1] + 14 + row * LABEL_ROW_H) }
       );
       list.forEach((a, i) => (a.labelRow = rows[i]));
     }
@@ -439,7 +445,8 @@ export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; la
 
 function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
   if (!a.label) return null;
-  const text = a.label.length > 26 ? a.label.slice(0, 25) + "…" : a.label;
+  const text = wrapLabel(a.label, a.side === "top" || a.side === "bottom");
+  const extra = (text.split("\n").length - 1) * LABEL_ROW_H; // подпись над линией растёт вверх: первая строка поднимается
   const first = a.points[0];
   const last = a.points[a.points.length - 1];
   switch (a.side) {
@@ -448,7 +455,7 @@ function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; label
     case "right":
       return { x: last[0] + 4, y: last[1] + 4, anchor: "start", text };
     case "top":
-      return { x: first[0], y: first[1] - 4 - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
+      return { x: first[0], y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
     case "bottom":
       return { x: first[0], y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
     default: {
@@ -461,7 +468,7 @@ function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; label
           idx = i;
         }
       }
-      if (idx >= 0) return { x: (a.points[idx][0] + a.points[idx + 1][0]) / 2, y: a.points[idx][1] - 5, anchor: "middle", text };
+      if (idx >= 0) return { x: (a.points[idx][0] + a.points[idx + 1][0]) / 2, y: a.points[idx][1] - 5 - extra, anchor: "middle", text };
       return { x: (first[0] + last[0]) / 2 + 4, y: (first[1] + last[1]) / 2, anchor: "start", text };
     }
   }

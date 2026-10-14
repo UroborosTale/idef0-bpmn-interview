@@ -136,13 +136,17 @@ export function ArrowShape({ arrow, selected, showLabel = true }: { arrow: Arrow
   return (
     <g data-arrow-key={arrow.key} style={{ cursor: "pointer" }}>
       <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
-      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.4 : 1.4} markerEnd={selected ? "url(#i0-arrow-sel)" : "url(#i0-arrow)"} />
+      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.2 : 1.1} markerEnd={selected ? "url(#i0-arrow-sel)" : "url(#i0-arrow)"} />
       {tunnelArcs(arrow).map((arc, i) => (
         <path key={`t${i}`} data-tunnel d={`M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}`} fill="none" stroke={color} strokeWidth={1.4} pointerEvents="none" />
       ))}
       {showLabel && (
-        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#374151"} fontWeight={selected ? 600 : 400} pointerEvents="none">
-          {lab.text}
+        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none">
+          {lab.text.split("\n").map((line, i) => (
+            <tspan key={i} x={lab.x} dy={i === 0 ? 0 : 12}>
+              {line}
+            </tspan>
+          ))}
         </text>
       )}
     </g>
