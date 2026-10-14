@@ -13,9 +13,9 @@ afterEach(() => {
 });
 
 describe("палитра фигур", () => {
-  it("в палитре задача, подпроцесс, три события и два шлюза с подсказками", () => {
+  it("в палитре задача, подпроцесс, три события и четыре шлюза с подсказками", () => {
     render(<ShapePalette />);
-    expect(PALETTE.map((p) => p.kind)).toEqual(["task", "subprocess", "event:start", "event:intermediate", "event:end", "gateway:exclusive", "gateway:parallel"]);
+    expect(PALETTE.map((p) => p.kind)).toEqual(["task", "subprocess", "event:start", "event:intermediate", "event:end", "gateway:exclusive", "gateway:parallel", "gateway:inclusive", "gateway:event_based"]);
     for (const p of PALETTE) expect(screen.getByRole("button", { name: p.title })).toBeTruthy();
   });
 
@@ -36,5 +36,32 @@ describe("палитра фигур", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     fireEvent.pointerUp(document, { clientX: 400, clientY: 300 });
     expect(post).not.toHaveBeenCalled();
+  });
+
+  it("тип события выбирается в списке рядом с фигурой и попадает в команду «drop»", () => {
+    render(<ShapePalette />);
+    fireEvent.click(screen.getByRole("button", { name: "Тип: Промежуточное событие" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Таймер" }));
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Промежуточное событие" }), { clientX: 20, clientY: 20 });
+    fireEvent.pointerUp(document, { clientX: 20, clientY: 20 });
+    expect(post).toHaveBeenCalledWith({ t: "drop", kind: "event:intermediate:timer", dragged: false });
+    // у конечного события — свои типы, среди них завершение процесса; «Без типа» возвращает простое событие
+    fireEvent.click(screen.getByRole("button", { name: "Тип: Конечное событие" }));
+    expect(screen.getByRole("menuitemradio", { name: "Завершение процесса" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Без типа" }));
+    post.mockClear();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Конечное событие" }), { clientX: 20, clientY: 20 });
+    fireEvent.pointerUp(document, { clientX: 20, clientY: 20 });
+    expect(post).toHaveBeenCalledWith({ t: "drop", kind: "event:end", dragged: false });
+  });
+
+  it("соединительная линия включает инструмент Visio, повторный щелчок возвращает указатель", () => {
+    render(<ShapePalette />);
+    const b = screen.getByRole("button", { name: "Соединительная линия" });
+    fireEvent.click(b);
+    expect(post).toHaveBeenLastCalledWith({ t: "tool", tool: "connector" });
+    fireEvent.click(b);
+    expect(post).toHaveBeenLastCalledWith({ t: "tool", tool: "pointer" });
   });
 });

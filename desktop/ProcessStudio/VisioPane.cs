@@ -124,11 +124,42 @@ internal sealed class VisioPane : Panel
         "subprocess" => new("Подпроцесс", "round", 160, 90, "RGB(232,238,247)", 1.3, "Новый подпроцесс", 12),
         "gateway:exclusive" => new("Шлюз «или»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "X", 16),
         "gateway:parallel" => new("Шлюз «и»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "+", 18),
-        "event:start" => new("Начальное событие", "oval", 36, 36, "RGB(153,255,102)", 1.3, "Начало", 11),
-        "event:intermediate" => new("Промежуточное событие", "oval", 36, 36, "RGB(255,153,51)", 1.3, "Событие", 11),
-        "event:end" => new("Конечное событие", "oval", 36, 36, "RGB(255,130,98)", 3.2, "Конец", 11),
-        _ => null,
+        "gateway:inclusive" => new("Шлюз «включающий»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
+        "gateway:event_based" => new("Шлюз «событийный»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
+        _ => EventSpec(kind),
     };
+
+    /// <summary>Вид события «event:положение[:тип]»: по имени фигуры импорт определяет и положение, и тип (сообщение, таймер…).</summary>
+    private static Spec? EventSpec(string kind)
+    {
+        var parts = kind.Split(':');
+        if (parts[0] != "event" || parts.Length < 2) return null;
+        var (name, fill, line, text) = parts[1] switch
+        {
+            "start" => ("Начальное событие", "RGB(153,255,102)", 1.3, "Начало"),
+            "intermediate" => ("Промежуточное событие", "RGB(255,153,51)", 1.3, "Событие"),
+            "end" => ("Конечное событие", "RGB(255,130,98)", 3.2, "Конец"),
+            _ => ("", "", 0.0, ""),
+        };
+        if (name == "") return null;
+        if (parts.Length > 2 && TriggerNames.TryGetValue(parts[2], out var t)) { name += $" «{t}»"; text = char.ToUpper(t[0]) + t[1..]; }
+        return new(name, "oval", 36, 36, fill, line, text, 11);
+    }
+
+    /// <summary>Типы событий: ключ модели → слово в имени фигуры (по нему импорт распознаёт триггер).</summary>
+    private static readonly Dictionary<string, string> TriggerNames = new()
+    {
+        ["message"] = "сообщение", ["timer"] = "таймер", ["conditional"] = "условное", ["signal"] = "сигнал",
+        ["error"] = "ошибка", ["escalation"] = "эскалация", ["terminate"] = "завершение процесса",
+    };
+
+    /// <summary>Включает инструмент окна Visio: «connector» — соединительная линия, иначе обычный указатель.</summary>
+    public void SetTool(string tool) => Try(() =>
+    {
+        const int visCmdDRPointerTool = 1219, visCmdDRConnectorTool = 1225;
+        dynamic app = visio.Ocx.Window.Application;
+        app.DoCmd((short)(tool == "connector" ? visCmdDRConnectorTool : visCmdDRPointerTool));
+    });
 
     private const double PxIn = 1.0 / 96.0; // пиксель диаграммы → дюймы Visio
 

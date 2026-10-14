@@ -62,6 +62,7 @@ internal sealed class MainForm : Form
             case "reload": await Reload(); break;
             case "zoom": visio.SetZoom(root.GetProperty("value").GetDouble()); break;
             case "fit": visio.FitPage(); break;
+            case "tool": visio.SetTool(root.GetProperty("tool").GetString() ?? ""); break;
             case "grid": visio.ToggleGrid(); break;
             case "drop": OnDrop(root); break;
             case "select":

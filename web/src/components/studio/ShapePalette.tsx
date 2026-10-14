@@ -10,7 +10,16 @@ export const PALETTE: { kind: string; title: string }[] = [
   { kind: "event:end", title: "Конечное событие" },
   { kind: "gateway:exclusive", title: "Шлюз «или» (исключающий)" },
   { kind: "gateway:parallel", title: "Шлюз «и» (параллельный)" },
+  { kind: "gateway:inclusive", title: "Шлюз «или» (включающий)" },
+  { kind: "gateway:event_based", title: "Шлюз по событиям" },
 ];
+
+/** Типы событий, которые можно выбрать у каждого вида события (как в палитре Business Studio). */
+export const EVENT_TYPES: Record<string, { type: string; title: string }[]> = {
+  start: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }],
+  intermediate: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }, { type: "escalation", title: "Эскалация" }],
+  end: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "error", title: "Ошибка" }, { type: "escalation", title: "Эскалация" }, { type: "signal", title: "Сигнал" }, { type: "terminate", title: "Завершение процесса" }],
+};
 
 const INK = "#000";
 
@@ -39,6 +48,20 @@ function Glyph({ kind }: { kind: string }) {
           <path d="m8.5 8.5 7 7M15.5 8.5l-7 7" strokeWidth="2" />
         </>
       )}
+      {kind === "gateway:inclusive" && (
+        <>
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
+          <circle cx="12" cy="12" r="4.5" fill="none" strokeWidth="2" />
+        </>
+      )}
+      {kind === "gateway:event_based" && (
+        <>
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
+          <circle cx="12" cy="12" r="5.5" fill="none" />
+          <path d="m12 8.8 3 2.2-1.2 3.5h-3.6L9 11z" fill="none" />
+        </>
+      )}
+      {kind === "connector" && <path d="M5 4v8h14v8" fill="none" strokeWidth="1.4" stroke="#4677bf" />}
       {kind === "gateway:parallel" && (
         <>
           <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
@@ -55,6 +78,14 @@ function Glyph({ kind }: { kind: string }) {
  */
 export default function ShapePalette() {
   const [drag, setDrag] = useState<{ kind: string; x: number; y: number } | null>(null);
+  // выбранный тип события у каждого вида и открытый список типов
+  const [types, setTypes] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<string | null>(null);
+  const [tool, setTool] = useState<"pointer" | "connector">("pointer");
+  const pickTool = (t: "pointer" | "connector") => {
+    setTool(t);
+    postToShell({ t: "tool", tool: t });
+  };
 
   useEffect(() => {
     if (!drag) return;
@@ -76,20 +107,57 @@ export default function ShapePalette() {
 
   return (
     <div className="shape-palette" role="toolbar" aria-orientation="vertical" aria-label="Палитра фигур">
-      {PALETTE.map((p) => (
-        <button
-          key={p.kind}
-          className={`palette-item ${drag?.kind === p.kind ? "dragging" : ""}`}
-          title={`${p.title}: перетащите на диаграмму или щёлкните`}
-          aria-label={p.title}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            setDrag({ kind: p.kind, x: e.clientX, y: e.clientY });
-          }}
-        >
-          <Glyph kind={p.kind} />
-        </button>
-      ))}
+      <button className={`palette-item ${tool === "connector" ? "active" : ""}`} title="Соединительная линия: протяните от фигуры к фигуре (ещё раз — вернуться к указателю)" aria-label="Соединительная линия" aria-pressed={tool === "connector"} onClick={() => pickTool(tool === "connector" ? "pointer" : "connector")}>
+        <Glyph kind="connector" />
+      </button>
+      {PALETTE.map((p) => {
+        const pos = p.kind.startsWith("event:") ? p.kind.slice(6) : null;
+        const type = pos ? types[pos] ?? "" : "";
+        const kind = type ? `${p.kind}:${type}` : p.kind;
+        const typeTitle = pos ? EVENT_TYPES[pos].find((t) => t.type === type)?.title : null;
+        return (
+          <div key={p.kind} className="palette-cell">
+            <button
+              className={`palette-item ${drag?.kind === kind ? "dragging" : ""}`}
+              title={`${p.title}${typeTitle && type ? ` — ${typeTitle}` : ""}: перетащите на диаграмму или щёлкните`}
+              aria-label={p.title}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setOpen(null);
+                setDrag({ kind, x: e.clientX, y: e.clientY });
+              }}
+            >
+              <Glyph kind={p.kind} />
+              {type && <span className="palette-badge">{typeTitle?.[0]}</span>}
+            </button>
+            {pos && (
+              <>
+                <button className="palette-more" title={`Тип события: ${p.title.toLowerCase()}`} aria-label={`Тип: ${p.title}`} aria-expanded={open === pos} onClick={() => setOpen(open === pos ? null : pos)}>
+                  ▸
+                </button>
+                {open === pos && (
+                  <div className="palette-flyout" role="menu">
+                    {EVENT_TYPES[pos].map((t) => (
+                      <button
+                        key={t.type}
+                        role="menuitemradio"
+                        aria-checked={t.type === type}
+                        className={t.type === type ? "on" : ""}
+                        onClick={() => {
+                          setTypes((x) => ({ ...x, [pos]: t.type }));
+                          setOpen(null);
+                        }}
+                      >
+                        {t.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -105,4 +105,30 @@ describe("фигуры из палитры Visio (без меток pm_*)", () =
     expect(changes.shapeMap.map((x) => x.shapeId).sort()).toEqual(["9001", "9002", "9003", "9004", "9005"]);
     expect(changes.shapeMap.every((x) => x.page === "BPMN B002.01.01" && changes.added.includes(x.nodeId))).toBe(true);
   });
+
+  it("шлюзы «включающий» и «событийный», события с типом (сообщение, таймер, завершение) распознаются по имени фигуры палитры", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN B002.01.01");
+    const edited = await edit(buf, page, (xml) =>
+      xml.replace(
+        "</Shapes>",
+        shape(9011, "Шлюз «включающий».50", "diamond", "O", 900, 300, 50, 50) +
+          shape(9012, "Шлюз «событийный».51", "diamond", "O", 1000, 300, 50, 50) +
+          shape(9013, "Начальное событие «сообщение».52", "oval", "Сообщение", 1100, 300, 36, 36) +
+          shape(9014, "Промежуточное событие «таймер».53", "oval", "Таймер", 1200, 300, 36, 36) +
+          shape(9015, "Конечное событие «завершение процесса».54", "oval", "Завершение процесса", 1300, 300, 36, 36) +
+          "</Shapes>"
+      )
+    );
+    const { model, changes } = reconcileVsdxEdit(m, await parseVsdx(edited));
+    const added = model.nodes.filter((n) => changes.added.includes(n.id));
+    expect(added).toHaveLength(5);
+    expect(added.find((n) => n.type === "gateway" && n.subtype === "inclusive")).toBeTruthy();
+    expect(added.find((n) => n.type === "gateway" && n.subtype === "event_based")).toBeTruthy();
+    const ev = (name: string) => added.find((n) => n.type === "event" && n.name === name)!;
+    expect(ev("Сообщение")).toMatchObject({ subtype: "start", trigger: { type: "message" } });
+    expect(ev("Таймер")).toMatchObject({ subtype: "intermediate", trigger: { type: "timer" } });
+    expect(ev("Завершение процесса")).toMatchObject({ subtype: "end", trigger: { type: "terminate" } });
+  });
 });

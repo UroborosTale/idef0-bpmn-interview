@@ -213,4 +213,13 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .visio-body .visio-slot { flex: 1; min-width: 0; height: auto; }
 .shape-palette { flex: 0 0 34px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; background: var(--bs-toolbar); border-right: 1px solid var(--bs-border); user-select: none; }
 .palette-item { width: 28px; height: 28px; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 2px; cursor: grab; touch-action: none; }
+.palette-cell { position: relative; display: flex; align-items: center; justify-content: center; }
+.palette-item { position: relative; }
+.palette-item.active { background: var(--bs-press); border: 1px solid var(--bs-hover-border); }
+.palette-badge { position: absolute; right: -1px; bottom: -1px; font-size: 8px; line-height: 9px; padding: 0 2px; background: #fff; border: 1px solid var(--bs-border); border-radius: 2px; color: #000; }
+.palette-more { position: absolute; right: -3px; top: 50%; transform: translateY(-50%); width: 8px; height: 14px; padding: 0; border: 0; background: transparent; font-size: 8px; color: #555; cursor: pointer; }
+.palette-flyout { position: absolute; left: 34px; top: -2px; z-index: 30; min-width: 150px; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--bs-border); box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+.palette-flyout button { text-align: left; padding: 4px 10px; border: 0; background: transparent; font-size: 12px; cursor: pointer; }
+.palette-flyout button:hover { background: var(--bs-hover); }
+.palette-flyout button.on { font-weight: 600; background: var(--bs-press); }
 .palette-item.dragging { background: var(--bs-press); border-color: var(--bs-hover-border); }
