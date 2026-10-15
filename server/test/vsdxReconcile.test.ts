@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import { buildVsdx } from "../src/export/vsdx.js";
-import { applySheetEdits, parseVsdx, reconcileVsdxEdit } from "../src/pipeline/vsdxImport.js";
+import { applyDeletions, applyIdef0Edits, applySheetEdits, parseVsdx, reconcileVsdxEdit } from "../src/pipeline/vsdxImport.js";
 import { structuredModel } from "./fixtures.js";
 
 /** Правка файла так, как её делает Visio: меняется содержимое страницы внутри пакета. */
@@ -178,6 +178,43 @@ describe("размер листа, заданный в Visio", () => {
     expect(applySheetEdits(model, (await parseVsdx(edited)).sheets)).toBe(1);
     expect(model.bpmn_frames.o1).toMatchObject({ show: true });
     expect(model.bpmn_frames.o1.w).toBeGreaterThan(0);
+  });
+});
+
+describe("правки IDEF0 и удаление фигур из Visio", () => {
+  it("файл без правок: ничего не переименовано и не пропало", async () => {
+    const m = structuredModel();
+    const parsed = await parseVsdx(await buildVsdx(m));
+    const c = applyIdef0Edits(JSON.parse(JSON.stringify(m)), parsed.idef0);
+    expect(c).toEqual({ functions: [], arrows: [], missingFunctions: [], missingArrows: [] });
+  });
+
+  it("блок и стрелка IDEF0 переименованы в Visio — названия функции и сущности меняются в модели", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const fn = m.nodes.find((n) => !n.bpmn_scope && (n.type === "task" || n.type === "subprocess") && !n.idef0_parent)!;
+    const page = await pageNo(buf, "IDEF0 B002.00.00");
+    const edited = await edit(buf, page, (xml) => xml.replace(/<Text>[\s\S]*?<\/Text>/g, (t) => t.split(fn.name).join("Новое название блока"))); // правится текст фигуры, метка pm_n остаётся прежней
+    const parsed = await parseVsdx(edited);
+    const model = JSON.parse(JSON.stringify(m));
+    const c = applyIdef0Edits(model, parsed.idef0);
+    expect(c.functions.length + c.arrows.length).toBeGreaterThan(0);
+    if (c.functions.length) expect(model.nodes.find((n: { id: string }) => n.id === fn.id).name).toBe("Новое название блока");
+  });
+
+  it("удаление: шаг убирается вместе со стрелками и граничными событиями, функция — с вложенными и шагами диаграммы; без вызова модель не меняется", async () => {
+    const m = structuredModel();
+    const op = m.nodes.find((n) => n.idef0_parent && m.nodes.some((x) => x.bpmn_scope === n.id))!;
+    const model = JSON.parse(JSON.stringify(m));
+    const r = applyDeletions(model, [op.id], []);
+    expect(r.nodes).toBeGreaterThan(1); // операция и её шаги
+    expect(model.nodes.some((n: { id: string; bpmn_scope?: string }) => n.id === op.id || n.bpmn_scope === op.id)).toBe(false);
+    expect(model.flows.every((f: { from: string; to: string }) => model.nodes.some((n: { id: string }) => n.id === f.from) && model.nodes.some((n: { id: string }) => n.id === f.to))).toBe(true);
+    // шаг BPMN
+    const step = m.nodes.find((n) => n.bpmn_scope && n.type === "task")!;
+    const m2 = JSON.parse(JSON.stringify(m));
+    expect(applyDeletions(m2, [step.id], []).nodes).toBe(1);
+    expect(m2.flows.some((f: { from: string; to: string }) => f.from === step.id || f.to === step.id)).toBe(false);
   });
 });
 

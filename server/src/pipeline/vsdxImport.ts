@@ -83,6 +83,8 @@ export interface VsdxPage {
   edges: VsdxEdge[];
   /** Рамка листа этой страницы (метка pm_k = sheet), если она есть. */
   sheet?: VsdxSheet;
+  /** Блоки и стрелки IDEF0 с метками (для страниц IDEF0 собственной выгрузки). */
+  idef0Marks?: VsdxIdef0Mark[];
 }
 /** Рамка листа на странице нашей выгрузки: что нарисовано при выгрузке (orig) и что стало в Visio (now), px, y вниз. */
 export interface VsdxSheet {
@@ -91,8 +93,29 @@ export interface VsdxSheet {
   orig: [number, number, number, number];
   now: { x: number; y: number; w: number; h: number };
 }
+/** Фигура страницы IDEF0 нашей выгрузки: блок функции (k = fn) или стрелка (k = arrow) с текущим текстом из Visio. */
+export interface VsdxIdef0Mark {
+  k: "fn" | "arrow";
+  id: string;
+  /** Код блока (для fn) — он стоит перед названием в тексте фигуры. */
+  code?: string;
+  /** Название при выгрузке. */
+  was: string;
+  /** Связь стрелки «вид|функция|сущность» (для arrow). */
+  link?: string;
+  text: string;
+  shapeId: string;
+}
+export interface VsdxIdef0Page {
+  name: string;
+  marks: VsdxIdef0Mark[];
+  /** Что нарисовано при выгрузке (pm_manifest): функции и стрелки; нужны, чтобы увидеть удалённое. */
+  manifest?: { fn: string[]; ar: string[] };
+}
 export interface ParsedVsdx {
   pages: VsdxPage[];
+  /** Страницы IDEF0 собственной выгрузки: правки названий блоков и стрелок. */
+  idef0: VsdxIdef0Page[];
   /** Листы со всех страниц, в том числе IDEF0 (их фигуры пока не читаются, а размер листа — да). */
   sheets: VsdxSheet[];
   warnings: string[];
@@ -391,6 +414,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
 
   const pages: VsdxPage[] = [];
   const sheets: VsdxSheet[] = [];
+  const idef0: VsdxIdef0Page[] = [];
   let skippedIdef0 = 0;
   const pageList = arr<X>(parser.parse(pagesXml).Pages?.Page);
   if (pageList.length > MAX_PAGES) warnings.push(`В файле ${pageList.length} страниц — прочитаны первые ${MAX_PAGES}.`);
@@ -410,7 +434,17 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
     }
     const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings);
     if (page.sheet) sheets.push(page.sheet);
-    if (isIdef0) continue;
+    if (isIdef0) {
+      let manifest: VsdxIdef0Page["manifest"];
+      try {
+        const m = JSON.parse(pageUser.pm_manifest ?? "null") as { fn?: string[]; ar?: string[] } | null;
+        if (m) manifest = { fn: m.fn ?? [], ar: m.ar ?? [] };
+      } catch {
+        /* повреждённая метка — как будто её нет */
+      }
+      idef0.push({ name, marks: page.idef0Marks ?? [], ...(manifest ? { manifest } : {}) });
+      continue;
+    }
     if (pageUser.pm_page === "bpmn") {
       page.own = true;
       if (pageUser.pm_scope) page.scope = pageUser.pm_scope;
@@ -425,7 +459,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   }
   if (skippedIdef0) warnings.push(`Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`);
   if (pages.length === 0) warnings.push("Не найдено ни одной фигуры, похожей на шаг процесса, событие или шлюз.");
-  return { pages, sheets, warnings };
+  return { pages, sheets, idef0, warnings };
 }
 
 function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[]): VsdxPage {
@@ -625,7 +659,13 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
       sheet = { kind: sh.user.pm_fd, key: sh.user.pm_fk ?? "", orig: orig as [number, number, number, number], now: { x: sh.box.x, y: sh.box.y, w: sh.box.w, h: sh.box.h } };
     }
   }
-  return { name: pageName, nodes, containers: lanes, edges, ...(sheet ? { sheet } : {}) };
+  const idef0Marks: VsdxIdef0Mark[] = [];
+  for (const s of all) {
+    const k = s.user.pm_k;
+    if ((k !== "fn" && k !== "arrow") || !s.user.pm_id) continue;
+    idef0Marks.push({ k, id: s.user.pm_id, ...(s.user.pm_c ? { code: s.user.pm_c } : {}), was: s.user.pm_n ?? "", ...(s.user.pm_a ? { link: s.user.pm_a } : {}), text: textDeep(s), shapeId: s.id });
+  }
+  return { name: pageName, nodes, containers: lanes, edges, ...(sheet ? { sheet } : {}), ...(idef0Marks.length ? { idef0Marks } : {}) };
 }
 
 // --- модель ---
@@ -926,4 +966,103 @@ export function applySheetEdits(model: ProcessLogicModel, sheets: VsdxSheet[]): 
     changed++;
   }
   return changed;
+}
+
+
+/** Что изменилось на страницах IDEF0 в Visio. */
+export interface Idef0EditChanges {
+  /** Переименованные блоки функций. */
+  functions: { nodeId: string; from: string; to: string }[];
+  /** Переименованные стрелки: меняется название сущности (данные, регламента, роли, системы) — она общая для всех диаграмм. */
+  arrows: { kind: string; entityId: string; from: string; to: string }[];
+  /** Блоки и стрелки, удалённые в Visio (в модели остались). */
+  missingFunctions: string[];
+  missingArrows: string[];
+}
+
+/**
+ * Правки страниц IDEF0 из Visio: название блока (текст «код название» без кода) и подпись стрелки возвращаются в модель. Новые фигуры
+ * IDEF0 не создаются, удалённые только перечисляются (удаляет их applyDeletions по подтверждению).
+ */
+export function applyIdef0Edits(model: ProcessLogicModel, pages: VsdxIdef0Page[]): Idef0EditChanges {
+  const out: Idef0EditChanges = { functions: [], arrows: [], missingFunctions: [], missingArrows: [] };
+  const seenFn = new Set<string>();
+  const seenAr = new Set<string>();
+  const nodeById = new Map(model.nodes.map((n) => [n.id, n] as const));
+  const tag = (n: ProcessNode, t: string) => {
+    if (!n.tags.includes(t)) n.tags = [...n.tags, t];
+  };
+  const entities = (kind: string): { id: string; name: string }[] | null =>
+    kind === "input" || kind === "output" || kind === "link" || kind === "controlData" ? model.data : kind === "control" ? model.controls : kind === "role" ? model.roles : kind === "system" ? model.systems : null;
+  for (const page of pages) {
+    for (const m of page.marks) {
+      if (m.k === "fn") {
+        seenFn.add(m.id);
+        const node = nodeById.get(m.id);
+        if (!node) continue;
+        let text = clean(m.text);
+        if (m.code && text.startsWith(`${m.code} `)) text = text.slice(m.code.length + 1).trim();
+        if (text && text !== clean(m.was) && text !== node.name) {
+          out.functions.push({ nodeId: node.id, from: node.name, to: text });
+          node.name = text;
+          tag(node, "edited_externally");
+        }
+      } else {
+        const [kind, , entityId] = (m.link ?? "").split("|");
+        if (m.link) seenAr.add(m.link);
+        const list = entities(kind);
+        const entity = list?.find((e) => e.id === (entityId ?? m.id));
+        if (!entity) continue;
+        const text = clean(m.text);
+        // подпись при выгрузке перенесена по словам: сравниваются слова, а не переводы строк
+        if (text && text !== clean(m.was) && text !== entity.name) {
+          out.arrows.push({ kind, entityId: entity.id, from: entity.name, to: text });
+          entity.name = text;
+        }
+      }
+    }
+    for (const id of page.manifest?.fn ?? []) if (!seenFn.has(id) && nodeById.has(id)) out.missingFunctions.push(id);
+    for (const l of page.manifest?.ar ?? []) if (!seenAr.has(l)) out.missingArrows.push(l);
+  }
+  return out;
+}
+
+/**
+ * Удаляет из модели то, что в Visio нарисовано при выгрузке, а потом удалено: шаги (с граничными событиями и стрелками к ним),
+ * функции IDEF0 (с вложенными функциями и шагами их диаграмм) и стрелки BPMN. Стрелки IDEF0 снимаются со связанных функций (данные,
+ * регламенты, роли и системы остаются в справочниках). Возвращает, сколько объектов удалено.
+ */
+export function applyDeletions(model: ProcessLogicModel, nodeIds: string[], flowIds: string[], arrowLinks: string[] = []): { nodes: number; flows: number; arrows: number } {
+  const doomed = new Set(nodeIds);
+  // вложенные: потомки функции, шаги её диаграммы и граничные события удаляемых задач
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const n of model.nodes) {
+      if (doomed.has(n.id)) continue;
+      if ((n.idef0_parent && doomed.has(n.idef0_parent)) || (n.bpmn_scope && doomed.has(n.bpmn_scope)) || (n.attached_to && doomed.has(n.attached_to))) {
+        doomed.add(n.id);
+        grew = true;
+      }
+    }
+  }
+  const before = { nodes: model.nodes.length, flows: model.flows.length };
+  const goneFlows = new Set(flowIds);
+  model.nodes = model.nodes.filter((n) => !doomed.has(n.id));
+  model.flows = model.flows.filter((f) => !goneFlows.has(f.id) && !doomed.has(f.from) && !doomed.has(f.to));
+  let arrows = 0;
+  for (const link of arrowLinks) {
+    const [kind, nodeId, entityId] = link.split("|");
+    const n = model.nodes.find((x) => x.id === nodeId);
+    if (!n || !entityId) continue;
+    const drop = (list: string[] | undefined) => (list ? list.filter((x) => x !== entityId) : list);
+    const was = JSON.stringify([n.inputs, n.outputs, n.controls, n.system_ids, n.control_data_ids, n.role_id]);
+    if (kind === "input" || kind === "link") n.inputs = drop(n.inputs) ?? [];
+    else if (kind === "output") n.outputs = drop(n.outputs) ?? [];
+    else if (kind === "control") n.controls = drop(n.controls) ?? [];
+    else if (kind === "controlData" || kind === "controlLink") n.control_data_ids = drop(n.control_data_ids);
+    else if (kind === "system") n.system_ids = drop(n.system_ids) ?? [];
+    else if (kind === "role" && n.role_id === entityId) n.role_id = null;
+    if (JSON.stringify([n.inputs, n.outputs, n.controls, n.system_ids, n.control_data_ids, n.role_id]) !== was) arrows++;
+  }
+  return { nodes: before.nodes - model.nodes.length, flows: before.flows - model.flows.length, arrows };
 }

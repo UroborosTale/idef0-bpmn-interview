@@ -315,18 +315,41 @@ internal sealed class MainForm : Form
     /// Принять правки из Visio: файл уходит на сервер, новые фигуры помечаются id созданных шагов (иначе следующий приём создал бы
     /// их заново), студия получает обновлённую сессию без перезагрузки страницы. Возвращает ответ сервера (JSON).
     /// </summary>
+    private string? declinedDeletion;
+
     private async Task<string> Apply(bool auto = false)
     {
         await gate.WaitAsync();
         try
         {
             var json = await visio.SendEditsAsync(server);
+            // удалённое в Visio: пользователь решает, убирать ли это и из модели (по умолчанию в модели всё остаётся)
+            int Count(JsonElement ch, string k) => ch.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.Array ? v.GetArrayLength() : 0;
+            string MissingKey(JsonElement ch) => string.Join(",", new[] { "missing", "missingFlows" }.SelectMany(k => ch.GetProperty(k).EnumerateArray().Select(x => x.GetString())))
+                + "|" + string.Join(",", ch.GetProperty("idef0").GetProperty("missingFunctions").EnumerateArray().Select(x => x.GetString()))
+                + "|" + string.Join(",", ch.GetProperty("idef0").GetProperty("missingArrows").EnumerateArray().Select(x => x.GetString()));
+            using (var first = JsonDocument.Parse(json))
+            {
+                var ch = first.RootElement.GetProperty("changes");
+                var gone = Count(ch, "missing");
+                var goneFlows = Count(ch, "missingFlows");
+                var goneFns = Count(ch.GetProperty("idef0"), "missingFunctions");
+                var goneArrows = Count(ch.GetProperty("idef0"), "missingArrows");
+                var key = MissingKey(ch);
+                if (gone + goneFlows + goneFns + goneArrows > 0 && key != declinedDeletion)
+                {
+                    var what = string.Join(", ", new[] { gone > 0 ? $"шагов BPMN: {gone}" : "", goneFlows > 0 ? $"стрелок BPMN: {goneFlows}" : "", goneFns > 0 ? $"функций IDEF0: {goneFns}" : "", goneArrows > 0 ? $"стрелок IDEF0: {goneArrows}" : "" }.Where(x => x != ""));
+                    var ask = MessageBox.Show(this, $"В Visio удалено: {what}.\n\nУдалить это и из модели процесса? (Функция уходит вместе с вложенными функциями и шагами её диаграмм.)", Text, MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                    if (ask == DialogResult.Yes) { json = await visio.SendEditsAsync(server, deleteMissing: true); declinedDeletion = null; }
+                    else declinedDeletion = key; // тот же набор больше не спрашиваем, пока не изменится
+                }
+            }
             using var doc = JsonDocument.Parse(json);
             var c = doc.RootElement.GetProperty("changes");
             int n(string k) => c.GetProperty(k).GetArrayLength();
             visio.TagCreated(c);
             var changed = n("renamed") + n("added") + n("addedFlows") + n("flowsRenamed");
-            status.Text = (auto ? "Автоматически: " : "") + $"правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}" + (n("missing") + n("missingFlows") > 0 ? $"; удалено в Visio {n("missing")} шагов и {n("missingFlows")} стрелок (в модели остались)" : "");
+            status.Text = (auto ? "Автоматически: " : "") + $"правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}" + (n("missing") + n("missingFlows") > 0 ? $"; удалено в Visio {n("missing")} шагов и {n("missingFlows")} стрелок (в модели остались)" : "") + (c.TryGetProperty("deleted", out var del) && del.GetProperty("nodes").GetInt32() + del.GetProperty("flows").GetInt32() > 0 ? $"; из модели удалено: объектов {del.GetProperty("nodes").GetInt32()}, стрелок {del.GetProperty("flows").GetInt32()}" : "");
             if (!auto || changed > 0) PostToWeb("{\"t\":\"session\",\"session\":" + doc.RootElement.GetProperty("session").GetRawText() + "}");
             return json;
         }
@@ -426,6 +449,9 @@ internal sealed class MainForm : Form
         }
         // живая связь: фигура, выделенная в Visio, открывается в панели свойств студии
         var taskId = added.First(n => n.GetProperty("name").GetString() == "Новая задача").GetProperty("id").GetString()!;
+        PostToWeb("{\"t\":\"props\"}"); // как в Business Studio, панель свойств скрыта, пока её не открыли (Ctrl+E)
+        await Task.Delay(500);
+        visio.ShowDiagram(new Diagram("bpmn", scope)); // панель свойств изменила размер холста, и студия вернула свою страницу — самопроверка снова открывает страницу операции
         L($"выделение в Visio: {visio.SelectNode(taskId)}; метка: {visio.SelectedTag()}");
         await PollTick();
         await Task.Delay(1500);
@@ -433,6 +459,7 @@ internal sealed class MainForm : Form
         L($"панель свойств студии после выделения в Visio: {props}");
         if (!props.Contains("Свойства элемента") || !props.Contains("true")) L("ПРОВАЛ: выделение из Visio не дошло до панели свойств студии");
         // после приёма правок студия вернула Visio на свою страницу; для проверок возвращаемся на страницу операции
+        await Task.Delay(1500); // студия может ещё раз прислать место холста (панель свойств изменила его размер)
         visio.ShowDiagram(new Diagram("bpmn", scope));
         await Task.Delay(300);
         // студия → Visio: шаг, выбранный в студии, выделяется на диаграмме

@@ -482,7 +482,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     // у блока подпись «код название», как в Business Studio; полное название хранится в метке pm_n
     const own = ownStyle(model, "idef0_block");
     const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 10.7), ...(own.text ? { color: own.text } : {}) }];
-    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
+    page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_c: b.code, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     // у блока контекстной диаграммы в правом нижнем углу — номер блока «0», как в Business Studio
     if (!editable) page.label("0", { x: b.x + b.w - 6, y: b.y + b.h - 18, anchor: "end", w: 30 }, { fontPx: 10, color: "#000000" });
   }

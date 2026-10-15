@@ -496,7 +496,7 @@ internal sealed class VisioPane : Panel
     }
 
     /// <summary>Сохраняет документ из окна Visio и отправляет серверу как правки сессии. Возвращает ответ сервера (JSON).</summary>
-    public async Task<string> SendEditsAsync(ServerHost server)
+    public async Task<string> SendEditsAsync(ServerHost server, bool deleteMissing = false)
     {
         if (LoadedSession == null) throw new InvalidOperationException("В Visio ничего не открыто");
         await Task.Delay(100); // Visio заканчивает обработку только что созданных фигур в очереди окна; сохранение без паузы подвисает
@@ -515,7 +515,7 @@ internal sealed class VisioPane : Panel
         }
         finally { Visible = wasVisible; }
         var content = Convert.ToBase64String(await File.ReadAllBytesAsync(file));
-        var body = new StringContent(System.Text.Json.JsonSerializer.Serialize(new { content }), System.Text.Encoding.UTF8, "application/json");
+        var body = new StringContent(System.Text.Json.JsonSerializer.Serialize(new { content, deleteMissing }), System.Text.Encoding.UTF8, "application/json");
         Trace?.Invoke("POST правок: старт");
         var resp = await ServerHost.Http.PostAsync($"{server.Url}/api/sessions/{LoadedSession}/diagram-import/vsdx", body);
         Trace?.Invoke("POST правок: ответ получен");

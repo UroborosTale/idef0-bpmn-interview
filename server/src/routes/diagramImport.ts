@@ -9,7 +9,7 @@ import {
   reconcileDrawioIdef0Edit,
   buildModelFromParsedDrawio,
 } from "../pipeline/diagramImport.js";
-import { parseVsdx, buildModelFromParsedVsdx, reconcileVsdxEdit, applySheetEdits } from "../pipeline/vsdxImport.js";
+import { parseVsdx, buildModelFromParsedVsdx, reconcileVsdxEdit, applySheetEdits, applyIdef0Edits, applyDeletions } from "../pipeline/vsdxImport.js";
 import { parseXlsx, buildModelFromTable } from "../pipeline/xlsxImport.js";
 import { stepsTemplateXlsx } from "../pipeline/xlsxTemplate.js";
 import { detectGaps } from "../pipeline/gaps.js";
@@ -67,7 +67,7 @@ diagramImportRouter.post("/sessions/:id/diagram-import/vsdx", async (req, res) =
     res.status(409).json({ error: block });
     return;
   }
-  const { content } = req.body as { content: string };
+  const { content, deleteMissing } = req.body as { content: string; deleteMissing?: boolean };
   if (typeof content !== "string" || !content) {
     res.status(400).json({ error: "content (файл .vsdx в base64) обязателен" });
     return;
@@ -81,7 +81,11 @@ diagramImportRouter.post("/sessions/:id/diagram-import/vsdx", async (req, res) =
   }
   const { model, changes } = reconcileVsdxEdit(session.model!, parsed);
   const sheetsChanged = applySheetEdits(model, parsed.sheets); // размер листа, заданный в Visio
-  (changes as { sheets?: number }).sheets = sheetsChanged;
+  const idef0 = applyIdef0Edits(model, parsed.idef0); // названия блоков и стрелок IDEF0
+  // удалённое в Visio удаляется из модели только по подтверждению пользователя (deleteMissing); иначе оно лишь перечисляется
+  let deleted = { nodes: 0, flows: 0, arrows: 0 };
+  if (deleteMissing) deleted = applyDeletions(model, [...changes.missing, ...idef0.missingFunctions], changes.missingFlows, idef0.missingArrows);
+  Object.assign(changes as object, { sheets: sheetsChanged, idef0, deleted });
   model.gaps = detectGaps(model);
   const validation = validateModel(model);
   updateSession(req.params.id, { model, validation, diagramsStale: true });
