@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { purchaseModel } from "../../test/fixtures";
+import { purchaseModel, structuredModel } from "../../test/fixtures";
 import { LANE_H, START_Y, autoLayout, boxOf, laneIndexAtY, laneIndexOfRole, positionsFromBpmnXml, visibleNodes, withLayout, wrapText } from "./geometry";
-import { addFlow, addNodeAt, addRole, deleteNode, duplicateNode, deleteRole, dropNodeIntoLane, moveNode, nextId, setNodeRole, setNodeType } from "./model-ops";
+import { addFlow, addNodeAt, addRole, deleteNode, duplicateNode, deleteRole, dropNodeIntoLane, moveNode, nextId, replaceNodeObject, setNodeRole, setNodeType } from "./model-ops";
 
 const laid = () => withLayout(purchaseModel());
 
@@ -137,5 +137,22 @@ describe("BPMN: дублирование", () => {
 
   it("несуществующий элемент", () => {
     expect(duplicateNode(laid(), "нет").error).toBeTruthy();
+  });
+});
+describe("BPMN: смена объекта фигуры", () => {
+  it("новый объект занимает место прежнего: диаграмма, положение, стрелки; прежний убирается", () => {
+    const m = structuredModel();
+    const old = m.nodes.find((n) => n.id === "b9")!; // конечное событие диаграммы o1
+    const other = { ...old, id: "z1", name: "Другое событие", bpmn_scope: "o2", layout: { x: 5, y: 5 } };
+    const before = { ...m, nodes: [...m.nodes, other], flows: [...m.flows, { id: "zf", from: "z1", to: "z1x", type: "sequence" } as never] };
+    const next = replaceNodeObject(before, "b9", "z1");
+    expect(next.nodes.find((n) => n.id === "b9")).toBeUndefined();
+    const placed = next.nodes.find((n) => n.id === "z1")!;
+    expect(placed.bpmn_scope).toBe(old.bpmn_scope);
+    expect(placed.layout).toEqual(old.layout);
+    expect(next.flows.every((f) => f.from !== "b9" && f.to !== "b9")).toBe(true);
+    expect(next.flows.some((f) => f.to === "z1" && before.flows.some((g) => g.to === "b9" && g.from === f.from))).toBe(true);
+    expect(next.flows.some((f) => f.id === "zf")).toBe(false); // прежние стрелки нового объекта с другой диаграммы сняты
+    expect(replaceNodeObject(before, "b9", "b1")).toBe(before); // другой вид — не меняется
   });
 });

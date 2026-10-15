@@ -58,7 +58,7 @@ let menuSeq = 0;
  * Показать меню Windows под элементом anchor: обещание отдаёт id выбранного пункта или null, если меню закрыли без выбора.
  * Нужно в настольном приложении: выпадающее HTML-меню над холстом закрыто окном Visio.
  */
-export function showShellMenu(anchor: Element | "cursor", items: ShellMenuItem[]): Promise<string | null> {
+export function showShellMenu(anchor: Element | "cursor", items: ShellMenuItem[], opts: { mini?: boolean } = {}): Promise<string | null> {
   const id = `m${++menuSeq}`;
   const r = anchor === "cursor" ? null : anchor.getBoundingClientRect();
   return new Promise((resolve) => {
@@ -68,6 +68,6 @@ export function showShellMenu(anchor: Element | "cursor", items: ShellMenuItem[]
         resolve(m.t === "menu-pick" ? m.item : null);
       }
     });
-    postToShell({ t: "menu", id, rect: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : { cursor: true }, items });
+    postToShell({ t: "menu", id, rect: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : { cursor: true }, items, ...(opts.mini ? { mini: true } : {}) });
   });
 }

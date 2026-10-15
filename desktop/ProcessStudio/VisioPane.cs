@@ -317,6 +317,47 @@ internal sealed class VisioPane : Panel
         return win.Selection.Group();
     }
 
+    /// <summary>
+    /// Форматирование выделенных фигур Visio (панель над меню фигуры): шрифт крупнее и мельче, полужирный и курсив, заливка, выравнивание текста
+    /// по горизонтали и вертикали, порядок наложения. Это оформление документа Visio: в модель оно не возвращается.
+    /// </summary>
+    public void FormatSelection(string op, Color? color)
+    {
+        try
+        {
+            dynamic win = visio.Ocx.Window;
+            dynamic sel = win.Selection;
+            int n = (int)sel.Count;
+            for (int i = 1; i <= n; i++)
+            {
+                dynamic sh = sel[i];
+                switch (op)
+                {
+                    case "bigger":
+                    case "smaller":
+                        Try(() => { var c = sh.CellsU["Char.Size"]; double v = Convert.ToDouble(c.ResultIU) + (op == "bigger" ? 1 : -1) / 72.0; if (v >= 4 / 72.0) c.ResultIU = v; });
+                        break;
+                    case "bold":
+                    case "italic":
+                        Try(() => { var c = sh.CellsU["Char.Style"]; int v = (int)Convert.ToDouble(c.ResultIU); int bit = op == "bold" ? 1 : 2; c.FormulaU = (v ^ bit).ToString(); });
+                        break;
+                    case "fill":
+                        if (color is { } col) Try(() => sh.CellsU["FillForegnd"].FormulaU = $"RGB({col.R},{col.G},{col.B})");
+                        break;
+                    case "left": Try(() => sh.CellsU["Para.HorzAlign"].FormulaU = "0"); break;
+                    case "center": Try(() => sh.CellsU["Para.HorzAlign"].FormulaU = "1"); break;
+                    case "right": Try(() => sh.CellsU["Para.HorzAlign"].FormulaU = "2"); break;
+                    case "top": Try(() => sh.CellsU["VerticalAlign"].FormulaU = "0"); break;
+                    case "middle": Try(() => sh.CellsU["VerticalAlign"].FormulaU = "1"); break;
+                    case "bottom": Try(() => sh.CellsU["VerticalAlign"].FormulaU = "2"); break;
+                    case "front": Try(() => sh.BringToFront()); break;
+                    case "back": Try(() => sh.SendToBack()); break;
+                }
+            }
+        }
+        catch { /* ничего не выделено или Visio занят */ }
+    }
+
     /// <summary>Записывает пользовательскую ячейку фигуры (User.имя): фигура получает метку модели, как у фигур нашей выгрузки.</summary>
     private static void SetUser(dynamic holder, string name, string value)
     {

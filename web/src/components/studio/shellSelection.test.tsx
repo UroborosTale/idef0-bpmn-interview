@@ -89,6 +89,36 @@ describe("выделение между студией и Visio", () => {
     expect(saved.nodes.find((n) => n.id === "b0")!.trigger?.type).toBe("timer");
   });
 
+  it("пункты меню фигуры «Гиперссылка…» и «Настроить показ параметров»: окна, запись в модель, Visio прячется на время окна", async () => {
+    const onSave = vi.fn(async () => true);
+    render(<Studio session={session(structuredModel())} busy={false} onSave={onSave} />);
+    const menuFor = async (item: string) => {
+      post.mockClear();
+      fromShell({ t: "shape-menu", kind: "node", id: "b1" });
+      const req = post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: { id?: string; label?: string }[] }).find((m) => m.t === "menu")!;
+      expect(req.items!.map((i) => i.label)).toEqual(expect.arrayContaining(["Настроить показ параметров", "Гиперссылка…", "Сменить объект"]));
+      await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: req.id, item } })));
+    };
+    await menuFor("links");
+    expect(screen.getByRole("dialog", { name: "Гиперссылки" })).toBeTruthy();
+    expect(post.mock.calls.some((c) => (c[0] as { t: string; visible?: boolean }).t === "slot" && (c[0] as { visible?: boolean }).visible === false)).toBe(true);
+    fireEvent.change(screen.getByLabelText("Адрес"), { target: { value: "https://example.org/reg" } });
+    fireEvent.change(screen.getByLabelText("Описание"), { target: { value: "Регламент" } });
+    fireEvent.click(screen.getByRole("button", { name: "ОК" }));
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
+    const saved = () => (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; hyperlinks?: { address: string; description?: string }[]; param_display?: Record<string, { param: string; prefix?: string }> }[] }])[0].nodes.find((n) => n.id === "b1")!;
+    expect(saved().hyperlinks).toEqual([{ address: "https://example.org/reg", description: "Регламент" }]);
+
+    await menuFor("params");
+    expect(screen.getByRole("dialog", { name: "Настройка показа параметров объекта" })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Параметр 3"));
+    fireEvent.change(screen.getByLabelText("Параметр для отображения"), { target: { value: "role" } });
+    fireEvent.change(screen.getByLabelText("Префикс"), { target: { value: "Исп.: " } });
+    fireEvent.click(screen.getByRole("button", { name: "ОК" }));
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
+    expect(saved().param_display).toEqual({ p3: { param: "role", prefix: "Исп.: " } });
+  });
+
   it("правый щелчок по пустому месту: вставить, выделить всё и команды страницы уходят оболочке", async () => {
     render(<Studio session={session()} busy={false} onSave={vi.fn(async () => true)} />);
     fromShell({ t: "shape-menu", kind: null, id: null });

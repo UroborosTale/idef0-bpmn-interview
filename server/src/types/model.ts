@@ -151,6 +151,15 @@ export const ProcessNode = z.object({
   // Жизненный цикл объекта, как в Business Studio: статус и версия (без поля — «в работе», версия 1.0.0).
   lc_status: z.enum(["in_work", "review", "approved", "archived"]).optional(),
   lc_version: z.string().optional(),
+  // Гиперссылки объекта (диалог «Гиперссылка…»): первая — основная; в Visio это раздел Hyperlink фигуры.
+  hyperlinks: z.array(z.object({ address: z.string(), subaddress: z.string().optional(), description: z.string().optional() })).optional(),
+  // Показ параметров объекта на диаграмме (диалог «Настроить показ параметров объекта»): место вокруг фигуры → параметр (shared/paramDisplay.ts).
+  param_display: z
+    .record(
+      z.string(),
+      z.object({ param: z.string(), prefix: z.string().optional(), postfix: z.string().optional(), align: z.enum(["left", "center", "right"]).optional(), title: z.boolean().optional(), rows: z.number().optional() })
+    )
+    .optional(),
   idef0_parent: z.string().nullable().optional(),
   // Шаг диаграммы BPMN операции: id функции IDEF0 (операции), чью диаграмму он образует. Такой узел — не функция
   // IDEF0, а подоперация; без поля узел относится к общей схеме процесса (прежнее поведение).

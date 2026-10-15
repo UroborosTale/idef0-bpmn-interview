@@ -163,6 +163,8 @@ internal sealed class MainForm : Form
             }
         }
         menu.ShowCheckMargin = true;
+        // как в Business Studio, над меню фигуры — панель форматирования выделенных фигур (шрифт, заливка, выравнивание, порядок)
+        if (m.TryGetProperty("mini", out var mini) && mini.ValueKind == JsonValueKind.True) AddMiniToolbar(menu);
         Fill(menu.Items, m.GetProperty("items"));
         menu.Closed += (_, _) => BeginInvoke(() =>
         {
@@ -170,6 +172,48 @@ internal sealed class MainForm : Form
             menu.Dispose();
         });
         menu.Show(at);
+    }
+
+    /// <summary>Панель форматирования в начале меню фигуры: каждая кнопка применяет действие к выделенным фигурам Visio и закрывает меню.</summary>
+    private void AddMiniToolbar(ContextMenuStrip menu)
+    {
+        var panel = new FlowLayoutPanel { Width = 372, Height = 98, Margin = Padding.Empty, Padding = new Padding(2), BackColor = Color.White, WrapContents = true };
+        void Add(string text, string tip, string op, FontStyle style = FontStyle.Regular)
+        {
+            var b = new Button { Text = text, Width = 58, Height = 29, Margin = new Padding(1), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9f, style), UseVisualStyleBackColor = true };
+            b.FlatAppearance.BorderSize = 0;
+            b.FlatAppearance.MouseOverBackColor = Color.FromArgb(222, 235, 250);
+            new ToolTip().SetToolTip(b, tip);
+            b.Click += (_, _) =>
+            {
+                menu.Close();
+                if (op == "fill")
+                {
+                    using var dlg = new ColorDialog { FullOpen = true };
+                    if (dlg.ShowDialog(this) == DialogResult.OK) visio.FormatSelection("fill", dlg.Color);
+                }
+                else if (op == "painter" || op == "align") RunCommand(op == "painter" ? "formatpainter" : "align");
+                else visio.FormatSelection(op, null);
+            };
+            panel.Controls.Add(b);
+        }
+        Add("A\u207A", "Увеличить шрифт", "bigger");
+        Add("A\u207B", "Уменьшить шрифт", "smaller");
+        Add("Ж", "Полужирный", "bold", FontStyle.Bold);
+        Add("К", "Курсив", "italic", FontStyle.Italic);
+        Add("Кисть", "Формат по образцу", "painter");
+        Add("Цвет", "Цвет заливки", "fill");
+        Add("\u2261\u2190", "Текст по левому краю", "left");
+        Add("\u2261", "Текст по центру", "center");
+        Add("\u2192\u2261", "Текст по правому краю", "right");
+        Add("\u2912", "Текст сверху", "top");
+        Add("\u2195", "Текст по середине", "middle");
+        Add("\u2913", "Текст снизу", "bottom");
+        Add("Выше", "На передний план", "front");
+        Add("Ниже", "На задний план", "back");
+        Add("Равн.", "Выровнять фигуры…", "align");
+        menu.Items.Add(new ToolStripControlHost(panel) { Margin = Padding.Empty, Padding = Padding.Empty, AutoSize = false, Size = panel.Size });
+        menu.Items.Add(new ToolStripSeparator());
     }
 
     /// <summary>Меню объекта под курсором: что выделено в Visio, студия решает сама (у шага — тип задачи и цикла, у пустого места — страница).</summary>

@@ -15,7 +15,9 @@ import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
-import { deleteNode, duplicateNode, setEventDirection, setEventPosition, setEventTrigger, updateNode } from "../bpmn-editor/model-ops";
+import { deleteNode, duplicateNode, replaceNodeObject, setEventDirection, setEventPosition, setEventTrigger, updateNode } from "../bpmn-editor/model-ops";
+import ChoiceDialog from "../ChoiceDialog";
+import { HyperlinksDialog, ParamsDialog } from "./ObjectDialogs";
 import { allowedTriggers, eventSpec, type TriggerType } from "@shared/events";
 import { diagramSvg, download, sheetBox, svgToPng } from "./export-image";
 import { sheetPrintHtml, sheetPrintSetup } from "@shared/sheetPrint";
@@ -125,6 +127,8 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const [problemsOpen, setProblemsOpen] = useState(!inDesktopShell());
   const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  /** Окно объекта по пункту меню фигуры: гиперссылки, показ параметров, смена объекта. */
+  const [objDialog, setObjDialog] = useState<{ kind: "links" | "params" | "change"; id: string } | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
   const [questions, setQuestions] = useState<AgentQuestionRow[]>([]);
@@ -675,9 +679,13 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
       }
       items = [
         ...typed,
+        { id: "params", label: "Настроить показ параметров" },
         ...edit,
+        { group: "Ссылки" },
+        { id: "links", label: "Гиперссылка…" },
         { group: "Объект" },
         { id: "similar", label: "Выделить все подобные" },
+        { id: "change", label: "Сменить объект" },
         { id: "usage", label: "Анализ использования объекта" },
         { id: "find", label: "Найти в навигаторе" },
         { group: "Свойства" },
@@ -697,7 +705,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         { id: "props", label: "Свойства диаграммы", kbd: "Ctrl+E" },
       ];
     }
-    void showShellMenu("cursor", items).then((picked) => {
+    void showShellMenu("cursor", items, { mini: !!node }).then((picked) => {
       if (!picked) return;
       const [what, arg = ""] = picked.split(/:(.*)/s);
       if (what === "cmd") return postToShell({ t: "cmd", name: arg });
@@ -723,6 +731,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         window.setTimeout(() => void save(), 0);
         return;
       }
+      if (what === "links" || what === "params" || what === "change") return setObjDialog({ kind: what, id: node.id });
       if (what === "similar") {
         const same = draft.nodes.filter((n) => n.type === node.type && n.bpmn_scope === node.bpmn_scope && (n.bpmn_scope ? true : n.idef0_parent === node.idef0_parent));
         return postToShell({ t: "select-many", ids: same.map((n) => n.id) });
@@ -1164,7 +1173,8 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           </div>
           <div className="doc-area">
             {inDesktopShell() && (active.kind === "bpmn" || active.kind === "idef0") && (
-              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} toolbar={{
+              <VisioSlot sessionId={session.id} updatedAt={session.updatedAt} diagram={active.kind === "bpmn" ? { kind: "bpmn", scope: active.scope } : { kind: "idef0", parent: active.parent }} suspended={!!objDialog}
+                toolbar={{
                   propsOpen,
                   onToggleProps: () => setPropsOpen(!propsOpen),
                   onFind: findInNavigator,
@@ -1240,6 +1250,44 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         )}
       </div>
 
+      {objDialog && (() => {
+        const target = draft.nodes.find((n) => n.id === objDialog.id);
+        if (!target) return null;
+        const close = () => setObjDialog(null);
+        const apply = (next: ProcessLogicModel) => {
+          h.commit(next);
+          close();
+          window.setTimeout(() => void save(), 0); // в окне Visio правка видна после записи в модель
+        };
+        if (objDialog.kind === "links") return <HyperlinksDialog links={target.hyperlinks ?? []} onClose={close} onApply={(links) => apply(updateNode(h.draftRef.current, target.id, { hyperlinks: links.length ? links : undefined }))} />;
+        if (objDialog.kind === "params")
+          return (
+            <ParamsDialog
+              display={target.param_display ?? {}}
+              onClose={close}
+              onApply={(display, all) => {
+                const same = (n: ProcessNode) => n.id === target.id || (all && n.type === target.type && (n.type !== "event" || n.subtype === target.subtype));
+                const value = Object.keys(display).length ? display : undefined;
+                apply({ ...h.draftRef.current, nodes: h.draftRef.current.nodes.map((n) => (same(n) ? { ...n, param_display: value } : n)) });
+              }}
+            />
+          );
+        const codes = idef0Codes(draft);
+        const choices = draft.nodes
+          .filter((n) => n.type === target.type && n.id !== target.id && n.bpmn_scope !== target.bpmn_scope)
+          .map((n) => ({ id: n.id, title: n.name || "(без названия)", details: n.bpmn_scope ? `Диаграмма ${codes.get(n.bpmn_scope) ?? ""} ${draft.nodes.find((x) => x.id === n.bpmn_scope)?.name ?? ""}`.trim() : "Общая схема" }));
+        return (
+          <ChoiceDialog
+            title="Выберите новый объект для фигуры диаграммы"
+            description={`Вместо «${target.name || "(без названия)"}» на диаграмме встанет выбранный объект.`}
+            choices={choices}
+            emptyText="В модели нет других объектов этого вида."
+            confirmLabel="Выбрать"
+            onClose={close}
+            onConfirm={(c) => apply(replaceNodeObject(h.draftRef.current, target.id, c.id))}
+          />
+        );
+      })()}
       {wizardOpen && <StructureWizard model={draft} onApply={(next) => h.commit(seed(next, null))} onClose={() => setWizardOpen(false)} />}
       {notice && (
         <div className="bpe-banner" role="alert">

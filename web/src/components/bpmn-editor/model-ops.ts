@@ -595,3 +595,22 @@ export function addMessage(m: M, from: string, to: string, name?: string): OpRes
 
 export const updateMessage = (m: M, id: string, patch: Partial<MessageFlow>): M => ({ ...m, messages: (m.messages ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x)) });
 export const deleteMessage = (m: M, id: string): M => ({ ...m, messages: (m.messages ?? []).filter((x) => x.id !== id) });
+/**
+ * «Сменить объект»: фигура диаграммы получает другой существующий объект того же вида. Новый объект занимает место прежнего
+ * (диаграмма, дорожка, положение), стрелки и граничные события прежнего переходят к нему, а прежний убирается из модели.
+ * Прежние стрелки нового объекта (он стоял на другой диаграмме) снимаются.
+ */
+export function replaceNodeObject(m: M, id: string, withId: string): M {
+  const old = m.nodes.find((n) => n.id === id);
+  const next = m.nodes.find((n) => n.id === withId);
+  if (!old || !next || id === withId || old.type !== next.type) return m;
+  const moved: ProcessNode = { ...next, bpmn_scope: old.bpmn_scope, layout: old.layout, role_id: next.role_id ?? old.role_id, attached_to: old.attached_to };
+  return {
+    ...m,
+    nodes: m.nodes.filter((n) => n.id !== id).map((n) => (n.id === withId ? moved : n.attached_to === id ? { ...n, attached_to: withId } : n)),
+    flows: [
+      ...m.flows.filter((f) => f.from !== withId && f.to !== withId && f.from !== id && f.to !== id),
+      ...m.flows.filter((f) => (f.from === id || f.to === id) && f.from !== withId && f.to !== withId).map((f) => ({ ...f, from: f.from === id ? withId : f.from, to: f.to === id ? withId : f.to })),
+    ],
+  };
+}

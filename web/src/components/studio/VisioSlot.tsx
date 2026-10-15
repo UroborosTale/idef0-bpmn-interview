@@ -30,7 +30,7 @@ export interface VisioToolbar {
  * Место холста диаграммы в настольном приложении: над ним панель инструментов, а на самом месте оболочка кладёт окно Visio.
  * Положение и размер места (в CSS-пикселях окна) отправляются оболочке при каждом изменении; при уходе со вкладки Visio прячется.
  */
-export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { sessionId: string; updatedAt: string; diagram: VisioDiagram; toolbar: VisioToolbar }) {
+export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar, suspended }: { sessionId: string; updatedAt: string; diagram: VisioDiagram; toolbar: VisioToolbar; suspended?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const diagramKey = JSON.stringify(diagram);
   const [zoom, setZoom] = useState<string>("fit");
@@ -41,7 +41,7 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || suspended) return; // пока открыто окно студии, Visio спрятан: окно Visio лежало бы поверх него
     let last = "";
     const send = (visible = true) => {
       const r = el.getBoundingClientRect();
@@ -59,7 +59,7 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
       send(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, updatedAt, diagramKey]);
+  }, [sessionId, updatedAt, diagramKey, suspended]);
 
   // меню «Действия» закрывается щелчком вне панели
   useEffect(() => {

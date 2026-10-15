@@ -35,4 +35,18 @@ describe("экспорт в VSDX", () => {
       expect(new XMLParser({ ignoreAttributes: false }).parse(xml), f).toBeTruthy();
     }
   });
+
+  it("гиперссылки и показ параметров объекта: раздел Hyperlink и подписи вокруг фигуры", async () => {
+    const m = branchingModel();
+    const task = m.nodes.find((n) => n.type === "task" && n.bpmn_scope !== undefined) ?? m.nodes.find((n) => n.type === "task")!;
+    task.hyperlinks = [{ address: "https://example.org/reg", description: "Регламент" }];
+    task.duration = "3 дня";
+    task.param_display = { p3: { param: "duration", prefix: "Срок ", title: false }, n1: { param: "duration", title: true } };
+    const { zip } = await open(m);
+    const all = (await Promise.all(Object.keys(zip.files).filter((f) => /^visio\/pages\/page\d+\.xml$/.test(f)).map((f) => zip.file(f)!.async("string")))).join("");
+    expect(all).toContain('<Section N="Hyperlink">');
+    expect(all).toContain("https://example.org/reg");
+    expect(all).toContain("Срок 3 дня");
+    expect(all).toContain("Длительность: 3 дня");
+  });
 });

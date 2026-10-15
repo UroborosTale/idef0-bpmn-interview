@@ -11,6 +11,7 @@ import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
 import { visioFlowProps, visioShapeProps, type VisioPropOut } from "../shared/visioBpmn.js";
 import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
 import { TASK_ICON_PAD, taskIcon } from "../shared/taskIcons.js";
+import { paramText, shownParams } from "../shared/paramDisplay.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -87,6 +88,8 @@ interface Style {
   /** Ключ для приклейки соединителей. */
   key?: string;
   ports?: Port[];
+  /** Гиперссылки фигуры (раздел Hyperlink): первая — по умолчанию. */
+  hyperlinks?: { address: string; subaddress?: string; description?: string }[];
   /** Данные фигуры (раздел Property): свойства BPMN, как в трафарете Visio; в Visio видны в «Данных фигуры». */
   props?: VisioPropOut[];
 }
@@ -108,6 +111,17 @@ const propRows = (props: VisioPropOut[] | undefined) =>
         .map(
           (p) =>
             `<Row N="${p.name}"><Cell N="Value" V="${esc(p.value)}" U="STR"/><Cell N="Prompt" V=""/><Cell N="Label" V="${esc(p.label)}"/><Cell N="Format" V="${esc(p.list.join(";"))}"/><Cell N="SortKey" V=""/><Cell N="Type" V="1"/><Cell N="Invisible" V="0"/><Cell N="Verify" V="0"/><Cell N="DataLinked" V="0"/><Cell N="LangID" V="ru-RU"/><Cell N="Calendar" V="0"/></Row>`
+        )
+        .join("")}</Section>`
+    : "";
+
+/** Раздел Hyperlink: гиперссылки объекта (двойной щелчок по фигуре в Visio открывает основную). */
+const hyperlinkRows = (links: Style["hyperlinks"]) =>
+  links?.length
+    ? `<Section N="Hyperlink">${links
+        .map(
+          (l, i) =>
+            `<Row N="Row_${i + 1}"><Cell N="Description" V="${esc(l.description ?? "")}"/><Cell N="Address" V="${esc(l.address)}"/><Cell N="SubAddress" V="${esc(l.subaddress ?? "")}"/><Cell N="ExtraInfo" V=""/><Cell N="Frame" V=""/><Cell N="SortKey" V=""/><Cell N="NewWindow" V="0"/><Cell N="Default" V="${i === 0 ? 1 : 0}"/><Cell N="Invisible" V="0"/></Row>`
         )
         .join("")}</Section>`
     : "";
@@ -238,7 +252,7 @@ export class Page {
 
     const geom = this.geometry(main, h, 0, main.every((g) => g.kind === "path" && !g.closed) || style.fill === null) + (extra.length ? this.geometry(extra, h, 1, true) : "");
     this.shapes.push(
-      `<Shape ID="${id}" NameU="Shape.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${connection}${propRows(style.props)}${userRows(tag)}${textXml}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
+      `<Shape ID="${id}" NameU="Shape.${id}" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">${cells.join("")}${connection}${propRows(style.props)}${userRows(tag)}${hyperlinkRows(style.hyperlinks)}${textXml}${geom}${text ? `<Text>${text}</Text>` : ""}</Shape>`
     );
     return id;
   }
@@ -769,7 +783,8 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
   const pos = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");
   const styleKind: StyleKind = s.kind === "event" ? (pos === "start" ? "event_start" : pos === "end" ? "event_end" : "event_intermediate") : s.kind;
   const own = ownStyle(model, styleKind);
-  const look: Style = { ...(own.fill ? { fill: own.fill } : {}), ...(own.line ? { line: own.line } : {}), ...(own.text ? { color: own.text } : {}), ...(own.font_size ? { fontPx: own.font_size } : {}) };
+  const node = s.nodeId ? model.nodes.find((n) => n.id === s.nodeId) : undefined;
+  const look: Style = { ...(own.fill ? { fill: own.fill } : {}), ...(own.line ? { line: own.line } : {}), ...(own.text ? { color: own.text } : {}), ...(own.font_size ? { fontPx: own.font_size } : {}), ...(node?.hyperlinks?.length && !plain ? { hyperlinks: node.hyperlinks } : {}) };
   if (s.kind === "event") {
     // параметры триггера (имя сообщения, ссылки, срок таймера, условие) в свойствах Visio не помещаются — они в метке фигуры
     const trigger = s.nodeId ? model.nodes.find((n) => n.id === s.nodeId)?.trigger : undefined;
@@ -797,6 +812,44 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
     }
   } else {
     drawBlock(page, s, x, y, w, h, tag, props, look);
+  }
+  if (node && !plain) drawParams(page, s, node, model);
+}
+
+/** Параметры объекта вокруг фигуры (настройка «Настроить показ параметров»): шесть мест сверху и снизу, четыре сноски в углах, седьмое — под названием. */
+function drawParams(page: Page, s: Shape, node: ProcessLogicModel["nodes"][number], model: ProcessLogicModel) {
+  const slots = shownParams(node);
+  if (!slots.length) return;
+  const { x, y, w, h } = s;
+  // у событий и шлюзов название стоит под фигурой — нижние параметры ниже названия
+  const below = s.kind === "event" || s.kind === "gateway" ? y + h + 36 : y + h + 3;
+  const top = (hh: number) => y - hh - 3;
+  const font = 8.7;
+  for (const [id, slot] of slots) {
+    const text = paramText(slot, node, model);
+    if (!text) continue;
+    const lines = text.split("\n");
+    const hh = lines.length * font * 1.35 + 2;
+    const ww = Math.max(40, Math.min(240, Math.max(...lines.map((l) => l.length)) * font * 0.58 + 6));
+    const align = slot.align ?? (id === "p1" || id === "p4" || id === "n1" || id === "n3" ? "left" : id === "p3" || id === "p6" || id === "n2" || id === "n4" ? "right" : "center");
+    const anchor = align === "left" ? "start" : align === "right" ? "end" : "middle";
+    const base = { fontPx: font, align } as Style;
+    if (id === "p1" || id === "p2" || id === "p3") page.label(text, { x: id === "p1" ? x : id === "p2" ? x + w / 2 : x + w, y: top(hh), anchor, w: ww, h: hh }, base);
+    else if (id === "p4" || id === "p5" || id === "p6") page.label(text, { x: id === "p4" ? x : id === "p5" ? x + w / 2 : x + w, y: below, anchor, w: ww, h: hh }, base);
+    else if (id === "p7") page.label(text, { x: x + w / 2, y: below + (s.kind === "event" || s.kind === "gateway" ? 28 : 0) + (s.kind === "task" || s.kind === "subprocess" ? 0 : 0), anchor: "middle", w: ww, h: hh }, base);
+    else {
+      // сноска: текст у угла со скобкой и пунктирной линией к углу фигуры
+      const left = id === "n1" || id === "n3";
+      const up = id === "n1" || id === "n2";
+      const cx = left ? x : x + w;
+      const cy = up ? y : y + h;
+      const tx = left ? cx - 30 : cx + 30;
+      const ty = up ? cy - 34 : cy + 34;
+      page.polyline([[cx, cy], [tx, ty]], { weightPt: 0.8, dash: true, line: "#475569" });
+      const bx = left ? tx - ww : tx;
+      page.label(text, { x: bx, y: up ? ty - hh : ty, anchor: left ? "end" : "start", w: ww, h: hh }, { ...base, align: left ? "right" : "left" });
+      page.polyline(left ? [[tx - 4, up ? ty - hh : ty], [tx, up ? ty - hh : ty], [tx, up ? ty : ty + hh]] : [[tx + 4, up ? ty - hh : ty], [tx, up ? ty - hh : ty], [tx, up ? ty : ty + hh]], { weightPt: 0.8, line: "#475569" });
+    }
   }
 }
 

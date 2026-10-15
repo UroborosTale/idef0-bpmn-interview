@@ -103,6 +103,10 @@ export interface ProcessNode {
   /** Жизненный цикл объекта, как в Business Studio: статус и версия (без поля — «в работе», 1.0.0). */
   lc_status?: "in_work" | "review" | "approved" | "archived";
   lc_version?: string;
+  /** Гиперссылки объекта (диалог «Гиперссылка…»): первая — основная. */
+  hyperlinks?: { address: string; subaddress?: string; description?: string }[];
+  /** Показ параметров объекта на диаграмме: место вокруг фигуры → параметр (shared/paramDisplay.ts). */
+  param_display?: Record<string, { param: string; prefix?: string; postfix?: string; align?: "left" | "center" | "right"; title?: boolean; rows?: number }>;
   idef0_parent?: string | null;
   /** Шаг диаграммы BPMN операции: id функции IDEF0 (операции). */
   bpmn_scope?: string | null;
