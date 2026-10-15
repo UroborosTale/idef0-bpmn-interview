@@ -26,12 +26,15 @@ export interface FrameDefaults {
   no: string;
 }
 
-export const FRAME_H = 30; // высота штампа
-export const FRAME_GRID = 20; // шаг клеток
-export const FRAME_MAJOR = 5; // каждая пятая линия — потемнее
+export const FRAME_H = 12; // высота штампа: у Business Studio он узкая полоса под листом
+export const FRAME_GRID = 40; // шаг клеток (у Business Studio — около сантиметра)
+export const FRAME_MAJOR = 1_000_000; // выделенных линий сетки у Business Studio нет: все клетки одинаковые
 const MAX_LINES = 400;
-const NODE_W = 170;
-const NO_W = 140;
+/** Ширина ячейки NODE (15 % листа, не меньше 90) и ячейки NO. (не меньше 56): доли штампа Business Studio. */
+const nodeWidth = (w: number) => Math.max(90, Math.round(w * 0.154));
+const noWidth = (w: number) => Math.max(56, Math.round(w * 0.035));
+/** Размер шрифта надписей штампа (px): мелкий, как в Business Studio. */
+export const FRAME_FONT = 7.5;
 
 const LABELS: Record<"nodeLabel" | "titleLabel" | "noLabel", string> = { nodeLabel: "NODE:", titleLabel: "TITLE:", noLabel: "NO.:" };
 
@@ -127,6 +130,8 @@ export function frameGeometry(world: { w: number; h: number }, frame: IdefFrame 
   const sheet = { x: ox, y: oy, w, h: bodyH + FRAME_H };
   const footer = { x: ox, y: oy + bodyH, w, h: FRAME_H };
   const t = frameTexts(frame, d);
+  const NODE_W = nodeWidth(w);
+  const NO_W = noWidth(w);
   const noX = ox + w - NO_W;
   // на очень больших листах шаг клеток растёт, чтобы линий было не больше MAX_LINES на сторону
   const lines = (origin: number, len: number) => {
@@ -135,14 +140,18 @@ export function frameGeometry(world: { w: number; h: number }, frame: IdefFrame 
   };
   const y = footer.y;
   const nx = ox + NODE_W;
+  // как в Business Studio: «NODE:» у левого края ячейки, значение — по её центру, «TITLE:» у левого края, название — по центру,
+  // «NO.:» и номер листа — в узкой ячейке справа
+  const labelW = { node: 38, title: 34, no: 22 };
   const cells: FrameCell[] = [
-    { field: "nodeLabel", x: ox, y, w: 70, h: FRAME_H, text: t.nodeLabel, tx: ox + 6, anchor: "start" },
-    { field: "node", x: ox + 70, y, w: NODE_W - 70, h: FRAME_H, text: t.node, tx: ox + 80, anchor: "start" },
-    { field: "titleLabel", x: nx, y, w: 70, h: FRAME_H, text: t.titleLabel, tx: nx + 6, anchor: "start" },
-    { field: "title", x: nx + 70, y, w: noX - nx - 70, h: FRAME_H, text: t.title, tx: (nx + 70 + noX) / 2, anchor: "middle" },
-    { field: "noLabel", x: noX, y, w: 60, h: FRAME_H, text: t.noLabel, tx: noX + 6, anchor: "start" },
-    { field: "no", x: noX + 60, y, w: NO_W - 60, h: FRAME_H, text: t.no, tx: noX + 66, anchor: "start" },
+    { field: "nodeLabel", x: ox, y, w: labelW.node, h: FRAME_H, text: t.nodeLabel, tx: ox + 3, anchor: "start" },
+    { field: "node", x: ox + labelW.node, y, w: NODE_W - labelW.node, h: FRAME_H, text: t.node, tx: (ox + labelW.node + nx) / 2, anchor: "middle" },
+    { field: "titleLabel", x: nx, y, w: labelW.title, h: FRAME_H, text: t.titleLabel, tx: nx + 3, anchor: "start" },
+    { field: "title", x: nx + labelW.title, y, w: noX - nx - labelW.title, h: FRAME_H, text: t.title, tx: (nx + labelW.title + noX) / 2, anchor: "middle" },
+    { field: "noLabel", x: noX, y, w: labelW.no, h: FRAME_H, text: t.noLabel, tx: noX + 3, anchor: "start" },
+    { field: "no", x: noX + labelW.no, y, w: NO_W - labelW.no, h: FRAME_H, text: t.no, tx: noX + labelW.no + 3, anchor: "start" },
   ];
+
   return { sheet, footer, dividers: [nx, noX], gridXs: lines(ox, w), gridYs: lines(oy, bodyH), cells };
 }
 

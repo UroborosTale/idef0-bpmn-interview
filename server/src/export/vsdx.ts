@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
-import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
+import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame, FRAME_FONT } from "../shared/idef0Frame.js";
 import { tunnelArcs } from "../shared/idef0Layout.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
 import { LABEL_W, LANE_X } from "../shared/bpmnGeometry.js";
@@ -454,10 +454,10 @@ const pageSize = (w: number, h: number, geo: FrameGeometry | null): [number, num
 
 /** Рамка и штамп — оформление (pm_k = deco): при чтении правок из Visio они пропускаются. Сетка в Visio не выгружается. */
 function drawSheet(page: Page, geo: FrameGeometry) {
-  page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#ffffff", weightPt: 0.75 });
+  page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef7", weightPt: 0.75 });
   page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 0.75 });
   for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 0.75 });
-  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 4, y: c.y + 6, anchor: c.anchor, w: Math.max(20, c.w - 8) }, { fontPx: 10, color: "#000000" });
+  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 3, y: c.y - 1, anchor: c.anchor, w: Math.max(20, c.w - 4) }, { fontPx: FRAME_FONT, color: "#000000" });
 }
 
 /** Ширина рамки подписи стрелки по самой длинной строке (кегль 10,5; прописные и цифры шире строчных). */
@@ -613,7 +613,9 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   page.rect(bx0, 1, bw0, 24, { fill: "#e8eef7", weightPt: 1, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
   page.rect(bx0, 25, bw0, 12, { fill: "#e8eef7", weightPt: 1 });
   // пул и дорожки
-  page.rect(bx0, d.pool.y, bw0, d.pool.h, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
+  // как в Business Studio, контейнер кончается там же, где дорожки (документы и аннотации стоят ниже него)
+  const lanesBottom = d.lanes.length ? Math.max(...d.lanes.map((l) => l.y + l.h)) : d.pool.y + d.pool.h;
+  page.rect(bx0, d.pool.y, bw0, lanesBottom - d.pool.y, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   for (const l of d.lanes) {
     const laneId = l.roleId ?? "__unassigned__";
     page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#000000", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });

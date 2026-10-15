@@ -1,3 +1,4 @@
+import { FRAME_FONT } from "@shared/idef0Frame";
 import { FRAME_GRID, FRAME_MIN_H, FRAME_MIN_W, SHEET_FORMATS, frameShown, gridShown, sheetFormatOf, type FrameGeometry, type IdefFrame } from "@shared/idef0Frame";
 import type { FramePatch } from "./sheet-ops";
 
@@ -37,18 +38,18 @@ export function FrameLayer({ geo, grid, layers = "all" }: { geo: FrameGeometry; 
           {grid && (
             <g data-frame-grid pointerEvents="none">
               {geo.gridXs.map((l) => (
-                <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+                <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke="#e4e4e4" strokeWidth={1} />
               ))}
               {geo.gridYs.map((l) => (
-                <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke={l.major ? "#cfd4dc" : "#e3e6eb"} strokeWidth={0.7} />
+                <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke="#e4e4e4" strokeWidth={1} />
               ))}
             </g>
           )}
-          <rect x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="#e8eef9" stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
+          <rect x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="#e8eef7" stroke="#000" strokeWidth={1} pointerEvents="none" />
           {geo.dividers.map((x) => (
-            <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#1f2937" strokeWidth={1} pointerEvents="none" />
+            <line key={x} x1={x} y1={footer.y} x2={x} y2={footer.y + footer.h} stroke="#000" strokeWidth={1} pointerEvents="none" />
           ))}
-          <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#1f2937" strokeWidth={1.2} pointerEvents="none" />
+          <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="none" stroke="#000" strokeWidth={1.4} pointerEvents="none" />
           {/* лист двигают за штамп, а растягивают за любой край и угол */}
           <rect data-frame-move x={footer.x} y={footer.y} width={footer.w} height={footer.h} fill="transparent" style={{ cursor: "move" }}>
             <title>Потяните штамп, чтобы подвинуть лист</title>
@@ -72,8 +73,8 @@ export function FrameLayer({ geo, grid, layers = "all" }: { geo: FrameGeometry; 
             <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
               <title>Двойной щелчок — изменить надпись</title>
               <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="transparent" />
-              <text x={c.tx} y={c.y + c.h / 2 + 5} textAnchor={c.anchor} fontSize={15} fontFamily="Arial, sans-serif" fill="#111827" pointerEvents="none">
-                {clip(c.text, Math.floor(c.w / 8))}
+              <text x={c.tx} y={c.y + c.h / 2 + 2.6} textAnchor={c.anchor} fontSize={FRAME_FONT} fontFamily="Arial, sans-serif" fill="#000" pointerEvents="none">
+                {clip(c.text, Math.floor(c.w / (FRAME_FONT * 0.55)))}
               </text>
             </g>
           ))}

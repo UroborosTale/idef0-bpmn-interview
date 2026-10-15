@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { frameGeometry, frameTexts, withFrameHeight } from "../src/shared/idef0Frame.js";
+import { frameGeometry, frameTexts, withFrameHeight, FRAME_H } from "../src/shared/idef0Frame.js";
 import { generateIdef0 } from "../src/pipeline/idef0.js";
 import { purchaseModel } from "./fixtures.js";
 import type { ProcessLogicModel } from "../src/types/model.js";
@@ -14,9 +14,9 @@ describe("рамка листа IDEF0", () => {
 
   it("лист округляется до клетки, штамп добавляется снизу, ячейки идут слева направо", () => {
     const g = frameGeometry({ w: 905, h: 431 }, undefined, defaults);
-    expect(g.sheet).toEqual({ x: 0, y: 0, w: 920, h: 440 + 30 });
+    expect(g.sheet).toEqual({ x: 0, y: 0, w: 920, h: 440 + FRAME_H });
     expect(g.footer.y).toBe(440);
-    expect(g.gridXs.length).toBeGreaterThan(40);
+    expect(g.gridXs.length).toBeGreaterThan(20); // клетки по 40 px, как у Business Studio
     expect(g.cells.map((c) => c.field)).toEqual(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]);
     const xs = g.cells.map((c) => c.x);
     expect([...xs].sort((a, b) => a - b)).toEqual(xs);
@@ -25,14 +25,14 @@ describe("рамка листа IDEF0", () => {
 
   it("лист, заданный вручную, стоит где поставили и не зависит от содержимого; сетка и штамп смещаются вместе с ним; пунктира нет", () => {
     const g = frameGeometry({ w: 900, h: 500 }, { x: 100, y: -40, w: 1300, h: 700 }, defaults);
-    expect(g.sheet).toEqual({ x: 100, y: -40, w: 1300, h: 730 });
-    expect(g.footer).toEqual({ x: 100, y: 660, w: 1300, h: 30 });
-    expect(g.gridXs[0].at).toBe(120);
-    expect(g.gridYs[0].at).toBe(-20);
+    expect(g.sheet).toEqual({ x: 100, y: -40, w: 1300, h: 700 + FRAME_H });
+    expect(g.footer).toEqual({ x: 100, y: 660, w: 1300, h: FRAME_H });
+    expect(g.gridXs[0].at).toBe(140);
+    expect(g.gridYs[0].at).toBe(0);
     expect(g.cells[0].x).toBe(100);
     expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(1400);
     const small = frameGeometry({ w: 900, h: 500 }, { w: 50, h: 60 }, defaults);
-    expect([small.sheet.w, small.sheet.h]).toEqual([440, 230]); // меньше минимума не бывает: по ширине помещается штамп
+    expect([small.sheet.w, small.sheet.h]).toEqual([440, 200 + FRAME_H]); // меньше минимума не бывает: по ширине помещается штамп
     for (const c of small.cells) expect(c.w).toBeGreaterThan(0); // ячейки штампа не схлопываются и не налезают
     expect([...small.cells].every((c, i, a) => i === 0 || c.x >= a[i - 1].x + a[i - 1].w - 0.5)).toBe(true);
     expect("guideX" in g).toBe(false);
@@ -47,8 +47,8 @@ describe("рамка листа IDEF0", () => {
     const [vx, vy, vw, vh] = svg.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
     expect([vx, vy]).toEqual([-60, -80]);
     expect(vw).toBeGreaterThanOrEqual(1400); // правый край листа 1340 (+60 слева)
-    expect(vh).toBeGreaterThanOrEqual(930); // нижний край штампа 850 (+80 сверху)
-    expect(svg).toContain('x="-60" y="-80" width="1400" height="930"');
+    expect(vh).toBeGreaterThanOrEqual(900 + FRAME_H); // нижний край штампа 832 (+80 сверху)
+    expect(svg).toContain(`x="-60" y="-80" width="1400" height="${900 + FRAME_H}"`);
   });
 
   it("лист с очень далёкими блоками не плодит миллионы линий сетки", () => {
@@ -61,13 +61,13 @@ describe("рамка листа IDEF0", () => {
     const base = generateIdef0(purchaseModel());
     expect(base.decompositionSvg).toContain("NODE:");
     expect(base.decompositionSvg).toContain("NO.:");
-    expect(base.decompositionSvg).toMatch(/stroke="#e3e6eb"/); // клетки
+    expect(base.decompositionSvg).toMatch(/stroke="#e4e4e4"/); // клетки
     expect(base.children[0].svg).toContain("A2");
 
     const m = purchaseModel();
     m.idef0_frames = { "": { grid: false, texts: { title: "Название <лист>", node: "ЛИСТ-1" } } };
     const noGrid = generateIdef0(m).decompositionSvg;
-    expect(noGrid).not.toMatch(/stroke="#e3e6eb"/);
+    expect(noGrid).not.toMatch(/stroke="#e4e4e4"/);
     expect(noGrid).toContain("ЛИСТ-1");
     expect(noGrid).toContain("Название &lt;лист&gt;"); // разметка экранируется
 
