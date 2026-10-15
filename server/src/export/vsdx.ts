@@ -397,13 +397,13 @@ export function stencilMasters(): StencilMaster[] {
   ];
   const below = (w: number) => ({ w, h: 30, gap: 3 });
   return [
-    mk("Задача", "task", "Шаг процесса BPMN", 150, 90, (p, tag) => p.rect(0, 0, 150, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag })),
-    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 160, 90, (p, tag) => p.rect(0, 0, 160, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 12, tag }, subMarker(160, 90))),
-    mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
-    mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 11, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
-    mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#99ff66", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag })),
-    mk("Промежуточное событие", "event:intermediate", "Событие внутри процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff9933", weightPt: 1.3, fontPx: 11, textBelow: below(120), tag }, [{ kind: "ellipse", cx: 18, cy: 18, rx: 14, ry: 14 }])),
-    mk("Конечное событие", "event:end", "Завершение процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff8262", weightPt: 3.2, fontPx: 11, textBelow: below(120), tag })),
+    mk("Задача", "task", "Шаг процесса BPMN", 150, 90, (p, tag) => p.rect(0, 0, 150, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 10.7, tag })),
+    mk("Подпроцесс", "subprocess", "Свёрнутый подпроцесс BPMN", 160, 90, (p, tag) => p.rect(0, 0, 160, 90, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, fontPx: 10.7, tag }, subMarker(160, 90))),
+    mk("Шлюз «или»", "gateway:exclusive", "Исключающий шлюз: выбор одной ветви", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 9.3, textBelow: below(130), tag }, gatewayGlyph("exclusive", 50, 50))),
+    mk("Шлюз «и»", "gateway:parallel", "Параллельный шлюз: все ветви одновременно", 50, 50, (p, tag) => p.diamond(0, 0, 50, 50, { fill: "#ffff99", weightPt: 1.3, fontPx: 9.3, textBelow: below(130), tag }, gatewayGlyph("parallel", 50, 50))),
+    mk("Начальное событие", "event:start", "Начало процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#99ff66", weightPt: 1.3, fontPx: 9.3, textBelow: below(120), tag })),
+    mk("Промежуточное событие", "event:intermediate", "Событие внутри процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff9933", weightPt: 1.3, fontPx: 9.3, textBelow: below(120), tag }, [{ kind: "ellipse", cx: 18, cy: 18, rx: 14, ry: 14 }])),
+    mk("Конечное событие", "event:end", "Завершение процесса", 36, 36, (p, tag) => p.ellipse(0, 0, 36, 36, { fill: "#ff8262", weightPt: 3.2, fontPx: 9.3, textBelow: below(120), tag })),
     mk("Функция IDEF0", "fn", "Функциональный блок IDEF0", 170, 90, (p, tag) => p.rect(0, 0, 170, 90, { fill: "#e8eef7", weightPt: 1.4, fontPx: 12, tag })),
   ];
 }
@@ -481,7 +481,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     portsOf.set(b.nodeId, pp);
     // у блока подпись «код название», как в Business Studio; полное название хранится в метке pm_n
     const own = ownStyle(model, "idef0_block");
-    const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
+    const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 10.7), ...(own.text ? { color: own.text } : {}) }];
     page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     // у блока контекстной диаграммы в правом нижнем углу — номер блока «0», как в Business Studio
     if (!editable) page.label("0", { x: b.x + b.w - 6, y: b.y + b.h - 18, anchor: "end", w: 30 }, { fontPx: 10, color: "#000000" });
@@ -757,10 +757,10 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
     const isEnd = position === "end";
     const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
     const glyphs = triggerGlyph(s.event?.trigger ?? "none", s.event?.throwing ?? false);
-    page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
+    page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 9.3, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
     drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
-    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name === "Слияние потоков" ? "" : s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
+    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name === "Слияние потоков" ? "" : s.name, fontPx: 9.3, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
     // как в Business Studio, значок шлюза — жирный: «X» и «+» рисуются толстыми линиями поверх тонкого значка фигуры
     const [cx, cy] = [x + w / 2, y + h / 2];
     const sub = s.subtype ?? "exclusive";
@@ -830,7 +830,7 @@ function taskIconParts(subtype: string | undefined): GeomPart[] {
 
 function drawBlock(page: Page, s: Shape, x: number, y: number, w: number, h: number, tag: Record<string, string>, props: VisioPropOut[], look: Style) {
   {
-    page.rect(x, y, w, h, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 12, tag, key: s.id, props, ...look }, [
+    page.rect(x, y, w, h, { fill: "#e8eef7", weightPt: 1.3, roundingPx: 10, text: s.name, fontPx: 10.7, tag, key: s.id, props, ...look }, [
       ...(s.kind === "subprocess" ? [{ kind: "path" as const, pts: [[w / 2 - 7, h - 17], [w / 2 + 7, h - 17], [w / 2 + 7, h - 3], [w / 2 - 7, h - 3]] as Pt[], closed: true }, { kind: "path" as const, pts: [[w / 2 - 4, h - 10], [w / 2 + 4, h - 10]] as Pt[] }, { kind: "path" as const, pts: [[w / 2, h - 14], [w / 2, h - 6]] as Pt[] }] : []),
       ...loopGlyph(s.loop, w, h, s.kind === "subprocess"),
       ...(s.kind === "task" ? taskIconParts(s.subtype) : []),

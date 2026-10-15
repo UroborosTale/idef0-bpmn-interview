@@ -288,7 +288,7 @@ export function optimizedLayoutWithRows(m: ProcessLogicModel): { positions: Map<
     const d = diagramLayout(candidate);
     const nodes = d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)!, label: n.name }));
     const q = routeQuality(nodes, d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes, d.extras.artifacts.map(artifactObstacle));
-    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(d.routes) * 60;
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(d.routes) * 400;
   };
   const withPositions = (base: ProcessLogicModel, pos: Map<string, { x: number; y: number }>): ProcessLogicModel => ({ ...base, nodes: base.nodes.map((n) => (pos.has(n.id) ? { ...n, layout: pos.get(n.id)! } : n)) });
   const rowNodes = ranked.shown.map((n) => ({ id: n.id, laneIndex: ranked.laneOf.get(n.id)!, type: n.type }));
@@ -301,7 +301,7 @@ export function optimizedLayoutWithRows(m: ProcessLogicModel): { positions: Map<
   for (const compress of [false, true]) {
     for (const firstDown of [true, false]) {
       const rows = branchRows(rowNodes, rowEdges, xOf, firstDown);
-      if (rows.size === 0) continue;
+      if (rows.size === 0 && !compress) continue;
       const span = new Map<number, [number, number]>();
       for (const n of rowNodes) {
         const r = rows.get(n.id) ?? 0;
@@ -313,7 +313,7 @@ export function optimizedLayoutWithRows(m: ProcessLogicModel): { positions: Map<
         return clampLaneHeight(Math.max(h, LANE_H + (hi - lo) * ROW_PITCH));
       });
       const rank2 = compress
-        ? rankColumns({ ids: ranked.shown.map((n) => n.id), lane: new Map(rowNodes.map((n) => [n.id, n.laneIndex * 100 + (rows.get(n.id) ?? 0) + 50] as const)), edges: rowEdges }).rank
+        ? rankColumns({ ids: ranked.shown.map((n) => n.id), lane: new Map(rowNodes.map((n) => [n.id, n.laneIndex * 100 + (rows.get(n.id) ?? 0) + 50] as const)), edges: rowEdges, verticalFrom: new Set(ranked.shown.filter((n) => n.type === "gateway").map((n) => n.id)) }).rank
         : rank;
       const tops = laneTops(heights);
       const pos = new Map<string, { x: number; y: number }>();

@@ -40,38 +40,38 @@ extra annotation 980,1770 180×60 «График поставки по дого�
 extra annotation 1200,1770 180×60 «Инструкция по приёмке оборудования» link[713,1732 1290,1770]
 extra annotation 1420,1770 180×60 «Заявка полна, если заполнены наименование, количество, обоснование и срок»
 extra annotation 1640,1770 180×60 «Бюджет достаточен, если сумма заявки не превышает остаток по статье расходов»
-# BPMN C090.01.01 1931×670
-lane r_erp 80,60 1751×150
-lane r_init 80,210 1751×150
-lane r_chief 80,360 1751×150
+# BPMN C090.01.01 1741×670
+lane r_erp 80,60 1561×150
+lane r_init 80,210 1561×150
+lane r_chief 80,360 1561×150
 shape Node_o11_start1 event/start 175,267 36×36 «Потребность в оборудовании выявлена»
 shape Node_o11_start2 event/start 175,117 36×36 «Остаток на складе опустился ниже минимального»
 shape Node_o11_start3 event/start 175,417 36×36 «Плановый цикл закупок запущен»
 shape Node_o11_m1 gateway/exclusive 365,260 50×50 «Слияние потоков»
 shape Node_o11_fill task/user 555,240 150×90 «Заполнить заявку на закупку»
 shape Node_o11_late event/intermediate 559,312 36×36 «Срок заполнения истёк»
-shape Node_o11_remind task/service 935,90 150×90 «Напомнить инициатору о заявке»
-shape Node_o11_endRemind event/end 1125,117 36×36 «Напоминание отправлено»
-shape Node_o11_check task/business_rule 745,90 150×90 «Проверить комплектность заявки»
+shape Node_o11_remind task/service 745,90 150×90 «Напомнить инициатору о заявке»
+shape Node_o11_endRemind event/end 935,117 36×36 «Напоминание отправлено»
+shape Node_o11_check task/business_rule 1125,90 150×90 «Проверить комплектность заявки»
 shape Node_o11_ok gateway/exclusive 1315,110 50×50 «Заявка заполнена верно?»
-shape Node_o11_send task/send 1505,240 150×90 «Отправить заявку на согласование»
-shape Node_o11_done event/end 1695,267 36×36 «Заявка направлена на согласование»
+shape Node_o11_send task/send 1315,240 150×90 «Отправить заявку на согласование»
+shape Node_o11_done event/end 1505,267 36×36 «Заявка направлена на согласование»
 edge Flow_o11_f1 Node_o11_start1→Node_o11_m1 [211,285 365,285]
-edge Flow_o11_f2 Node_o11_start2→Node_o11_m1 [211,135 390,135 390,260]
-edge Flow_o11_f3 Node_o11_start3→Node_o11_m1 [211,435 383.5,435 383.5,303.5]
+edge Flow_o11_f2 Node_o11_start2→Node_o11_m1 [211,135 383.5,135 383.5,266.5]
+edge Flow_o11_f3 Node_o11_start3→Node_o11_m1 [211,435 390,435 390,310]
 edge Flow_o11_f4 Node_o11_m1→Node_o11_fill [415,285 555,285]
-edge Flow_o11_f5 Node_o11_fill→Node_o11_check [705,285 727,285 727,135 745,135]
-edge Flow_o11_f6 Node_o11_check→Node_o11_ok [820,90 820,66 1340,66 1340,110]
-edge Flow_o11_f7 Node_o11_ok→Node_o11_m1 [1340,160 1340,389 396.5,389 396.5,303.5] «Нет»
-edge Flow_o11_f8 Node_o11_ok→Node_o11_send [1365,135 1447,135 1447,285 1505,285] «Да»
-edge Flow_o11_f9 Node_o11_send→Node_o11_done [1655,285 1695,285]
-edge Flow_o11_f10 Node_o11_late→Node_o11_remind [577,348 577,372 1010,372 1010,180]
-edge Flow_o11_f11 Node_o11_remind→Node_o11_endRemind [1085,135 1125,135]
+edge Flow_o11_f5 Node_o11_fill→Node_o11_check [705,285 987,285 987,135 1125,135]
+edge Flow_o11_f6 Node_o11_check→Node_o11_ok [1275,135 1315,135]
+edge Flow_o11_f7 Node_o11_ok→Node_o11_m1 [1340,110 1340,66 396.5,66 396.5,266.5] «Нет»
+edge Flow_o11_f8 Node_o11_ok→Node_o11_send [1365,135 1390,135 1390,240] «Да»
+edge Flow_o11_f9 Node_o11_send→Node_o11_done [1465,285 1505,285]
+edge Flow_o11_f10 Node_o11_late→Node_o11_remind [577,348 577,372 820,372 820,180]
+edge Flow_o11_f11 Node_o11_remind→Node_o11_endRemind [895,135 935,135]
 extra data 586.3,216 18×20 «Потребность в оборудовании» link[595.3,236 595.3,240]
 extra data 655.7,216 18×20 «Заявка на закупку» link[664.7,240 664.7,236]
 extra store 621,334 18×20 «ERP «Закупки»» link[630,334 630,330]
 extra annotation 100,570 180×60 «Положение о закупках» link[630,330 190,570]
-extra annotation 320,570 180×60 «Заявка полна, если заполнены наименование, количество, обоснование и срок» link[820,180 410,570]
+extra annotation 320,570 180×60 «Заявка полна, если заполнены наименование, количество, обоснование и срок» link[1200,180 410,570]
 # BPMN C090.01.02 1991×670
 lane r_erp 80,60 1811×150
 lane r_head 80,210 1811×150
@@ -109,41 +109,41 @@ extra data 1641,66 18×20 «Согласованная заявка на зак�
 extra store 1641,184 18×20 «ERP «Закупки»» link[1650,184 1650,180]
 extra annotation 100,570 180×60 «Бюджет закупок на год» link[820,480 190,570]
 extra annotation 320,570 180×60 «Бюджет достаточен, если сумма заявки не превышает остаток по статье расходов» link[820,480 410,570]
-# BPMN C090.02.01 1997×720
-lane r_erp 80,60 1817×150
-lane r_buyer 80,210 1817×260
+# BPMN C090.02.01 1931×720
+lane r_erp 80,60 1751×150
+lane r_buyer 80,210 1751×260
 shape Node_o21_start event/start 175,267 36×36 «Заявка на закупку согласована»
 shape Node_o21_retry event/intermediate 365,267 36×36 «Рассылка запроса возобновлена»
 shape Node_o21_m1 gateway/exclusive 555,260 50×50 «Слияние потоков»
 shape Node_o21_send task/send 745,240 150×90 «Разослать запрос предложений поставщикам»
 shape Node_o21_wait gateway/event_based 935,260 50×50 «Что наступит раньше?»
-shape Node_o21_got event/intermediate 1125,377 36×36 «Предложения получены»
-shape Node_o21_timeout event/intermediate 1191,293 36×36 «Срок приёма предложений истёк»
-shape Node_o21_compare task/user 1315,350 150×90 «Сравнить предложения и выбрать победителя»
-shape Node_o21_end event/end 1505,377 36×36 «Поставщик выбран»
+shape Node_o21_got event/intermediate 1015,403 36×36 «Предложения получены»
+shape Node_o21_timeout event/intermediate 1125,267 36×36 «Срок приёма предложений истёк»
+shape Node_o21_compare task/user 1191,376 150×90 «Сравнить предложения и выбрать победителя»
+shape Node_o21_end event/end 1371,377 36×36 «Поставщик выбран»
 shape Node_o21_noOffers task/service 1315,90 150×90 «Зафиксировать отсутствие предложений»
-shape Node_o21_again gateway/exclusive 1571,286 50×50 «Повторить запрос?»
+shape Node_o21_again gateway/exclusive 1505,260 50×50 «Повторить запрос?»
 shape Node_o21_jump event/intermediate 1695,267 36×36 «Повторный запрос инициирован»
-shape Node_o21_cancel event/end 1761,403 36×36 «Закупка прекращена»
+shape Node_o21_cancel event/end 1585,403 36×36 «Закупка прекращена»
 edge Flow_o21_f1 Node_o21_start→Node_o21_m1 [193,303 193,334 580,334 580,310]
 edge Flow_o21_f2 Node_o21_retry→Node_o21_m1 [401,285 555,285]
 edge Flow_o21_f3 Node_o21_m1→Node_o21_send [605,285 745,285]
 edge Flow_o21_f4 Node_o21_send→Node_o21_wait [895,285 935,285]
-edge Flow_o21_f5 Node_o21_wait→Node_o21_got [960,310 960,395 1125,395]
-edge Flow_o21_f6 Node_o21_wait→Node_o21_timeout [985,285 1100,285 1100,311 1191,311]
-edge Flow_o21_f7 Node_o21_got→Node_o21_compare [1161,395 1315,395]
-edge Flow_o21_f8 Node_o21_compare→Node_o21_end [1465,395 1505,395]
-edge Flow_o21_f9 Node_o21_timeout→Node_o21_noOffers [1227,311 1283,311 1283,135 1315,135]
-edge Flow_o21_f10 Node_o21_noOffers→Node_o21_again [1465,135 1596,135 1596,286]
-edge Flow_o21_f11 Node_o21_again→Node_o21_jump [1621,311 1670,311 1670,285 1695,285] «Да»
-edge Flow_o21_f12 Node_o21_again→Node_o21_cancel [1596,336 1596,421 1761,421] «Нет»
+edge Flow_o21_f5 Node_o21_wait→Node_o21_got [960,310 960,421 1015,421]
+edge Flow_o21_f6 Node_o21_wait→Node_o21_timeout [985,285 1125,285]
+edge Flow_o21_f7 Node_o21_got→Node_o21_compare [1051,421 1191,421]
+edge Flow_o21_f8 Node_o21_compare→Node_o21_end [1341,421 1358,421 1358,395 1371,395]
+edge Flow_o21_f9 Node_o21_timeout→Node_o21_noOffers [1161,285 1250,285 1250,135 1315,135]
+edge Flow_o21_f10 Node_o21_noOffers→Node_o21_again [1465,135 1530,135 1530,260]
+edge Flow_o21_f11 Node_o21_again→Node_o21_jump [1555,285 1695,285] «Да»
+edge Flow_o21_f12 Node_o21_again→Node_o21_cancel [1530,310 1530,421 1585,421] «Нет»
 extra data 811,216 18×20 «Согласованная заявка на закупку» link[820,236 820,240]
 extra store 832,334 18×20 «Система электронного документооборота» link[841,334 841,330]
-extra data 1381,326 18×20 «Выбранное коммерческое предложение» link[1390,350 1390,346]
+extra data 1257,352 18×20 «Выбранное коммерческое предложение» link[1266,376 1266,372]
 extra annotation 100,530 180×60 «Регламент закупочных процедур» link[820,330 190,530]
 pool Pool_p_suppl 735,640 170×40
 message Msg_o21_m1 Node_o21_send→Pool_p_suppl [820,330 820,497 798.8,497 798.8,640]
-message Msg_o21_m2 Pool_p_suppl→Node_o21_got [841.3,640 841.3,538.5 1143,538.5 1143,413]
+message Msg_o21_m2 Pool_p_suppl→Node_o21_got [841.3,640 841.3,551.5 1033,551.5 1033,439]
 # BPMN C090.02.02 2311×910
 lane r_erp 80,60 2131×150
 lane r_fin 80,210 2131×150

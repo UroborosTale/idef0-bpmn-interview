@@ -14,6 +14,8 @@ export interface RankInput {
   lane: Map<string, number>;
   /** Стрелки между фигурами (неизвестные концы и петли на себя отбрасываются). */
   edges: { from: string; to: string }[];
+  /** Шлюзы: стрелка от шлюза в другую дорожку идёт вертикально, цель встаёт в тот же столбец (как в Business Studio). Без набора — прежнее правило. */
+  verticalFrom?: Set<string>;
 }
 
 export interface Ranked {
@@ -23,7 +25,7 @@ export interface Ranked {
   preds: Map<string, string[]>;
 }
 
-export function rankColumns({ ids, lane, edges }: RankInput): Ranked {
+export function rankColumns({ ids, lane, edges, verticalFrom }: RankInput): Ranked {
   const order = new Map(ids.map((id, i) => [id, i] as const));
   const out = new Map<string, string[]>();
   const hasIn = new Set<string>();
@@ -62,7 +64,8 @@ export function rankColumns({ ids, lane, edges }: RankInput): Ranked {
   while (queue.length > 0) {
     queue.sort((a, b) => order.get(a)! - order.get(b)!);
     const u = queue.shift()!;
-    let r = Math.max(-1, ...(preds.get(u) ?? []).map((p) => rank.get(p) ?? -1)) + 1;
+    // обычно столбец — на один правее самого дальнего предшественника; стрелка от шлюза в другую дорожку вертикальна (тот же столбец)
+    let r = Math.max(0, ...(preds.get(u) ?? []).map((p) => (rank.get(p) ?? -1) + (verticalFrom?.has(p) && lane.get(p) !== lane.get(u) ? 0 : 1)));
     while (taken.has(`${r}:${lane.get(u)}`)) r++;
     taken.add(`${r}:${lane.get(u)}`);
     rank.set(u, r);

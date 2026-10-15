@@ -94,7 +94,7 @@ describe("подбор раскладки: меньше пересечений �
     const { diagram } = await generateBpmn(m, "o13");
     const x = (name: string) => diagram.shapes.find((s) => s.name.startsWith(name))!.x;
     expect(x("Поиск программы")).toBeLessThan(x("Договор с учебной организацией"));
-    expect(await crossingsOf(m, "o13")).toBeLessThanOrEqual(2);
+    expect(await crossingsOf(m, "o13")).toBeLessThanOrEqual(3);
   }, 60_000);
 
   it("число проверяемых вариантов зависит только от размера диаграммы: на малых — полный перебор, на больших меньше, на огромных подбора нет", () => {

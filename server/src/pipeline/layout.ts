@@ -365,11 +365,11 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     const allFlows = [...flowsForScore, ...(ex?.extraFlows ?? [])];
     const routes = routeFlows(all, allFlows, ex?.obstacles ?? []);
     const q = routeQuality(all, allFlows, routes, ex?.obstacles ?? []);
-    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(routes) * 60;
+    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(routes) * 400;
   };
   const withRows = (firstDown: boolean, compress: boolean): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
     const rows = branchRows(nodes, edgeList, boxes, firstDown);
-    if (rows.size === 0) return null;
+    if (rows.size === 0 && !compress) return null;
     const heights = [...laneHeights];
     const span = new Map<number, [number, number]>();
     for (const n of nodes) {
@@ -382,7 +382,7 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     let rawX = best.rawX;
     if (compress) {
       const lane = new Map(nodes.map((n) => [n.id, n.laneIndex * 100 + (rows.get(n.id) ?? 0) + 50] as const));
-      const { rank } = rankColumns({ ids: nodes.map((n) => n.id), lane, edges: edgeList.map((e) => ({ from: e.from, to: e.to })) });
+      const { rank } = rankColumns({ ids: nodes.map((n) => n.id), lane, edges: edgeList.map((e) => ({ from: e.from, to: e.to })), verticalFrom: new Set(nodes.filter((n) => n.type === "gateway").map((n) => n.id)) });
       rawX = new Map(nodes.map((n) => [n.id, COLUMN_X0 + (rank.get(n.id) ?? 0) * COLUMN_W] as const));
       for (const n of nodes) if (n.fixed) rawX.set(n.id, best.rawX.get(n.id) ?? 0);
     }
