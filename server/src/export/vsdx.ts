@@ -612,12 +612,16 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   // полоса заголовка: название с кодом в одну строку и пустая узкая полоса под ним, как в Business Studio
   const bx0 = LANE_X; // пул начинается там же, где дорожки: узкой полосы с названием пула у Business Studio нет
   const bw0 = d.pool.w - (LANE_X - d.pool.x);
-  page.rect(bx0, 1, bw0, 24, { fill: "#e8eef7", weightPt: 1, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
-  page.rect(bx0, 25, bw0, 12, { fill: "#e8eef7", weightPt: 1 });
+  // полосы заголовка заполняют всё место над дорожками (у Business Studio дорожки начинаются сразу под ними): название — 2/3, пустая — 1/3
+  const lanesTop = d.lanes.length ? Math.min(...d.lanes.map((l) => l.y)) : d.pool.y;
+  const bandH = Math.max(30, lanesTop - 1);
+  const titleH = Math.round(bandH * 0.68);
+  page.rect(bx0, 1, bw0, titleH, { fill: "#e8eef7", weightPt: 1, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
+  page.rect(bx0, 1 + titleH, bw0, bandH - titleH, { fill: "#e8eef7", weightPt: 1 });
   // пул и дорожки
   // как в Business Studio, контейнер кончается там же, где дорожки (документы и аннотации стоят ниже него)
   const lanesBottom = d.lanes.length ? Math.max(...d.lanes.map((l) => l.y + l.h)) : d.pool.y + d.pool.h;
-  page.rect(bx0, d.pool.y, bw0, lanesBottom - d.pool.y, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
+  page.rect(bx0, lanesTop, bw0, lanesBottom - lanesTop, { fill: "#ffffff", weightPt: 1.4, tag: { pm_k: "pool" } });
   for (const l of d.lanes) {
     const laneId = l.roleId ?? "__unassigned__";
     page.rect(l.x, l.y, l.w, l.h, { fill: "#ffffff", line: "#000000", weightPt: 1, tag: { pm_k: "lane", pm_id: laneId } });
@@ -756,7 +760,17 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
     page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 11, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
     drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
-    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
+    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name === "Слияние потоков" ? "" : s.name, fontPx: 11, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
+    // как в Business Studio, значок шлюза — жирный: «X» и «+» рисуются толстыми линиями поверх тонкого значка фигуры
+    const [cx, cy] = [x + w / 2, y + h / 2];
+    const sub = s.subtype ?? "exclusive";
+    if (sub === "exclusive") {
+      page.polyline([[cx - 9, cy - 9], [cx + 9, cy + 9]], { weightPt: 2.6, line: "#000000" });
+      page.polyline([[cx + 9, cy - 9], [cx - 9, cy + 9]], { weightPt: 2.6, line: "#000000" });
+    } else if (sub === "parallel") {
+      page.polyline([[cx - 11, cy], [cx + 11, cy]], { weightPt: 2.6, line: "#000000" });
+      page.polyline([[cx, cy - 11], [cx, cy + 11]], { weightPt: 2.6, line: "#000000" });
+    }
   } else {
     drawBlock(page, s, x, y, w, h, tag, props, look);
   }
