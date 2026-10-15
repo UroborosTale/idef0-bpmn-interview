@@ -15,7 +15,8 @@ import Idef0Editor from "../idef0-editor/Idef0Editor";
 import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
-import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
+import { deleteNode, duplicateNode, setEventDirection, setEventPosition, setEventTrigger, updateNode } from "../bpmn-editor/model-ops";
+import { allowedTriggers, eventSpec, type TriggerType } from "@shared/events";
 import { diagramSvg, download, sheetBox, svgToPng } from "./export-image";
 import { sheetPrintHtml, sheetPrintSetup } from "@shared/sheetPrint";
 import Navigator, { type SetOp } from "./Navigator";
@@ -58,6 +59,18 @@ const hasOperationDiagram = (m: ProcessLogicModel, id: string) => m.nodes.some((
 
 /** Сколько открытых диаграмм помнит «Назад». */
 const HISTORY_DOCS = 50;
+
+/** Порядок и названия триггеров в меню «Тип триггера» по виду события — как в Business Studio (docs/bs6-bpmn-types.md). */
+const EVENT_TRIGGER_ORDER: Record<string, [string, string][]> = (() => {
+  const L: Record<string, string> = { none: "Неопределенное", message: "Сообщение", timer: "Таймер", conditional: "Условие", link: "Ссылка", escalation: "Эскалация", error: "Ошибка", compensation: "Компенсация", signal: "Сигнал", multiple: "Множественное", parallel_multiple: "Параллельное множественное", terminate: "Завершение", cancel: "Отмена" };
+  const of = (...k: string[]): [string, string][] => k.map((t) => [t, L[t]]);
+  return {
+    start: of("none", "message", "timer", "conditional", "signal", "multiple", "parallel_multiple"),
+    intermediate: of("none", "message", "timer", "conditional", "link", "escalation", "compensation", "signal", "multiple", "parallel_multiple"),
+    end: of("none", "message", "escalation", "error", "compensation", "signal", "multiple", "terminate", "cancel"),
+    boundary: of("message", "timer", "conditional", "signal", "error", "escalation", "compensation", "cancel", "multiple", "parallel_multiple"),
+  };
+})();
 
 export default function Studio({ session, busy, onSave, onOpenImport, onReopen }: { session: SessionRecord; busy: boolean; onSave: (m: M) => Promise<boolean>; /** Открыть вкладку приёма правок из внешних редакторов. */ onOpenImport?: () => void; /** Открыть новый цикл правок у утверждённой версии. */ onReopen?: () => Promise<void> | void }) {
   const model = session.model!;
@@ -648,6 +661,18 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         if ((SUBTYPES[node.type] ?? []).length > 0) typed.push(kindMenu(node.type === "task" ? "Тип задачи" : "Тип подпроцесса", "subtype", SUBTYPES[node.type], node.subtype ?? ""));
         typed.push(kindMenu("Тип цикла", "loop", [["", "Нет, выполняется один раз"], ...LOOP_KINDS.map((k) => [k, LOOP_LABELS[k]] as [string, string])], node.loop ?? ""));
       } else if (node.type === "gateway") typed.push(kindMenu("Тип шлюза", "subtype", SUBTYPES.gateway ?? [], node.subtype ?? ""));
+      else if (node.type === "event") {
+        // как в Business Studio: «Тип события» и «Тип триггера» (набор триггеров зависит от типа события)
+        const spec = eventSpec(node, !!node.attached_to);
+        const evKey = spec.position === "intermediate" ? (spec.throwing ? "intermediate_throw" : "intermediate_catch") : spec.position;
+        if (spec.position !== "boundary")
+          typed.push(
+            kindMenu("Тип события", "evtype", [["start", "Стартовое событие"], ["intermediate_catch", "Промежуточное событие (Обработчик)"], ["intermediate_throw", "Промежуточное событие (Инициатор)"], ["end", "Конечное событие"]], evKey)
+          );
+        const order = EVENT_TRIGGER_ORDER[spec.position];
+        const allowed = allowedTriggers(spec.position, spec.throwing);
+        typed.push(kindMenu("Тип триггера", "trigger", order.filter(([t]) => (allowed as string[]).includes(t)).map(([t, l]) => [t, l] as [string, string]), spec.trigger));
+      }
       items = [
         ...typed,
         ...edit,
@@ -683,6 +708,19 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         const patch: Partial<ProcessNode> = what === "subtype" ? { subtype: arg || undefined } : { loop: (arg || undefined) as ProcessNode["loop"] };
         h.commit(updateNode(h.draftRef.current, node.id, patch));
         window.setTimeout(() => void save(), 0); // в окне Visio правка видна после записи в модель
+        return;
+      }
+      if (what === "evtype") {
+        const model = h.draftRef.current;
+        const next = arg === "start" || arg === "end" ? setEventPosition(model, node.id, arg) : setEventDirection(setEventPosition(model, node.id, "intermediate"), node.id, arg === "intermediate_throw" ? "throw" : "catch");
+        h.commit(next);
+        window.setTimeout(() => void save(), 0);
+        return;
+      }
+      if (what === "trigger") {
+        const cur = eventSpec(node, !!node.attached_to);
+        h.commit(setEventTrigger(h.draftRef.current, node.id, arg === "none" ? null : { ...(cur.trigger === arg ? cur.details : {}), type: arg as TriggerType }));
+        window.setTimeout(() => void save(), 0);
         return;
       }
       if (what === "similar") {

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { session } from "../../test/fixtures";
+import { session, structuredModel } from "../../test/fixtures";
 import Studio from "./Studio";
 
 /** Оболочка настольного приложения: window.chrome.webview с подпиской на сообщения, как в WebView2. */
@@ -69,6 +69,24 @@ describe("выделение между студией и Visio", () => {
     await act(async () => new Promise((r) => setTimeout(r, 10)));
     const saved = (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; subtype?: string }[] }])[0];
     expect(saved.nodes.find((n) => n.id === "b1")!.subtype).toBe("user");
+  });
+
+  it("правый щелчок по событию: «Тип события» и «Тип триггера» как в Business Studio; выбор записывается в модель", async () => {
+    const onSave = vi.fn(async () => true);
+    render(<Studio session={session(structuredModel())} busy={false} onSave={onSave} />);
+    fromShell({ t: "shape-menu", kind: "node", id: "b0" });
+    type Item = { label?: string; items?: { id: string; label: string; checked?: boolean }[] };
+    const req = post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: Item[] }).find((m) => m.t === "menu")!;
+    const ev = req.items!.find((i) => i.label === "Тип события")!;
+    expect(ev.items!.map((i) => i.label)).toEqual(["Стартовое событие", "Промежуточное событие (Обработчик)", "Промежуточное событие (Инициатор)", "Конечное событие"]);
+    expect(ev.items!.find((i) => i.checked)!.id).toBe("evtype:start");
+    const trg = req.items!.find((i) => i.label === "Тип триггера")!;
+    expect(trg.items!.map((i) => i.label)).toEqual(["Неопределенное", "Сообщение", "Таймер", "Условие", "Сигнал", "Множественное", "Параллельное множественное"]);
+    expect(trg.items!.find((i) => i.checked)!.id).toBe("trigger:none");
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: req.id, item: "trigger:timer" } })));
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
+    const saved = (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; trigger?: { type: string } | null }[] }])[0];
+    expect(saved.nodes.find((n) => n.id === "b0")!.trigger?.type).toBe("timer");
   });
 
   it("правый щелчок по пустому месту: вставить, выделить всё и команды страницы уходят оболочке", async () => {
