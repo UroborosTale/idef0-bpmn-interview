@@ -327,6 +327,10 @@ const EVENT_TRIGGERS: [RegExp, TriggerType][] = [
   [/escalation|эскалац/, "escalation"],
   [/conditional|условн/, "conditional"],
   [/terminate|терминат|завершение процесса/, "terminate"],
+  [/parallel.?multiple|параллельн\S* множественн/, "parallel_multiple"],
+  [/multiple|множественн/, "multiple"],
+  [/compensation|компенсац/, "compensation"],
+  [/link|ссылк/, "link"],
 ];
 
 /** Триггер из метки pm_trg собственной выгрузки; испорченная метка не ошибка. */

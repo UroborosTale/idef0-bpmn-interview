@@ -427,7 +427,7 @@ internal sealed class MainForm : Form
             .Select(n => n.TryGetProperty("bpmn_scope", out var b) && b.ValueKind == JsonValueKind.String ? b.GetString() : null).First(x => x != null)!;
         visio.ShowDiagram(new Diagram("bpmn", scope));
         var before = visio.ShapeCount;
-        var drops = new[] { "task", "gateway:exclusive", "event:end", "event:intermediate:timer" };
+        var drops = new[] { "task", "gateway:exclusive", "event:end", "event:intermediate:timer", "event:end:terminate", "event:end:compensation" };
         await visio.PrepareEventShapesAsync(server);
         var madeAll = drops.Select(k => visio.DropMaster(k, null)).ToList();
         L($"палитра: создано {string.Join(", ", madeAll.Select(m => $"«{m}»"))}; фигур на странице {before} → {visio.ShapeCount}");
@@ -438,6 +438,7 @@ internal sealed class MainForm : Form
         var added = JsonDocument.Parse(nodesJson).RootElement.GetProperty("model").GetProperty("nodes").EnumerateArray().Where(n => n.TryGetProperty("tags", out var tg) && tg.EnumerateArray().Any(t => t.GetString() == "added_externally")).ToList();
         L("новые шаги в модели: " + string.Join("; ", added.Select(n => $"{n.GetProperty("type").GetString()}:{n.GetProperty("name").GetString()}")));
         if (!added.Any(n => n.GetProperty("type").GetString() == "event" && n.TryGetProperty("trigger", out var tr) && tr.ValueKind == JsonValueKind.Object && tr.GetProperty("type").GetString() == "timer")) L("ПРОВАЛ: событие-таймер из палитры не стало событием с триггером «таймер»");
+        foreach (var want in new[] { "terminate", "compensation" }) if (!added.Any(n => n.TryGetProperty("trigger", out var tr) && tr.ValueKind == JsonValueKind.Object && tr.GetProperty("type").GetString() == want)) L($"ПРОВАЛ: событие «{want}» из палитры не стало событием с этим триггером");
         if (added.Count != drops.Length || !added.Any(n => n.GetProperty("name").GetString() == "Новая задача" && n.GetProperty("type").GetString() == "task")) L("ПРОВАЛ: фигуры из палитры не стали шагами модели");
         // повторный приём без правок не должен создавать шаги заново: новые фигуры помечены id созданных шагов
         var again = await Apply();

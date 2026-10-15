@@ -802,10 +802,27 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
 
 /** Названия триггеров в именах фигур палитры (по ним импорт опознаёт тип); те же слова в оболочке (VisioPane.TriggerNames). */
 const PALETTE_EVENTS: Record<string, string[]> = {
-  start: ["none", "message", "timer", "conditional", "signal"],
-  intermediate: ["none", "message", "timer", "conditional", "signal", "escalation"],
-  end: ["none", "message", "error", "escalation", "signal"], // «завершение процесса» — залитый значок отдельной фигурой, в палитру не берётся
+  // наборы триггеров — как в меню «Тип триггера» Business Studio (см. docs/bs6-bpmn-types.md)
+  start: ["none", "message", "timer", "conditional", "signal", "multiple", "parallel_multiple"],
+  intermediate: ["none", "message", "timer", "conditional", "link", "signal", "multiple", "parallel_multiple"],
+  end: ["none", "message", "escalation", "error", "compensation", "signal", "multiple", "terminate"],
 };
+
+/** Лист-образец всех значков событий: каждый триггер в начальном, промежуточном (ждёт и выбрасывает) и конечном событии (для проверки вида). */
+export async function buildEventIconSheet(): Promise<Buffer> {
+  const { TRIGGER_TYPES } = await import("../shared/events.js");
+  const model = { nodes: [], roles: [], flows: [] } as unknown as ProcessLogicModel;
+  const page = new Page("icons", 620, 80 + TRIGGER_TYPES.length * 70);
+  const cols: [string, "start" | "intermediate" | "end", boolean][] = [["start", "start", false], ["intermediate ждёт", "intermediate", false], ["intermediate выбрасывает", "intermediate", true], ["end", "end", true]];
+  TRIGGER_TYPES.forEach((trigger, row) => {
+    page.label(trigger, { x: 10, y: 60 + row * 70 + 14, anchor: "start", w: 120 }, { fontPx: 11 });
+    cols.forEach(([, position, throwing], c) => {
+      const shape = { id: `e${row}_${c}`, kind: "event", subtype: position, event: { position, trigger, throwing }, name: "", x: 160 + c * 110, y: 50 + row * 70, w: 36, h: 36 } as unknown as Shape;
+      drawBpmnShape(page, shape, model, true);
+    });
+  });
+  return packVsdx([page], {}, []);
+}
 
 /**
  * Документ с готовыми событиями для палитры оболочки: по странице на каждое сочетание «положение:тип» (например «intermediate:timer»),

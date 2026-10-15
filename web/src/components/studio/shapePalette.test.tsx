@@ -49,7 +49,7 @@ describe("палитра фигур", () => {
     // у конечного события — свои типы, среди них эскалация; «Без типа» возвращает простое событие
     fireEvent.click(screen.getByRole("button", { name: "Тип: Конечное событие" }));
     expect(screen.getByRole("menuitemradio", { name: "Эскалация" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Без типа" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Неопределенное" }));
     post.mockClear();
     fireEvent.pointerDown(screen.getByRole("button", { name: "Конечное событие" }), { clientX: 20, clientY: 20 });
     fireEvent.pointerUp(document, { clientX: 20, clientY: 20 });

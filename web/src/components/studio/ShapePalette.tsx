@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { postToShell } from "../../desktop";
+import { scaleGlyphs, triggerGlyph, type TriggerType } from "@shared/events";
 
 /** Фигуры палитры (как в редакторе Business Studio): вид совпадает с мастерами «Фигур документа» в выгрузке Visio. */
 export const PALETTE: { kind: string; title: string }[] = [
@@ -18,11 +19,28 @@ export const PALETTE: { kind: string; title: string }[] = [
 ];
 
 /** Типы событий, которые можно выбрать у каждого вида события (как в палитре Business Studio). */
+const T = (type: string, title: string) => ({ type, title });
 export const EVENT_TYPES: Record<string, { type: string; title: string }[]> = {
-  start: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }],
-  intermediate: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "timer", title: "Таймер" }, { type: "conditional", title: "Условие" }, { type: "signal", title: "Сигнал" }, { type: "escalation", title: "Эскалация" }],
-  end: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "error", title: "Ошибка" }, { type: "escalation", title: "Эскалация" }, { type: "signal", title: "Сигнал" }],
+  start: [T("", "Неопределенное"), T("message", "Сообщение"), T("timer", "Таймер"), T("conditional", "Условие"), T("signal", "Сигнал"), T("multiple", "Множественное"), T("parallel_multiple", "Параллельное множественное")],
+  intermediate: [T("message", "Сообщение"), T("timer", "Таймер"), T("conditional", "Условие"), T("link", "Ссылка"), T("signal", "Сигнал"), T("multiple", "Множественное"), T("parallel_multiple", "Параллельное множественное")],
+  end: [T("", "Неопределенное"), T("message", "Сообщение"), T("escalation", "Эскалация"), T("error", "Ошибка"), T("compensation", "Компенсация"), T("signal", "Сигнал"), T("multiple", "Множественное"), T("terminate", "Завершение")],
 };
+
+/** Значок типа события во флайауте палитры: кольцо события и тот же глиф триггера, что в редакторе и в Visio. */
+function TriggerIcon({ type, pos }: { type: string; pos: string }) {
+  const glyphs = scaleGlyphs(triggerGlyph((type || "none") as TriggerType, pos === "end"), 0.72);
+  return (
+    <svg viewBox="-12 -12 24 24" width="20" height="18" aria-hidden="true" stroke="#000" strokeWidth="1" strokeLinejoin="round" fill="none" data-trigger={type || "none"}>
+      <circle r="11" strokeWidth={pos === "end" ? 2.2 : 1} />
+      {pos === "intermediate" && <circle r="9" />}
+      {glyphs.map((g, i) => {
+        const stroke = g.kind === "poly" && g.light ? "#fff" : "#000";
+        if (g.kind === "circle") return <circle key={i} r={g.r} fill={g.filled ? "#000" : "none"} />;
+        return <path key={i} d={g.pts.map(([x, y], k) => `${k ? "L" : "M"}${x} ${y}`).join(" ") + (g.closed ? "Z" : "")} fill={g.filled ? "#000" : "none"} stroke={stroke} />;
+      })}
+    </svg>
+  );
+}
 
 /** Существующие объекты справочников, как во второй группе палитры Business Studio: ставятся к выбранному шагу. */
 export type ExistingKind = "activity" | "document" | "system" | "regulation" | "role";
@@ -192,7 +210,7 @@ export default function ShapePalette({ onExisting }: { onExisting?: (kind: Exist
               }}
             >
               <Glyph kind={p.kind} />
-              {type && <span className="palette-badge">{typeTitle?.slice(0, 2)}</span>}
+              {type && pos && <span className="palette-badge"><TriggerIcon type={type} pos={pos} /></span>}
             </button>
             {pos && (
               <>
@@ -214,7 +232,7 @@ export default function ShapePalette({ onExisting }: { onExisting?: (kind: Exist
                           setOpen(null);
                         }}
                       >
-                        {t.type ? t.title.slice(0, 2) : "∅"}
+                        <TriggerIcon type={t.type} pos={pos} />
                       </button>
                     ))}
                   </div>

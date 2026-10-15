@@ -222,11 +222,12 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .palette-item { width: 28px; height: 28px; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 2px; cursor: grab; touch-action: none; }
 .palette-item { position: relative; }
 .palette-item.active { background: var(--bs-press); border: 1px solid var(--bs-hover-border); }
-.palette-badge { position: absolute; right: -1px; bottom: -1px; font-size: 8px; line-height: 9px; padding: 0 2px; background: #fff; border: 1px solid var(--bs-border); border-radius: 2px; color: #000; }
+.palette-badge { position: absolute; right: -3px; bottom: -3px; display: flex; padding: 0; background: #fff; border-radius: 50%; line-height: 0; }
+.palette-badge svg { width: 13px; height: 12px; }
 .palette-more { position: absolute; right: -2px; top: 17px; width: 12px; height: 12px; padding: 0; border: 1px solid var(--bs-border); background: #fff; font-size: 8px; line-height: 10px; color: #333; cursor: pointer; z-index: 1; }
 .palette-cell { position: relative; display: flex; flex-direction: column; align-items: center; }
 .palette-flyout { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px; padding: 2px; background: #fff; border: 1px solid var(--bs-border); }
-.palette-flyout button { width: 24px; height: 20px; padding: 0; border: 0; background: transparent; font-size: 12px; cursor: pointer; }
+.palette-flyout button { width: 28px; height: 22px; padding: 0; border: 0; background: transparent; font-size: 12px; cursor: pointer; }
 .palette-flyout button:hover { background: var(--bs-hover); }
 .palette-flyout button.on { font-weight: 600; background: var(--bs-press); }
 .palette-item.dragging { background: var(--bs-press); border-color: var(--bs-hover-border); }

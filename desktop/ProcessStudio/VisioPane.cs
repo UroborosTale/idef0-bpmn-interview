@@ -154,6 +154,7 @@ internal sealed class VisioPane : Panel
     {
         ["message"] = "сообщение", ["timer"] = "таймер", ["conditional"] = "условное", ["signal"] = "сигнал",
         ["error"] = "ошибка", ["escalation"] = "эскалация", ["terminate"] = "завершение процесса",
+        ["link"] = "ссылка", ["multiple"] = "множественное", ["parallel_multiple"] = "параллельное множественное", ["compensation"] = "компенсация",
     };
 
     /// <summary>
@@ -276,9 +277,21 @@ internal sealed class VisioPane : Panel
             dynamic win = visio.Ocx.Window;
             dynamic page = win.Page;
             dynamic src = eventDoc.Pages.ItemU[$"{parts[1]}:{parts[2]}"];
-            src.Shapes[1].Copy();
+            // на странице основная фигура и, у выбрасывающих событий, залитые части значка: копируются все и собираются в группу
+            int count = (int)src.Shapes.Count;
+            dynamic all = src.CreateSelection(0 /* visSelTypeAll */);
+            all.Copy();
             page.Paste();
             dynamic shape = win.Selection[1];
+            dynamic textHolder = shape;
+            if (count > 1)
+            {
+                shape = win.Selection.Group();
+                textHolder = shape;
+                // подпись принадлежит основной фигуре группы (у неё ячейки BPMN события), а не группе: иначе она встала бы по центру значка
+                foreach (dynamic sub in shape.Shapes)
+                    if ((short)sub.CellExistsU["Prop.BpmnEventType", 0] != 0) { textHolder = sub; break; }
+            }
             double left = 0, top = 0, width = 0, height = 0;
             double x, y;
             try
@@ -296,7 +309,7 @@ internal sealed class VisioPane : Panel
             shape.CellsU["PinX"].ResultIU = x;
             shape.CellsU["PinY"].ResultIU = y;
             Try(() => shape.NameU = spec.Name);
-            shape.Text = spec.Text;
+            textHolder.Text = spec.Text;
             Try(() => win.DeselectAll());
             return spec.Text;
         }
