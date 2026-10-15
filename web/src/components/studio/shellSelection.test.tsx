@@ -28,6 +28,8 @@ const sent = () => post.mock.calls.map((c) => c[0] as { t: string; id?: string }
 describe("выделение между студией и Visio", () => {
   it("фигура, выделенная в Visio, открывается в панели свойств; обратно она не отправляется", () => {
     render(<Studio session={session()} busy={false} onSave={vi.fn(async () => true)} />);
+    expect(document.querySelector(".props-head")).toBeNull(); // как в Business Studio, свойства открываются по кнопке
+    fromShell({ t: "props" });
     expect(title()).toBe("Свойства процесса");
     fromShell({ t: "visio-select", kind: "node", id: "b" });
     expect(title()).toBe("Свойства элемента");
@@ -44,13 +46,14 @@ describe("выделение между студией и Visio", () => {
     render(<Studio session={session()} busy={false} onSave={vi.fn(async () => true)} />);
     fromShell({ t: "что-то другое" });
     fromShell(null);
+    expect(document.querySelector(".props-head")).toBeNull();
+    fromShell({ t: "props" });
     expect(title()).toBe("Свойства процесса");
   });
 
   it("Ctrl+E в окне Visio (сообщение props) открывает скрытую панель свойств, как в Business Studio", () => {
     render(<Studio session={session()} busy={false} onSave={vi.fn(async () => true)} />);
-    fireEvent.click(document.querySelector('[title="Скрыть панель"]')!);
-    expect(document.querySelector(".props-head")).toBeNull();
+    expect(document.querySelector(".props-head")).toBeNull(); // по умолчанию панель скрыта
     fromShell({ t: "props" });
     expect(document.querySelector(".props-head")).not.toBeNull();
   });

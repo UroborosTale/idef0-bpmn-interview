@@ -1,4 +1,4 @@
-export type NavIconKind = "folder" | "process" | "diagram" | "subprocess" | "operation" | "bpmn" | "step";
+export type NavIconKind = "folder" | "process" | "diagram" | "subprocess" | "operation" | "bpmn" | "step" | "tabActivity" | "tabDicts" | "tabReports";
 
 const INK = "#35507d";
 
@@ -46,6 +46,27 @@ export default function NavIcon({ kind }: { kind: NavIconKind }) {
           <rect x="7" y="6.6" width="3.2" height="2.8" rx=".6" fill="#e8eef7" />
           <path d="M5.6 8H7M10.2 8h1.4" />
           <path d="M13 6.8l1 1.2-1 1.2-1-1.2z" fill="#fbe9a8" />
+        </g>
+      )}
+      {kind === "tabActivity" && (
+        // «Деятельность»: блок процесса
+        <g {...common}>
+          <rect x="3" y="4" width="10" height="8" rx="1.5" fill="#e8eef7" />
+          <path d="M13 8h2.5M8 12v2.5M8 4V1.8" />
+        </g>
+      )}
+      {kind === "tabDicts" && (
+        // «Справочники»: книга
+        <g {...common}>
+          <path d="M2.5 3.5c2-1 4-1 5.5.3 1.5-1.3 3.5-1.3 5.5-.3v9c-2-1-4-1-5.5.3-1.5-1.3-3.5-1.3-5.5-.3z" fill="#fff" />
+          <path d="M8 3.8v9" />
+        </g>
+      )}
+      {kind === "tabReports" && (
+        // «Отчёты»: лист с диаграммой
+        <g {...common}>
+          <path d="M3.5 1.8h6l3 3v9.4h-9z" fill="#fff" />
+          <path d="M9.5 1.8v3h3M5.5 11.5v-2M8 11.5v-4M10.5 11.5v-3" />
         </g>
       )}
       {kind === "step" && (

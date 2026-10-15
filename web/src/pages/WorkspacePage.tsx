@@ -276,7 +276,7 @@ export default function WorkspacePage({
         />
       )}
 
-      {session.mode === "A" && session.status === "ready" && (
+      {session.mode === "A" && session.status === "ready" && !desk && (
         <div className="toolbar">
           <button disabled={busy} onClick={() => withBusy(async () => setSession(await api.runPipeline(sessionId, onProgress)))}>Перезапустить обработку текста</button>
         </div>

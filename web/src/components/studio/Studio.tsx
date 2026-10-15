@@ -105,10 +105,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const [navReveal, setNavReveal] = useState<{ id: string | null; n: number }>({ id: null, n: 0 });
   /** Бумага для печати листа IDEF0: "" — по формату листа диаграммы (если он стандартный), иначе A4. */
   const [paper, setPaper] = useState("");
-  const [propsOpen, setPropsOpen] = useState(true);
+  // как в Business Studio, в настольном приложении свойства и список проверок открываются по кнопке (Ctrl+E и меню объекта тоже открывают)
+  const [propsOpen, setPropsOpen] = useState(!inDesktopShell());
   const [full, setFull] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [problemsOpen, setProblemsOpen] = useState(true);
+  const [problemsOpen, setProblemsOpen] = useState(!inDesktopShell());
   const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);

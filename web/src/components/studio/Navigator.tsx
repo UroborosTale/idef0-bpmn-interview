@@ -273,7 +273,7 @@ export default function Navigator({
       <div key={n.id}>
         <div
           className={`nav-row ${selectedId === n.id ? "selected" : ""} ${clipboard?.mode === "cut" && clipboard.id === n.id ? "nav-cut" : ""} ${dropHere ? `drop-${dropHere.kind}` : ""}`}
-          style={{ paddingLeft: 8 + depth * 14 }}
+          style={{ paddingLeft: 8 + depth * 14, "--nav-depth": depth } as React.CSSProperties}
           data-nav-fn={n.id}
           data-drop-preview={dropHere?.preview ?? undefined}
           tabIndex={selectedId === n.id ? 0 : -1}
@@ -361,7 +361,7 @@ export default function Navigator({
         {open && isHost && (
           <div
             className={`nav-row nav-bpmn-row ${hasSteps ? "on" : ""} ${activeKey === `bpmn:${n.id}` ? "active-doc" : ""}`}
-            style={{ paddingLeft: 8 + (depth + 1) * 14 }}
+            style={{ paddingLeft: 8 + (depth + 1) * 14, "--nav-depth": depth + 1 } as React.CSSProperties}
             data-nav-bpmn={n.id}
             onClick={() => onOpenDoc(bpmnDoc(n.id))}
             title={hasSteps ? "Диаграмма BPMN операции" : "Диаграмма BPMN операции ещё пуста — откройте и опишите шаги"}
@@ -378,7 +378,7 @@ export default function Navigator({
             <div
               key={s.id}
               className="nav-row nav-step"
-              style={{ paddingLeft: 8 + (depth + 2) * 14 }}
+              style={{ paddingLeft: 8 + (depth + 2) * 14, "--nav-depth": depth + 2 } as React.CSSProperties}
               data-nav-step={s.id}
               onClick={() => onOpenDoc(bpmnDoc(n.id))}
               title={s.name}
@@ -397,7 +397,7 @@ export default function Navigator({
   const group = model.process.group?.trim();
   const processCode = structured ? processCodeOf(model) : "";
   const base = group ? 1 : 0;
-  const pad = (d: number) => ({ paddingLeft: 8 + d * 14 });
+  const pad = (d: number) => ({ paddingLeft: 8 + d * 14, "--nav-depth": d } as React.CSSProperties);
   const twisty = (id: string, show = true) => (
     <span
       className="nav-twisty"
@@ -815,6 +815,9 @@ export default function Navigator({
       <div className="nav-vtabs" role="tablist" aria-orientation="vertical" aria-label="Разделы навигатора">
         {NAV_TABS.map((t) => (
           <button key={t.key} role="tab" aria-selected={navTab === t.key} className="nav-vtab" onClick={() => setNavTab(t.key)} title={t.title}>
+            <span className="nav-vtab-icon">
+              <NavIcon kind={t.key === "activity" ? "tabActivity" : t.key === "dicts" ? "tabDicts" : "tabReports"} />
+            </span>
             {t.title}
           </button>
         ))}

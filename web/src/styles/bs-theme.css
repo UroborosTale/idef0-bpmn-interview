@@ -245,3 +245,18 @@ td { border: 1px solid #e3e7ec; padding: 1px 4px; }
 .palette-sep { width: 22px; height: 1px; background: var(--bs-border); margin: 4px 0; }
 .prop-row { display: flex; align-items: center; gap: 8px; }
 .prop-row button { font-size: 12px; padding: 1px 8px; }
+
+/* значок вертикальной вкладки навигатора стоит над названием, как в Business Studio */
+.nav-vtab { display: flex; flex-direction: row; align-items: center; gap: 4px; }
+.nav-vtab-icon { writing-mode: horizontal-tb; display: inline-flex; transform: rotate(90deg); }
+/* линии дерева навигатора: пунктирные вертикали по числу уровней вложенности */
+.nav-section .nav-row { background-image: repeating-linear-gradient(to right, transparent 0 13px, transparent 13px 14px); position: relative; }
+.nav-section .nav-row::before {
+  content: ""; position: absolute; left: 14px; top: 0; bottom: 0;
+  width: calc(var(--nav-depth, 0) * 14px); pointer-events: none;
+  background: repeating-linear-gradient(to right, #b9bec4 0 1px, transparent 1px 14px);
+  -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 2px);
+  mask-image: repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 2px);
+  opacity: .7;
+}
+.nav-section .nav-row.selected::before, .nav-section .nav-row.active-doc::before { opacity: .0; }
