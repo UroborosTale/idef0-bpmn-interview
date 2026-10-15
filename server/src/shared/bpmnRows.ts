@@ -64,6 +64,22 @@ export function branchRows(nodes: RowNode[], edges: { from: string; to: string }
       }
     }
   }
+  // Шлюз, в который входят только из другой дорожки (сверху или снизу), встаёт у границы своей дорожки — в «верхнем» или «нижнем» ряду,
+  // а следующий за ним шаг — в основном ряду того же столбца (стрелка вертикальна), как в Business Studio. Стрелки сверху: ряд выше основного.
+  const incoming = new Map<string, string[]>();
+  for (const e of edges) if (e.from !== e.to && byId.has(e.from) && byId.has(e.to)) incoming.set(e.to, [...(incoming.get(e.to) ?? []), e.from]);
+  for (const g of nodes) {
+    if (g.type !== "gateway" || g.fixed || rows.has(g.id)) continue;
+    const ins = incoming.get(g.id) ?? [];
+    const outs = out.get(g.id) ?? [];
+    if (ins.length === 0 || outs.length !== 1) continue;
+    if (!ins.every((f) => byId.get(f)!.laneIndex !== g.laneIndex)) continue;
+    const target = byId.get(outs[0])!;
+    if (target.laneIndex !== g.laneIndex || target.type === "gateway" || target.fixed || rows.has(target.id)) continue;
+    const fromAbove = ins.every((f) => byId.get(f)!.laneIndex < g.laneIndex);
+    // входящий снизу шлюз остаётся в основном ряду: стрелка поднимается к нему вертикально
+    if (fromAbove) rows.set(g.id, -1);
+  }
   return rows;
 }
 

@@ -140,51 +140,51 @@ edge Flow_o12_f25 Node_o12_ok3→Node_o12_rew3 [3810,110 3810,66 4050,66 4050,90
 edge Flow_o12_f26 Node_o12_rew3→Node_o12_endRew3 [4125,135 4165,135]
 edge Flow_o12_f27 Node_o12_ok3→Node_o12_end [3835,135 3852,135 3852,271 3865,271] «Да»
 extra annotation 100,830 180×60 «Согласование не требуется при выполнении обоих условий» link[820,180 190,830]
-# BPMN C025.01.03 2741×700
-lane r_elma 80,60 2561×150
-lane r_spec 80,210 2561×260
+# BPMN C025.01.03 2561×700
+lane r_elma 80,60 2381×150
+lane r_spec 80,210 2381×260
 shape Node_o13_start event/start 175,117 36×36 «Заявка на обучение согласована»
 shape Node_o13_task task/service 365,90 150×90 «Создать задачу специалисту на проверку направления»
 shape Node_o13_assign task/service 555,90 150×90 «Назначить специалиста на задачу»
-shape Node_o13_m1 gateway/exclusive 745,370 50×50 «Слияние потоков»
-shape Node_o13_open task/user 935,350 150×90 «Открыть задачу и изучить контекст заявки»
-shape Node_o13_pick task/user 1125,350 150×90 «Выбрать программу обучения из списка под целевой результат»
-shape Node_o13_found gateway/exclusive 1315,370 50×50 «Удалось подобрать программу обучения?»
-shape Node_o13_contract gateway/exclusive 1575,370 50×50 «Договор с учебной организацией заключен?»
-shape Node_o13_confirm task/user 1695,350 150×90 «Подтвердить программу обучения и организацию»
-shape Node_o13_notify task/service 1885,90 150×90 «Отправить уведомление сотруднику о подтверждении заявки»
-shape Node_o13_endOk event/end 2075,117 36×36 «Заявка на обучение подтверждена»
-shape Node_o13_search task/user 1395,266 150×90 «Поиск программы во внешнем контуре»
-shape Node_o13_tender gateway/exclusive 1885,370 50×50 «Возможно провести тендерную процедуру?»
-shape Node_o13_docs task/user 2145,350 150×90 «Подготовка документов для проведения тендерной закупки»
-shape Node_o13_buy task/user 2325,350 150×90 «Проведение тендерной закупки»
-shape Node_o13_endBuy event/end 2505,377 36×36 «Необходимая программа обучения куплена, заявка подтверждена»
-shape Node_o13_fail task/user 1965,266 150×90 «Нажать кнопку “Не удалось подобрать направление”»
-shape Node_o13_again task/service 2265,90 150×90 «Отправить заявку на дополнительную проработку»
+shape Node_o13_m1 gateway/exclusive 745,260 50×50 «Слияние потоков»
+shape Node_o13_open task/user 825,376 150×90 «Открыть задачу и изучить контекст заявки»
+shape Node_o13_pick task/user 1005,350 150×90 «Выбрать программу обучения из списка под целевой результат»
+shape Node_o13_found gateway/exclusive 1185,370 50×50 «Удалось подобрать программу обучения?»
+shape Node_o13_contract gateway/exclusive 1445,370 50×50 «Договор с учебной организацией заключен?»
+shape Node_o13_confirm task/user 1525,350 150×90 «Подтвердить программу обучения и организацию»
+shape Node_o13_notify task/service 1695,90 150×90 «Отправить уведомление сотруднику о подтверждении заявки»
+shape Node_o13_endOk event/end 1885,117 36×36 «Заявка на обучение подтверждена»
+shape Node_o13_search task/user 1265,266 150×90 «Поиск программы во внешнем контуре»
+shape Node_o13_tender gateway/exclusive 1705,370 50×50 «Возможно провести тендерную процедуру?»
+shape Node_o13_docs task/user 1965,350 150×90 «Подготовка документов для проведения тендерной закупки»
+shape Node_o13_buy task/user 2145,350 150×90 «Проведение тендерной закупки»
+shape Node_o13_endBuy event/end 2325,377 36×36 «Необходимая программа обучения куплена, заявка подтверждена»
+shape Node_o13_fail task/user 1785,266 150×90 «Нажать кнопку “Не удалось подобрать направление”»
+shape Node_o13_again task/service 2075,90 150×90 «Отправить заявку на дополнительную проработку»
 edge Flow_o13_f1 Node_o13_start→Node_o13_task [211,135 365,135]
 edge Flow_o13_f2 Node_o13_task→Node_o13_assign [515,135 555,135]
-edge Flow_o13_f3 Node_o13_assign→Node_o13_m1 [705,135 727,135 727,395 745,395]
-edge Flow_o13_f4 Node_o13_m1→Node_o13_open [795,395 935,395]
-edge Flow_o13_f5 Node_o13_open→Node_o13_pick [1085,395 1125,395]
-edge Flow_o13_f6 Node_o13_pick→Node_o13_found [1275,395 1315,395]
-edge Flow_o13_f7 Node_o13_found→Node_o13_contract [1340,370 1340,242 1600,242 1600,370] «Да»
-edge Flow_o13_f8 Node_o13_found→Node_o13_search [1365,395 1382,395 1382,311 1395,311] «Нет»
-edge Flow_o13_f9 Node_o13_search→Node_o13_tender [1470,266 1470,232 1910,232 1910,370]
-edge Flow_o13_f10 Node_o13_contract→Node_o13_confirm [1625,395 1695,395] «Да»
-edge Flow_o13_f11 Node_o13_contract→Node_o13_tender [1600,420 1600,464 1910,464 1910,420] «Нет»
-edge Flow_o13_f12 Node_o13_confirm→Node_o13_notify [1770,350 1770,135 1885,135]
-edge Flow_o13_f13 Node_o13_notify→Node_o13_endOk [2035,135 2075,135]
-edge Flow_o13_f14 Node_o13_tender→Node_o13_docs [1935,395 2145,395] «Да»
-edge Flow_o13_f15 Node_o13_docs→Node_o13_buy [2295,395 2325,395]
-edge Flow_o13_f16 Node_o13_buy→Node_o13_endBuy [2475,395 2505,395]
-edge Flow_o13_f17 Node_o13_tender→Node_o13_fail [1885,395 1861,395 1861,311 1965,311] «Нет»
-edge Flow_o13_f18 Node_o13_fail→Node_o13_again [2115,311 2202,311 2202,135 2265,135]
-edge Flow_o13_f19 Node_o13_again→Node_o13_m1 [2340,90 2340,66 770,66 770,370]
-pool Pool_p_search 1385,620 170×40
-message Msg_o13_m1 Node_o13_search→Pool_p_search [1450.5,356 1450.2,620]
-message Msg_o13_m2 Pool_p_search→Node_o13_search [1410.5,620 1410.5,500 1489.5,500 1489.5,356]
-message Msg_o13_m3 Node_o13_buy→Pool_p_search [2380.5,440 2380.5,542 1529.5,542 1529.5,620]
-message Msg_o13_m4 Pool_p_search→Node_o13_buy [1489.8,620 1489.8,552 2419.5,552 2419.5,440]
+edge Flow_o13_f3 Node_o13_assign→Node_o13_m1 [705,135 727,135 727,285 745,285]
+edge Flow_o13_f4 Node_o13_m1→Node_o13_open [770,310 770,421 825,421]
+edge Flow_o13_f5 Node_o13_open→Node_o13_pick [975,421 992,421 992,395 1005,395]
+edge Flow_o13_f6 Node_o13_pick→Node_o13_found [1155,395 1185,395]
+edge Flow_o13_f7 Node_o13_found→Node_o13_contract [1210,370 1210,242 1470,242 1470,370] «Да»
+edge Flow_o13_f8 Node_o13_found→Node_o13_search [1235,395 1252,395 1252,311 1265,311] «Нет»
+edge Flow_o13_f9 Node_o13_search→Node_o13_tender [1340,266 1340,232 1730,232 1730,370]
+edge Flow_o13_f10 Node_o13_contract→Node_o13_confirm [1495,395 1525,395] «Да»
+edge Flow_o13_f11 Node_o13_contract→Node_o13_tender [1470,420 1470,464 1730,464 1730,420] «Нет»
+edge Flow_o13_f12 Node_o13_confirm→Node_o13_notify [1600,350 1600,135 1695,135]
+edge Flow_o13_f13 Node_o13_notify→Node_o13_endOk [1845,135 1885,135]
+edge Flow_o13_f14 Node_o13_tender→Node_o13_docs [1755,395 1965,395] «Да»
+edge Flow_o13_f15 Node_o13_docs→Node_o13_buy [2115,395 2145,395]
+edge Flow_o13_f16 Node_o13_buy→Node_o13_endBuy [2295,395 2325,395]
+edge Flow_o13_f17 Node_o13_tender→Node_o13_fail [1705,395 1681,395 1681,311 1785,311] «Нет»
+edge Flow_o13_f18 Node_o13_fail→Node_o13_again [1935,311 2017,311 2017,135 2075,135]
+edge Flow_o13_f19 Node_o13_again→Node_o13_m1 [2150,90 2150,66 770,66 770,260]
+pool Pool_p_search 1255,620 170×40
+message Msg_o13_m1 Node_o13_search→Pool_p_search [1320.5,356 1320.2,620]
+message Msg_o13_m2 Pool_p_search→Node_o13_search [1280.5,620 1280.5,500 1359.5,500 1359.5,356]
+message Msg_o13_m3 Node_o13_buy→Pool_p_search [2200.5,440 2200.5,542 1399.5,542 1399.5,620]
+message Msg_o13_m4 Pool_p_search→Node_o13_buy [1359.8,620 1359.8,552 2239.5,552 2239.5,440]
 # BPMN C025.02.01 3071×520
 lane r_elma 80,60 2891×150
 lane r_spec 80,210 2891×150
