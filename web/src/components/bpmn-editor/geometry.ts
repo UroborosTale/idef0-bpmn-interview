@@ -326,7 +326,7 @@ export function optimizedLayoutWithRows(m: ProcessLogicModel): { positions: Map<
       }
       const candidate = withPositions(withLaneHeights(m, heights), pos);
       const widthGain = compress ? (Math.max(...[...plain].map(([, p]) => p.x)) - Math.max(...[...pos].map(([, p]) => p.x))) / 100 : 0;
-      const sc = scoreModel(candidate) - Math.max(0, widthGain) * 10;
+      const sc = scoreModel(candidate) - Math.max(0, widthGain) * 0.5;
       if (sc < bestScore - 1e-9) (bestScore = sc, bestPos = pos, bestHeights = heights);
     }
   }

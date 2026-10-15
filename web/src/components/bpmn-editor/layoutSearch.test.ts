@@ -31,7 +31,9 @@ describe("кнопка «Расставить»: подбор по числу п
       for (const h of bpmnHosts(m)) {
         const view = scopeView(m as M, h.id);
         const a = quality(view, autoLayout(view));
-        const b = quality(view, optimizedLayout(view));
+        // подбор может поднять дорожки под ряды веток: оценивается диаграмма с теми же высотами, что и позиции
+        const optimized = withLayout(view, true, undefined, true);
+        const b = quality(optimized, new Map(optimized.nodes.filter((n) => n.layout).map((n) => [n.id, n.layout!] as const)));
         expect(b.crossings, `${name} ${h.id}`).toBeLessThanOrEqual(a.crossings);
         expect(b.cuts, `${name} ${h.id}`).toBeLessThanOrEqual(a.cuts);
         base += a.crossings;
