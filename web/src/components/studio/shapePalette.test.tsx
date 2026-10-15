@@ -13,9 +13,9 @@ afterEach(() => {
 });
 
 describe("палитра фигур", () => {
-  it("в палитре задача, подпроцесс, три события и четыре шлюза с подсказками", () => {
+  it("в палитре задача, подпроцесс, три события и семь шлюзов с подсказками", () => {
     render(<ShapePalette />);
-    expect(PALETTE.map((p) => p.kind)).toEqual(["task", "subprocess", "event:start", "event:intermediate", "event:end", "gateway:exclusive", "gateway:parallel", "gateway:inclusive", "gateway:event_based"]);
+    expect(PALETTE.map((p) => p.kind)).toEqual(["task", "subprocess", "event:start", "event:intermediate", "event:end", "gateway:exclusive", "gateway:parallel", "gateway:inclusive", "gateway:event_based", "gateway:complex", "gateway:event_based_start", "gateway:parallel_event_based"]);
     for (const p of PALETTE) expect(screen.getByRole("button", { name: p.title })).toBeTruthy();
   });
 

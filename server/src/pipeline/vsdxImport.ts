@@ -234,7 +234,7 @@ interface Geometry {
   ellipse: boolean;
   diamond: boolean;
   /** Значок внутри шлюза собственной выгрузки (вторая секция геометрии). */
-  glyph?: "exclusive" | "parallel" | "inclusive" | "event_based";
+  glyph?: "exclusive" | "parallel" | "inclusive" | "event_based" | "event_based_start" | "parallel_event_based" | "complex";
 }
 
 function geometryOf(shape: X): Geometry {
@@ -580,7 +580,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
       if (vb?.loop) node.loop = vb.loop;
     } else if (kind === "gateway") {
       const g = geo.glyph;
-      node.subtype = vb?.gateway ?? g ?? (/parallel|параллел|\band\b|«и»/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
+      node.subtype = vb?.gateway ?? g ?? (/комплексн|complex/.test(s.name) ? "complex" : /параллельн.*событ|parallel.*event/.test(s.name) ? "parallel_event_based" : /событ.*запуск|event.*start|создание нового экземпляра/.test(s.name) ? "event_based_start" : /parallel|параллел|\band\b|«и»/.test(s.name) ? "parallel" : /inclusive|включающ|\bor\b/.test(s.name) ? "inclusive" : /event.?based|событийн/.test(s.name) ? "event_based" : "exclusive");
     } else if (kind === "event") {
       if (vb?.position) node.subtype = vb.position;
       else if (/start|начал|старт/.test(s.name) || (!s.name && /^(начало|старт|start)/.test(norm(text)))) node.subtype = "start";

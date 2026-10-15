@@ -45,7 +45,11 @@ function gatewayTag(subtype?: string): string {
     case "inclusive":
       return "inclusiveGateway";
     case "event_based":
+    case "event_based_start":
+    case "parallel_event_based":
       return "eventBasedGateway";
+    case "complex":
+      return "complexGateway";
     default:
       return "exclusiveGateway";
   }
@@ -107,7 +111,7 @@ export function buildCamundaBpmn(model: ProcessLogicModel): BpmsExportResult {
       flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${assigneeAttr}${defaultAttr(n)}>${formDataXml}${loopXml(n.loop)}</bpmn:${tag}>`);
     } else if (n.type === "gateway") {
       const tag = gatewayTag(n.subtype);
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)} />`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)}${n.subtype === "event_based_start" ? ' instantiate="true"' : n.subtype === "parallel_event_based" ? ' instantiate="true" eventGatewayType="Parallel"' : ""} />`);
     } else if (n.type === "event") {
       const boundary = isBoundaryNode(n, model.nodes);
       const spec = eventSpec(n, boundary);

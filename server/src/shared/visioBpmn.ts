@@ -19,7 +19,7 @@ export type VisioProps = Record<string, VisioProp>;
 export type VisioKind = "task" | "subprocess" | "gateway" | "event" | "flow" | "pool" | "ignore";
 export type VisioTaskType = "user" | "service" | "manual" | "send" | "receive" | "script" | "business_rule";
 export type VisioLoop = "standard" | "parallel" | "sequential";
-export type VisioGateway = "exclusive" | "parallel" | "inclusive" | "event_based";
+export type VisioGateway = "exclusive" | "parallel" | "inclusive" | "event_based" | "complex" | "event_based_start" | "parallel_event_based";
 export type VisioEventPosition = "start" | "intermediate" | "end";
 export type VisioFlowType = "sequence" | "message" | "association";
 
@@ -83,15 +83,9 @@ function loopOf(n: string, lost: string[]): VisioLoop | undefined {
 // --- шлюз ---
 
 function gatewayOf(n: string, exclusiveType: string, lost: string[]): VisioGateway {
-  if (/сложн|complex/.test(n)) {
-    lost.push("сложный шлюз (прочитан как исключающий)");
-    return "exclusive";
-  }
-  if (/параллельн.*событ|parallel.*event/.test(n)) {
-    lost.push("параллельный событийный шлюз (прочитан как событийный)");
-    return "event_based";
-  }
-  if (/исключающ.*событ|exclusive.*event/.test(n)) return "event_based";
+  if (/сложн|complex|комплексн/.test(n)) return "complex";
+  if (/параллельн.*событ|parallel.*event/.test(n)) return "parallel_event_based";
+  if (/исключающ.*событ|exclusive.*event/.test(n)) return /создани|запуск|new instance|start/.test(n) ? "event_based_start" : "event_based";
   if (/включающ|inclusive/.test(n)) return "inclusive";
   if (/^(оператор )?и$|parallel|параллельн/.test(n)) return "parallel";
   if (/исключающ|exclusive/.test(n)) return /событ|event/.test(exclusiveType) ? "event_based" : "exclusive";
@@ -188,7 +182,7 @@ const TASK_LABELS: Record<string, string> = { none: "Нет", service: "Служ
 const TASK_LIST = ["Нет", "Служба", "Получить", "Отправить", "Пользователь", "Сценарий", "Вручную", "Создание экземпляра приема", "Бизнес-правило"];
 const ACTIVITY_LIST = ["Задача", "Подпроцесс"];
 const GATEWAY_LIST = ["Оператор исключающего ИЛИ", "Исключающее событие(создание нового экземпляра)", "Оператор включающего ИЛИ", "Оператор И", "Параллельное событие(создание нового экземпляра)", "Сложный оператор"];
-const GATEWAY_LABELS: Record<string, string> = { exclusive: GATEWAY_LIST[0], event_based: GATEWAY_LIST[0], inclusive: GATEWAY_LIST[2], parallel: GATEWAY_LIST[3] };
+const GATEWAY_LABELS: Record<string, string> = { exclusive: GATEWAY_LIST[0], event_based: GATEWAY_LIST[0], event_based_start: GATEWAY_LIST[1], inclusive: GATEWAY_LIST[2], parallel: GATEWAY_LIST[3], parallel_event_based: GATEWAY_LIST[4], complex: GATEWAY_LIST[5] };
 const EXCLUSIVE_LIST = ["Данные", "Событие"];
 const EVENT_LIST = ["Начальное событие", "Начальное (без прерывания)", "Промежуточное событие", "Промежуточное (без прерывания)", "Промежуточное (генерация)", "Завершающее событие"];
 // как в трафарете Visio, список триггеров — английские токены даже в русской версии

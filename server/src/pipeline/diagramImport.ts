@@ -56,7 +56,7 @@ export interface ParsedBpmn {
 }
 
 const TASK_TAGS = ["task", "userTask", "serviceTask", "manualTask", "sendTask", "receiveTask", "scriptTask", "subProcess"];
-const GATEWAY_TAGS = ["exclusiveGateway", "parallelGateway", "inclusiveGateway", "eventBasedGateway"];
+const GATEWAY_TAGS = ["exclusiveGateway", "parallelGateway", "inclusiveGateway", "eventBasedGateway", "complexGateway"];
 const EVENT_TAGS = ["startEvent", "endEvent", "intermediateCatchEvent", "intermediateThrowEvent", "boundaryEvent"];
 
 export function parseBpmnXml(xml: string): ParsedBpmn {

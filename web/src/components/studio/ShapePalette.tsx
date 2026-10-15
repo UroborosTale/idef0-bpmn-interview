@@ -12,6 +12,9 @@ export const PALETTE: { kind: string; title: string }[] = [
   { kind: "gateway:parallel", title: "Шлюз «и» (параллельный)" },
   { kind: "gateway:inclusive", title: "Шлюз «или» (включающий)" },
   { kind: "gateway:event_based", title: "Шлюз по событиям" },
+  { kind: "gateway:complex", title: "Шлюз комплексный" },
+  { kind: "gateway:event_based_start", title: "Шлюз по событиям (запуск процесса)" },
+  { kind: "gateway:parallel_event_based", title: "Шлюз параллельный по событиям (запуск процесса)" },
 ];
 
 /** Типы событий, которые можно выбрать у каждого вида события (как в палитре Business Studio). */
@@ -69,6 +72,26 @@ function Glyph({ kind }: { kind: string }) {
           <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
           <circle cx="12" cy="12" r="5.5" fill="none" />
           <path d="m12 8.8 3 2.2-1.2 3.5h-3.6L9 11z" fill="none" />
+        </>
+      )}
+      {kind === "gateway:complex" && (
+        <>
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
+          <path d="M12 6.5v11M6.5 12h11M8.2 8.2l7.6 7.6M15.8 8.2l-7.6 7.6" strokeWidth="1.8" />
+        </>
+      )}
+      {kind === "gateway:event_based_start" && (
+        <>
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
+          <circle cx="12" cy="12" r="5.5" fill="none" />
+          <path d="m12 8.8 3 2.2-1.2 3.5h-3.6L9 11z" fill="none" />
+        </>
+      )}
+      {kind === "gateway:parallel_event_based" && (
+        <>
+          <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
+          <circle cx="12" cy="12" r="5.5" fill="none" />
+          <path d="M12 8.8v6.4M8.8 12h6.4" strokeWidth="1.6" />
         </>
       )}
       {kind === "connector" && <path d="M5 4v8h14v8" fill="none" strokeWidth="1.4" stroke="#4677bf" />}

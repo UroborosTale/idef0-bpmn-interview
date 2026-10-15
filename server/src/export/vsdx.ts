@@ -555,6 +555,10 @@ function drawEventFilled(page: Page, glyphs: Glyph[], x: number, y: number, w: n
     } else if (g.kind === "poly" && g.light) page.polyline(g.pts.map(([px, py]) => [cx + px, cy + py] as Pt), { weightPt: 0.8, line: "#ffffff" });
   }
 }
+/** Правильный пятиугольник радиуса r вершиной вверх. */
+function pentagonPts(cx: number, cy: number, r: number): Pt[] {
+  return [0, 1, 2, 3, 4].map((i) => [cx + r * Math.sin((i * 2 * Math.PI) / 5), cy - r * Math.cos((i * 2 * Math.PI) / 5)] as Pt);
+}
 function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPart[] {
   const [cx, cy] = [w / 2, h / 2];
   switch (subtype) {
@@ -569,6 +573,24 @@ function gatewayGlyph(subtype: string | undefined, w: number, h: number): GeomPa
       return [
         { kind: "ellipse", cx, cy, rx: 10, ry: 10 },
         { kind: "ellipse", cx, cy, rx: 7.5, ry: 7.5 },
+      ];
+    case "event_based_start":
+      // исключающий событийный шлюз «для запуска процесса»: одно кольцо с пятиугольником
+      return [{ kind: "ellipse", cx, cy, rx: 10, ry: 10 }, { kind: "path", pts: pentagonPts(cx, cy, 5.5), closed: true }];
+    case "parallel_event_based":
+      // параллельный событийный шлюз «для запуска процесса»: кольцо с «плюсом»
+      return [
+        { kind: "ellipse", cx, cy, rx: 10, ry: 10 },
+        { kind: "path", pts: [[cx - 6, cy], [cx + 6, cy]] },
+        { kind: "path", pts: [[cx, cy - 6], [cx, cy + 6]] },
+      ];
+    case "complex":
+      // комплексный шлюз: «звезда» из «плюса» и «креста»
+      return [
+        { kind: "path", pts: [[cx - 9, cy], [cx + 9, cy]] },
+        { kind: "path", pts: [[cx, cy - 9], [cx, cy + 9]] },
+        { kind: "path", pts: [[cx - 6.5, cy - 6.5], [cx + 6.5, cy + 6.5]] },
+        { kind: "path", pts: [[cx + 6.5, cy - 6.5], [cx - 6.5, cy + 6.5]] },
       ];
     default:
       return [
@@ -767,6 +789,8 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
     if (sub === "exclusive") {
       page.polyline([[cx - 9, cy - 9], [cx + 9, cy + 9]], { weightPt: 2.6, line: "#000000" });
       page.polyline([[cx + 9, cy - 9], [cx - 9, cy + 9]], { weightPt: 2.6, line: "#000000" });
+    } else if (sub === "complex") {
+      for (const [a, b] of [[[-10, 0], [10, 0]], [[0, -10], [0, 10]], [[-7, -7], [7, 7]], [[7, -7], [-7, 7]]] as [number, number][][]) page.polyline([[cx + a[0], cy + a[1]], [cx + b[0], cy + b[1]]], { weightPt: 2, line: "#000000" });
     } else if (sub === "parallel") {
       page.polyline([[cx - 11, cy], [cx + 11, cy]], { weightPt: 2.6, line: "#000000" });
       page.polyline([[cx, cy - 11], [cx, cy + 11]], { weightPt: 2.6, line: "#000000" });

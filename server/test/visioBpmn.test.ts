@@ -45,16 +45,17 @@ describe("свойства BPMN фигур Visio: словарь значени�
     expect(gw("Оператор исключающего ИЛИ").gateway).toBe("exclusive");
     expect(gw("Exclusive").gateway).toBe("exclusive");
     expect(gw("Exclusive", "Event").gateway).toBe("event_based");
-    expect(gw("Исключающее событие(создание нового экземпляра)").gateway).toBe("event_based");
+    expect(gw("Исключающее событие(создание нового экземпляра)").gateway).toBe("event_based_start");
     expect(gw("Оператор включающего ИЛИ").gateway).toBe("inclusive");
     expect(gw("Оператор И").gateway).toBe("parallel");
     expect(gw("Parallel").gateway).toBe("parallel");
+    // комплексный и параллельный событийный шлюзы теперь поддерживаются: ничего не теряется
     const complex = gw("Сложный оператор");
-    expect(complex.gateway).toBe("exclusive");
-    expect(complex.lost.join()).toContain("сложный шлюз");
+    expect(complex.gateway).toBe("complex");
+    expect(complex.lost).toEqual([]);
     const pe = gw("Параллельное событие(создание нового экземпляра)");
-    expect(pe.gateway).toBe("event_based");
-    expect(pe.lost.length).toBe(1);
+    expect(pe.gateway).toBe("parallel_event_based");
+    expect(pe.lost).toEqual([]);
     expect(gw("Оператор И").kind).toBe("gateway");
   });
 

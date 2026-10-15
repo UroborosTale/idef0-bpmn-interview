@@ -218,3 +218,32 @@ describe("правки IDEF0 и удаление фигур из Visio", () => {
   });
 });
 
+describe("новые шлюзы Business Studio", () => {
+  it("комплексный и два событийных шлюза «для запуска процесса»: BPMN-элементы и признак запуска в файле", async () => {
+    const { generateBpmn } = await import("../src/pipeline/bpmn.js");
+    const m = structuredModel();
+    const op = m.nodes.filter((n) => n.bpmn_scope === "o1");
+    const base = op.find((n) => n.type === "task")!;
+    const mk = (id: string, subtype: string) => ({ ...base, id, name: id, type: "gateway" as const, subtype, inputs: [], outputs: [], controls: [] });
+    m.nodes.push(mk("gx1", "complex"), mk("gx2", "event_based_start"), mk("gx3", "parallel_event_based"));
+    const { xml } = await generateBpmn(m, "o1");
+    expect(xml).toMatch(/<bpmn:complexGateway id="Node_gx1"/);
+    expect(xml).toMatch(/<bpmn:eventBasedGateway id="Node_gx2"[^>]*instantiate="true"/);
+    expect(xml).toMatch(/<bpmn:eventBasedGateway id="Node_gx3"[^>]*instantiate="true"[^>]*eventGatewayType="Parallel"/);
+  });
+
+  it("фигуры палитры Visio с такими названиями приходят как комплексный и событийные шлюзы", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN B002.01.01");
+    const diamond = (id: number, nameU: string, cx: number) =>
+      `<Shape ID="${id}" NameU="${nameU}" Type="Shape"><Cell N="PinX" V="${cx / 96}"/><Cell N="PinY" V="${300 / 96}"/><Cell N="Width" V="${50 / 96}"/><Cell N="Height" V="${50 / 96}"/><Cell N="LocPinX" V="${25 / 96}"/><Cell N="LocPinY" V="${25 / 96}"/><Section N="Geometry" IX="0"><Cell N="NoFill" V="0"/><Cell N="NoLine" V="0"/>` +
+      [[25, 50], [50, 25], [25, 0], [0, 25], [25, 50]].map(([x, y], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${x / 96}"/><Cell N="Y" V="${y / 96}"/></Row>`).join("") +
+      `</Section><Text>*</Text></Shape>`;
+    const edited = await edit(buf, page, (xml) => xml.replace("</Shapes>", diamond(9101, "Шлюз «комплексный»", 900) + diamond(9102, "Шлюз «событийный, запуск процесса»", 1000) + diamond(9103, "Шлюз «параллельный событийный, запуск процесса»", 1100) + "</Shapes>"));
+    const { model, changes } = reconcileVsdxEdit(m, await parseVsdx(edited));
+    const subs = model.nodes.filter((n) => changes.added.includes(n.id)).map((n) => n.subtype).sort();
+    expect(subs).toEqual(["complex", "event_based_start", "parallel_event_based"].sort());
+  });
+});
+

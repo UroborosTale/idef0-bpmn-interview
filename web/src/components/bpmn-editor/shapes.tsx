@@ -36,6 +36,22 @@ function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: s
       return <path d={`M${cx - 9} ${cy} H${cx + 9} M${cx} ${cy - 9} V${cy + 9}`} {...p} />;
     case "inclusive":
       return <circle cx={cx} cy={cy} r={9} stroke={INK} strokeWidth={2.5} fill="none" />;
+    case "complex":
+      return <path d={`M${cx - 9} ${cy} H${cx + 9} M${cx} ${cy - 9} V${cy + 9} M${cx - 6.5} ${cy - 6.5} L${cx + 6.5} ${cy + 6.5} M${cx + 6.5} ${cy - 6.5} L${cx - 6.5} ${cy + 6.5}`} {...p} strokeWidth={2.2} />;
+    case "event_based_start":
+      return (
+        <g stroke={INK} strokeWidth={1.2} fill="none">
+          <circle cx={cx} cy={cy} r={10} />
+          <path d={[0, 1, 2, 3, 4].map((i) => `${i === 0 ? "M" : "L"}${cx + 5.5 * Math.sin((i * 2 * Math.PI) / 5)} ${cy - 5.5 * Math.cos((i * 2 * Math.PI) / 5)}`).join(" ") + " Z"} />
+        </g>
+      );
+    case "parallel_event_based":
+      return (
+        <g stroke={INK} strokeWidth={1.2} fill="none">
+          <circle cx={cx} cy={cy} r={10} />
+          <path d={`M${cx - 6} ${cy} H${cx + 6} M${cx} ${cy - 6} V${cy + 6}`} strokeWidth={2} />
+        </g>
+      );
     case "event_based":
       return (
         <g stroke={INK} strokeWidth={1.2} fill="none">

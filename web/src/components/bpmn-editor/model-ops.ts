@@ -55,7 +55,7 @@ export const EVENT_PALETTE: { label: string; group: string; spec: NewNodeSpec }[
 export const SUBTYPES: Record<string, [string, string][]> = {
   task: [["", "Обычная"], ["user", "Пользовательская"], ["service", "Сервисная"], ["manual", "Ручная"], ["send", "Отправка"], ["receive", "Получение"], ["script", "Скрипт"], ["business_rule", "Бизнес-правила"]],
   event: [["start", "Начальное"], ["intermediate", "Промежуточное"], ["end", "Конечное"]],
-  gateway: [["exclusive", "Исключающий (XOR)"], ["parallel", "Параллельный (AND)"], ["inclusive", "Включающий (OR)"], ["event_based", "По событию"]],
+  gateway: [["exclusive", "Исключающий (XOR)"], ["parallel", "Параллельный (AND)"], ["inclusive", "Включающий (OR)"], ["event_based", "По событию (исключающий)"], ["complex", "Комплексный"], ["event_based_start", "По событию, запуск процесса (исключающий)"], ["parallel_event_based", "По событию, запуск процесса (параллельный)"]],
   subprocess: [],
 };
 export const TYPE_LABELS: Record<string, string> = { task: "Задача", subprocess: "Подпроцесс", event: "Событие", gateway: "Шлюз" };

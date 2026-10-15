@@ -126,6 +126,9 @@ internal sealed class VisioPane : Panel
         "gateway:parallel" => new("Шлюз «и»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "+", 18),
         "gateway:inclusive" => new("Шлюз «включающий»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
         "gateway:event_based" => new("Шлюз «событийный»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
+        "gateway:complex" => new("Шлюз «комплексный»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "*", 18),
+        "gateway:event_based_start" => new("Шлюз «событийный, запуск процесса»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
+        "gateway:parallel_event_based" => new("Шлюз «параллельный событийный, запуск процесса»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O+", 14),
         _ => EventSpec(kind),
     };
 

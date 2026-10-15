@@ -67,6 +67,13 @@ function taskTag(subtype?: string): string {
   }
 }
 
+/** Атрибуты событийного шлюза «для запуска процесса»: он создаёт экземпляр процесса, параллельный — ждёт все события. */
+function gatewayExtra(subtype?: string): string {
+  if (subtype === "event_based_start") return ' instantiate="true"';
+  if (subtype === "parallel_event_based") return ' instantiate="true" eventGatewayType="Parallel"';
+  return "";
+}
+
 function gatewayTag(subtype?: string): string {
   switch (subtype) {
     case "parallel":
@@ -74,7 +81,11 @@ function gatewayTag(subtype?: string): string {
     case "inclusive":
       return "inclusiveGateway";
     case "event_based":
+    case "event_based_start":
+    case "parallel_event_based":
       return "eventBasedGateway";
+    case "complex":
+      return "complexGateway";
     default:
       return "exclusiveGateway";
   }
@@ -343,7 +354,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
       flowElementsXml.push(`<bpmn:subProcess id="${id}" name="${esc(n.name)}"${defaultAttr(n)}>${loopXml(n.loop)}</bpmn:subProcess>`);
     } else if (n.type === "gateway") {
       const tag = gatewayTag(n.subtype);
-      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)} />`);
+      flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)}${gatewayExtra(n.subtype)} />`);
     } else if (n.type === "event") {
       pushEventXml(id, n.name, eventSpec(n, isBoundary(n)), isBoundary(n) ? { hostId: n.attached_to!, interrupting: n.interrupting !== false } : undefined);
     }

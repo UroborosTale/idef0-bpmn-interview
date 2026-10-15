@@ -96,7 +96,8 @@ export const EventSubtype = z.enum([
   "signal",
 ]);
 // gateway subtypes
-export const GatewaySubtype = z.enum(["exclusive", "parallel", "inclusive", "event_based"]);
+// как в Business Studio: ещё комплексный шлюз и два событийных шлюза «для запуска процесса» (исключающий и параллельный)
+export const GatewaySubtype = z.enum(["exclusive", "parallel", "inclusive", "event_based", "complex", "event_based_start", "parallel_event_based"]);
 
 // Триггер события: что его запускает или выбрасывает и параметры (подробнее — shared/events.ts).
 export const EventTriggerSchema = z.object({
