@@ -835,7 +835,7 @@ export async function buildEventShapesVsdx(): Promise<Buffer> {
   for (const [position, triggers] of Object.entries(PALETTE_EVENTS)) {
     for (const trigger of triggers) {
       const page = new Page(`${position}:${trigger}`, 200, 120);
-      const shape: Shape = { id: "e", kind: "event", subtype: position === "start" ? "start" : position === "end" ? "end" : "intermediate", event: { position: position as "start", trigger: trigger as never, throwing: false }, name: "", x: 20, y: 20, w: 36, h: 36 } as Shape;
+      const shape: Shape = { id: "e", kind: "event", subtype: position === "start" ? "start" : position === "end" ? "end" : "intermediate", event: { position: position as "start", trigger: trigger as never, throwing: position === "end" }, name: "", x: 20, y: 20, w: 36, h: 36 } as Shape;
       drawBpmnShape(page, shape, model, true);
       pages.push(page);
     }

@@ -204,9 +204,6 @@ internal sealed class VisioPane : Panel
     {
         var spec = SpecFor(kind);
         if (spec == null || LoadedSession == null) return null;
-        // событие с типом (сообщение, таймер…) копируется из документа готовых фигур: значок внутри круга нарисован нашим кодом
-        var typed = kind.Split(':').Length > 2 ? DropTypedEvent(kind, spec, client) : null;
-        if (typed != null) return typed;
         dynamic win = visio.Ocx.Window;
         dynamic page = win.Page;
 
@@ -244,76 +241,80 @@ internal sealed class VisioPane : Panel
         {
             // подпись события — под фигурой, как в нашей выгрузке
             Try(() => shape.CellsU["VerticalAlign"].ResultIU = 0);
-            Try(() => { shape.CellsU["TxtPinY"].FormulaU = $"-{(3 + 15) * PxIn}"; shape.CellsU["TxtWidth"].ResultIU = 120 * PxIn; shape.CellsU["TxtHeight"].ResultIU = 30 * PxIn; });
+            Try(() => { shape.CellsU["TxtPinY"].FormulaU = "-" + F((3 + 15) * PxIn); shape.CellsU["TxtWidth"].ResultIU = 120 * PxIn; shape.CellsU["TxtHeight"].ResultIU = 30 * PxIn; });
         }
+        // событие с типом: значок триггера — примитивами поверх круга, всё собирается в группу
+        var kp = kind.Split(':');
+        if (kp.Length > 2 && spec.Shape == "oval")
+            Try(() =>
+            {
+                dynamic grp = DrawEventGlyph(win, page, shape, kp[1], kp[2], x, y);
+                grp.NameU = spec.Name;
+            });
         Try(() => win.DeselectAll());
         return spec.Text;
     }
 
-    private dynamic? eventDoc;
+    private System.Text.Json.JsonElement? glyphs;
 
-    /// <summary>Скачивает у сервера документ с готовыми событиями палитры (страница на каждое сочетание положения и типа) и открывает его скрытым.</summary>
+    /// <summary>Скачивает у сервера значки триггеров (примитивы: круги и ломаные), которыми рисуются события с типом.</summary>
     public async Task PrepareEventShapesAsync(ServerHost server)
     {
-        if (eventDoc != null) return;
+        if (glyphs != null) return;
         try
         {
-            var bytes = await ServerHost.Http.GetByteArrayAsync($"{server.Url}/api/visio/event-shapes");
-            var file = Path.Combine(work, $"event-shapes.{Environment.ProcessId}.vsdx");
-            await File.WriteAllBytesAsync(file, bytes);
-            const short visOpenRO = 2, visOpenHidden = 64;
-            eventDoc = visio.Ocx.Application.Documents.OpenEx(file, (short)(visOpenRO | visOpenHidden));
+            var json = await ServerHost.Http.GetStringAsync($"{server.Url}/api/visio/event-glyphs");
+            glyphs = System.Text.Json.JsonDocument.Parse(json).RootElement.GetProperty("glyphs").Clone();
         }
-        catch { eventDoc = null; /* без документа событие рисуется без значка внутри */ }
+        catch { glyphs = null; /* без значков событие рисуется кругом с подписью */ }
     }
 
-    /// <summary>Копирует готовое событие со страницы «положение:тип» на текущую страницу в точку client; null — документа или страницы нет.</summary>
-    private string? DropTypedEvent(string kind, Spec spec, Point? client)
+    private static string F(double v) => v.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Рисует значок триггера поверх события (центр cx, cy в дюймах) примитивами Visio и собирает круг и значок в группу.
+    /// Выбрасывающие события (конечное) — залитый значок, ждущие — контурный; у промежуточного есть внутреннее кольцо.
+    /// </summary>
+    private dynamic DrawEventGlyph(dynamic win, dynamic page, dynamic oval, string position, string trigger, double cx, double cy)
     {
-        if (eventDoc == null) return null;
-        try
+        var parts = new List<dynamic> { oval };
+        if (position == "intermediate")
         {
-            var parts = kind.Split(':');
-            dynamic win = visio.Ocx.Window;
-            dynamic page = win.Page;
-            dynamic src = eventDoc.Pages.ItemU[$"{parts[1]}:{parts[2]}"];
-            // на странице основная фигура и, у выбрасывающих событий, залитые части значка: копируются все и собираются в группу
-            int count = (int)src.Shapes.Count;
-            dynamic all = src.CreateSelection(0 /* visSelTypeAll */);
-            all.Copy();
-            page.Paste();
-            dynamic shape = win.Selection[1];
-            dynamic textHolder = shape;
-            if (count > 1)
-            {
-                shape = win.Selection.Group();
-                textHolder = shape;
-                // подпись принадлежит основной фигуре группы (у неё ячейки BPMN события), а не группе: иначе она встала бы по центру значка
-                foreach (dynamic sub in shape.Shapes)
-                    if ((short)sub.CellExistsU["Prop.BpmnEventType", 0] != 0) { textHolder = sub; break; }
-            }
-            double left = 0, top = 0, width = 0, height = 0;
-            double x, y;
-            try
-            {
-                win.GetViewRect(ref left, ref top, ref width, ref height);
-                var p = client ?? new Point(visio.ClientSize.Width / 2, visio.ClientSize.Height / 2);
-                x = left + p.X / (double)Math.Max(1, visio.ClientSize.Width) * width;
-                y = top - p.Y / (double)Math.Max(1, visio.ClientSize.Height) * height;
-            }
-            catch
-            {
-                x = Convert.ToDouble(page.PageSheet.CellsU["PageWidth"].ResultIU) / 2;
-                y = Convert.ToDouble(page.PageSheet.CellsU["PageHeight"].ResultIU) / 2;
-            }
-            shape.CellsU["PinX"].ResultIU = x;
-            shape.CellsU["PinY"].ResultIU = y;
-            Try(() => shape.NameU = spec.Name);
-            textHolder.Text = spec.Text;
-            Try(() => win.DeselectAll());
-            return spec.Text;
+            dynamic ring = page.DrawOval(cx - 14 * PxIn, cy - 14 * PxIn, cx + 14 * PxIn, cy + 14 * PxIn);
+            ring.CellsU["FillPattern"].FormulaU = "0";
+            ring.CellsU["LineWeight"].ResultIU = 1.3 / 72.0;
+            parts.Add(ring);
         }
-        catch { return null; }
+        if (glyphs is { } all && all.TryGetProperty(trigger, out var g) && g.TryGetProperty(position == "end" ? "throw" : "catch", out var list))
+        {
+            foreach (var p in list.EnumerateArray())
+            {
+                var filled = p.TryGetProperty("filled", out var f) && f.GetBoolean();
+                if (p.GetProperty("kind").GetString() == "circle")
+                {
+                    var r = p.GetProperty("r").GetDouble() * PxIn;
+                    parts.Add(page.DrawOval(cx - r, cy - r, cx + r, cy + r));
+                    parts[^1].CellsU["FillPattern"].FormulaU = filled ? "1" : "0";
+                    if (filled) parts[^1].CellsU["FillForegnd"].FormulaU = "RGB(0,0,0)";
+                    continue;
+                }
+                var closed = p.TryGetProperty("closed", out var c) && c.GetBoolean();
+                var light = p.TryGetProperty("light", out var l) && l.GetBoolean();
+                var pts = new List<double>();
+                foreach (var pt in p.GetProperty("pts").EnumerateArray()) { pts.Add(cx + pt[0].GetDouble() * PxIn); pts.Add(cy - pt[1].GetDouble() * PxIn); }
+                if (closed) { pts.Add(pts[0]); pts.Add(pts[1]); }
+                dynamic line = page.DrawPolyline(pts.ToArray(), 0);
+                line.CellsU["FillPattern"].FormulaU = filled && closed ? "1" : "0";
+                if (filled && closed) line.CellsU["FillForegnd"].FormulaU = "RGB(0,0,0)";
+                line.CellsU["LineColor"].FormulaU = light ? "RGB(255,255,255)" : "RGB(0,0,0)";
+                line.CellsU["LineWeight"].ResultIU = 1.0 / 72.0;
+                parts.Add(line);
+            }
+        }
+        if (parts.Count == 1) return oval;
+        win.DeselectAll();
+        foreach (var part in parts) win.Select(part, 2 /* visSelect */);
+        return win.Selection.Group();
     }
 
     /// <summary>Записывает пользовательскую ячейку фигуры (User.имя): фигура получает метку модели, как у фигур нашей выгрузки.</summary>

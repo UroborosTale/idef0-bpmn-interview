@@ -3,6 +3,7 @@ import { getSession } from "../repo.js";
 import { idef0ToDrawio } from "../pipeline/idef0.js";
 import { buildAlbumHtml } from "../export/album.js";
 import { buildEventShapesVsdx, buildVsdx } from "../export/vsdx.js";
+import { TRIGGER_TYPES, triggerGlyph } from "../shared/events.js";
 import { launchPdfBrowser } from "../export/pdfBrowser.js";
 import { PAPER_MM, idef0PrintHtml, type Orientation } from "../export/idef0Print.js";
 import { cleanSheetSvg, sheetPrintHtml } from "../shared/sheetPrint.js";
@@ -226,6 +227,13 @@ exportRouter.post("/sessions/:id/export/sheet.pdf", async (req, res) => {
 });
 
 /** События для палитры настольного приложения (по странице на сочетание положения и типа). */
+/** Значки триггеров для событий, которые оболочка рисует сама (по примитивам): для каждого триггера — ждущий и выбрасывающий вид. */
+exportRouter.get("/visio/event-glyphs", (_req, res) => {
+  const glyphs: Record<string, { catch: unknown; throw: unknown }> = {};
+  for (const t of TRIGGER_TYPES) glyphs[t] = { catch: triggerGlyph(t, false), throw: triggerGlyph(t, true) };
+  res.json({ glyphs });
+});
+
 exportRouter.get("/visio/event-shapes", async (_req, res) => {
   try {
     res.type("application/vnd.ms-visio.drawing").send(await buildEventShapesVsdx());
