@@ -84,5 +84,28 @@ describe("выделение между студией и Visio", () => {
     expect(st).toMatch(/подтверждён|гипотеза/);
     expect(st).toMatch(/из интервью|создан вручную/);
   });
+
+  it("палитра существующих объектов: документ к выбранному шагу входом, программный продукт — отметкой; без шага — подсказка", async () => {
+    sessionStorage.clear(); // вкладки студии из прошлых тестов не восстанавливаются: открыта общая схема BPMN
+    const onSave = vi.fn(async () => true);
+    render(<Studio session={session()} busy={false} onSave={onSave} />);
+    const lastMenu = () => post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: { id?: string; label?: string; disabled?: boolean }[] }).filter((m) => m.t === "menu").at(-1)!;
+    fireEvent.click(document.querySelector('[aria-label="Документы"]')!);
+    expect(lastMenu().items![0]).toMatchObject({ disabled: true, label: "Сначала выберите шаг на диаграмме" });
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-closed", id: lastMenu().id } })));
+    fromShell({ t: "visio-select", kind: "node", id: "b" });
+    fireEvent.click(document.querySelector('[aria-label="Документы"]')!);
+    const doc = lastMenu();
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: doc.id, item: "in:d2" } })));
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
+    let saved = (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; inputs: string[]; system_ids: string[] }[] }])[0];
+    expect(saved.nodes.find((n) => n.id === "b")!.inputs).toContain("d2");
+    fireEvent.click(document.querySelector('[aria-label="Программные продукты и базы данных"]')!);
+    const sys = lastMenu();
+    await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: sys.id, item: "sys:s1" } })));
+    await act(async () => new Promise((r) => setTimeout(r, 10)));
+    saved = (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; inputs: string[]; system_ids: string[] }[] }])[0];
+    expect(saved.nodes.find((n) => n.id === "b")!.system_ids).toContain("s1");
+  });
 });
 

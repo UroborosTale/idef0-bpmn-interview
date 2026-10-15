@@ -325,3 +325,17 @@ describe("навигатор: меню строки, как в Business Studio",
   });
 });
 
+describe("навигатор: «Сменить версию объекта»", () => {
+  it("пункт меню и Ctrl+Shift+V вызывают смену версии выбранной функции", () => {
+    const onFunctionAction = vi.fn();
+    render(<Navigator model={structuredModel()} activeKey="bpmn" selectedId="o1" onOpenDoc={vi.fn()} onSelectFn={vi.fn()} onAddFunction={vi.fn()} onFunctionAction={onFunctionAction} />);
+    const row = document.querySelector('[data-nav-fn="o1"]')!;
+    fireEvent.contextMenu(row, { clientX: 10, clientY: 10 });
+    fireEvent.click([...document.querySelectorAll(".nav-menu-item")].find((b) => b.textContent!.startsWith("Сменить версию объекта"))!);
+    expect(onFunctionAction).toHaveBeenLastCalledWith("new-version", "o1");
+    onFunctionAction.mockClear();
+    fireEvent.keyDown(row, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true });
+    expect(onFunctionAction).toHaveBeenCalledWith("new-version", "o1");
+  });
+});
+

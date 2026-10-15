@@ -1,3 +1,4 @@
+import { LC_STATUS_LABELS, lcStatus, lcVersion, nextVersion } from "./lifecycle";
 import { useState } from "react";
 import type { Fragment, ProcessLogicModel, ValidationIssue } from "../../types";
 import { CommitInput, Field } from "../editor-core/fields";
@@ -460,6 +461,26 @@ export default function NodeProperties({
         </Section>
       )}
 
+      <Section title="Жизненный цикл">
+        <Field label="Статус">
+          <select value={lcStatus(node)} onChange={(e) => set({ lc_status: e.target.value as keyof typeof LC_STATUS_LABELS })}>
+            {Object.entries(LC_STATUS_LABELS).map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Версия объекта">
+          <div className="prop-row">
+            <span data-lc-version>{lcVersion(node)}</span>
+            <button title="Сменить версию объекта (Ctrl+Shift+V): следующая версия, статус — «в работе»" onClick={() => set({ lc_version: nextVersion(lcVersion(node)), lc_status: "in_work" })}>
+              Сменить версию
+            </button>
+          </div>
+        </Field>
+        <p className="muted prop-note">Когда и кем менялся объект — в «Истории» ниже (по сохранённым версиям модели).</p>
+      </Section>
       <HistoryList sessionId={sessionId} kind="node" id={node.id} stamp={stamp} />
 
       <div className="bpe-actions">

@@ -46,7 +46,7 @@ describe("панель «Свойства»: функция", () => {
     expect(title()).toBe("Свойства элемента");
     expect(document.querySelector(".prop-kind")!.textContent).toMatch(/Задача\s*A3/);
     const sections = [...document.querySelectorAll(".prop-section > summary")].map((s) => s.firstChild!.textContent);
-    expect(sections).toEqual(["Общие", "Сроки и стоимость", "Триггеры блока", "Граничные события", "Потоки сообщений", "Ролевая модель", "Стороны блока IDEF0", "RACI", "Диаграммы", "Оформление", "Источник в интервью", "История"]);
+    expect(sections).toEqual(["Общие", "Сроки и стоимость", "Триггеры блока", "Граничные события", "Потоки сообщений", "Ролевая модель", "Стороны блока IDEF0", "RACI", "Диаграммы", "Оформление", "Источник в интервью", "Жизненный цикл", "История"]);
   });
 
   it("правка атрибутов и исполнителя", () => {
@@ -169,6 +169,20 @@ describe("панель «Свойства»: карточка деятельно
     m.nodes.push({ ...m.nodes[0], id: "gw", name: "Решение?", type: "gateway", subtype: "exclusive", inputs: [], outputs: [], controls: [] });
     panel({ kind: "node", id: "gw" }, m);
     expect(screen.queryByText("Содержание деятельности")).toBeNull();
+  });
+});
+
+describe("панель «Свойства»: жизненный цикл объекта, как в Business Studio", () => {
+  it("статус меняется в списке, «Сменить версию» даёт следующую версию и возвращает статус «В работе»", () => {
+    const m = purchaseModel();
+    const task = m.nodes.find((n) => n.type === "task")!;
+    const p = panel({ kind: "node", id: task.id }, m);
+    expect(document.querySelector("[data-lc-version]")!.textContent).toBe("1.0.0");
+    fireEvent.change(field("Статус"), { target: { value: "approved" } });
+    expect(p.model().nodes.find((n) => n.id === task.id)!.lc_status).toBe("approved");
+    fireEvent.click(screen.getByRole("button", { name: "Сменить версию" }));
+    expect(p.model().nodes.find((n) => n.id === task.id)).toMatchObject({ lc_version: "1.0.1", lc_status: "in_work" });
+    expect(document.querySelector('[data-tab="life"]')).not.toBeNull(); // раздел — на вкладке «Жизненный цикл»
   });
 });
 

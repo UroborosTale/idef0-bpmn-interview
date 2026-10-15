@@ -100,6 +100,9 @@ export interface ProcessNode {
   begin?: string | null;
   result?: string | null;
   deadline?: string | null;
+  /** Жизненный цикл объекта, как в Business Studio: статус и версия (без поля — «в работе», 1.0.0). */
+  lc_status?: "in_work" | "review" | "approved" | "archived";
+  lc_version?: string;
   idef0_parent?: string | null;
   /** Шаг диаграммы BPMN операции: id функции IDEF0 (операции). */
   bpmn_scope?: string | null;

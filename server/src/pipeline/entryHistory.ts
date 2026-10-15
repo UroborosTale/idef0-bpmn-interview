@@ -29,7 +29,7 @@ const FIELDS: Record<HistoryKind, string[]> = {
   controls: ["name", "kind", "reference", "owner", "description"],
   kpi: ["name", "target", "unit", "period", "owner", "description"],
   risks: ["name", "mitigation", "level", "owner", "description"],
-  node: ["name", "type", "role_id", "duration", "note"],
+  node: ["name", "type", "role_id", "duration", "note", "content", "begin", "result", "deadline", "lc_status", "lc_version"],
 };
 
 type Rec = Record<string, unknown>;

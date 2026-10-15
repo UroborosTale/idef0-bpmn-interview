@@ -136,7 +136,7 @@ describe("студия в браузере", () => {
     const sys = s.body.model.systems.find((x: { name: string }) => x.name === "СЭД «Дело»");
     expect(sys).toMatchObject({ description: "Электронный документооборот", owner: "ИТ-отдел" });
 
-    await page.locator(".props-vtab", { hasText: "Связи" }).click(); // история записи — на вкладке «Связи»
+    await page.locator(".props-vtab", { hasText: "Жизненный цикл" }).click(); // история записи — на вкладке «Жизненный цикл», как в Business Studio
     await page.locator(".props-body summary", { hasText: "История" }).click();
     await page.locator(".prop-history li").first().waitFor();
     expect(await page.locator(".prop-history").innerText()).toMatch(/Появилась/);

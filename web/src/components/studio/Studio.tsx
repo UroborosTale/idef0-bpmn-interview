@@ -31,7 +31,9 @@ import StructureWizard from "./StructureWizard";
 import VisioSlot from "./VisioSlot";
 import RibbonIcon from "./RibbonIcon";
 import { inDesktopShell, onShellMessage, postToShell, recalledTabs, rememberTabs, showShellMenu, type ShellMenuItem } from "../../desktop";
-import { SUBTYPES } from "../bpmn-editor/model-ops";
+import { SUBTYPES, nextId } from "../bpmn-editor/model-ops";
+import type { ExistingKind } from "./ShapePalette";
+import { LC_STATUS_LABELS, lcStatus, lcVersion, nextVersion } from "./lifecycle";
 import { LOOP_KINDS, LOOP_LABELS } from "@shared/loops";
 import type { PropTab } from "./PanelParts";
 
@@ -247,8 +249,13 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const renameFn = (id: string, name: string) => {
     h.commit(updateNode(h.draftRef.current, id, { name }));
   };
-  const fnAction = (action: "add-child" | "skeleton" | "duplicate" | "delete", id: string) => {
+  const fnAction = (action: "add-child" | "skeleton" | "duplicate" | "delete" | "new-version", id: string) => {
     const m = h.draftRef.current;
+    if (action === "new-version") {
+      const n = m.nodes.find((x) => x.id === id);
+      if (n) h.commit(updateNode(m, id, { lc_version: nextVersion(lcVersion(n)), lc_status: "in_work" }));
+      return;
+    }
     if (action === "add-child") {
       const r = addChildFunction(m, id);
       h.commit(r.model);
@@ -504,6 +511,71 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
    * выделить все подобные, анализ использования, свойства; у пустого места — вставить, выделить всё и команды страницы.
    * Смена типа сразу записывается в модель — Visio перечитывает диаграмму.
    */
+  /**
+   * Вторая группа палитры, как в Business Studio: существующий объект справочника — к выбранному шагу диаграммы. Документ — входом или
+   * выходом, программный продукт и нормативный документ — отметкой, исполнитель — дорожкой; «Деятельность» ставит на диаграмму
+   * операции шаг-ссылку на другую функцию. Изменение сразу записывается в модель, Visio перечитывает диаграмму.
+   */
+  const pickExisting = (kind: ExistingKind, anchor: Element) => {
+    const m = h.draftRef.current;
+    const step = selection?.kind === "node" ? m.nodes.find((n) => n.id === selection.id && (n.type === "task" || n.type === "subprocess")) : undefined;
+    const scope = active.kind === "bpmn" ? active.scope : null;
+    let items: ShellMenuItem[];
+    if (kind === "activity") {
+      const fns = m.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope && n.id !== scope);
+      const codes = idef0Codes(m);
+      items = fns.length ? fns.map((f) => ({ id: `act:${f.id}`, label: `${codes.get(f.id) ?? ""} ${f.name}`.trim() })) : [{ id: "none", label: "В модели нет других функций", disabled: true }];
+    } else if (!step) {
+      items = [{ id: "none", label: "Сначала выберите шаг на диаграмме", disabled: true }];
+    } else if (kind === "document") {
+      items = [
+        ...m.data.map((d) => ({ label: d.name, items: [{ id: `in:${d.id}`, label: "Вход шага", checked: step.inputs.includes(d.id) }, { id: `out:${d.id}`, label: "Выход шага", checked: step.outputs.includes(d.id) }] })),
+        { group: "Новый" },
+        { id: "new-doc", label: "Новый документ…" },
+      ];
+    } else if (kind === "system") {
+      items = [...m.systems.map((s) => ({ id: `sys:${s.id}`, label: s.name, checked: step.system_ids.includes(s.id) })), { group: "Новый" }, { id: "new-sys", label: "Новый программный продукт…" }];
+    } else if (kind === "regulation") {
+      items = m.controls.length ? m.controls.map((c) => ({ id: `ctl:${c.id}`, label: c.name, checked: step.controls.includes(c.id) })) : [{ id: "none", label: "В справочнике нет нормативных документов", disabled: true }];
+    } else {
+      items = m.roles.map((r) => ({ id: `role:${r.id}`, label: r.name, checked: step.role_id === r.id }));
+    }
+    void showShellMenu(anchor, items).then((picked) => {
+      if (!picked || picked === "none") return;
+      const cur = h.draftRef.current;
+      const [what, id = ""] = picked.split(/:(.*)/s);
+      const toggle = (list: string[], x: string) => (list.includes(x) ? list.filter((y) => y !== x) : [...list, x]);
+      let next: ProcessLogicModel | null = null;
+      if (what === "act") {
+        const fn = cur.nodes.find((n) => n.id === id);
+        if (!fn || !scope) return;
+        const node: ProcessNode = { id: nextId("n", cur.nodes.map((n) => n.id)), type: "subprocess", name: fn.name, role_id: fn.role_id ?? null, system_ids: [], inputs: [], outputs: [], controls: [], bpmn_scope: scope, status: "confirmed", confidence: 1, source: [], requirement_ids: [], tags: [`reuse:${fn.id}`], confirmed_by: [] };
+        next = { ...cur, nodes: [...cur.nodes, node] };
+      } else if (step) {
+        const s = cur.nodes.find((n) => n.id === step.id)!;
+        if (what === "in") next = updateNode(cur, s.id, { inputs: toggle(s.inputs, id) });
+        else if (what === "out") next = updateNode(cur, s.id, { outputs: toggle(s.outputs, id) });
+        else if (what === "sys") next = updateNode(cur, s.id, { system_ids: toggle(s.system_ids, id) });
+        else if (what === "ctl") next = updateNode(cur, s.id, { controls: toggle(s.controls, id) });
+        else if (what === "role") next = updateNode(cur, s.id, { role_id: id });
+        else if (what === "new-doc" || what === "new-sys") {
+          const name = window.prompt(what === "new-doc" ? "Название нового документа" : "Название программного продукта")?.trim();
+          if (!name) return;
+          if (what === "new-doc") {
+            const did = nextId("d", cur.data.map((d) => d.id));
+            next = updateNode({ ...cur, data: [...cur.data, { id: did, name, kind: "document", source: [] } as ProcessLogicModel["data"][number]] }, s.id, { outputs: [...s.outputs, did] });
+          } else {
+            const sid = nextId("s", cur.systems.map((x) => x.id));
+            next = updateNode({ ...cur, systems: [...cur.systems, { id: sid, name, source: [] } as ProcessLogicModel["systems"][number]] }, s.id, { system_ids: [...s.system_ids, sid] });
+          }
+        }
+      }
+      if (!next) return;
+      h.commit(next);
+      window.setTimeout(() => void save(), 0);
+    });
+  };
+
   const shapeMenuRef = useRef<(kind: string | null, id: string | null) => void>(() => undefined);
   shapeMenuRef.current = (kind, id) => {
     const node = (kind === "node" || kind === "fn") && id ? draft.nodes.find((n) => n.id === id) : undefined;
@@ -1014,6 +1086,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                   onNext: histTarget(1) !== null ? () => goHist(1) : undefined,
                   syncNav,
                   onToggleSync: () => setSyncNav((v) => !v),
+                  onExisting: locked ? undefined : pickExisting,
                 }}
               />
             )}
@@ -1106,7 +1179,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           return (
             <span data-status-object>
               {code && <>{code} </>}
-              <b>{n.name}</b> · {n.status === "confirmed" ? "подтверждён" : `гипотеза ${Math.round(n.confidence * 100)}%`} ·{" "}
+              <b>{n.name}</b> · версия {lcVersion(n)}, {LC_STATUS_LABELS[lcStatus(n)].toLowerCase()} · {n.status === "confirmed" ? "подтверждён" : `гипотеза ${Math.round(n.confidence * 100)}%`} ·{" "}
               {n.source.length > 0 ? `из интервью (цитат: ${n.source.length})` : "создан вручную"} · версия процесса {draft.process.version}, {new Date(session.updatedAt).toLocaleString("ru-RU")}
             </span>
           );

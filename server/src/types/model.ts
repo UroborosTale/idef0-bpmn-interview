@@ -147,6 +147,9 @@ export const ProcessNode = z.object({
   begin: z.string().nullable().optional(),
   result: z.string().nullable().optional(),
   deadline: z.string().nullable().optional(),
+  // Жизненный цикл объекта, как в Business Studio: статус и версия (без поля — «в работе», версия 1.0.0).
+  lc_status: z.enum(["in_work", "review", "approved", "archived"]).optional(),
+  lc_version: z.string().optional(),
   idef0_parent: z.string().nullable().optional(),
   // Шаг диаграммы BPMN операции: id функции IDEF0 (операции), чью диаграмму он образует. Такой узел — не функция
   // IDEF0, а подоперация; без поля узел относится к общей схеме процесса (прежнее поведение).

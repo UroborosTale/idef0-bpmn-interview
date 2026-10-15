@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { postToShell, shellHasMenus, showShellMenu, type VisioDiagram } from "../../desktop";
 import RibbonIcon from "./RibbonIcon";
-import ShapePalette from "./ShapePalette";
+import ShapePalette, { type ExistingKind } from "./ShapePalette";
 
 const ZOOMS = [25, 50, 75, 100, 150, 200] as const;
 
@@ -20,6 +20,8 @@ export interface VisioToolbar {
   /** Синхронизация навигатора с выбранной фигурой диаграммы (переключатель). */
   syncNav?: boolean;
   onToggleSync?: () => void;
+  /** Существующий объект справочника к выбранному шагу (вторая группа палитры). */
+  onExisting?: (kind: ExistingKind, anchor: Element) => void;
 }
 
 /**
@@ -213,7 +215,7 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
         )}
       </div>
       <div className="visio-body">
-        {diagram.kind === "bpmn" && <ShapePalette />}
+        {diagram.kind === "bpmn" && <ShapePalette onExisting={toolbar.onExisting} />}
         <div ref={ref} className="visio-slot" data-visio-slot>
           Visio открывается на этом месте…
         </div>

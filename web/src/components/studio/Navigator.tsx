@@ -95,7 +95,7 @@ export default function Navigator({
   /** Перенести функцию (перетаскиванием или кнопками «вверх/вниз»); без обработчика перетаскивание отключено. */
   onMoveFunction?: (id: string, target: MoveTarget) => void;
   /** Действие из контекстного меню функции. */
-  onFunctionAction?: (action: "add-child" | "skeleton" | "duplicate" | "delete", id: string) => void;
+  onFunctionAction?: (action: "add-child" | "skeleton" | "duplicate" | "delete" | "new-version", id: string) => void;
   /** Открыть мастер структуры. */
   onWizard?: () => void;
   /** Запрос «Найти в навигаторе»: id функции (шаг диаграммы операции — её операция) или null — текущая диаграмма; n растёт с каждым запросом. */
@@ -525,6 +525,12 @@ export default function Navigator({
     const tag = (e.target as HTMLElement).tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     const key = (letter: string) => mod && !e.altKey && (e.key.toLowerCase() === letter || e.code === `Key${letter.toUpperCase()}`);
+    // Ctrl+Shift+V — «Сменить версию объекта», как в Business Studio
+    if (key("v") && e.shiftKey && onFunctionAction && selectedId) {
+      e.preventDefault();
+      onFunctionAction("new-version", selectedId);
+      return;
+    }
     if (key("v") && onPaste && clipboard) {
       e.preventDefault();
       const target = selectedId ? model.nodes.find((n) => n.id === selectedId && (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope) : undefined;
@@ -589,6 +595,7 @@ export default function Navigator({
               {onMoveFunction && menuItem("Переместить вниз", () => onMoveFunction(menuFn.id, { kind: "after", id: siblings[at + 1]?.id ?? menuFn.id }), at < 0 || at >= siblings.length - 1, "Ctrl+↓")}
               {onFunctionAction && menuItem("Дублировать", () => onFunctionAction("duplicate", menuFn.id))}
               {onFunctionAction && menuItem("Удалить…", () => onFunctionAction("delete", menuFn.id), false, "Del")}
+              {onFunctionAction && menuItem("Сменить версию объекта", () => onFunctionAction("new-version", menuFn.id), false, "Ctrl+Shift+V")}
               <div className="nav-menu-group">Отчёты</div>
               {(Object.keys(REPORT_TITLES) as ReportKind[]).map((k) => menuItem(REPORT_TITLES[k], () => onOpenDoc(reportDoc(k))))}
               {onProperties && menuItem("Свойства", () => onProperties(menuFn.id), false, "Ctrl+E")}

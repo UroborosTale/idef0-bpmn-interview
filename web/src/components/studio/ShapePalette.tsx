@@ -21,6 +21,16 @@ export const EVENT_TYPES: Record<string, { type: string; title: string }[]> = {
   end: [{ type: "", title: "Без типа" }, { type: "message", title: "Сообщение" }, { type: "error", title: "Ошибка" }, { type: "escalation", title: "Эскалация" }, { type: "signal", title: "Сигнал" }],
 };
 
+/** Существующие объекты справочников, как во второй группе палитры Business Studio: ставятся к выбранному шагу. */
+export type ExistingKind = "activity" | "document" | "system" | "regulation" | "role";
+export const EXISTING: { kind: ExistingKind; title: string }[] = [
+  { kind: "activity", title: "Деятельность" },
+  { kind: "document", title: "Документы" },
+  { kind: "system", title: "Программные продукты и базы данных" },
+  { kind: "regulation", title: "Нормативные документы" },
+  { kind: "role", title: "Исполнители" },
+];
+
 const INK = "#000";
 
 function Glyph({ kind }: { kind: string }) {
@@ -62,6 +72,37 @@ function Glyph({ kind }: { kind: string }) {
         </>
       )}
       {kind === "connector" && <path d="M5 4v8h14v8" fill="none" strokeWidth="1.4" stroke="#4677bf" />}
+      {kind === "x:activity" && (
+        <>
+          <rect x="3" y="6" width="13" height="10" rx="2" fill="#e8eef7" />
+          <rect x="8" y="9" width="13" height="10" rx="2" fill="#fff" />
+        </>
+      )}
+      {kind === "x:document" && (
+        <>
+          <path d="M6 3.5h8.5l3.5 3.5v13.5H6z" fill="#fff" />
+          <path d="M14.5 3.5V7H18M8.5 11h7M8.5 14h7M8.5 17h5" fill="none" />
+        </>
+      )}
+      {kind === "x:system" && (
+        <>
+          <ellipse cx="12" cy="6" rx="7" ry="2.5" fill="#fff" />
+          <path d="M5 6v11c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6" fill="#fff" />
+          <path d="M5 11.5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" fill="none" />
+        </>
+      )}
+      {kind === "x:regulation" && (
+        <>
+          <path d="M5 5.5c2.5-1.2 5-1.2 7 .3 2-1.5 4.5-1.5 7-.3v13c-2.5-1.2-5-1.2-7 .3-2-1.5-4.5-1.5-7-.3z" fill="#fff" />
+          <path d="M12 5.8v13.3" fill="none" />
+        </>
+      )}
+      {kind === "x:role" && (
+        <>
+          <circle cx="12" cy="8" r="3.5" fill="#fff" />
+          <path d="M5 20c.5-4 3.4-6 7-6s6.5 2 7 6z" fill="#e8eef7" />
+        </>
+      )}
       {kind === "gateway:parallel" && (
         <>
           <path d="M12 2.5 21.5 12 12 21.5 2.5 12z" fill="#ffff99" />
@@ -76,7 +117,7 @@ function Glyph({ kind }: { kind: string }) {
  * Палитра фигур слева от диаграммы. Фигуру тянут на диаграмму, как в Business Studio: нажать, перенести курсор на место Visio и
  * отпустить — оболочка создаёт фигуру в точке отпускания. Простой щелчок кладёт фигуру в центр видимой части страницы.
  */
-export default function ShapePalette() {
+export default function ShapePalette({ onExisting }: { onExisting?: (kind: ExistingKind, anchor: Element) => void } = {}) {
   const [drag, setDrag] = useState<{ kind: string; x: number; y: number } | null>(null);
   // выбранный тип события у каждого вида и открытый список типов
   const [types, setTypes] = useState<Record<string, string>>({});
@@ -160,6 +201,16 @@ export default function ShapePalette() {
           </div>
         );
       })}
+      {onExisting && (
+        <>
+          <div className="palette-sep" role="separator" />
+          {EXISTING.map((x) => (
+            <button key={x.kind} className="palette-item" title={`${x.title}: для добавления существующего объекта к выбранному шагу нажмите на кнопку`} aria-label={x.title} onClick={(e) => onExisting(x.kind, e.currentTarget)}>
+              <Glyph kind={`x:${x.kind}`} />
+            </button>
+          ))}
+        </>
+      )}
     </div>
   );
 }
