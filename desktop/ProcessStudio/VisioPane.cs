@@ -164,6 +164,7 @@ internal sealed class VisioPane : Panel
         {
             ["align"] = 1049, ["distribute"] = 1230, ["snapglue"] = 1084, ["pagesetup"] = 1076,
             ["panzoom"] = 1653, ["sizepos"] = 1670, ["formatpainter"] = 1271, ["print"] = 1010,
+            ["cut"] = 1020, ["copy"] = 1021, ["paste"] = 1022, ["delete"] = 1023, ["selectall"] = 1025,
         };
         try
         {
@@ -379,6 +380,66 @@ internal sealed class VisioPane : Panel
         catch { }
         return false;
     }
+
+    /// <summary>«Выделить все подобные»: выделяет на текущей странице фигуры объектов модели с этими id; возвращает, сколько выделено.</summary>
+    public int SelectMany(ICollection<string> ids)
+    {
+        const short visSelect = 2;
+        var n = 0;
+        try
+        {
+            dynamic win = visio.Ocx.Window;
+            win.DeselectAll();
+            foreach (dynamic s in win.Page.Shapes)
+            {
+                var id = User(s, "pm_id");
+                if (id == null || User(s, "pm_k") != "node" || !ids.Contains(id)) continue;
+                win.Select(s, visSelect);
+                n++;
+            }
+        }
+        catch { }
+        return n;
+    }
+
+    /// <summary>
+    /// Правый щелчок: выделяет объект модели под курсором (client — точка в окне Visio), как при щелчке левой кнопкой. Уже выделенную
+    /// фигуру не трогает (меню действует на всё выделение); под курсором нет объекта модели — выделение снимается.
+    /// </summary>
+    public void SelectAt(Point client)
+    {
+        const short visSelect = 2;
+        const short visSpatialOverlap = 1, visSpatialContainedIn = 4, visSpatialFrontToBack = 4;
+        try
+        {
+            dynamic win = visio.Ocx.Window;
+            dynamic page = win.Page;
+            double left = 0, top = 0, width = 0, height = 0;
+            win.GetViewRect(ref left, ref top, ref width, ref height);
+            var x = left + client.X / (double)Math.Max(1, visio.ClientSize.Width) * width;
+            var y = top - client.Y / (double)Math.Max(1, visio.ClientSize.Height) * height;
+            dynamic found = page.SpatialSearch(x, y, (short)(visSpatialContainedIn | visSpatialOverlap), 0.04, (short)visSpatialFrontToBack);
+            dynamic? hit = null;
+            for (var i = 1; i <= (int)found.Count; i++)
+            {
+                dynamic sh = found[i];
+                var k = User(sh, "pm_k");
+                if (k is "node" or "flow" or "fn" or "arrow") { hit = sh; break; }
+            }
+            dynamic sel = win.Selection;
+            if (hit != null)
+            {
+                for (var i = 1; i <= (int)sel.Count; i++) if ((int)sel[i].ID == (int)hit.ID) return; // уже выделена
+                win.DeselectAll();
+                win.Select(hit, visSelect);
+            }
+            else win.DeselectAll();
+        }
+        catch { /* окно Visio ещё не готово */ }
+    }
+
+    /// <summary>Экранный прямоугольник окна Visio (для перехвата правого щелчка).</summary>
+    public Rectangle ScreenBounds => RectangleToScreen(ClientRectangle);
 
     /// <summary>Для самопроверки: меняет текст фигуры шага на текущей странице.</summary>
     public bool SetTextOf(string nodeId, string text)

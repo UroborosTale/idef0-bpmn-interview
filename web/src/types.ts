@@ -95,6 +95,11 @@ export interface ProcessNode {
   control_data_ids?: string[];
   duration?: string | null;
   frequency?: string | null;
+  /** Описание деятельности, как в карточке Business Studio: содержание, начало, результат, требования к срокам. */
+  content?: string | null;
+  begin?: string | null;
+  result?: string | null;
+  deadline?: string | null;
   idef0_parent?: string | null;
   /** Шаг диаграммы BPMN операции: id функции IDEF0 (операции). */
   bpmn_scope?: string | null;

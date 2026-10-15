@@ -75,6 +75,7 @@ export default function PropertiesPanel({
   onOpenDecomposition,
   onOpenDoc,
   onClose,
+  tabRequest,
   toolbar,
 }: {
   model: M;
@@ -90,6 +91,8 @@ export default function PropertiesPanel({
   onOpenDecomposition: (id: string) => void;
   onOpenDoc: (doc: StudioDoc) => void;
   onClose: () => void;
+  /** Открыть вкладку панели (n меняется при каждом запросе). */
+  tabRequest?: { tab: PropTab; n: number };
   /** Панель инструментов окна свойств (сохранить, обновить, отчёты, действия); без неё не показывается. */
   toolbar?: PanelToolbar;
 }) {
@@ -182,6 +185,10 @@ export default function PropertiesPanel({
   // при переходе к другому объекту карточка открывается сверху
   const bodyRef = useRef<HTMLDivElement>(null);
   const [propTab, setPropTab] = useState<PropTab>("main");
+  // студия может попросить открыть нужную вкладку (например, «Анализ использования объекта» — вкладку связей)
+  useEffect(() => {
+    if (tabRequest) setPropTab(tabRequest.tab);
+  }, [tabRequest]);
   const [arrowMsg, setArrowMsg] = useState<string | null>(null);
   const selKey = sel ? (sel.kind === "arrow" ? `arrow:${sel.arrow.key}` : sel.kind === "entry" ? `entry:${sel.dict}:${sel.id}` : `${sel.kind}:${sel.id}`) : "process";
   useEffect(() => {

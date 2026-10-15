@@ -7,7 +7,7 @@ import { splitAccepted, validateModel } from "@shared/validate";
 import { bpmnHosts, functionCodes, stepCodes } from "@shared/codes";
 import { applyPatch } from "@shared/patch";
 import { api, type AgentQuestionRow, type AgentReportRow, type AgentTaskRow, type Proposal, type ReportFinding } from "../../api/client";
-import type { ProcessLogicModel, SessionRecord, ValidationIssue } from "../../types";
+import type { ProcessLogicModel, ProcessNode, SessionRecord, ValidationIssue } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useModelHistory } from "../editor-core/hooks";
 import { DraftBanner } from "../editor-core/fields";
 import BpmnEditor from "../bpmn-editor/BpmnEditor";
@@ -30,7 +30,10 @@ import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunct
 import StructureWizard from "./StructureWizard";
 import VisioSlot from "./VisioSlot";
 import RibbonIcon from "./RibbonIcon";
-import { inDesktopShell, onShellMessage, postToShell, recalledTabs, rememberTabs } from "../../desktop";
+import { inDesktopShell, onShellMessage, postToShell, recalledTabs, rememberTabs, showShellMenu, type ShellMenuItem } from "../../desktop";
+import { SUBTYPES } from "../bpmn-editor/model-ops";
+import { LOOP_KINDS, LOOP_LABELS } from "@shared/loops";
+import type { PropTab } from "./PanelParts";
 
 type M = ProcessLogicModel;
 
@@ -495,6 +498,83 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   // отправляется обратно, чтобы не было эха.
   const shellSelected = useRef<string | null>(null);
   const [syncNav, setSyncNav] = useState(false);
+  const [propsTabRequest, setPropsTabRequest] = useState<{ tab: PropTab; n: number } | undefined>(undefined);
+  /**
+   * Меню объекта по правому щелчку в Visio, как в Business Studio: у шага — тип задачи, тип цикла, вырезать/копировать/вставить,
+   * выделить все подобные, анализ использования, свойства; у пустого места — вставить, выделить всё и команды страницы.
+   * Смена типа сразу записывается в модель — Visio перечитывает диаграмму.
+   */
+  const shapeMenuRef = useRef<(kind: string | null, id: string | null) => void>(() => undefined);
+  shapeMenuRef.current = (kind, id) => {
+    const node = (kind === "node" || kind === "fn") && id ? draft.nodes.find((n) => n.id === id) : undefined;
+    const edit: ShellMenuItem[] = [
+      { group: "Правка" },
+      { id: "cmd:cut", label: "Вырезать", kbd: "Ctrl+X" },
+      { id: "cmd:copy", label: "Копировать", kbd: "Ctrl+C" },
+      { id: "cmd:paste", label: "Вставить", kbd: "Ctrl+V" },
+      { id: "cmd:delete", label: "Удалить", kbd: "Del" },
+    ];
+    const kindMenu = (label: string, prefix: string, options: [string, string][], current: string): ShellMenuItem => ({
+      label,
+      items: options.map(([k, l]) => ({ id: `${prefix}:${k}`, label: l, checked: current === k })),
+    });
+    let items: ShellMenuItem[];
+    if (node) {
+      const typed: ShellMenuItem[] = [];
+      if (node.type === "task" || node.type === "subprocess") {
+        if ((SUBTYPES[node.type] ?? []).length > 0) typed.push(kindMenu(node.type === "task" ? "Тип задачи" : "Тип подпроцесса", "subtype", SUBTYPES[node.type], node.subtype ?? ""));
+        typed.push(kindMenu("Тип цикла", "loop", [["", "Нет, выполняется один раз"], ...LOOP_KINDS.map((k) => [k, LOOP_LABELS[k]] as [string, string])], node.loop ?? ""));
+      } else if (node.type === "gateway") typed.push(kindMenu("Тип шлюза", "subtype", SUBTYPES.gateway ?? [], node.subtype ?? ""));
+      items = [
+        ...typed,
+        ...edit,
+        { group: "Объект" },
+        { id: "similar", label: "Выделить все подобные" },
+        { id: "usage", label: "Анализ использования объекта" },
+        { id: "find", label: "Найти в навигаторе" },
+        { group: "Свойства" },
+        { id: "props", label: "Свойства объекта", kbd: "Ctrl+E" },
+      ];
+    } else if (kind === "flow" && id) {
+      items = [{ id: "cmd:delete", label: "Удалить", kbd: "Del" }, { group: "Свойства" }, { id: "props", label: "Свойства объекта", kbd: "Ctrl+E" }];
+    } else {
+      items = [
+        { id: "cmd:paste", label: "Вставить", kbd: "Ctrl+V" },
+        { id: "cmd:selectall", label: "Выделить всё", kbd: "Ctrl+A" },
+        { group: "Страница" },
+        { id: "cmd:pagesetup", label: "Параметры страницы…", kbd: "Shift+F5" },
+        { id: "cmd:fitcontent", label: "Изменить размеры по содержимому" },
+        { id: "grid", label: "Сетка: показать или скрыть" },
+        { group: "Свойства" },
+        { id: "props", label: "Свойства диаграммы", kbd: "Ctrl+E" },
+      ];
+    }
+    void showShellMenu("cursor", items).then((picked) => {
+      if (!picked) return;
+      const [what, arg = ""] = picked.split(/:(.*)/s);
+      if (what === "cmd") return postToShell({ t: "cmd", name: arg });
+      if (what === "grid") return postToShell({ t: "grid" });
+      if (what === "props") return setPropsOpen(true);
+      if (!node) return;
+      if (what === "subtype" || what === "loop") {
+        const patch: Partial<ProcessNode> = what === "subtype" ? { subtype: arg || undefined } : { loop: (arg || undefined) as ProcessNode["loop"] };
+        h.commit(updateNode(h.draftRef.current, node.id, patch));
+        window.setTimeout(() => void save(), 0); // в окне Visio правка видна после записи в модель
+        return;
+      }
+      if (what === "similar") {
+        const same = draft.nodes.filter((n) => n.type === node.type && n.bpmn_scope === node.bpmn_scope && (n.bpmn_scope ? true : n.idef0_parent === node.idef0_parent));
+        return postToShell({ t: "select-many", ids: same.map((n) => n.id) });
+      }
+      if (what === "usage") {
+        setSelection({ kind: "node", id: node.id });
+        setPropsOpen(true);
+        setPropsTabRequest((r) => ({ tab: "links", n: (r?.n ?? 0) + 1 }));
+        return;
+      }
+      if (what === "find") findInNavigator();
+    });
+  };
   const syncNavRef = useRef(false);
   syncNavRef.current = syncNav;
   useEffect(() => {
@@ -502,6 +582,10 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     return onShellMessage((m) => {
       if (m.t === "props") {
         setPropsOpen(true); // Ctrl+E в окне Visio — свойства объекта, как в Business Studio
+        return;
+      }
+      if (m.t === "shape-menu") {
+        shapeMenuRef.current(m.kind, m.id);
         return;
       }
       if (m.t !== "visio-select") return;
@@ -895,7 +979,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
 
       <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "330px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
         {navOpen && (
-          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onAddFunction={locked ? () => undefined : addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={locked ? undefined : moveFn} onFunctionAction={locked ? undefined : fnAction} onWizard={locked ? undefined : () => setWizardOpen(true)} reveal={navReveal} storageKey={session.id} onRenameFunction={locked ? undefined : renameFn} clipboard={clip} onCopy={locked ? undefined : copyFn} onCut={locked ? undefined : cutFn} onPaste={locked ? undefined : pasteFn} activeSet={activeSetId} onActiveSet={chooseSet} onSetOp={locked ? undefined : setOp} onClose={() => setNavOpen(false)} />
+          <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onProperties={(id) => (selectFn(id), setPropsOpen(true))} onAddFunction={locked ? () => undefined : addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={locked ? undefined : moveFn} onFunctionAction={locked ? undefined : fnAction} onWizard={locked ? undefined : () => setWizardOpen(true)} reveal={navReveal} storageKey={session.id} onRenameFunction={locked ? undefined : renameFn} clipboard={clip} onCopy={locked ? undefined : copyFn} onCut={locked ? undefined : cutFn} onPaste={locked ? undefined : pasteFn} activeSet={activeSetId} onActiveSet={chooseSet} onSetOp={locked ? undefined : setOp} onClose={() => setNavOpen(false)} />
         )}
         <div className="studio-main">
           <div className="doc-tabs" role="tablist">
@@ -986,6 +1070,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
             onOpenDecomposition={(id) => open(idef0Doc(id))}
             onOpenDoc={open}
             onClose={() => setPropsOpen(false)}
+            tabRequest={propsTabRequest}
             toolbar={{ dirty: h.dirty, busy, onSave: () => void save(), onRefresh: refreshFromServer, onFind: findInNavigator, onDuplicate: locked ? undefined : duplicate }}
           />
           </fieldset>
@@ -1008,9 +1093,24 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         </div>
       )}
       <div className="statusbar">
-        <span>
-          <b>{draft.process.name}</b> · {draft.process.type} · версия {draft.process.version} · статус: {draft.process.status}
-        </span>
+        {(() => {
+          // как в Business Studio: при выбранном объекте строка состояния показывает его код, статус и происхождение
+          const n = selection?.kind === "node" ? draft.nodes.find((x) => x.id === selection.id) : undefined;
+          if (!n)
+            return (
+              <span>
+                <b>{draft.process.name}</b> · {draft.process.type} · версия {draft.process.version} · статус: {draft.process.status}
+              </span>
+            );
+          const code = idef0Codes(draft).get(n.id);
+          return (
+            <span data-status-object>
+              {code && <>{code} </>}
+              <b>{n.name}</b> · {n.status === "confirmed" ? "подтверждён" : `гипотеза ${Math.round(n.confidence * 100)}%`} ·{" "}
+              {n.source.length > 0 ? `из интервью (цитат: ${n.source.length})` : "создан вручную"} · версия процесса {draft.process.version}, {new Date(session.updatedAt).toLocaleString("ru-RU")}
+            </span>
+          );
+        })()}
         <span className="muted">
           функций {fnCount} · шагов BPMN {shown.length} · связей {draft.flows.length} · исполнителей {draft.roles.length}
         </span>

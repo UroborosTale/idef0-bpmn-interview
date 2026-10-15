@@ -65,6 +65,7 @@ export default function Navigator({
   onOpenDoc,
   onSelectFn,
   onAddFunction,
+  onProperties,
   onOpenEntry,
   onMoveFunction,
   onFunctionAction,
@@ -87,6 +88,8 @@ export default function Navigator({
   onOpenDoc: (doc: StudioDoc) => void;
   onSelectFn: (id: string) => void;
   onAddFunction: (parentId: string | null) => void;
+  /** «Свойства» в меню строки: выбрать функцию и открыть панель свойств (Ctrl+E). */
+  onProperties?: (id: string) => void;
   /** Открыть справочник с карточкой записи (из результатов поиска). */
   onOpenEntry?: (dict: DictKind, id: string) => void;
   /** Перенести функцию (перетаскиванием или кнопками «вверх/вниз»); без обработчика перетаскивание отключено. */
@@ -570,6 +573,7 @@ export default function Navigator({
               {hasKids && menuItem("Открыть декомпозицию", () => onOpenDoc(idef0Doc(menuFn.id)))}
               {host && menuItem("Открыть диаграмму BPMN", () => onOpenDoc(bpmnDoc(menuFn.id)))}
               {canAddChild && onFunctionAction && menuItem(structured ? "Добавить операцию" : "Добавить подфункцию", () => onFunctionAction("add-child", menuFn.id))}
+              {menuItem("Добавить рядом", () => onAddFunction(menuFn.idef0_parent ?? null))}
               {host && !model.nodes.some((x) => x.bpmn_scope === menuFn.id) && onFunctionAction && menuItem("Создать заготовку диаграммы BPMN", () => onFunctionAction("skeleton", menuFn.id))}
               {onRenameFunction && menuItem("Переименовать", () => startRename(menuFn.id), false, "F2")}
               {onSetOp &&
@@ -585,6 +589,9 @@ export default function Navigator({
               {onMoveFunction && menuItem("Переместить вниз", () => onMoveFunction(menuFn.id, { kind: "after", id: siblings[at + 1]?.id ?? menuFn.id }), at < 0 || at >= siblings.length - 1, "Ctrl+↓")}
               {onFunctionAction && menuItem("Дублировать", () => onFunctionAction("duplicate", menuFn.id))}
               {onFunctionAction && menuItem("Удалить…", () => onFunctionAction("delete", menuFn.id), false, "Del")}
+              <div className="nav-menu-group">Отчёты</div>
+              {(Object.keys(REPORT_TITLES) as ReportKind[]).map((k) => menuItem(REPORT_TITLES[k], () => onOpenDoc(reportDoc(k))))}
+              {onProperties && menuItem("Свойства", () => onProperties(menuFn.id), false, "Ctrl+E")}
             </>
           );
         })()

@@ -303,3 +303,25 @@ describe("навигатор: клавиши и запоминание сост�
     expect(c.row("o1")).not.toBeNull();
   });
 });
+
+describe("навигатор: меню строки, как в Business Studio", () => {
+  it("«Добавить рядом» добавляет функцию на тот же уровень; «Отчёты» открывают отчёт; «Свойства» открывают панель", () => {
+    const onAddFunction = vi.fn();
+    const onOpenDoc = vi.fn();
+    const onProperties = vi.fn();
+    const m = structuredModel();
+    render(<Navigator model={m} activeKey="bpmn" selectedId={null} onOpenDoc={onOpenDoc} onSelectFn={vi.fn()} onAddFunction={onAddFunction} onProperties={onProperties} />);
+    const fnRow = document.querySelector('[data-nav-fn="o1"]')!;
+    fireEvent.contextMenu(fnRow, { clientX: 10, clientY: 10 });
+    const item = (label: string) => [...document.querySelectorAll(".nav-menu-item")].find((b) => b.textContent!.startsWith(label)) as HTMLButtonElement;
+    fireEvent.click(item("Добавить рядом"));
+    expect(onAddFunction).toHaveBeenCalledWith(m.nodes.find((n) => n.id === "o1")!.idef0_parent ?? null);
+    fireEvent.contextMenu(fnRow, { clientX: 10, clientY: 10 });
+    fireEvent.click(item("Регламент процесса"));
+    expect(onOpenDoc).toHaveBeenCalledWith(expect.objectContaining({ key: "report:regulation" }));
+    fireEvent.contextMenu(fnRow, { clientX: 10, clientY: 10 });
+    fireEvent.click(item("Свойства"));
+    expect(onProperties).toHaveBeenCalledWith("o1");
+  });
+});
+

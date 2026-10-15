@@ -33,7 +33,7 @@ export function recalledTabs<T>(sessionId: string): T | null {
 
 /** Сообщение от оболочки: выделение в Visio (visio-select) или обновлённая сессия после приёма правок (session). */
 /** props — Ctrl+E в окне Visio: открыть свойства выбранного объекта. */
-export type ShellMessage = { t: "visio-select"; kind: "node" | "flow"; id: string } | { t: "session"; session: unknown } | { t: "props" } | { t: "menu-pick"; id: string; item: string } | { t: "menu-closed"; id: string };
+export type ShellMessage = { t: "visio-select"; kind: "node" | "flow"; id: string } | { t: "session"; session: unknown } | { t: "props" } | { t: "menu-pick"; id: string; item: string } | { t: "menu-closed"; id: string } | { t: "shape-menu"; kind: string | null; id: string | null };
 
 /** Подписка на сообщения оболочки; возвращает отписку. Вне настольного приложения ничего не делает. */
 export function onShellMessage(handler: (m: ShellMessage) => void): () => void {
@@ -41,14 +41,14 @@ export function onShellMessage(handler: (m: ShellMessage) => void): () => void {
   if (!sh?.addEventListener) return () => undefined;
   const listener = (e: { data: unknown }) => {
     const d = e.data as { t?: string } | null;
-    if (d && (d.t === "visio-select" || d.t === "session" || d.t === "props" || d.t === "menu-pick" || d.t === "menu-closed")) handler(d as ShellMessage);
+    if (d && (d.t === "visio-select" || d.t === "session" || d.t === "props" || d.t === "menu-pick" || d.t === "menu-closed" || d.t === "shape-menu")) handler(d as ShellMessage);
   };
   sh.addEventListener("message", listener);
   return () => sh.removeEventListener?.("message", listener);
 }
 
 /** Пункт меню оболочки: id возвращается при выборе; group — заголовок группы (в меню Windows — разделитель). */
-export type ShellMenuItem = { id: string; label: string; kbd?: string; checked?: boolean; disabled?: boolean } | { group: string };
+export type ShellMenuItem = { id: string; label: string; kbd?: string; checked?: boolean; disabled?: boolean } | { group: string } | { label: string; items: ShellMenuItem[]; disabled?: boolean };
 
 /** Оболочка умеет показывать меню Windows (поверх окна Visio, куда HTML-меню не достаёт). */
 export const shellHasMenus = (): boolean => !!shell()?.addEventListener;
@@ -58,9 +58,9 @@ let menuSeq = 0;
  * Показать меню Windows под элементом anchor: обещание отдаёт id выбранного пункта или null, если меню закрыли без выбора.
  * Нужно в настольном приложении: выпадающее HTML-меню над холстом закрыто окном Visio.
  */
-export function showShellMenu(anchor: Element, items: ShellMenuItem[]): Promise<string | null> {
+export function showShellMenu(anchor: Element | "cursor", items: ShellMenuItem[]): Promise<string | null> {
   const id = `m${++menuSeq}`;
-  const r = anchor.getBoundingClientRect();
+  const r = anchor === "cursor" ? null : anchor.getBoundingClientRect();
   return new Promise((resolve) => {
     const off = onShellMessage((m) => {
       if ((m.t === "menu-pick" || m.t === "menu-closed") && m.id === id) {
@@ -68,6 +68,6 @@ export function showShellMenu(anchor: Element, items: ShellMenuItem[]): Promise<
         resolve(m.t === "menu-pick" ? m.item : null);
       }
     });
-    postToShell({ t: "menu", id, rect: { x: r.left, y: r.top, w: r.width, h: r.height }, items });
+    postToShell({ t: "menu", id, rect: r ? { x: r.left, y: r.top, w: r.width, h: r.height } : { cursor: true }, items });
   });
 }

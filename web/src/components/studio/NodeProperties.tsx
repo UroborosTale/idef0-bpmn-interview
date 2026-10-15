@@ -125,9 +125,9 @@ export default function NodeProperties({
   const timing = node.type === "task" || node.type === "subprocess";
   const subtypes = node.type === "event" ? [] : SUBTYPES[node.type] ?? []; // у событий вид и триггер — в блоке «Событие и триггер»
   const set = (patch: Partial<typeof node>) => onChange(updateNode(model, node.id, patch));
-  const text = (key: "duration" | "time_processing" | "time_waiting" | "cost_estimate" | "frequency", label: string, placeholder?: string) => (
+  const text = (key: "duration" | "time_processing" | "time_waiting" | "cost_estimate" | "frequency" | "content" | "begin" | "result" | "deadline", label: string, placeholder?: string, multiline = false) => (
     <Field label={label}>
-      <CommitInput value={node[key] ?? ""} placeholder={placeholder} onCommit={(v) => set({ [key]: v.trim() || null })} />
+      <CommitInput multiline={multiline} value={node[key] ?? ""} placeholder={placeholder} onCommit={(v) => set({ [key]: v.trim() || null })} />
     </Field>
   );
 
@@ -216,6 +216,15 @@ export default function NodeProperties({
         <Field label="Название">
           <CommitInput required value={node.name} onCommit={(v) => set({ name: v.trim() })} />
         </Field>
+        {(node.type === "task" || node.type === "subprocess") && (
+          <>
+            {/* поля карточки деятельности Business Studio */}
+            {text("content", "Содержание деятельности", "что делается на этом шаге", true)}
+            {text("begin", "Начало", "что запускает деятельность")}
+            {text("result", "Результат", "чем заканчивается")}
+            {text("deadline", "Требования к срокам", "например, не позднее 3 рабочих дней")}
+          </>
+        )}
         <Field label="Тип">
           <select value={node.type} onChange={(e) => onChange(setNodeType(model, node.id, e.target.value as typeof node.type))}>
             {Object.entries(TYPE_LABELS).map(([k, l]) => (

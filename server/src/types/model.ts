@@ -142,6 +142,11 @@ export const ProcessNode = z.object({
   control_data_ids: z.array(z.string()).optional(),
   duration: z.string().nullable().optional(),
   frequency: z.string().nullable().optional(),
+  // Описание деятельности, как в карточке Business Studio: содержание, с чего начинается, чем заканчивается, требования к срокам.
+  content: z.string().nullable().optional(),
+  begin: z.string().nullable().optional(),
+  result: z.string().nullable().optional(),
+  deadline: z.string().nullable().optional(),
   idef0_parent: z.string().nullable().optional(),
   // Шаг диаграммы BPMN операции: id функции IDEF0 (операции), чью диаграмму он образует. Такой узел — не функция
   // IDEF0, а подоперация; без поля узел относится к общей схеме процесса (прежнее поведение).

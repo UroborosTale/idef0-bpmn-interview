@@ -148,3 +148,27 @@ describe("панель «Свойства»: связи и стрелки", () =
     expect(title()).toBe("Свойства процесса"); // стрелки больше нет — панель не показывает её свойства
   });
 });
+
+describe("панель «Свойства»: карточка деятельности, как в Business Studio", () => {
+  it("у задачи — содержание деятельности, начало, результат и требования к срокам; правки записываются в модель", () => {
+    const m = purchaseModel();
+    const task = m.nodes.find((n) => n.type === "task")!;
+    const p = panel({ kind: "node", id: task.id }, m);
+    commit(field("Содержание деятельности"), "Проверить заявку на полноту");
+    commit(field("Начало"), "Поступила заявка");
+    commit(field("Результат"), "Заявка проверена");
+    commit(field("Требования к срокам"), "1 рабочий день");
+    const saved = p.model().nodes.find((n) => n.id === task.id)!;
+    expect(saved).toMatchObject({ content: "Проверить заявку на полноту", begin: "Поступила заявка", result: "Заявка проверена", deadline: "1 рабочий день" });
+    commit(field("Начало"), "");
+    expect(p.model().nodes.find((n) => n.id === task.id)!.begin).toBeNull();
+  });
+
+  it("у события и шлюза этих полей нет", () => {
+    const m = purchaseModel();
+    m.nodes.push({ ...m.nodes[0], id: "gw", name: "Решение?", type: "gateway", subtype: "exclusive", inputs: [], outputs: [], controls: [] });
+    panel({ kind: "node", id: "gw" }, m);
+    expect(screen.queryByText("Содержание деятельности")).toBeNull();
+  });
+});
+

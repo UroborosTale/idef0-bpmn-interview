@@ -67,6 +67,13 @@ internal sealed class MainForm : Form
             case "zoom": visio.SetZoom(root.GetProperty("value").GetDouble()); break;
             case "fit": visio.FitPage(); break;
             case "menu": ShowMenu(root); break;
+            case "select-many":
+                {
+                    var ids = root.GetProperty("ids").EnumerateArray().Select(x => x.GetString() ?? "").ToHashSet();
+                    var n = visio.SelectMany(ids);
+                    status.Text = $"Выделено подобных фигур: {n}";
+                    break;
+                }
             case "cmd": RunCommand(root.GetProperty("name").GetString() ?? ""); break;
             case "open-visio": await OpenInVisio(); break;
             case "tool": visio.SetTool(root.GetProperty("tool").GetString() ?? ""); break;
@@ -123,32 +130,54 @@ internal sealed class MainForm : Form
         var id = m.GetProperty("id").GetString() ?? "";
         var r = m.GetProperty("rect");
         var s = web.DeviceDpi / 96f;
-        var at = web.PointToScreen(new Point((int)(r.GetProperty("x").GetDouble() * s), (int)((r.GetProperty("y").GetDouble() + r.GetProperty("h").GetDouble()) * s)));
+        var at = r.TryGetProperty("cursor", out var cur) && cur.ValueKind == JsonValueKind.True
+            ? Cursor.Position
+            : web.PointToScreen(new Point((int)(r.GetProperty("x").GetDouble() * s), (int)((r.GetProperty("y").GetDouble() + r.GetProperty("h").GetDouble()) * s)));
         var menu = new ContextMenuStrip { ShowImageMargin = false, Font = new Font("Segoe UI", 9f) };
         string? picked = null;
-        foreach (var it in m.GetProperty("items").EnumerateArray())
+        // пункты: обычный (id), заголовок группы (group — разделитель) и подменю (items — вложенные пункты, как «Тип задачи ▸»)
+        void Fill(ToolStripItemCollection into, JsonElement list)
         {
-            if (it.TryGetProperty("group", out var g) && g.ValueKind == JsonValueKind.String)
+            foreach (var it in list.EnumerateArray())
             {
-                if (menu.Items.Count > 0) menu.Items.Add(new ToolStripSeparator());
-                continue;
+                if (it.TryGetProperty("group", out var g) && g.ValueKind == JsonValueKind.String)
+                {
+                    if (into.Count > 0) into.Add(new ToolStripSeparator());
+                    continue;
+                }
+                var item = new ToolStripMenuItem(it.GetProperty("label").GetString())
+                {
+                    Tag = it.TryGetProperty("id", out var idv) ? idv.GetString() : null,
+                    ShortcutKeyDisplayString = it.TryGetProperty("kbd", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null,
+                    Checked = it.TryGetProperty("checked", out var c) && c.ValueKind == JsonValueKind.True,
+                    Enabled = !(it.TryGetProperty("disabled", out var d) && d.ValueKind == JsonValueKind.True),
+                };
+                if (it.TryGetProperty("items", out var sub) && sub.ValueKind == JsonValueKind.Array)
+                {
+                    ((ToolStripDropDownMenu)item.DropDown).ShowImageMargin = false;
+                    ((ToolStripDropDownMenu)item.DropDown).ShowCheckMargin = true;
+                    Fill(item.DropDownItems, sub);
+                }
+                else item.Click += (_, _) => picked = (string?)item.Tag;
+                into.Add(item);
             }
-            var item = new ToolStripMenuItem(it.GetProperty("label").GetString())
-            {
-                Tag = it.GetProperty("id").GetString(),
-                ShortcutKeyDisplayString = it.TryGetProperty("kbd", out var k) && k.ValueKind == JsonValueKind.String ? k.GetString() : null,
-                Checked = it.TryGetProperty("checked", out var c) && c.ValueKind == JsonValueKind.True,
-                Enabled = !(it.TryGetProperty("disabled", out var d) && d.ValueKind == JsonValueKind.True),
-            };
-            item.Click += (_, _) => picked = (string?)item.Tag;
-            menu.Items.Add(item);
         }
+        menu.ShowCheckMargin = true;
+        Fill(menu.Items, m.GetProperty("items"));
         menu.Closed += (_, _) => BeginInvoke(() =>
         {
             PostToWeb(picked != null ? JsonSerializer.Serialize(new { t = "menu-pick", id, item = picked }) : JsonSerializer.Serialize(new { t = "menu-closed", id }));
             menu.Dispose();
         });
         menu.Show(at);
+    }
+
+    /// <summary>Меню объекта под курсором: что выделено в Visio, студия решает сама (у шага — тип задачи и цикла, у пустого места — страница).</summary>
+    private void ShowShapeMenu()
+    {
+        visio.SelectAt(visio.ToClient(Cursor.Position));
+        var tag = visio.SelectedTag();
+        PostToWeb(JsonSerializer.Serialize(new { t = "shape-menu", kind = tag?.Kind, id = tag?.Id }));
     }
 
     private void RunCommand(string name)
@@ -187,12 +216,31 @@ internal sealed class MainForm : Form
         private readonly MainForm form;
         private readonly HookProc proc; // держим делегат, иначе его соберёт сборщик мусора
         private readonly IntPtr hook;
+        private const int WH_MOUSE = 7, WM_RBUTTONUP = 0x205;
+        private readonly HookProc mouseProc;
+        private readonly IntPtr mouseHook;
 
         public Hotkeys(MainForm form)
         {
             this.form = form;
             proc = OnKey;
             hook = SetWindowsHookEx(WH_KEYBOARD, proc, IntPtr.Zero, GetCurrentThreadId());
+            mouseProc = OnMouse;
+            mouseHook = SetWindowsHookEx(WH_MOUSE, mouseProc, IntPtr.Zero, GetCurrentThreadId());
+        }
+
+        /// <summary>
+        /// Правый щелчок в окне Visio: нажатие Visio обрабатывает сам (выделяет фигуру под курсором), а отпускание перехватывается —
+        /// вместо меню Visio студия показывает меню объекта, как в Business Studio (тип задачи, тип цикла, свойства…).
+        /// </summary>
+        private IntPtr OnMouse(int code, IntPtr wParam, IntPtr lParam)
+        {
+            if (code == 0 && (int)wParam == WM_RBUTTONUP && form.visio.Visible && form.visio.ScreenBounds.Contains(Cursor.Position))
+            {
+                form.BeginInvoke(form.ShowShapeMenu);
+                return (IntPtr)1;
+            }
+            return CallNextHookEx(mouseHook, code, wParam, lParam);
         }
 
         private IntPtr OnKey(int code, IntPtr wParam, IntPtr lParam)
@@ -219,7 +267,11 @@ internal sealed class MainForm : Form
             return CallNextHookEx(hook, code, wParam, lParam);
         }
 
-        public void Dispose() => UnhookWindowsHookEx(hook);
+        public void Dispose()
+        {
+            UnhookWindowsHookEx(hook);
+            UnhookWindowsHookEx(mouseHook);
+        }
     }
 
     /// <summary>Фигура из палитры: при перетаскивании — в точку, где отпустили кнопку (если она над Visio), при щелчке — в центр.</summary>
