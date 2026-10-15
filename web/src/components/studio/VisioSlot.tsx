@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { postToShell, shellHasMenus, showShellMenu, type VisioDiagram } from "../../desktop";
+import { postToShell, shellHasMenus, showShellMenu, type ShellMenuItem, type VisioDiagram } from "../../desktop";
 import RibbonIcon from "./RibbonIcon";
 import ShapePalette, { type ExistingKind } from "./ShapePalette";
 
@@ -22,6 +22,8 @@ export interface VisioToolbar {
   onToggleSync?: () => void;
   /** Существующий объект справочника к выбранному шагу (вторая группа палитры). */
   onExisting?: (kind: ExistingKind, anchor: Element) => void;
+  /** Лист диаграммы (рамка со штампом), как «Параметры страницы» Visio: формат, поворот, авторазмер, рамка и сетка. */
+  sheet?: { items: ShellMenuItem[]; onPick: (id: string) => void };
 }
 
 /**
@@ -182,6 +184,19 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar }: { 
         {toolbar.onToggleSync && (
           <button className={`tb-btn ${toolbar.syncNav ? "toggled" : ""}`} onClick={toolbar.onToggleSync} aria-label="Синхронизировать с текущей фигурой" aria-pressed={!!toolbar.syncNav} title="Синхронизировать навигатор с текущей фигурой диаграммы">
             <RibbonIcon name="sync" />
+          </button>
+        )}
+        {toolbar.sheet && (
+          <button
+            className="tb-btn tb-text"
+            aria-haspopup="menu"
+            title="Лист: формат (A4, A3, A2), поворот, авторазмер, рамка и сетка. Размер листа можно менять и прямо в Visio: потяните за угол рамки и нажмите «Записать правки»"
+            onClick={(e) => {
+              const sheet = toolbar.sheet!;
+              void showShellMenu(e.currentTarget, sheet.items).then((picked) => picked && sheet.onPick(picked));
+            }}
+          >
+            Лист
           </button>
         )}
         <span className="tb-sep" />

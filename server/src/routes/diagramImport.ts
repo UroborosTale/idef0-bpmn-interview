@@ -9,7 +9,7 @@ import {
   reconcileDrawioIdef0Edit,
   buildModelFromParsedDrawio,
 } from "../pipeline/diagramImport.js";
-import { parseVsdx, buildModelFromParsedVsdx, reconcileVsdxEdit } from "../pipeline/vsdxImport.js";
+import { parseVsdx, buildModelFromParsedVsdx, reconcileVsdxEdit, applySheetEdits } from "../pipeline/vsdxImport.js";
 import { parseXlsx, buildModelFromTable } from "../pipeline/xlsxImport.js";
 import { stepsTemplateXlsx } from "../pipeline/xlsxTemplate.js";
 import { detectGaps } from "../pipeline/gaps.js";
@@ -80,6 +80,8 @@ diagramImportRouter.post("/sessions/:id/diagram-import/vsdx", async (req, res) =
     return;
   }
   const { model, changes } = reconcileVsdxEdit(session.model!, parsed);
+  const sheetsChanged = applySheetEdits(model, parsed.sheets); // размер листа, заданный в Visio
+  (changes as { sheets?: number }).sheets = sheetsChanged;
   model.gaps = detectGaps(model);
   const validation = validateModel(model);
   updateSession(req.params.id, { model, validation, diagramsStale: true });

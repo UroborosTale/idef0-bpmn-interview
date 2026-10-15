@@ -1,3 +1,4 @@
+import { FRAME_GRID, FRAME_H, FRAME_MIN_H, FRAME_MIN_W, type IdefFrame } from "../shared/idef0Frame.js";
 import JSZip from "jszip";
 import { XMLParser } from "fast-xml-parser";
 import { nanoid } from "nanoid";
@@ -80,9 +81,20 @@ export interface VsdxPage {
   nodes: VsdxNode[];
   containers: VsdxContainer[];
   edges: VsdxEdge[];
+  /** Рамка листа этой страницы (метка pm_k = sheet), если она есть. */
+  sheet?: VsdxSheet;
+}
+/** Рамка листа на странице нашей выгрузки: что нарисовано при выгрузке (orig) и что стало в Visio (now), px, y вниз. */
+export interface VsdxSheet {
+  kind: "idef0" | "bpmn";
+  key: string;
+  orig: [number, number, number, number];
+  now: { x: number; y: number; w: number; h: number };
 }
 export interface ParsedVsdx {
   pages: VsdxPage[];
+  /** Листы со всех страниц, в том числе IDEF0 (их фигуры пока не читаются, а размер листа — да). */
+  sheets: VsdxSheet[];
   warnings: string[];
 }
 
@@ -378,6 +390,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   }
 
   const pages: VsdxPage[] = [];
+  const sheets: VsdxSheet[] = [];
   let skippedIdef0 = 0;
   const pageList = arr<X>(parser.parse(pagesXml).Pages?.Page);
   if (pageList.length > MAX_PAGES) warnings.push(`В файле ${pageList.length} страниц — прочитаны первые ${MAX_PAGES}.`);
@@ -387,10 +400,8 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
     const sheet = cells(p.PageSheet);
     const pageH = numOf(sheet, "PageHeight", 8.5);
     const pageUser = p.PageSheet ? userCells(p.PageSheet) : {};
-    if ((pageUser.pm_page ?? "").startsWith("idef0")) {
-      skippedIdef0++;
-      continue;
-    }
+    const isIdef0 = (pageUser.pm_page ?? "").startsWith("idef0");
+    if (isIdef0) skippedIdef0++;
     const target = targets.get(attr(p.Rel, "id") ?? "") ?? `page${pi + 1}.xml`;
     const xml = await read(`visio/pages/${target.replace(/^\/?(visio\/pages\/)?/, "")}`);
     if (!xml) {
@@ -398,6 +409,8 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
       continue;
     }
     const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings);
+    if (page.sheet) sheets.push(page.sheet);
+    if (isIdef0) continue;
     if (pageUser.pm_page === "bpmn") {
       page.own = true;
       if (pageUser.pm_scope) page.scope = pageUser.pm_scope;
@@ -412,7 +425,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   }
   if (skippedIdef0) warnings.push(`Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`);
   if (pages.length === 0) warnings.push("Не найдено ни одной фигуры, похожей на шаг процесса, событие или шлюз.");
-  return { pages, warnings };
+  return { pages, sheets, warnings };
 }
 
 function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[]): VsdxPage {
@@ -603,7 +616,16 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     warnings.push(`На странице «${pageName}» не перенесено в модель: ${[...counts].map(([k, n]) => (n > 1 ? `${k} (${n})` : k)).join(", ")}.`);
   }
 
-  return { name: pageName, nodes, containers: lanes, edges };
+  // рамка листа собственной выгрузки: её размер мог измениться в Visio
+  let sheet: VsdxSheet | undefined;
+  const sh = all.find((s) => s.user.pm_k === "sheet");
+  if (sh) {
+    const orig = (sh.user.pm_sr ?? "").split(",").map(Number);
+    if (orig.length === 4 && orig.every(Number.isFinite) && (sh.user.pm_fd === "idef0" || sh.user.pm_fd === "bpmn")) {
+      sheet = { kind: sh.user.pm_fd, key: sh.user.pm_fk ?? "", orig: orig as [number, number, number, number], now: { x: sh.box.x, y: sh.box.y, w: sh.box.w, h: sh.box.h } };
+    }
+  }
+  return { name: pageName, nodes, containers: lanes, edges, ...(sheet ? { sheet } : {}) };
 }
 
 // --- модель ---
@@ -876,4 +898,32 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
     for (const id of page.manifest?.flows ?? []) if (!seenFlows.has(id) && flowById.has(id)) changes.missingFlows.push(id);
   }
   return { model: out, changes };
+}
+
+
+/**
+ * Размер и положение листа, изменённые в Visio (рамку листа растянули или подвинули), переносятся в настройки листа модели:
+ * idef0_frames / bpmn_frames, ключ — функция или операция диаграммы. Поле листа — без штампа, поэтому высота рамки уменьшается
+ * на высоту штампа. Возвращает число изменённых листов.
+ */
+export function applySheetEdits(model: ProcessLogicModel, sheets: VsdxSheet[]): number {
+  let changed = 0;
+  for (const sh of sheets) {
+    const [ox, oy, ow, oh] = sh.orig;
+    const moved = [sh.now.x - ox, sh.now.y - oy, sh.now.w - ow, sh.now.h - oh].some((d) => Math.abs(d) > 2);
+    if (!moved) continue;
+    const field = sh.kind === "idef0" ? "idef0_frames" : "bpmn_frames";
+    const frames = (model[field] ??= {} as Record<string, IdefFrame>);
+    const cur: IdefFrame = frames[sh.key] ?? {};
+    // на клетку — как лист в редакторе; размер не меньше минимального
+    const snap = (v: number) => Math.round(v / FRAME_GRID) * FRAME_GRID;
+    cur.x = snap(sh.now.x);
+    cur.y = snap(sh.now.y);
+    cur.w = Math.max(FRAME_MIN_W, snap(sh.now.w));
+    cur.h = Math.max(FRAME_MIN_H, snap(sh.now.h - FRAME_H));
+    if (sh.kind === "bpmn") cur.show = true; // лист BPMN по умолчанию скрыт: раз его правили, он нужен
+    frames[sh.key] = cur;
+    changed++;
+  }
+  return changed;
 }

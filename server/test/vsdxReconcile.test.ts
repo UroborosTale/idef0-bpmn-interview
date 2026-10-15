@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import { buildVsdx } from "../src/export/vsdx.js";
-import { parseVsdx, reconcileVsdxEdit } from "../src/pipeline/vsdxImport.js";
+import { applySheetEdits, parseVsdx, reconcileVsdxEdit } from "../src/pipeline/vsdxImport.js";
 import { structuredModel } from "./fixtures.js";
 
 /** Правка файла так, как её делает Visio: меняется содержимое страницы внутри пакета. */
@@ -132,3 +132,52 @@ describe("фигуры из палитры Visio (без меток pm_*)", () =
     expect(ev("Завершение процесса")).toMatchObject({ subtype: "end", trigger: { type: "terminate" } });
   });
 });
+
+describe("размер листа, заданный в Visio", () => {
+  /** Растягивает рамку листа так, как это делает Visio: меняет ширину и высоту фигуры (дюймы), левый верхний угол остаётся. */
+  const resizeSheet = (xml: string, dxPx: number, dyPx: number) => {
+    const at = xml.indexOf('<Cell N="Value" V="sheet"');
+    const start = xml.lastIndexOf("<Shape ", at);
+    const end = xml.indexOf("</Shape>", at) + "</Shape>".length;
+    let shape = xml.slice(start, end);
+    const cell = (name: string, f: (v: number) => number) => {
+      const re = new RegExp('(<Cell N="' + name + '" V=")([-0-9.]+)');
+      shape = shape.replace(re, (_m, pre: string, v: string) => pre + f(Number(v)));
+    };
+    cell("Width", (v) => v + dxPx / 96);
+    cell("Height", (v) => v + dyPx / 96);
+    cell("PinX", (v) => v + dxPx / 192);
+    cell("PinY", (v) => v - dyPx / 192);
+    return xml.slice(0, start) + shape + xml.slice(end);
+  };
+
+  it("лист IDEF0 растянули в Visio — настройки листа модели получают новый размер; без правки ничего не меняется", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const same = applySheetEdits(JSON.parse(JSON.stringify(m)), (await parseVsdx(buf)).sheets);
+    expect(same).toBe(0);
+    const page = await pageNo(buf, "IDEF0 B002.00.00");
+    const edited = await edit(buf, page, (xml) => resizeSheet(xml, 200, 120));
+    const sheets = (await parseVsdx(edited)).sheets.filter((x) => x.kind === "idef0" && x.key === "");
+    expect(sheets).toHaveLength(1);
+    const model = JSON.parse(JSON.stringify(m));
+    expect(applySheetEdits(model, sheets)).toBe(1);
+    const f = model.idef0_frames[""];
+    expect(f.w).toBeGreaterThan(sheets[0].orig[2]);
+    expect(f.h).toBeGreaterThan(sheets[0].orig[3] - 12);
+    expect(f.w % 40).toBe(0); // лист ложится на клетки
+  });
+
+  it("лист BPMN, включённый и растянутый в Visio, показывается и хранит размер", async () => {
+    const m = structuredModel();
+    m.bpmn_frames = { o1: { show: true } };
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN B002.01.01");
+    const edited = await edit(buf, page, (xml) => resizeSheet(xml, 160, 80));
+    const model = JSON.parse(JSON.stringify(m));
+    expect(applySheetEdits(model, (await parseVsdx(edited)).sheets)).toBe(1);
+    expect(model.bpmn_frames.o1).toMatchObject({ show: true });
+    expect(model.bpmn_frames.o1.w).toBeGreaterThan(0);
+  });
+});
+

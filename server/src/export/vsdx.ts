@@ -453,9 +453,10 @@ function sheetOnPage(world: { w: number; h: number }, settings: IdefFrame | unde
 const pageSize = (w: number, h: number, geo: FrameGeometry | null): [number, number] => (geo ? [Math.max(w, geo.sheet.x + geo.sheet.w), Math.max(h, geo.sheet.y + geo.sheet.h)] : [w, h]);
 
 /** Рамка и штамп — оформление (pm_k = deco): при чтении правок из Visio они пропускаются. Сетка в Visio не выгружается. */
-function drawSheet(page: Page, geo: FrameGeometry) {
+function drawSheet(page: Page, geo: FrameGeometry, kind: "idef0" | "bpmn", key: string) {
   page.rect(geo.footer.x, geo.footer.y, geo.footer.w, geo.footer.h, { fill: "#e8eef7", weightPt: 0.75 });
-  page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 0.75 });
+  // рамка листа помечена: размер и положение, заданные в Visio (тянут за углы и стороны), при приёме правок становятся листом модели
+  page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 0.75, tag: { pm_k: "sheet", pm_fd: kind, pm_fk: key, pm_sr: [geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h].map((v) => Math.round(v)).join(",") } });
   for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 0.75 });
   for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 3, y: c.y - 1, anchor: c.anchor, w: Math.max(20, c.w - 4) }, { fontPx: FRAME_FONT, color: "#000000" });
 }
@@ -470,7 +471,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
   const geo = frameShown(settings) ? sheetOnPage({ w: d.width, h: d.height }, settings, fi.defaults) : null;
   const [pw, ph] = pageSize(d.width, d.height, geo);
   const page = new Page(name, pw, ph, { pm_page: `idef0:${d.code}`, ...(parentNodeId ? { pm_parent: parentNodeId } : {}), ...(editable ? {} : { pm_ro: "1" }), ...(kind === "context" ? { pm_ctx: "1" } : {}) });
-  if (geo) drawSheet(page, geo);
+  if (geo) drawSheet(page, geo, "idef0", fi.key);
   else page.label(d.title, { x: 16, y: 8, anchor: "start", w: Math.max(300, d.title.length * 9) }, { fontPx: 15, bold: true });
 
   const portsOf = new Map<string, ReturnType<typeof blockPorts>>();
@@ -605,7 +606,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   const [pw, ph] = pageSize(d.width, d.height, geo);
   const page = new Page(name, pw, ph, { pm_page: "bpmn", ...(scope ? { pm_scope: scope } : {}) });
   // лист — под диаграммой: штамп и рамка рисуются первыми
-  if (geo) drawSheet(page, geo);
+  if (geo) drawSheet(page, geo, "bpmn", scope ?? "");
   // полоса заголовка над пулом: код и название диаграммы (оформление — при чтении правок пропускается)
   // полоса заголовка: название с кодом в одну строку и пустая узкая полоса под ним, как в Business Studio
   const bx0 = LANE_X; // пул начинается там же, где дорожки: узкой полосы с названием пула у Business Studio нет

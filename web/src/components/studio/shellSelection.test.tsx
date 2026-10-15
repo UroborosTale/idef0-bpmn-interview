@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { session } from "../../test/fixtures";
 import Studio from "./Studio";
@@ -106,6 +106,28 @@ describe("выделение между студией и Visio", () => {
     await act(async () => new Promise((r) => setTimeout(r, 10)));
     saved = (onSave.mock.calls.at(-1) as unknown as [{ nodes: { id: string; inputs: string[]; system_ids: string[] }[] }])[0];
     expect(saved.nodes.find((n) => n.id === "b")!.system_ids).toContain("s1");
+  });
+
+  it("кнопка «Лист»: формат A3 и книжная ориентация записываются в настройки листа модели", async () => {
+    sessionStorage.clear();
+    const onSave = vi.fn(async () => true);
+    render(<Studio session={session()} busy={false} onSave={onSave} />);
+    const lastMenu = () => post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: { id?: string; checked?: boolean }[] }).filter((m) => m.t === "menu").at(-1)!;
+    const pick = async (item: string) => {
+      fireEvent.click(screen.getByRole("button", { name: "Лист" }));
+      const req = lastMenu();
+      await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: req.id, item } })));
+      await act(async () => new Promise((r) => setTimeout(r, 10)));
+      return (onSave.mock.calls.at(-1) as unknown as [{ bpmn_frames?: Record<string, { show?: boolean; w?: number; h?: number }> }])[0];
+    };
+    let saved = await pick("frame");
+    expect(saved.bpmn_frames![""].show).toBe(true); // общая схема BPMN: рамка по умолчанию скрыта
+    saved = await pick("fmt:A3");
+    expect(saved.bpmn_frames![""]).toMatchObject({ w: 1580, h: 1080 });
+    saved = await pick("portrait");
+    expect(saved.bpmn_frames![""]).toMatchObject({ w: 1080, h: 1580 });
+    saved = await pick("auto");
+    expect(saved.bpmn_frames![""].w).toBeUndefined();
   });
 });
 

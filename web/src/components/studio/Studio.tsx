@@ -33,6 +33,8 @@ import RibbonIcon from "./RibbonIcon";
 import { inDesktopShell, onShellMessage, postToShell, recalledTabs, rememberTabs, showShellMenu, type ShellMenuItem } from "../../desktop";
 import { SUBTYPES, nextId } from "../bpmn-editor/model-ops";
 import type { ExistingKind } from "./ShapePalette";
+import { setSheetFrame, type FramePatch } from "../editor-core/sheet-ops";
+import { SHEET_FORMATS, bpmnFrameShown, frameKey, frameShown, gridShown, sheetFormatOf } from "@shared/idef0Frame";
 import { LC_STATUS_LABELS, lcStatus, lcVersion, nextVersion } from "./lifecycle";
 import { LOOP_KINDS, LOOP_LABELS } from "@shared/loops";
 import type { PropTab } from "./PanelParts";
@@ -42,7 +44,9 @@ type M = ProcessLogicModel;
 /** Начальное состояние черновика: роли и позиции фигур достроены (в черновиках, сохранённых раньше, полей новой версии модели нет). */
 const normalize = (m: M): M =>
   m.assignments && m.pools && m.messages && m.accepted_issues ? m : { ...m, assignments: m.assignments ?? [], pools: m.pools ?? [], messages: m.messages ?? [], accepted_issues: m.accepted_issues ?? [] };
-const seed = (m: M, bpmnXml: string | null | undefined): M => withIdef0Layout(withScopeLayouts(withLayout(normalize(m), false, positionsFromBpmnXml(bpmnXml))));
+// В настольном приложении диаграммы рисует и раскладывает сервер, а правит Visio: позиции BPMN студия не достраивает и не сохраняет
+// (иначе её раскладка, не знающая служебных начала и конца, ложилась бы на фигуры и перекрывала их).
+const seed = (m: M, bpmnXml: string | null | undefined): M => (inDesktopShell() ? withIdef0Layout(normalize(m)) : withIdef0Layout(withScopeLayouts(withLayout(normalize(m), false, positionsFromBpmnXml(bpmnXml)))));
 
 /**
  * Окно студии: единое рабочее место процессного аналитика в духе Business Studio. Слева навигатор
@@ -576,6 +580,52 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     });
   };
 
+  /**
+   * Лист диаграммы в окне Visio, как «Параметры страницы»: формат (A4, A3, A2), поворот, авторазмер по содержимому, рамка со штампом и
+   * сетка. Размер сохраняется в настройках листа модели (idef0_frames / bpmn_frames), Visio перечитывает диаграмму. Лист можно
+   * растянуть и прямо в Visio — приём правок перенесёт новый размер в модель.
+   */
+  const sheetControl = (() => {
+    if (active.kind !== "bpmn" && active.kind !== "idef0") return undefined;
+    const field = active.kind === "bpmn" ? ("bpmn_frames" as const) : ("idef0_frames" as const);
+    const key = active.kind === "bpmn" ? active.scope ?? "" : frameKey(active.parent);
+    const frame = draft[field]?.[key];
+    const on = active.kind === "bpmn" ? bpmnFrameShown(frame) : frameShown(frame);
+    const manual = frame?.w !== undefined && frame?.h !== undefined;
+    const format = manual ? sheetFormatOf(frame!.w!, frame!.h!) : null;
+    const rectNow = { x: frame?.x ?? 0, y: frame?.y ?? 0, w: frame?.w ?? SHEET_FORMATS[0].w, h: frame?.h ?? SHEET_FORMATS[0].h };
+    const items: ShellMenuItem[] = [
+      { id: "frame", label: "Рамка листа со штампом", checked: on },
+      { id: "grid", label: "Сетка", checked: on && gridShown(frame), disabled: !on },
+      { group: "Формат" },
+      { id: "auto", label: "По содержимому диаграммы", checked: !manual, disabled: !on },
+      ...SHEET_FORMATS.map((f) => ({ id: `fmt:${f.id}`, label: `${f.label} (${f.id === "A4" ? "210 × 297" : f.id === "A3" ? "297 × 420" : "420 × 594"} мм)`, checked: format?.id === f.id, disabled: !on })),
+      { group: "Ориентация" },
+      { id: "landscape", label: "Альбомная", checked: manual ? rectNow.w >= rectNow.h : true, disabled: !on || !manual },
+      { id: "portrait", label: "Книжная", checked: manual && rectNow.w < rectNow.h, disabled: !on || !manual },
+    ];
+    const onPick = (id: string) => {
+      let patch: FramePatch | null = null;
+      if (id === "frame") patch = { show: !on };
+      else if (id === "grid") patch = { grid: !gridShown(frame) };
+      else if (id === "auto") patch = { rect: null };
+      else if (id.startsWith("fmt:")) {
+        const f = SHEET_FORMATS.find((x) => x.id === id.slice(4));
+        if (!f) return;
+        const portrait = manual && rectNow.w < rectNow.h;
+        patch = { rect: { x: rectNow.x, y: rectNow.y, w: portrait ? f.h : f.w, h: portrait ? f.w : f.h } };
+      } else if (id === "landscape" || id === "portrait") {
+        const wide = rectNow.w >= rectNow.h;
+        if ((id === "landscape") === wide) return;
+        patch = { rect: { x: rectNow.x, y: rectNow.y, w: rectNow.h, h: rectNow.w } };
+      }
+      if (!patch) return;
+      h.commit(setSheetFrame(h.draftRef.current, field, key, patch));
+      window.setTimeout(() => void save(), 0); // в окне Visio лист виден после записи в модель
+    };
+    return { items, onPick };
+  })();
+
   const shapeMenuRef = useRef<(kind: string | null, id: string | null) => void>(() => undefined);
   shapeMenuRef.current = (kind, id) => {
     const node = (kind === "node" || kind === "fn") && id ? draft.nodes.find((n) => n.id === id) : undefined;
@@ -1087,6 +1137,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                   syncNav,
                   onToggleSync: () => setSyncNav((v) => !v),
                   onExisting: locked ? undefined : pickExisting,
+                  sheet: locked ? undefined : sheetControl,
                 }}
               />
             )}
