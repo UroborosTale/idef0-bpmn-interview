@@ -100,10 +100,10 @@ export const MIN_FREE = 48;
 
 export const BLOCK_W = 170;
 export const BLOCK_H = 90;
-export const STEP_X = 230;
+export const STEP_X = 340;
 export const STEP_Y = 150;
-export const MARGIN = 170;
-const STUB_SIDE = 60; // внешние входы/выходы
+export const MARGIN = 220;
+const STUB_SIDE = 170; // внешние входы/выходы: длинные, подпись лежит на самой линии, как в Business Studio
 const STUB_CTRL = 46; // управление сверху
 const STUB_MECH = 40; // механизмы снизу
 
@@ -226,7 +226,7 @@ const rowOf = (i: number, n: number) => (n > 1 ? i % Math.min(3, n) : 0);
 const LABEL_ROW_H = 12;
 
 /** Подпись стрелки переносится по словам: до 34 знаков в строке и до 3 строк (как у Business Studio), строки разделены «\n». */
-export const wrapLabel = (text: string, wide = false): string => (wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
+export const wrapLabel = (text: string, wide: boolean | "side" = false): string => (wide === "side" ? wrapText(text, 30, 3) : wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
 /** Ширина подписи стрелки в пикселях (кегль 10,5): по самой длинной строке после переноса. */
 export const labelWidth = (wrapped: string): number => Math.max(1, ...wrapped.split("\n").map((l) => l.length)) * 6 + 4;
 /** Зазор между подписями в одной строке. */
@@ -249,7 +249,8 @@ const rectsHit = (a: LabelRect, b: LabelRect) => a.x0 < b.x1 + LABEL_GAP && b.x0
  * стрелками налезали друг на друга через две.
  */
 export function assignLabelRows(items: { x: number; label: string }[], opts: { obstacles?: LabelRect[]; /** y первой строки подписи из `lines` строк, поставленной в ряд `row`. */ y?: (item: number, row: number, lines: number) => number } = {}): number[] {
-  const order = items.map((_, i) => i).sort((i, j) => items[i].x - items[j].x);
+  // справа налево: у правой стрелки подпись ближе всего к блоку, а длинные подписи левых уходят выше (ниже), как в Business Studio
+  const order = items.map((_, i) => i).sort((i, j) => items[j].x - items[i].x);
   const rows: { x: number; w: number }[][] = [];
   const placed: LabelRect[] = [];
   const out: number[] = new Array(items.length).fill(0);
@@ -263,17 +264,17 @@ export function assignLabelRows(items: { x: number; label: string }[], opts: { o
       if (opts.y) {
         // высоты строк заданы: подписи сравниваются настоящими прямоугольниками (начала стрелок могут стоять на разной глубине)
         const y = opts.y(i, row, h);
-        const mine = { x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
+        const mine = { x0: items[i].x - 4, x1: items[i].x - 4 + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
         return placed.some((o) => rectsHit(mine, o)) || (opts.obstacles ?? []).some((o) => rectsHit(mine, o));
       }
-      for (let k = row; k < row + h; k++) if ((rows[k] ?? []).some((q) => Math.abs(items[i].x - q.x) < (w + q.w) / 2 + LABEL_GAP)) return true;
+      for (let k = row; k < row + h; k++) if ((rows[k] ?? []).some((q) => items[i].x < q.x + q.w + LABEL_GAP && q.x < items[i].x + w + LABEL_GAP)) return true;
       return false;
     };
     while (r < MAX_LABEL_ROWS - h && blocked(r)) r++;
     for (let k = r; k < r + h; k++) (rows[k] ??= []).push({ x: items[i].x, w });
     if (opts.y) {
       const y = opts.y(i, r, h);
-      placed.push({ x0: items[i].x - w / 2, x1: items[i].x + w / 2, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H });
+      placed.push({ x0: items[i].x - 4, x1: items[i].x - 4 + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H });
     }
     out[i] = r;
   }
@@ -354,7 +355,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
 
     // входы (слева): от функции-источника или снаружи
     const ins = n.inputs.filter((id) => dataById.has(id));
-    const iStep = spread(b.h, ins.length, 18, 14);
+    const iStep = spread(b.h, ins.length, 40, 14);
     ins.forEach((id, di) => {
       const label = dataById.get(id)!.name;
       const producer = producedBy.get(id);
@@ -387,7 +388,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
 
     // выходы (справа) — если не потреблены на этой диаграмме, уходят за границу
     const outs = n.outputs.filter((id) => dataById.has(id));
-    const oStep = spread(b.h, outs.length, 18, 14);
+    const oStep = spread(b.h, outs.length, 40, 14);
     outs.forEach((id, i) => {
       const consumed = fnNodes.some((o) => o.id !== n.id && (o.inputs.includes(id) || (o.control_data_ids ?? []).includes(id)));
       if (consumed) return;
@@ -511,22 +512,21 @@ export function labelSpec(a: { points: Pt[]; side: LabelSide; label?: string; la
 
 function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; labelRow?: number; bus?: boolean }): { x: number; y: number; anchor: "start" | "middle" | "end"; text: string } | null {
   if (!a.label) return null;
-  const text = a.bus ? wrapText(a.label, 60, 1).join("") : wrapLabel(a.label, a.side === "top" || a.side === "bottom");
+  const text = a.bus ? wrapText(a.label, 60, 1).join("") : wrapLabel(a.label, a.side === "left" || a.side === "right" ? "side" : a.side === "top" || a.side === "bottom");
   const extra = (text.split("\n").length - 1) * LABEL_ROW_H; // подпись над линией растёт вверх: первая строка поднимается
   const first = a.points[0];
   const last = a.points[a.points.length - 1];
   if (a.bus) return { x: first[0] + 8, y: first[1] - 4, anchor: "start", text };
   switch (a.side) {
-    // как в Business Studio, подпись внешней стрелки лежит над самой линией, у блока: вход слева прижат к блоку справа, выход
-    // (выходы стоят вплотную друг к другу, их подписи — за концом стрелки); длинная подпись входа выходит за свободный конец, но не в блок
+    // как в Business Studio, подпись внешней стрелки лежит на самой линии, по центру её отрезка (линия под текстом прерывается белой подложкой)
     case "left":
-      return { x: last[0] - 6, y: last[1] - 4 - extra, anchor: "end", text };
+      return { x: (first[0] + last[0]) / 2, y: first[1] + 4 - extra / 2, anchor: "middle", text };
     case "right":
-      return { x: last[0] + 4, y: last[1] + 4 - extra / 2, anchor: "start", text }; // у выходов стрелки идут вплотную: подпись за концом, по центру строк
+      return { x: (first[0] + last[0]) / 2, y: first[1] + 4 - extra / 2, anchor: "middle", text };
     case "top":
-      return { x: first[0], y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
+      return { x: first[0] - 4, y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text }; // как в Business Studio: подпись начинается у самой стрелки
     case "bottom":
-      return { x: first[0], y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "middle", text };
+      return { x: first[0] - 4, y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text };
     default: {
       let idx = -1;
       let best = -1;

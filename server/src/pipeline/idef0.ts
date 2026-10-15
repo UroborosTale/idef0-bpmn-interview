@@ -153,28 +153,34 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
   // должности процесса в целом, если они назначены (ролевая модель), иначе — все роли модели
   const processRoles = (model.assignments ?? []).filter((a) => a.node_id === null && a.kind !== "observer").map((a) => model.roles.find((r) => r.id === a.role_id)?.name ?? "").filter(Boolean);
   const mechs = processRoles.length > 0 ? uniq([...processRoles, ...ext.mechanisms.filter((s) => !model.roles.some((r) => r.name === s))]) : uniq([...ext.mechanisms, ...model.roles.map((r) => r.name)]);
-  // ширина — с запасом под самые длинные подписи входов и выходов (подписи обрезаются до 26 знаков)
-  const longest = Math.max(0, ...[...inputs, ...outputs].slice(0, 10).map((s) => Math.min(26, s.length) * 6.4));
-  const W = Math.max(640, Math.ceil(2 * (110 + 90 + longest + 16)));
-  const H = 420;
-  const cb = { x: W / 2 - 110, y: H / 2 - 55, w: 220, h: 110 };
+  // как у Business Studio: крупный блок, длинные боковые стрелки с подписью на самой линии, стрелки сверху и снизу покороче
+  const SIDE = 320;
+  const VERT = 130;
+  const cb = { w: 360, h: 220, x: 0, y: 0 };
+  const W = cb.w + 2 * (SIDE + 90);
+  const H = cb.h + 2 * (VERT + 120);
+  cb.x = W / 2 - cb.w / 2;
+  cb.y = H / 2 - cb.h / 2;
 
   const arrows: Idef0Arrow[] = [];
   inputs.slice(0, 5).forEach((name, i) => {
-    const y = cb.y + 20 + i * 18;
-    arrows.push({ points: [[cb.x - 90, y], [cb.x, y]], label: name, side: "left" });
+    const y = cb.y + 40 + i * 42;
+    arrows.push({ points: [[cb.x - SIDE, y], [cb.x, y]], label: name, side: "left" });
   });
+  // сверху и снизу стрелки разной длины: левая начинается выше всех, подпись сидит у самого начала стрелки и идёт вправо
   controls.slice(0, 5).forEach((name, i) => {
-    const x = cb.x + 24 + i * 34;
-    arrows.push({ points: [[x, cb.y - 60], [x, cb.y]], label: name, side: "top", labelRow: i % 3 });
+    const x = cb.x + 40 + i * 46;
+    const row = Math.min(controls.length, 5) - 1 - i;
+    arrows.push({ points: [[x, cb.y - 50 - row * 22], [x, cb.y]], label: name, side: "top" });
   });
   outputs.slice(0, 5).forEach((name, i) => {
-    const y = cb.y + 20 + i * 18;
-    arrows.push({ points: [[cb.x + cb.w, y], [cb.x + cb.w + 90, y]], label: name, side: "right" });
+    const y = cb.y + 40 + i * 42;
+    arrows.push({ points: [[cb.x + cb.w, y], [cb.x + cb.w + SIDE, y]], label: name, side: "right" });
   });
   mechs.slice(0, 5).forEach((name, i) => {
-    const x = cb.x + 24 + i * 34;
-    arrows.push({ points: [[x, cb.y + cb.h + 60], [x, cb.y + cb.h]], label: name, side: "bottom", labelRow: i % 3 });
+    const x = cb.x + 40 + i * 46;
+    const row = Math.min(mechs.length, 5) - 1 - i;
+    arrows.push({ points: [[x, cb.y + cb.h + 50 + row * 22], [x, cb.y + cb.h]], label: name, side: "bottom" });
   });
 
   const structured = isStructured(model);
@@ -183,7 +189,7 @@ function buildContextDiagram(model: ProcessLogicModel, ext: External): Idef0Diag
     code: ctxCode,
     title: structured ? `${ctxCode} — ${model.process.name} (контекстная диаграмма)` : "A-0 — контекстная диаграмма",
     width: W,
-    height: H + 50,
+    height: H,
     blocks: [{ nodeId: "__context__", code: ctxCode, name: model.process.name, ...cb }],
     arrows,
     footer: [
@@ -238,7 +244,7 @@ export const arrowLabelPlacement = (a: Idef0Arrow) => labelSpec(a);
 function frameSvg(geo: FrameGeometry, grid: boolean): string {
   const out: string[] = [];
   if (grid) {
-    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="#e4e4e4" stroke-width="1" />`);
+    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#dadada" : "#e4e4e4"}" stroke-width="1" />`);
     for (const l of geo.gridYs) out.push(`<line x1="${geo.sheet.x}" y1="${l.at}" x2="${geo.sheet.x + geo.sheet.w}" y2="${l.at}" stroke="#e4e4e4" stroke-width="1" />`);
   }
   out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef7" stroke="#1f2937" />`);
@@ -247,7 +253,7 @@ function frameSvg(geo: FrameGeometry, grid: boolean): string {
   for (const c of geo.cells) {
     const max = Math.floor(c.w / (FRAME_FONT * 0.55));
     const text = c.text.length > max ? c.text.slice(0, Math.max(1, max - 1)) + "…" : c.text;
-    out.push(`<text x="${c.tx}" y="${c.y + c.h / 2 + 2.6}" font-size="${FRAME_FONT}" text-anchor="${c.anchor}" font-family="Arial, sans-serif" fill="#111827">${esc(text)}</text>`);
+    out.push(`<text x="${c.tx}" y="${c.y + c.h / 2 + FRAME_FONT * 0.35}" font-size="${FRAME_FONT}" text-anchor="${c.anchor}" font-family="Arial, sans-serif" fill="#111827">${esc(text)}</text>`);
   }
   return out.join("\n    ");
 }

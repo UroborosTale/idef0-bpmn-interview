@@ -1,81 +1,93 @@
 # IDEF0 A0
-fn s1 170,170 170×90
-fn s2 400,320 170×90
-arrow control:s1:c_order266 [190,124 190,170] label@190,120/middle «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow control:s1:c_tk196 [216,124 216,170] label@216,108/middle «Трудовой кодекс РФ ст.196»
-arrow control:s1:c_list [242,124 242,170] label@242,96/middle «Список направлений обучения»
-arrow input:s1:d_need [110,184 170,184] label@164,180/end «Сотрудник нуждающийся в обучении»
-arrow input:s1:d_mandate [110,202 170,202] label@164,198/end «Поручение руководства»
-arrow output:s1:d_unapproved [340,184 400,184] label@404,188/start «Несогласованная заявка на обучение»
-arrow role:s1:r_initiator [190,300 190,260] label@190,314/middle «Инициатор заявки на обучение»
-arrow role:s1:r_spec [216,506 216,260]
-arrow role:s1:r_mgr [242,488 242,260]
-arrow role:s1:r_dird [268,470 268,260]
-arrow role:s1:r_dirhr [294,452 294,260]
-arrow system:s1:s_elma [320,434 320,260]
-arrow control:s2:c_law273 [420,274 420,320] label@420,258/middle «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
+fn s1 220,220 170×90
+fn s2 560,370 170×90
+arrow control:s1:c_order266 [240,174 240,220] label@236,146/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow control:s1:c_tk196 [266,174 266,220] label@262,158/start «Трудовой кодекс РФ ст.196»
+arrow control:s1:c_list [292,174 292,220] label@288,170/start «Список направлений обучения»
+arrow input:s1:d_need [50,234 220,234] label@135,232/middle «Сотрудник нуждающийся в
+обучении»
+arrow input:s1:d_mandate [50,274 220,274] label@135,278/middle «Поручение руководства»
+arrow output:s1:d_unapproved [390,234 560,234] label@475,232/middle «Несогласованная заявка на
+обучение»
+arrow role:s1:r_initiator [240,350 240,310] label@236,364/start «Инициатор заявки на обучение»
+arrow role:s1:r_spec [266,556 266,310]
+arrow role:s1:r_mgr [292,538 292,310]
+arrow role:s1:r_dird [318,520 318,310]
+arrow role:s1:r_dirhr [344,502 344,310]
+arrow system:s1:s_elma [370,484 370,310]
+arrow control:s2:c_law273 [580,324 580,370] label@576,284/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
 Российской Федерации»»
-arrow control:s2:c_tk187 [446,274 446,320] label@446,246/middle «Трудовой кодекс РФ ст.187»
-arrow control:s2:c_order266 [472,274 472,320] label@472,234/middle «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow link:s2:d_confirmed [340,202 364,202 364,334 400,334] label@382,329/middle «Подтверждённая заявка на обучение»
-arrow input:s2:d_dismissal [340,352 400,352] label@394,336/end «Уведомление об отчислении сотрудника от
-образовательной организации»
-arrow output:s2:d_trained [570,334 630,334] label@634,338/start «Обученный сотрудник»
-arrow output:s2:d_eduSection [570,352 630,352] label@634,350/start «Актуализированный раздел об образовании
-в карточке сотрудника»
-arrow output:s2:d_dismissed [570,370 630,370] label@634,374/start «Уведомление сотруднику о его отчислении»
-arrow role:s2:r_emp [550,450 550,410] label@550,524/middle «Сотрудник прошедший обучение»
-arrow role:s2:r_spec [216,506 524,506 524,410] label@224,502/start «Специалист отдела обучения и развития персонала»
-arrow role:s2:r_mgr [242,488 498,488 498,410] label@250,484/start «Руководитель инициатора заявки на обучение»
-arrow role:s2:r_dird [268,470 472,470 472,410] label@276,466/start «Директор дирекции операционной эффективности»
-arrow role:s2:r_dirhr [294,452 446,452 446,410] label@302,448/start «Директор по персоналу и операционной эффективности»
-arrow system:s2:s_elma [320,434 420,434 420,410] label@328,430/start «ELMA365»
+arrow control:s2:c_tk187 [606,324 606,370] label@602,308/start «Трудовой кодекс РФ ст.187»
+arrow control:s2:c_order266 [632,324 632,370] label@628,320/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow link:s2:d_confirmed [390,252 414,252 414,384 560,384] label@487,379/middle «Подтверждённая заявка на обучение»
+arrow input:s2:d_dismissal [390,424 560,424] label@475,416/middle «Уведомление об отчислении
+сотрудника от образовательной
+организации»
+arrow output:s2:d_trained [730,384 900,384] label@815,388/middle «Обученный сотрудник»
+arrow output:s2:d_eduSection [730,415 900,415] label@815,407/middle «Актуализированный раздел об
+образовании в карточке
+сотрудника»
+arrow output:s2:d_dismissed [730,446 900,446] label@815,444/middle «Уведомление сотруднику о его
+отчислении»
+arrow role:s2:r_emp [710,500 710,460] label@706,514/start «Сотрудник прошедший обучение»
+arrow role:s2:r_spec [266,556 684,556 684,460] label@274,552/start «Специалист отдела обучения и развития персонала»
+arrow role:s2:r_mgr [292,538 658,538 658,460] label@300,534/start «Руководитель инициатора заявки на обучение»
+arrow role:s2:r_dird [318,520 632,520 632,460] label@326,516/start «Директор дирекции операционной эффективности»
+arrow role:s2:r_dirhr [344,502 606,502 606,460] label@352,498/start «Директор по персоналу и операционной эффективности»
+arrow system:s2:s_elma [370,484 580,484 580,460] label@378,480/start «ELMA365»
 # IDEF0 C025.01.00
-fn o11 170,170 170×90
-fn o12 400,320 170×90
-fn o13 630,470 170×90
-arrow control:o11:c_order266 [190,124 190,170] label@190,120/middle «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow control:o11:c_list [216,124 216,170] label@216,108/middle «Список направлений обучения»
-arrow input:o11:d_need [110,184 170,184] label@164,180/end «Сотрудник нуждающийся в обучении»
-arrow input:o11:d_mandate [110,202 170,202] label@164,198/end «Поручение руководства»
-arrow link:o11:d_returned [570,334 586,334 586,140 142,140 142,220 170,220] label@364,135/middle «Заявка возвращена на доработку»
-arrow role:o11:r_initiator [190,300 190,260] label@190,314/middle «Инициатор заявки на обучение»
-arrow role:o11:r_elma [230,602 230,260]
-arrow system:o11:s_elma [270,584 270,260]
-arrow control:o12:c_tk196 [420,274 420,320] label@420,270/middle «Трудовой кодекс РФ ст.196»
-arrow link:o12:d_formed [340,184 356,184 356,334 400,334] label@378,329/middle «Сформированная заявка на обучение»
-arrow output:o12:d_unapproved [570,352 630,352] label@634,356/start «Несогласованная заявка на обучение»
-arrow role:o12:r_mgr [485,450 485,410] label@485,464/middle «Руководитель инициатора заявки на обучение»
-arrow role:o12:r_dird [517.5,450 517.5,410] label@517.5,476/middle «Директор дирекции операционной эффективности»
-arrow role:o12:r_dirhr [550,450 550,410] label@550,488/middle «Директор по персоналу и операционной эффективности»
-arrow role:o12:r_elma [230,602 452.5,602 452.5,410] label@238,598/start «ELMA365»
-arrow system:o12:s_elma [270,584 420,584 420,410] label@278,580/start «ELMA365»
-arrow link:o13:d_approved [570,370 602,370 602,274 614,274 614,484 630,484] label@586,365/middle «Согласованная заявка на обучение»
-arrow output:o13:d_impossible [800,484 860,484] label@864,482/start «Уведомление о невозможности исполнения
-заявки»
-arrow output:o13:d_confirmed [800,502 860,502] label@864,506/start «Подтверждённая заявка на обучение»
-arrow role:o13:r_spec [730,600 730,560] label@730,614/middle «Специалист отдела обучения и развития персонала»
-arrow role:o13:r_elma [230,602 690,602 690,560]
-arrow system:o13:s_elma [270,584 650,584 650,560]
+fn o11 220,220 170×90
+fn o12 560,370 170×90
+fn o13 900,520 170×90
+arrow control:o11:c_order266 [240,174 240,220] label@236,158/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow control:o11:c_list [266,174 266,220] label@262,170/start «Список направлений обучения»
+arrow input:o11:d_need [50,234 220,234] label@135,232/middle «Сотрудник нуждающийся в
+обучении»
+arrow input:o11:d_mandate [50,265 220,265] label@135,269/middle «Поручение руководства»
+arrow link:o11:d_returned [730,384 746,384 746,190 192,190 192,296 220,296] label@469,185/middle «Заявка возвращена на доработку»
+arrow role:o11:r_initiator [240,350 240,310] label@236,364/start «Инициатор заявки на обучение»
+arrow role:o11:r_elma [280,652 280,310]
+arrow system:o11:s_elma [320,634 320,310]
+arrow control:o12:c_tk196 [580,324 580,370] label@576,320/start «Трудовой кодекс РФ ст.196»
+arrow link:o12:d_formed [390,234 406,234 406,384 560,384] label@483,379/middle «Сформированная заявка на обучение»
+arrow output:o12:d_unapproved [730,415 900,415] label@815,413/middle «Несогласованная заявка на
+обучение»
+arrow role:o12:r_mgr [645,500 645,460] label@641,562/start «Руководитель инициатора заявки на обучение»
+arrow role:o12:r_dird [677.5,500 677.5,460] label@673.5,550/start «Директор дирекции операционной эффективности»
+arrow role:o12:r_dirhr [710,500 710,460] label@706,514/start «Директор по персоналу и операционной эффективности»
+arrow role:o12:r_elma [280,652 612.5,652 612.5,460] label@288,648/start «ELMA365»
+arrow system:o12:s_elma [320,634 580,634 580,460] label@328,630/start «ELMA365»
+arrow link:o13:d_approved [730,420 762,420 762,534 900,534] label@831,529/middle «Согласованная заявка на обучение»
+arrow output:o13:d_impossible [1070,534 1240,534] label@1155,532/middle «Уведомление о невозможности
+исполнения заявки»
+arrow output:o13:d_confirmed [1070,574 1240,574] label@1155,572/middle «Подтверждённая заявка на
+обучение»
+arrow role:o13:r_spec [1000,650 1000,610] label@996,664/start «Специалист отдела обучения и развития персонала»
+arrow role:o13:r_elma [280,652 960,652 960,610]
+arrow system:o13:s_elma [320,634 920,634 920,610]
 # IDEF0 C025.02.00
-fn o21 170,170 170×90
-fn o22 400,320 170×90
-arrow control:o21:c_law273 [190,124 190,170] label@190,108/middle «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
+fn o21 220,220 170×90
+fn o22 560,370 170×90
+arrow control:o21:c_law273 [240,174 240,220] label@236,134/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
 Российской Федерации»»
-arrow control:o21:c_tk187 [216,124 216,170] label@216,96/middle «Трудовой кодекс РФ ст.187»
-arrow control:o21:c_order266 [242,124 242,170] label@242,84/middle «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow input:o21:d_confirmed [110,184 170,184] label@164,180/end «Подтверждённая заявка на обучение»
-arrow input:o21:d_dismissal [110,202 170,202] label@164,186/end «Уведомление об отчислении сотрудника от
-образовательной организации»
-arrow output:o21:d_dismissed [340,202 400,202] label@404,206/start «Уведомление сотруднику о его отчислении»
-arrow role:o21:r_spec [190,470 190,260]
-arrow role:o21:r_elma [230,452 230,260]
-arrow system:o21:s_elma [270,434 270,260]
-arrow control:o22:c_tk187 [420,274 420,320] label@420,270/middle «Трудовой кодекс РФ ст.187»
-arrow link:o22:d_trained [340,184 356,184 356,334 400,334] label@378,329/middle «Обученный сотрудник»
-arrow output:o22:d_eduSection [570,334 630,334] label@634,332/start «Актуализированный раздел об образовании
-в карточке сотрудника»
-arrow role:o22:r_spec [190,470 500,470 500,410] label@198,466/start «Специалист отдела обучения и развития персонала»
-arrow role:o22:r_emp [540,450 540,410] label@540,488/middle «Сотрудник прошедший обучение»
-arrow role:o22:r_elma [230,452 460,452 460,410] label@238,448/start «ELMA365»
-arrow system:o22:s_elma [270,434 420,434 420,410] label@278,430/start «ELMA365»
+arrow control:o21:c_tk187 [266,174 266,220] label@262,158/start «Трудовой кодекс РФ ст.187»
+arrow control:o21:c_order266 [292,174 292,220] label@288,170/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow input:o21:d_confirmed [50,234 220,234] label@135,232/middle «Подтверждённая заявка на
+обучение»
+arrow input:o21:d_dismissal [50,274 220,274] label@135,266/middle «Уведомление об отчислении
+сотрудника от образовательной
+организации»
+arrow output:o21:d_dismissed [390,274 560,274] label@475,272/middle «Уведомление сотруднику о его
+отчислении»
+arrow role:o21:r_spec [240,520 240,310]
+arrow role:o21:r_elma [280,502 280,310]
+arrow system:o21:s_elma [320,484 320,310]
+arrow control:o22:c_tk187 [580,324 580,370] label@576,320/start «Трудовой кодекс РФ ст.187»
+arrow link:o22:d_trained [390,234 406,234 406,384 560,384] label@483,379/middle «Обученный сотрудник»
+arrow output:o22:d_eduSection [730,384 900,384] label@815,376/middle «Актуализированный раздел об
+образовании в карточке
+сотрудника»
+arrow role:o22:r_spec [240,520 660,520 660,460] label@248,516/start «Специалист отдела обучения и развития персонала»
+arrow role:o22:r_emp [700,500 700,460] label@696,514/start «Сотрудник прошедший обучение»
+arrow role:o22:r_elma [280,502 620,502 620,460] label@288,498/start «ELMA365»
+arrow system:o22:s_elma [320,484 580,484 580,460] label@328,480/start «ELMA365»

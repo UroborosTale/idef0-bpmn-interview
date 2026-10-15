@@ -32,16 +32,22 @@ export function FrameLayer({ geo, grid, layers = "all" }: { geo: FrameGeometry; 
   const front = layers !== "back";
   return (
     <g data-frame={front ? "" : undefined} data-frame-back={layers === "back" ? "" : undefined}>
+      {/* граница страницы: лист стоит внутри неё с полем 24 px, как в Business Studio */}
+      {back && (
+        <g data-frame-page>
+          <rect x={sheet.x - 24} y={sheet.y - 24} width={sheet.w + 48} height={sheet.h + 48} fill="#fff" stroke="#b6bbc1" strokeWidth={1} pointerEvents="none" />
+        </g>
+      )}
       {back && <rect x={sheet.x} y={sheet.y} width={sheet.w} height={sheet.h} fill="#fff" pointerEvents="none" />}
       {front && (
         <>
           {grid && (
             <g data-frame-grid pointerEvents="none">
               {geo.gridXs.map((l) => (
-                <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke="#e4e4e4" strokeWidth={1} />
+                <line key={`x${l.at}`} x1={l.at} y1={sheet.y} x2={l.at} y2={footer.y} stroke={l.major ? "#dadada" : "#e4e4e4"} strokeWidth={1} />
               ))}
               {geo.gridYs.map((l) => (
-                <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke="#e4e4e4" strokeWidth={1} />
+                <line key={`y${l.at}`} x1={sheet.x} y1={l.at} x2={sheet.x + sheet.w} y2={l.at} stroke={l.major ? "#dadada" : "#e4e4e4"} strokeWidth={1} />
               ))}
             </g>
           )}
@@ -73,7 +79,7 @@ export function FrameLayer({ geo, grid, layers = "all" }: { geo: FrameGeometry; 
             <g key={c.field} data-frame-field={c.field} style={{ cursor: "text" }}>
               <title>Двойной щелчок — изменить надпись</title>
               <rect x={c.x} y={c.y} width={c.w} height={c.h} fill="transparent" />
-              <text x={c.tx} y={c.y + c.h / 2 + 2.6} textAnchor={c.anchor} fontSize={FRAME_FONT} fontFamily="Arial, sans-serif" fill="#000" pointerEvents="none">
+              <text x={c.tx} y={c.y + c.h / 2 + FRAME_FONT * 0.35} textAnchor={c.anchor} fontSize={FRAME_FONT} fontFamily="Arial, sans-serif" fill="#000" pointerEvents="none">
                 {clip(c.text, Math.floor(c.w / (FRAME_FONT * 0.55)))}
               </text>
             </g>

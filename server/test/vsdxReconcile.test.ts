@@ -165,7 +165,7 @@ describe("размер листа, заданный в Visio", () => {
     const f = model.idef0_frames[""];
     expect(f.w).toBeGreaterThan(sheets[0].orig[2]);
     expect(f.h).toBeGreaterThan(sheets[0].orig[3] - 12);
-    expect(f.w % 40).toBe(0); // лист ложится на клетки
+    expect(f.w % 20).toBe(0); // лист ложится на клетки
   });
 
   it("лист BPMN, включённый и растянутый в Visio, показывается и хранит размер", async () => {

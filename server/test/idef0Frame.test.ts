@@ -16,7 +16,7 @@ describe("рамка листа IDEF0", () => {
     const g = frameGeometry({ w: 905, h: 431 }, undefined, defaults);
     expect(g.sheet).toEqual({ x: 0, y: 0, w: 920, h: 440 + FRAME_H });
     expect(g.footer.y).toBe(440);
-    expect(g.gridXs.length).toBeGreaterThan(20); // клетки по 40 px, как у Business Studio
+    expect(g.gridXs.length).toBeGreaterThan(40); // клетки по 20 px (5 мм), как у Business Studio
     expect(g.cells.map((c) => c.field)).toEqual(["nodeLabel", "node", "titleLabel", "title", "noLabel", "no"]);
     const xs = g.cells.map((c) => c.x);
     expect([...xs].sort((a, b) => a - b)).toEqual(xs);
@@ -27,8 +27,8 @@ describe("рамка листа IDEF0", () => {
     const g = frameGeometry({ w: 900, h: 500 }, { x: 100, y: -40, w: 1300, h: 700 }, defaults);
     expect(g.sheet).toEqual({ x: 100, y: -40, w: 1300, h: 700 + FRAME_H });
     expect(g.footer).toEqual({ x: 100, y: 660, w: 1300, h: FRAME_H });
-    expect(g.gridXs[0].at).toBe(140);
-    expect(g.gridYs[0].at).toBe(0);
+    expect(g.gridXs[0].at).toBe(120);
+    expect(g.gridYs[0].at).toBe(-20);
     expect(g.cells[0].x).toBe(100);
     expect(g.cells.at(-1)!.x + g.cells.at(-1)!.w).toBe(1400);
     const small = frameGeometry({ w: 900, h: 500 }, { w: 50, h: 60 }, defaults);

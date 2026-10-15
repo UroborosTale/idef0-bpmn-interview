@@ -141,7 +141,7 @@ export function ArrowShape({ arrow, selected, showLabel = true }: { arrow: Arrow
         <path key={`t${i}`} data-tunnel d={`M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}`} fill="none" stroke={color} strokeWidth={1.4} pointerEvents="none" />
       ))}
       {showLabel && (
-        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none">
+        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none" {...(arrow.side === "left" || arrow.side === "right" ? { stroke: "#fff", strokeWidth: 4, paintOrder: "stroke" } : {})}>
           {lab.text.split("\n").map((line, i) => (
             <tspan key={i} x={lab.x} dy={i === 0 ? 0 : 12}>
               {line}

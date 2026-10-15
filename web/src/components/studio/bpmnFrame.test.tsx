@@ -65,8 +65,8 @@ describe("BPMN: рамка листа", () => {
     const [x0, y0, w0, h0] = outer();
     drag(document.querySelector('.studio [data-frame-resize="e"]')!, 200, 0);
     expect(outer()).toEqual([x0, y0, w0 + 200, h0]);
-    drag(document.querySelector(".studio [data-frame-move]")!, 80, 40); // лист двигается по клеткам 40 px
-    expect(outer()).toEqual([x0 + 80, y0 + 40, w0 + 200, h0]);
+    drag(document.querySelector(".studio [data-frame-move]")!, 60, 40);
+    expect(outer()).toEqual([x0 + 60, y0 + 40, w0 + 200, h0]);
     fireEvent.click(screen.getByTitle(/Отменить/));
     expect(outer()).toEqual([x0, y0, w0 + 200, h0]);
     fireEvent.click(button("Авторазмер"));

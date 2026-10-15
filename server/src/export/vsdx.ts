@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
-import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame, FRAME_FONT } from "../shared/idef0Frame.js";
+import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame, FRAME_FONT, FRAME_H } from "../shared/idef0Frame.js";
 import { tunnelArcs } from "../shared/idef0Layout.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
 import { LABEL_W, LANE_X } from "../shared/bpmnGeometry.js";
@@ -458,7 +458,7 @@ function drawSheet(page: Page, geo: FrameGeometry, kind: "idef0" | "bpmn", key: 
   // рамка листа помечена: размер и положение, заданные в Visio (тянут за углы и стороны), при приёме правок становятся листом модели
   page.rect(geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h, { fill: null, weightPt: 0.75, tag: { pm_k: "sheet", pm_fd: kind, pm_fk: key, pm_sr: [geo.sheet.x, geo.sheet.y, geo.sheet.w, geo.sheet.h].map((v) => Math.round(v)).join(",") } });
   for (const x of geo.dividers) page.polyline([[x, geo.footer.y], [x, geo.footer.y + geo.footer.h]], { weightPt: 0.75 });
-  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 3, y: c.y - 1, anchor: c.anchor, w: Math.max(20, c.w - 4) }, { fontPx: FRAME_FONT, color: "#000000" });
+  for (const c of geo.cells) page.label(c.text, { x: c.anchor === "middle" ? c.x + c.w / 2 : c.x + 3, y: c.y + (FRAME_H - FRAME_FONT * 1.5) / 2, anchor: c.anchor, w: Math.max(20, c.w - 4) }, { fontPx: FRAME_FONT, color: "#000000" });
 }
 
 /** Ширина рамки подписи стрелки по самой длинной строке (кегль 10,5; прописные и цифры шире строчных). */
@@ -483,7 +483,8 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     const own = ownStyle(model, "idef0_block");
     const runs: Run[] = [{ text: editable ? `${b.code} ${b.name}` : b.name, fontPx: own.font_size ?? (big ? 13 : 12), ...(own.text ? { color: own.text } : {}) }];
     page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
-    if (!editable) page.label(b.code, { x: b.x + 6, y: b.y + b.h - 18, anchor: "start", w: 60 }, { fontPx: 10, color: "#4b5563" });
+    // у блока контекстной диаграммы в правом нижнем углу — номер блока «0», как в Business Studio
+    if (!editable) page.label("0", { x: b.x + b.w - 6, y: b.y + b.h - 18, anchor: "end", w: 30 }, { fontPx: 10, color: "#000000" });
   }
 
   for (const a of d.arrows) {
@@ -491,7 +492,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     if (!a.ref || (!a.startNode && !a.endNode)) {
       // стрелки контекстной диаграммы — только оформление
       page.polyline(a.points, { endArrow: true, weightPt: 0.75, line: "#4677bf", arrowSize: 0 });
-      if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor, w: labelBoxW(lab.text), h: lab.text.split("\n").length * 14.5 }, { fontPx: 10.5, color: "#000000" });
+      if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor, w: labelBoxW(lab.text), h: lab.text.split("\n").length * 14.5 }, { fontPx: 10.5, color: "#000000", ...(a.side === "left" || a.side === "right" ? { fill: "#ffffff" } : {}) }); // подпись на линии стоит на белой подложке
       continue;
     }
     const first = a.points[0];

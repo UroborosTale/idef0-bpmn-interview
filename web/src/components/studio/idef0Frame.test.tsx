@@ -123,7 +123,7 @@ describe("IDEF0: рамка листа и сетка", () => {
     expect(horizontal.length).toBeGreaterThan(0);
     for (const l of vertical) {
       expect(Number(l.getAttribute("y1"))).toBe(y); // от верхнего края листа
-      expect(Number(l.getAttribute("y2"))).toBe(y + h - 12); // до штампа
+      expect(Number(l.getAttribute("y2"))).toBe(y + h - 23); // до штампа
     }
     for (const l of horizontal) {
       expect(Number(l.getAttribute("x1"))).toBe(x); // от левого края листа
@@ -139,12 +139,12 @@ describe("IDEF0: рамка листа и сетка", () => {
     };
     const select = screen.getByLabelText("Формат листа") as HTMLSelectElement;
     fireEvent.change(select, { target: { value: "A4" } });
-    expect(outer()).toEqual([1120, 760 + 12]); // поле 760 + штамп 12
+    expect(outer()).toEqual([1120, 760 + 23]); // поле 760 + штамп 23
     expect((screen.getByLabelText("Формат листа") as HTMLSelectElement).value).toBe("A4");
     fireEvent.click(screen.getByTitle("Повернуть лист: альбомная ↔ книжная"));
-    expect(outer()).toEqual([760, 1120 + 12]);
+    expect(outer()).toEqual([760, 1120 + 23]);
     fireEvent.change(screen.getByLabelText("Формат листа"), { target: { value: "A3" } });
-    expect(outer()).toEqual([1080, 1580 + 12]); // книжная ориентация сохраняется при смене формата
+    expect(outer()).toEqual([1080, 1580 + 23]); // книжная ориентация сохраняется при смене формата
     fireEvent.change(screen.getByLabelText("Формат листа"), { target: { value: "auto" } });
     expect(document.querySelector(".bpe-warn")).toBeNull();
 
@@ -166,7 +166,7 @@ describe("IDEF0: рамка листа и сетка", () => {
     fireEvent.pointerUp(svg, { pointerId: 6, clientX: -9000, clientY: -9000 });
     const outer = [...document.querySelectorAll(".studio [data-frame] > rect")].find((r) => r.getAttribute("fill") === "none")!;
     expect(Number(outer.getAttribute("width"))).toBe(440); // по ширине помещается штамп
-    expect(Number(outer.getAttribute("height"))).toBe(212);
+    expect(Number(outer.getAttribute("height"))).toBe(200 + 23);
   });
 
   it("пунктирной линии на листе нет", () => {
