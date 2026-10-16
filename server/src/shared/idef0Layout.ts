@@ -487,6 +487,43 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     if (list.length < 2) continue;
     for (const copy of list.slice(1)) copy.labelHidden = true;
   }
+  // В8: ствол разветвления ICOM-стрелок («Разбить стрелку» в Business Studio) — стрелки одной сущности в одном виде
+  // сходятся в общий ствол у свободных концов, от него в каждый блок идёт свой отрезок; подпись одна (проход выше).
+  // Ствол рисуется самими стрелками: каждая начинается (входы, управления) или кончается (выходы) в общей точке ствола,
+  // поэтому отдельной линии не нужно, а редактор, SVG и Visio остаются без правок (тот же приём, что у «Границы»).
+  // Важно: ствол строится ДО расчёта строк подписей — иначе подписи управления на одном блоке налезают друг на друга.
+  const BRANCH_GAP = 34; // на сколько ствол отстоит от свободных концов
+  const BRANCH_STUB = 64; // вылет ствола наружу — место подписи и наконечника
+  for (const list of branches.values()) {
+    if (list.length < 2) continue;
+    const side = PORT_SIDE[list[0].kind];
+    const atStart = FREE_END[list[0].kind] === "start";
+    if (!atStart && FREE_END[list[0].kind] !== "end") continue; // механизмы: у них шина ниже
+    const freeOf = (a: (typeof list)[number]) => (atStart ? a.points[0] : a.points[a.points.length - 1]);
+    const xs = list.map((a) => freeOf(a)[0]);
+    const ys = list.map((a) => freeOf(a)[1]);
+    const y0 = ys[0]; // ствол строится от стрелки с подписью
+    if (side === "L") {
+      const trunkX = Math.min(...xs) - BRANCH_GAP;
+      list.forEach((a, i) => {
+        const f = freeOf(a);
+        a.points = [...(i === 0 ? ([[trunkX - BRANCH_STUB, y0]] as Pt[]) : []), [trunkX, y0], [trunkX, f[1]], ...a.points] as Pt[];
+      });
+    } else if (side === "R") {
+      const trunkX = Math.max(...xs) + BRANCH_GAP;
+      list.forEach((a, i) => {
+        const f = freeOf(a);
+        a.points = [...a.points, [trunkX, f[1]], [trunkX, y0], ...(i === 0 ? ([[trunkX + BRANCH_STUB, y0]] as Pt[]) : [])] as Pt[];
+      });
+    } else if (side === "T") {
+      const trunkY = Math.min(...ys) - BRANCH_GAP;
+      const stubX = Math.min(...xs) - BRANCH_STUB;
+      list.forEach((a, i) => {
+        const f = freeOf(a);
+        a.points = [...(i === 0 ? ([[stubX, trunkY]] as Pt[]) : []), [f[0], trunkY], ...a.points] as Pt[];
+      });
+    }
+  }
   // строки подписей управления и механизмов — по ширине подписей, отдельно для каждого блока и стороны
   // чужие подписи, которые строка не должна задевать: связи между блоками, внешние входы и выходы (их места не зависят от строк)
   const obstacles: LabelRect[] = [];

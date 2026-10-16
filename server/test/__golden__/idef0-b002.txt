@@ -2,12 +2,12 @@
 fn s1 220,220 170×90
 fn s2 560,370 170×90
 fn s3 900,520 170×90
-arrow control:s1:c_agree [240,174 240,220] label@236,110/start ««Соглашение о моделировании» (Протокол № КК-06-2026 от
+arrow control:s1:c_agree [176,140 240,140 240,174 240,220] label@172,76/start ««Соглашение о моделировании» (Протокол № КК-06-2026 от
 19.05.2026)»
-arrow control:s1:c_stp [266,174 266,220] label@262,134/start «СТП 113-01-2025 «Процессное управление»»
-arrow control:s1:c_std [292,174 292,220] label@288,146/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
+arrow control:s1:c_stp [202,140 266,140 266,174 266,220] label@198,100/start «СТП 113-01-2025 «Процессное управление»»
+arrow control:s1:c_std [228,140 292,140 292,174 292,220] label@224,112/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
 от 19.05.2026)»
-arrow controlData:s1:d_checklist [318,174 318,220] label@314,170/start «Чек-лист интервью»
+arrow controlData:s1:d_checklist [254,140 318,140 318,174 318,220] label@250,136/start «Чек-лист интервью»
 arrow input:s1:d_minutes [50,234 220,234] label@135,238/middle «Пункт протокола совещания»
 arrow input:s1:d_incoming [50,274 220,274] label@135,272/middle «Информация о вновь выявленном
 процессе»
@@ -15,20 +15,20 @@ arrow output:s1:d_kbProject [390,234 560,234] label@475,238/middle «Проек�
 arrow output:s1:d_procProject [390,274 560,274] label@475,278/middle «Проект процесса»
 arrow role:s1:r_head [240,652 240,310]
 arrow role:s1:r_dir [280,634 280,310]
-arrow control:s2:c_stp [580,324 580,370]
-arrow control:s2:c_std [606,324 606,370]
+arrow control:s2:c_stp [580,140 580,324 580,370]
+arrow control:s2:c_std [606,140 606,324 606,370]
 arrow input:s2:d_results [390,384 560,384] label@475,382/middle «Информация об итогах
 реализации процессов»
 arrow output:s2:d_eff [730,384 900,384] label@815,382/middle «Информация об эффективности
 реализации процесса»
 arrow role:s2:r_head [240,652 620,652 620,460] label@248,648/start «Начальник отдела корпоративных технологий»
 arrow role:s2:r_dir [280,634 580,634 580,460] label@288,630/start «Директор по персоналу и операционной эффективности»
-arrow control:s3:c_agree [920,474 920,520]
-arrow control:s3:c_stp [946,474 946,520]
-arrow control:s3:c_std [972,474 972,520]
+arrow control:s3:c_agree [920,140 920,474 920,520]
+arrow control:s3:c_stp [946,140 946,474 946,520]
+arrow control:s3:c_std [972,140 972,474 972,520]
 arrow control:s3:c_map [998,474 998,520] label@994,458/start ««Методика картирования процессов» (Протокол № КК-06-2026 от
 19.05.2026)»
-arrow controlData:s3:d_checklist [1024,474 1024,520]
+arrow controlData:s3:d_checklist [1024,140 1024,474 1024,520]
 arrow link:s3:d_ineff [730,402 754,402 754,534 900,534] label@827,517/middle «Информация о неэффективности реализации
 процесса»
 arrow output:s3:d_optProject [1070,534 1240,534] label@1155,532/middle «Проект оптимизированного
@@ -41,18 +41,18 @@ arrow role:s3:r_dir [280,634 920,634 920,610]
 fn o11 220,220 170×90
 fn o12 560,370 170×90
 fn o13 900,520 170×90
-arrow control:o11:c_stp [240,174 240,220] label@236,170/start «СТП 113-01-2025 «Процессное управление»»
+arrow control:o11:c_stp [176,140 240,140 240,174 240,220] label@172,136/start «СТП 113-01-2025 «Процессное управление»»
 arrow input:o11:d_incoming [50,234 220,234] label@135,232/middle «Информация о вновь выявленном
 процессе»
 arrow input:o11:d_minutes [50,274 220,274] label@135,278/middle «Пункт протокола совещания»
 arrow role:o11:r_spec [280,652 280,310]
 arrow role:o11:r_dir [240,350 240,310] label@236,364/start «Директор по персоналу и операционной эффективности»
-arrow control:o12:c_stp [580,324 580,370]
+arrow control:o12:c_stp [580,140 580,324 580,370]
 arrow controlData:o12:d_checklist [606,324 606,370] label@602,320/start «Чек-лист интервью»
 arrow link:o12:d_registryActual [390,234 406,234 406,384 560,384] label@483,379/middle «Актуальный реестр процессов ООО «РУ КМЗ»»
 arrow role:o12:r_spec [280,652 580,652 580,460] label@288,648/start «Сотрудник отдела корпоративных технологий»
 arrow role:o12:r_head [620,634 620,460]
-arrow control:o13:c_stp [920,474 920,520]
+arrow control:o13:c_stp [920,140 920,474 920,520]
 arrow control:o13:c_std [946,474 946,520] label@942,434/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
 от 19.05.2026)»
 arrow control:o13:c_agree [972,474 972,520] label@968,458/start ««Соглашение о моделировании» (Протокол № КК-06-2026 от
@@ -66,15 +66,15 @@ arrow role:o13:r_head [620,634 920,634 920,610] label@628,630/start «Начал
 # IDEF0 B002.02.00
 fn o21 220,220 170×90
 fn o22 560,370 170×90
-arrow control:o21:c_stp [240,174 240,220] label@236,146/start «СТП 113-01-2025 «Процессное управление»»
-arrow control:o21:c_std [266,174 266,220] label@262,158/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
+arrow control:o21:c_stp [240,174 240,220] label@236,170/start «СТП 113-01-2025 «Процессное управление»»
+arrow control:o21:c_std [202,140 266,140 266,174 266,220] label@198,124/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
 от 19.05.2026)»
 arrow input:o21:d_results [50,234 220,234] label@135,232/middle «Информация об итогах
 реализации процессов»
 arrow output:o21:d_eff [390,234 560,234] label@475,232/middle «Информация об эффективности
 реализации процесса»
 arrow role:o21:r_spec [240,484 240,310]
-arrow control:o22:c_std [580,324 580,370]
+arrow control:o22:c_std [580,140 580,324 580,370]
 arrow link:o22:d_devList [390,252 414,252 414,384 560,384] label@487,379/middle «Перечень выявленных отклонений»
 arrow output:o22:d_ineff [730,384 900,384] label@815,382/middle «Информация о неэффективности
 реализации процесса»
@@ -86,33 +86,33 @@ fn o31 220,220 170×90
 fn o32 560,370 170×90
 fn o33 900,520 170×90
 fn o34 1240,670 170×90
-arrow control:o31:c_stp [240,174 240,220] label@236,158/start «СТП 113-01-2025 «Процессное управление»»
+arrow control:o31:c_stp [176,140 240,140 240,174 240,220] label@172,136/start «СТП 113-01-2025 «Процессное управление»»
 arrow controlData:o31:d_checklist [266,174 266,220] label@262,170/start «Чек-лист интервью»
-arrow input:o31:d_ineff [50,234 220,234] label@135,232/middle «Информация о неэффективности
+arrow input:o31:d_ineff [-48,234 16,234 16,234 50,234 220,234] label@86,232/middle «Информация о неэффективности
 реализации процесса»
 arrow role:o31:r_spec [240,802 240,310]
 arrow role:o31:r_head [280,784 280,310]
-arrow control:o32:c_stp [580,324 580,370]
-arrow input:o32:d_ineff [390,384 560,384]
+arrow control:o32:c_stp [580,140 580,324 580,370]
+arrow input:o32:d_ineff [16,234 16,384 390,384 560,384]
 arrow link:o32:d_protocol [390,234 406,234 406,415 560,415] label@483,410/middle «Протокол интервью»
 arrow link:o32:d_chain [390,252 414,252 414,446 560,446] label@487,441/middle «Продуктовая цепочка»
 arrow role:o32:r_spec [240,802 620,802 620,460] label@248,798/start «Сотрудник отдела корпоративных технологий»
 arrow role:o32:r_head [280,784 580,784 580,460] label@288,780/start «Начальник отдела корпоративных технологий»
-arrow control:o33:c_stp [920,474 920,520]
-arrow control:o33:c_map [946,474 946,520] label@942,434/start ««Методика картирования процессов» (Протокол № КК-06-2026 от
+arrow control:o33:c_stp [920,140 920,474 920,520]
+arrow control:o33:c_map [882,440 946,440 946,474 946,520] label@878,400/start ««Методика картирования процессов» (Протокол № КК-06-2026 от
 19.05.2026)»
-arrow control:o33:c_std [972,474 972,520] label@968,458/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
+arrow control:o33:c_std [908,440 972,440 972,474 972,520] label@904,424/start ««Методика стандартизации процессов» (Протокол № КК-06-2026
 от 19.05.2026)»
-arrow input:o33:d_ineff [730,534 900,534]
+arrow input:o33:d_ineff [16,234 16,534 730,534 900,534]
 arrow link:o33:d_protocol [390,234 406,234 406,565 900,565] label@653,560/middle «Протокол интервью»
 arrow link:o33:d_chain [390,252 414,252 414,596 900,596] label@657,591/middle «Продуктовая цепочка»
 arrow role:o33:r_spec [240,802 960,802 960,610]
 arrow role:o33:r_head [280,784 920,784 920,610]
 arrow control:o34:c_agree [1260,624 1260,670] label@1256,608/start ««Соглашение о моделировании» (Протокол № КК-06-2026 от
 19.05.2026)»
-arrow control:o34:c_stp [1286,624 1286,670]
-arrow control:o34:c_std [1312,624 1312,670]
-arrow control:o34:c_map [1338,624 1338,670]
+arrow control:o34:c_stp [1286,140 1286,624 1286,670]
+arrow control:o34:c_std [1312,440 1312,624 1312,670]
+arrow control:o34:c_map [1338,440 1338,624 1338,670]
 arrow link:o34:d_frd [730,384 746,384 746,684 1240,684] label@993,679/middle «Результаты ФРД ООО «РУ КМЗ»»
 arrow link:o34:d_mapTarget [1070,534 1086,534 1086,724 1240,724] label@1163,719/middle «Целевая карта потока создания ценности»
 arrow output:o34:d_optProject [1410,684 1580,684] label@1495,682/middle «Проект оптимизированного
