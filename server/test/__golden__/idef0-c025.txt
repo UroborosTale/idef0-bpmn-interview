@@ -15,10 +15,10 @@ arrow role:s1:r_mgr [292,538 292,310]
 arrow role:s1:r_dird [318,520 318,310]
 arrow role:s1:r_dirhr [344,502 344,310]
 arrow system:s1:s_elma [370,484 370,310]
-arrow control:s2:c_law273 [580,324 580,370] label@576,284/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
+arrow control:s2:c_law273 [580,324 580,370] label@576,296/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
 Российской Федерации»»
-arrow control:s2:c_tk187 [606,324 606,370] label@602,308/start «Трудовой кодекс РФ ст.187»
-arrow control:s2:c_order266 [632,324 632,370] label@628,320/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow control:s2:c_tk187 [606,324 606,370] label@602,320/start «Трудовой кодекс РФ ст.187»
+arrow control:s2:c_order266 [632,324 632,370]
 arrow link:s2:d_confirmed [390,252 414,252 414,384 560,384] label@487,379/middle «Подтверждённая заявка на обучение»
 arrow input:s2:d_dismissal [390,424 560,424] label@475,416/middle «Уведомление об отчислении
 сотрудника от образовательной
@@ -82,7 +82,7 @@ arrow output:o21:d_dismissed [390,274 560,274] label@475,272/middle «Уведо
 arrow role:o21:r_spec [240,520 240,310]
 arrow role:o21:r_elma [280,502 280,310]
 arrow system:o21:s_elma [320,484 320,310]
-arrow control:o22:c_tk187 [580,324 580,370] label@576,320/start «Трудовой кодекс РФ ст.187»
+arrow control:o22:c_tk187 [580,324 580,370]
 arrow link:o22:d_trained [390,234 406,234 406,384 560,384] label@483,379/middle «Обученный сотрудник»
 arrow output:o22:d_eduSection [730,384 900,384] label@815,376/middle «Актуализированный раздел об
 образовании в карточке

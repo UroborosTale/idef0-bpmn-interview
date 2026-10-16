@@ -474,6 +474,19 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       }
     }
   }
+  // «Разбитая стрелка» (как «Разбить стрелку» в Business Studio): одна сущность в одном виде уходит в несколько
+  // блоков (или выходит из нескольких) — подпись ставится один раз, остальные копии её не повторяют. Должности и
+  // системы не трогаем: у них своя шина (bus) выше.
+  const branches = new Map<string, typeof arrows>();
+  for (const a of arrows) {
+    if (!TUNNEL_KINDS.has(a.kind) || !a.label) continue;
+    const key = arrowRouteKey(a.kind, a.entityId);
+    (branches.get(key) ?? branches.set(key, []).get(key)!).push(a);
+  }
+  for (const list of branches.values()) {
+    if (list.length < 2) continue;
+    for (const copy of list.slice(1)) copy.labelHidden = true;
+  }
   // строки подписей управления и механизмов — по ширине подписей, отдельно для каждого блока и стороны
   // чужие подписи, которые строка не должна задевать: связи между блоками, внешние входы и выходы (их места не зависят от строк)
   const obstacles: LabelRect[] = [];

@@ -36,7 +36,7 @@ arrow input:o11:d_need [50,234 220,234] label@135,238/middle «Потребно�
 arrow role:o11:r_init [240,350 240,310] label@236,364/start «Инициатор закупки»
 arrow role:o11:r_erp [280,502 280,310]
 arrow system:o11:s_erp [320,484 320,310]
-arrow control:o12:c_policy [580,324 580,370] label@576,308/start «Положение о закупках»
+arrow control:o12:c_policy [580,324 580,370]
 arrow control:o12:c_budget [606,324 606,370] label@602,320/start «Бюджет закупок на год»
 arrow link:o12:d_request [390,234 406,234 406,384 560,384] label@483,379/middle «Заявка на закупку»
 arrow output:o12:d_approvedReq [730,384 900,384] label@815,382/middle «Согласованная заявка на
