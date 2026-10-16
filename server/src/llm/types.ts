@@ -33,6 +33,8 @@ export interface ExtractedNode {
   type: "task" | "event" | "gateway" | "subprocess";
   subtype?: string;
   name: string; // глагол в инфинитиве + объект
+  /** Название операции, к которой относится действие (из operations того же ответа); null — действие общей схемы процесса. */
+  operation_name?: string | null;
   role_name?: string | null;
   system_names?: string[];
   input_names?: string[];
@@ -62,11 +64,33 @@ export interface ExtractedStatement {
   quote: string;
 }
 
+export interface ExtractedOperation {
+  /** Название операции — отглагольное существительное («Согласование заявки»), как у блоков IDEF0. */
+  name: string;
+  /** Подпроцесс операции — при глубине декомпозиции 2 и больше (название из subprocesses того же ответа). */
+  subprocess_name?: string | null;
+  source_fragment_id: string;
+  quote: string;
+  confidence: number;
+}
+
+/** Подпроцесс — группа операций (уровень 0 IDEF0); спрашивается у LLM только при глубине декомпозиции 2+. */
+export interface ExtractedSubprocess {
+  name: string;
+  source_fragment_id: string;
+  quote: string;
+  confidence: number;
+}
+
 export interface ExtractionChunkResult {
   roles: ExtractedRole[];
   systems: ExtractedSystem[];
   data: ExtractedData[];
   controls: ExtractedControl[];
+  /** Операции процесса: действия с operation_name = название операции образуют её диаграмму BPMN. */
+  operations?: ExtractedOperation[];
+  /** Подпроцессы (группы операций) — только при глубине декомпозиции 2 и больше. */
+  subprocesses?: ExtractedSubprocess[];
   nodes: ExtractedNode[];
   flows: ExtractedFlowHint[];
   statements: ExtractedStatement[];
@@ -88,7 +112,7 @@ export interface LLMProvider {
   readonly name: string;
   extractChunk(
     fragments: LLMFragmentInput[],
-    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string },
+    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string; decompositionDepth?: number },
     opts?: { model?: string }
   ): Promise<ExtractionChunkResult>;
   /** ФТ-М9.5.2: распознавание схемы (фото/скан) мультимодальной моделью в PLM — есть только у провайдеров с поддержкой изображений. */

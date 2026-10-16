@@ -378,3 +378,6 @@ server/data/*.sqlite-*
 server/data/
 *.log
 web/coverage/
+
+# история чатов Claude Code: рабочие логи с содержимым интервью, в репозиторий не попадает
+docs/claude-code-history/

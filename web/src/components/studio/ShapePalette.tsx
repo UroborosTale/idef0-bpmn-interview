@@ -112,6 +112,12 @@ function Glyph({ kind }: { kind: string }) {
           <path d="M12 8.8v6.4M8.8 12h6.4" strokeWidth="1.6" />
         </>
       )}
+      {kind === "idef0:fn" && (
+        <>
+          <rect x="2.5" y="6" width="19" height="12" fill="#e8eef7" />
+          <path d="M6 11h12M6 15h7" fill="none" />
+        </>
+      )}
       {kind === "connector" && <path d="M5 4v8h14v8" fill="none" strokeWidth="1.4" stroke="#4677bf" />}
       {kind === "x:activity" && (
         <>
@@ -158,7 +164,7 @@ function Glyph({ kind }: { kind: string }) {
  * Палитра фигур слева от диаграммы. Фигуру тянут на диаграмму, как в Business Studio: нажать, перенести курсор на место Visio и
  * отпустить — оболочка создаёт фигуру в точке отпускания. Простой щелчок кладёт фигуру в центр видимой части страницы.
  */
-export default function ShapePalette({ onExisting }: { onExisting?: (kind: ExistingKind, anchor: Element) => void } = {}) {
+export default function ShapePalette({ onExisting, mode = "bpmn" }: { onExisting?: (kind: ExistingKind, anchor: Element) => void; mode?: "bpmn" | "idef0" } = {}) {
   const [drag, setDrag] = useState<{ kind: string; x: number; y: number } | null>(null);
   // выбранный тип события у каждого вида и открытый список типов
   const [types, setTypes] = useState<Record<string, string>>({});
@@ -192,6 +198,21 @@ export default function ShapePalette({ onExisting }: { onExisting?: (kind: Exist
       <button className={`palette-item ${tool === "connector" ? "active" : ""}`} title="Соединительная линия: протяните от фигуры к фигуре (ещё раз — вернуться к указателю)" aria-label="Соединительная линия" aria-pressed={tool === "connector"} onClick={() => pickTool(tool === "connector" ? "pointer" : "connector")}>
         <Glyph kind="connector" />
       </button>
+      {mode === "idef0" ? (
+        // на диаграмме IDEF0 кнопка только одна: блок функции; стрелку рисуют инструментом «Соединительная линия»
+        <button
+          className={`palette-item ${drag?.kind === "idef0-fn" ? "dragging" : ""}`}
+          title="Блок функции: перетащите на диаграмму или щёлкните; название правится в Visio"
+          aria-label="Блок функции"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setDrag({ kind: "idef0-fn", x: e.clientX, y: e.clientY });
+          }}
+        >
+          <Glyph kind="idef0:fn" />
+        </button>
+      ) : (
+        <>
       {PALETTE.map((p) => {
         const pos = p.kind.startsWith("event:") ? p.kind.slice(6) : null;
         const type = pos ? types[pos] ?? "" : "";
@@ -250,6 +271,8 @@ export default function ShapePalette({ onExisting }: { onExisting?: (kind: Exist
               <Glyph kind={`x:${x.kind}`} />
             </button>
           ))}
+        </>
+      )}
         </>
       )}
     </div>

@@ -30,6 +30,7 @@ import type { Selection } from "./selection";
 import { bpmnDoc, dictDoc, docIsStale, docTitle, idef0Doc, type StudioDoc } from "./docs";
 import { acceptIssue, addOperationSkeleton, quickFixFor, revokeAcceptance, type QuickFix } from "./quick-fixes";
 import { addChildFunction, copyFunctionTree, copyImpact, deleteImpact, moveFunction, pasteDestination, type MoveTarget } from "./structure-ops";
+import { addEntry } from "./dict-ops";
 import StructureWizard from "./StructureWizard";
 import VisioSlot from "./VisioSlot";
 import RibbonIcon from "./RibbonIcon";
@@ -558,9 +559,17 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     } else if (kind === "system") {
       items = [...m.systems.map((s) => ({ id: `sys:${s.id}`, label: s.name, checked: step.system_ids.includes(s.id) })), { group: "Новый" }, { id: "new-sys", label: "Новый программный продукт…" }];
     } else if (kind === "regulation") {
-      items = m.controls.length ? m.controls.map((c) => ({ id: `ctl:${c.id}`, label: c.name, checked: step.controls.includes(c.id) })) : [{ id: "none", label: "В справочнике нет нормативных документов", disabled: true }];
+      items = [
+        ...(m.controls.length ? m.controls.map((c) => ({ id: `ctl:${c.id}`, label: c.name, checked: step.controls.includes(c.id) })) : [{ id: "none", label: "В справочнике нет нормативных документов", disabled: true } as ShellMenuItem]),
+        { group: "Новый" } as ShellMenuItem,
+        { id: "new-ctl", label: "Новый нормативный документ…" } as ShellMenuItem,
+      ];
     } else {
-      items = m.roles.map((r) => ({ id: `role:${r.id}`, label: r.name, checked: step.role_id === r.id }));
+      items = [
+        ...m.roles.map((r) => ({ id: `role:${r.id}`, label: r.name, checked: step.role_id === r.id })),
+        { group: "Новый" } as ShellMenuItem,
+        { id: "new-role", label: "Новый исполнитель…" } as ShellMenuItem,
+      ];
     }
     void showShellMenu(anchor, items).then((picked) => {
       if (!picked || picked === "none") return;
@@ -580,15 +589,25 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         else if (what === "sys") next = updateNode(cur, s.id, { system_ids: toggle(s.system_ids, id) });
         else if (what === "ctl") next = updateNode(cur, s.id, { controls: toggle(s.controls, id) });
         else if (what === "role") next = updateNode(cur, s.id, { role_id: id });
-        else if (what === "new-doc" || what === "new-sys") {
-          const name = window.prompt(what === "new-doc" ? "Название нового документа" : "Название программного продукта")?.trim();
+        else if (what === "new-doc" || what === "new-sys" || what === "new-ctl" || what === "new-role") {
+          const question =
+            what === "new-doc" ? "Название нового документа" :
+            what === "new-sys" ? "Название программного продукта" :
+            what === "new-ctl" ? "Название нового нормативного документа" : "Название нового исполнителя";
+          const name = window.prompt(question)?.trim();
           if (!name) return;
-          if (what === "new-doc") {
-            const did = nextId("d", cur.data.map((d) => d.id));
-            next = updateNode({ ...cur, data: [...cur.data, { id: did, name, kind: "document", source: [] } as ProcessLogicModel["data"][number]] }, s.id, { outputs: [...s.outputs, did] });
+          if (what === "new-doc" || what === "new-sys") {
+            // документ становится выходом шага, программный продукт — механизмом
+            const kind = what === "new-doc" ? "data" : "systems";
+            const added = addEntry(cur, kind, name);
+            next = updateNode(added.model, s.id, what === "new-doc" ? { outputs: [...s.outputs, added.id] } : { system_ids: [...s.system_ids, added.id] });
+          } else if (what === "new-ctl") {
+            const added = addEntry(cur, "controls", name);
+            next = updateNode(added.model, s.id, { controls: [...s.controls, added.id] });
           } else {
-            const sid = nextId("s", cur.systems.map((x) => x.id));
-            next = updateNode({ ...cur, systems: [...cur.systems, { id: sid, name, source: [] } as ProcessLogicModel["systems"][number]] }, s.id, { system_ids: [...s.system_ids, sid] });
+            // новый исполнитель сразу становится исполнителем шага — он же даёт дорожку на диаграмме
+            const added = addEntry(cur, "roles", name);
+            next = updateNode(added.model, s.id, { role_id: added.id });
           }
         }
       }
@@ -884,6 +903,18 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     const snapshot = h.draftRef.current;
     if (await onSave(snapshot)) h.markSaved(snapshot);
   };
+
+  /**
+   * В настольном приложении Visio — это холст, и оболочка перечитывает .vsdx по смене updatedAt сессии, то есть после записи
+   * модели. Поэтому правку структуры из студии («+ Функция», перенос, переименование, удаление) записываем сами, с короткой
+   * задержкой. В браузере так не делаем: там черновик и явное сохранение.
+   */
+  useEffect(() => {
+    if (!inDesktopShell() || !h.dirty || locked || busy) return;
+    const t = window.setTimeout(() => void save(), 500);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, h.dirty, locked, busy]);
 
   // История и сохранение вне редакторов диаграмм
   const onKeyDown = (e: React.KeyboardEvent) => {

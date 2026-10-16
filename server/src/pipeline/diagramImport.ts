@@ -281,6 +281,7 @@ export function importedModel(meta: SessionMeta, parts: { nodes: ProcessNode[]; 
     process: {
       id: `proc_${nanoid(8)}`,
       name: meta.processName,
+      code: meta.code,
       owner: meta.owner,
       department: meta.department,
       type: meta.modelType,

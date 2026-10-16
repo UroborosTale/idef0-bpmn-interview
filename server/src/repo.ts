@@ -10,6 +10,8 @@ import type { ImpactReport } from "./pipeline/impactAnalysis.js";
 
 export interface SessionMeta {
   processName: string;
+  /** Код процесса в реестре (вида B002.00.00), заданный при создании: по нему нумеруются функции и шаги. */
+  code?: string | null;
   department?: string;
   owner?: string;
   modelType: "AS-IS" | "TO-BE";
@@ -84,7 +86,7 @@ export interface InterviewTrack {
 export interface SessionRecord {
   id: string;
   title: string;
-  mode: "A" | "B";
+  mode: "A" | "B" | "blank"; // "blank" — «рисовать с нуля» (режим Г): пустая модель без текста интервью
   status: "draft" | "processing" | "ready" | "interviewing" | "completed";
   meta: SessionMeta;
   fragments: Fragment[];
@@ -154,7 +156,7 @@ function rowToRecord(row: any): SessionRecord {
   return record;
 }
 
-export function createSession(input: { title: string; mode: "A" | "B"; meta: SessionMeta }): SessionRecord {
+export function createSession(input: { title: string; mode: "A" | "B" | "blank"; meta: SessionMeta }): SessionRecord {
   const id = `sess_${nanoid(10)}`;
   const now = new Date().toISOString();
   db.prepare(

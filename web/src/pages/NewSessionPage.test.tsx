@@ -43,6 +43,24 @@ describe("новая сессия", () => {
     expect(normal).not.toHaveBeenCalled();
   });
 
+  it("код процесса приводится к виду B002.00.00 и уходит в meta; неверный код — сообщение без запроса", async () => {
+    const { onCreated } = setup();
+    const blank = vi.spyOn(api, "createBlankSession").mockResolvedValue({ id: "s3" } as never);
+    fireEvent.click(screen.getByLabelText(/Режим Г/));
+    fireEvent.change(screen.getByPlaceholderText(/например, Согласование/), { target: { value: "Найм" } });
+    fireEvent.change(screen.getByPlaceholderText("например, B002"), { target: { value: "Б2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Создать пустую модель и открыть студию" }));
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith("s3"));
+    expect(blank.mock.calls[0][0].meta.code).toBe("B002.00.00");
+
+    // неверный код: запрос не уходит, показано пояснение
+    const bad = vi.spyOn(api, "createBlankSession");
+    fireEvent.change(screen.getByPlaceholderText("например, B002"), { target: { value: "D001" } });
+    fireEvent.click(screen.getByRole("button", { name: "Создать пустую модель и открыть студию" }));
+    await screen.findByText(/Код не по шаблону/);
+    expect(bad).not.toHaveBeenCalled();
+  });
+
   it("ошибка сервера показывается и кнопка снова доступна", async () => {
     setup();
     vi.spyOn(api, "createBlankSession").mockRejectedValue(new Error("база недоступна"));

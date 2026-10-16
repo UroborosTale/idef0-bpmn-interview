@@ -6,10 +6,30 @@ import { structuredModel } from "../../test/fixtures";
 import type { ProcessLogicModel } from "../../types";
 import Navigator from "./Navigator";
 import StructureWizard from "./StructureWizard";
-import { addChildFunction, applyStructure, deleteImpact, moveFunction, moveProblem, parseOutline, previewMove, remapCodes, shiftFunction } from "./structure-ops";
+import { addChildFunction, applyStructure, deleteImpact, moveFunction, moveProblem, outlineFromModel, parseOutline, previewMove, remapCodes, shiftFunction } from "./structure-ops";
 
 type M = ProcessLogicModel;
 const codeOf = (m: M, id: string) => functionCodes(m).get(id);
+
+describe("список структуры из модели (предзаполнение мастера)", () => {
+  it("подпроцессы без отступа, операции с отступом; шаги диаграмм операций не попадают", () => {
+    const m = structuredModel();
+    const text = outlineFromModel(m);
+    const { items } = parseOutline(text);
+    const fns = m.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope);
+    expect(items.filter((i) => i.level === 0).map((i) => i.name)).toEqual(fns.filter((n) => !n.idef0_parent).map((n) => n.name));
+    expect(items.filter((i) => i.level === 1).map((i) => i.name).sort()).toEqual(fns.filter((n) => n.idef0_parent).map((n) => n.name).sort());
+    // действия диаграмм операций — не структура: их в списке быть не должно
+    const step = m.nodes.find((n) => n.bpmn_scope)!;
+    expect(text).not.toContain(step.name);
+    // список читается тем же разбором без ошибок формы
+    expect(items.length).toBe(fns.length);
+  });
+
+  it("пустая модель — пустой список", () => {
+    expect(outlineFromModel({ ...structuredModel(), nodes: [] })).toBe("");
+  });
+});
 
 describe("перенос функций: коды по Соглашению пересчитываются", () => {
   it("операция внутри подпроцесса: порядок меняется, код следует за порядком", () => {

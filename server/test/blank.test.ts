@@ -16,6 +16,7 @@ describe("сессия «рисовать с нуля»", () => {
     const s = r.body;
     expect(s.status).toBe("ready");
     expect(s.provider).toBeNull();
+    expect(s.mode).toBe("blank"); // режим Г — не «обработка текста»: в списке у сессии своя отметка, вкладки «Текст» нет
     expect(s.model.process).toMatchObject({ name: "Найм сотрудника", owner: "HR", type: "TO-BE" });
     expect(s.model.nodes).toEqual([]);
     expect(s.bpmnXml).toContain("<bpmn:definitions");
@@ -31,6 +32,14 @@ describe("сессия «рисовать с нуля»", () => {
     expect(put.status).toBe(200);
     expect(put.body.model.nodes).toHaveLength(1);
     expect((await app.call("POST", `/sessions/${s.id}/rebuild-diagrams`)).status).toBe(200);
+  });
+
+  it("код процесса из формы попадает в модель: по нему нумеруются функции и шаги", async () => {
+    const s = (await app.call("POST", "/sessions/blank", { meta: { processName: "Найм сотрудника", code: "B002.00.00" } })).body;
+    expect(s.model.process.code).toBe("B002.00.00");
+    // без кода поле пустое — модель без номера процесса
+    const t = (await app.call("POST", "/sessions/blank", { meta: { processName: "Найм без кода" } })).body;
+    expect(t.model.process.code ?? null).toBeNull();
   });
 
   it("без названия — 400", async () => {

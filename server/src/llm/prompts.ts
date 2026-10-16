@@ -9,7 +9,10 @@ export const EXTRACTION_SYSTEM_PROMPT = `Ты — модуль извлечен�
 6. Разделяй факты AS-IS от пожеланий (proposal, TO-BE) и проблем/болей (problem) — они уходят в statements, а не в nodes.
 7. Если формулировка содержит маркеры неопределённости ("обычно", "иногда", "бывает", "как правило") — всё равно извлеки как node/flow, но confidence должен быть ниже (0.3-0.6).
 8. order_hint — целое число, отражающее порядок действия по смыслу текста (для последующей сборки потока).
-9. Отвечай строго вызовом инструмента extract_process_chunk, без свободного текста.`;
+9. Действия одного смыслового этапа объединяй в операции: каждая операция — этап процесса, у которого есть свои действия. Название операции — отглагольное существительное («Согласование заявки», «Подготовка документов»), оно попадает в список operations. У каждого действия в nodes указывай operation_name — название операции из operations этого же ответа; действие, которое к операции не относится (общая схема процесса), оставляй без него.
+10. Обычно в процессе 3–7 операций, в операции 2–8 действий. Если процесс короткий и делится на 2–3 действия, верни пустой список operations — тогда все действия идут на общую схему.
+11. Подпроцессы (subprocesses) — группы операций: спрашивай их только если в задании указана глубина декомпозиции 2 и больше; тогда у каждой операции укажи subprocess_name. Список subprocesses — это блоки верхнего уровня IDEF0, названия — отглагольные существительные.
+12. Отвечай строго вызовом инструмента extract_process_chunk, без свободного текста.`;
 
 /** ФТ-М9.5.2: распознавание схемы процесса (фото/скан) в ту же структуру PLM, что и извлечение из текста. */
 export const DIAGRAM_RECOGNITION_SYSTEM_PROMPT = `Ты — модуль распознавания схем бизнес-процессов (IDEF0/BPMN/блок-схема) по изображению для системы построения моделей.
@@ -33,15 +36,23 @@ export function buildChunkUserPrompt(
   processName: string,
   modelType: string,
   fragmentsText: string,
-  fewShotContext?: string
+  fewShotContext?: string,
+  decompositionDepth = 2
 ): string {
+  // Глубина декомпозиции из паспорта процесса: 2 — подпроцессы и операции, 1 — только операции процесса.
+  const structureRules =
+    decompositionDepth >= 2
+      ? `Глубина декомпозиции: 2. Сгруппируй операции в подпроцессы (обычно 3–6 операций в подпроцессе и 3–6 подпроцессов; у подпроцесса должно быть не меньше двух операций) — перечисли подпроцессы в subprocesses, а у каждой операции укажи subprocess_name из этого списка. Операции без подпроцесса оставляй без subprocess_name.`
+      : `Глубина декомпозиции: 1. Подпроцессов нет: subprocesses должен быть пустым, а операции относятся к процессу напрямую.`;
   return `Процесс: "${processName}". Тип модели: ${modelType}.
 ${fewShotContext ? `\n${fewShotContext}\n` : ""}
 Фрагменты интервью (speaker=owner/participant — факты процесса, speaker=interviewer — вопросы для контекста):
 
 ${fragmentsText}
 
-Извлеки роли, системы, документы/данные, регламенты, действия/события/ветвления (nodes), связи между ними (flows, по order_hint), и отдельно проблемы/пожелания (statements). Вызови инструмент extract_process_chunk.`;
+${structureRules}
+
+Извлеки роли, системы, документы/данные, регламенты, действия/события/ветвления (nodes), связи между ними (flows, по order_hint), операции, подпроцессы и отдельно проблемы/пожелания (statements). Вызови инструмент extract_process_chunk.`;
 }
 
 export const EXTRACTION_TOOL = {
@@ -107,6 +118,33 @@ export const EXTRACTION_TOOL = {
           },
         },
       },
+      operations: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["name", "source_fragment_id", "quote", "confidence"],
+          properties: {
+            name: { type: "string" },
+            subprocess_name: { type: ["string", "null"] },
+            source_fragment_id: { type: "string" },
+            quote: { type: "string" },
+            confidence: { type: "number" },
+          },
+        },
+      },
+      subprocesses: {
+        type: "array",
+        items: {
+          type: "object",
+          required: ["name", "source_fragment_id", "quote", "confidence"],
+          properties: {
+            name: { type: "string" },
+            source_fragment_id: { type: "string" },
+            quote: { type: "string" },
+            confidence: { type: "number" },
+          },
+        },
+      },
       nodes: {
         type: "array",
         items: {
@@ -116,6 +154,7 @@ export const EXTRACTION_TOOL = {
             type: { enum: ["task", "event", "gateway", "subprocess"] },
             subtype: { type: "string" },
             name: { type: "string" },
+            operation_name: { type: ["string", "null"] },
             role_name: { type: ["string", "null"] },
             system_names: { type: "array", items: { type: "string" } },
             input_names: { type: "array", items: { type: "string" } },

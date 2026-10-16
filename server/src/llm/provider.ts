@@ -24,7 +24,7 @@ export class AnthropicProvider implements LLMProvider {
 
   async extractChunk(
     fragments: LLMFragmentInput[],
-    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string },
+    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string; decompositionDepth?: number },
     opts?: { model?: string }
   ): Promise<ExtractionChunkResult> {
     const msg = await this.client.messages.create({
@@ -37,7 +37,7 @@ export class AnthropicProvider implements LLMProvider {
       messages: [
         {
           role: "user",
-          content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext),
+          content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext, context.decompositionDepth),
         },
       ],
     });
@@ -104,7 +104,7 @@ export class LocalProvider implements LLMProvider {
 
   async extractChunk(
     fragments: LLMFragmentInput[],
-    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string },
+    context: { processName: string; modelType: "AS-IS" | "TO-BE"; fewShotContext?: string; decompositionDepth?: number },
     opts?: { model?: string }
   ): Promise<ExtractionChunkResult> {
     const body = {
@@ -112,7 +112,7 @@ export class LocalProvider implements LLMProvider {
       temperature: 0,
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
-        { role: "user", content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext) },
+        { role: "user", content: buildChunkUserPrompt(context.processName, context.modelType, formatFragments(fragments), context.fewShotContext, context.decompositionDepth) },
       ],
       tools: [{ type: "function", function: { name: EXTRACTION_TOOL.name, description: EXTRACTION_TOOL.description, parameters: (EXTRACTION_TOOL as any).input_schema } }],
       tool_choice: { type: "function", function: { name: EXTRACTION_TOOL.name } },

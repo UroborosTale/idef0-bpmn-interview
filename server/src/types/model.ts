@@ -474,6 +474,7 @@ export function emptyModel(meta: Partial<ProcessMeta> & { id: string; name: stri
     process: {
       id: meta.id,
       name: meta.name,
+      code: meta.code,
       owner: meta.owner,
       department: meta.department,
       type: meta.type ?? "AS-IS",

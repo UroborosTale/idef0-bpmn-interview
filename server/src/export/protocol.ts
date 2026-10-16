@@ -6,7 +6,7 @@ export function buildProtocolMarkdown(session: SessionRecord): string {
   const lines: string[] = [];
   lines.push(`# Протокол интервью — ${session.meta.processName}`);
   lines.push("");
-  lines.push(`- Режим: ${session.mode === "B" ? "интерактивное интервью" : "обработка готового текста"}`);
+  lines.push(`- Режим: ${session.mode === "B" ? "интерактивное интервью" : session.mode === "blank" ? "рисование с нуля в студии" : "обработка готового текста"}`);
   lines.push(`- Владелец процесса: ${session.meta.owner ?? "не указан"}`);
   lines.push(`- Подразделение: ${session.meta.department ?? "не указано"}`);
   lines.push(`- Тип модели: ${session.meta.modelType}`);

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { functionCodes, parseProcessCode, processCodeOf } from "@shared/codes";
 import type { ProcessLogicModel } from "../../types";
-import { applyStructure, parseOutline } from "./structure-ops";
+import { applyStructure, outlineFromModel, parseOutline } from "./structure-ops";
 import { normalizedProcessCode } from "./quick-fixes";
 
 const EXAMPLE = `Моделирование процесса
@@ -20,7 +20,8 @@ const EXAMPLE = `Моделирование процесса
  * заготовками диаграмм BPMN (начало → шаг → конец) у каждой операции. Справа — что получится, до создания.
  */
 export default function StructureWizard({ model, onApply, onClose }: { model: ProcessLogicModel; onApply: (next: ProcessLogicModel) => void; onClose: () => void }) {
-  const [text, setText] = useState("");
+  // список подставлен из модели: аналитик правит его, а не набирает структуру с нуля
+  const [text, setText] = useState(() => outlineFromModel(model));
   const [code, setCode] = useState(model.process.code ?? "");
   const [group, setGroup] = useState(model.process.group ?? "");
   const [skeletons, setSkeletons] = useState(true);
@@ -71,6 +72,10 @@ export default function StructureWizard({ model, onApply, onClose }: { model: Pr
               Структура
               <textarea rows={12} value={text} placeholder={EXAMPLE} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.stopPropagation()} aria-label="Структура процесса" />
             </label>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Список подставлен из модели — правьте его: подпроцесс без отступа, операции с отступом в четыре пробела. Применение
+              добавит к структуре диаграммы операций.
+            </div>
             <button className="link-button" onClick={() => setText(EXAMPLE)}>
               Вставить пример
             </button>

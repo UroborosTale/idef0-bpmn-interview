@@ -122,6 +122,8 @@ internal sealed class VisioPane : Panel
     {
         "task" => new("Задача", "round", 150, 90, "RGB(232,238,247)", 1.3, "Новая задача", 12),
         "subprocess" => new("Подпроцесс", "round", 160, 90, "RGB(232,238,247)", 1.3, "Новый подпроцесс", 12),
+        // блок функции IDEF0: размеры как у блока выгрузки (shared/idef0Layout: 170 × 90) и та же заливка
+        "idef0-fn" => new("Блок функции", "rect", 170, 90, "RGB(232,238,247)", 1.0, "Новая функция", 11),
         "gateway:exclusive" => new("Шлюз «или»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "X", 16),
         "gateway:parallel" => new("Шлюз «и»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "+", 18),
         "gateway:inclusive" => new("Шлюз «включающий»", "diamond", 50, 50, "RGB(255,255,153)", 1.3, "O", 16),
@@ -224,6 +226,13 @@ internal sealed class VisioPane : Panel
         }
 
         double hw = spec.W * PxIn / 2, hh = spec.H * PxIn / 2;
+        // щелчок по кнопке палитры (без перетаскивания): ставим фигуру в свободное место, а не в центр окна поверх уже нарисованной
+        if (client == null)
+        {
+            var spot = FreeSpot((object)page, x, y, spec.W * PxIn, spec.H * PxIn);
+            x = spot.x;
+            y = spot.y;
+        }
         dynamic shape = spec.Shape switch
         {
             "oval" => page.DrawOval(x - hw, y - hh, x + hw, y + hh),
@@ -255,8 +264,51 @@ internal sealed class VisioPane : Panel
         return spec.Text;
     }
 
-    private System.Text.Json.JsonElement? glyphs;
+    /// <summary>
+    /// Свободное место для новой фигуры: из центра окна сдвигаем вправо, пока новая фигура не перестанет попадать на габариты
+    /// уже нарисованных (с запасом, чтобы не слипались). Нужно при постановке фигуры щелчком по палитре — раньше она вставала
+    /// в центр окна и накрывала уже стоящую там фигуру.
+    /// </summary>
+    private static (double x, double y) FreeSpot(object pageObj, double x, double y, double w, double h)
+    {
+        dynamic page = pageObj;
+        var boxes = new List<(double l, double r, double b, double t)>();
+        try
+        {
+            int count = (int)page.Shapes.Count;
+            for (int i = 1; i <= count; i++)
+            {
+                dynamic sh = page.Shapes[i];
+                double px = Convert.ToDouble(sh.CellsU["PinX"].ResultIU);
+                double py = Convert.ToDouble(sh.CellsU["PinY"].ResultIU);
+                double sw = Convert.ToDouble(sh.CellsU["Width"].ResultIU);
+                double shh = Convert.ToDouble(sh.CellsU["Height"].ResultIU);
+                if (sw <= 0 || shh <= 0) continue;
+                boxes.Add((px - sw / 2, px + sw / 2, py - shh / 2, py + shh / 2));
+            }
+        }
+        catch { return (x, y); } // Visio занят или страница без фигур — оставляем как есть
+        if (boxes.Count == 0) return (x, y);
 
+        const double pad = 8 * PxIn;
+        bool free(double cx, double cy)
+        {
+            double l = cx - w / 2, r = cx + w / 2, b = cy - h / 2, t = cy + h / 2;
+            foreach (var box in boxes)
+                if (l < box.r + pad && r > box.l - pad && b < box.t + pad && t > box.b - pad) return false;
+            return true;
+        }
+
+        if (free(x, y)) return (x, y);
+        for (int step = 1; step <= 40; step++)
+        {
+            double nx = x + step * (w + 16 * PxIn);
+            if (free(nx, y)) return (nx, y);
+        }
+        return (x, y);
+    }
+
+    private System.Text.Json.JsonElement? glyphs;
     /// <summary>Скачивает у сервера значки триггеров (примитивы: круги и ломаные), которыми рисуются события с типом.</summary>
     public async Task PrepareEventShapesAsync(ServerHost server)
     {
@@ -401,6 +453,42 @@ internal sealed class VisioPane : Panel
         foreach (var x in changes.GetProperty("shapeMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "node", x.GetProperty("nodeId").GetString()!, true);
         foreach (var x in changes.GetProperty("flowMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "flow", x.GetProperty("flowId").GetString()!, false);
         // пометки — не правки пользователя: документ остаётся «сохранённым» и не вызывает новый приём правок
+        if (wasSaved) doc.Saved = true;
+        return tagged;
+    }
+
+    /// <summary>
+    /// Метки созданных на странице IDEF0 фигур: блок функции (pm_k = fn) и стрелка ICOM (pm_k = arrow с меткой вида связи
+    /// pm_a «вид|функция|сущность»). Ключи манифеста у IDEF0 свои — fn и ar, по ним приём правок видит удалённое.
+    /// </summary>
+    public int TagCreatedIdef0(System.Text.Json.JsonElement idef0)
+    {
+        dynamic doc = visio.Ocx.Document;
+        var tagged = 0;
+        var wasSaved = Convert.ToInt32(doc.Saved) != 0;
+        void Tag(string pageName, string shapeId, string kind, string id, string manifestKey, string? link)
+        {
+            try
+            {
+                dynamic page = doc.Pages.ItemU[pageName];
+                dynamic shape = page.Shapes.ItemFromID[int.Parse(shapeId)];
+                SetUser(shape, "pm_k", kind);
+                SetUser(shape, "pm_id", id);
+                if (link != null) SetUser(shape, "pm_a", link);
+                SetUser(shape, "pm_n", Regex.Replace((string)shape.Text ?? "", @"\s+", " ").Trim());
+                dynamic sheet = page.PageSheet;
+                var raw = (short)sheet.CellExistsU["User.pm_manifest", 0] == 0 ? "{}" : (string)sheet.CellsU["User.pm_manifest"].ResultStr[""];
+                var m = System.Text.Json.Nodes.JsonNode.Parse(string.IsNullOrWhiteSpace(raw) ? "{}" : raw)!.AsObject();
+                var list = m[manifestKey] as System.Text.Json.Nodes.JsonArray ?? new System.Text.Json.Nodes.JsonArray();
+                list.Add(id);
+                m[manifestKey] = list;
+                SetUser(sheet, "pm_manifest", m.ToJsonString());
+                tagged++;
+            }
+            catch { /* страницы или фигуры уже нет (удалили, пока шёл приём правок) */ }
+        }
+        foreach (var x in idef0.GetProperty("shapeMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "fn", x.GetProperty("nodeId").GetString()!, "fn", null);
+        foreach (var x in idef0.GetProperty("arrowMap").EnumerateArray()) Tag(x.GetProperty("page").GetString()!, x.GetProperty("shapeId").GetString()!, "arrow", x.GetProperty("entityId").GetString()!, "ar", x.GetProperty("link").GetString());
         if (wasSaved) doc.Saved = true;
         return tagged;
     }

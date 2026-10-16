@@ -48,7 +48,7 @@ const newFlow = (m: M, from: string, to: string, condition: string | null = null
 export function normalizedProcessCode(raw: string | null | undefined): string | null {
   const m = /^\s*([A-Za-zА-Яа-я])\s*[-_ .]?\s*(\d{1,3})(?:\.\d{2}\.\d{2})?\s*$/u.exec(raw ?? "");
   if (!m) return null;
-  const letter = { А: "A", В: "B", С: "C", а: "A", в: "B", с: "C" }[m[1]] ?? m[1].toUpperCase();
+  const letter = { А: "A", В: "B", С: "C", а: "A", в: "B", с: "C", Б: "B", б: "B" }[m[1]] ?? m[1].toUpperCase();
   if (!["A", "B", "C"].includes(letter)) return null;
   return `${letter}${m[2].padStart(3, "0")}.00.00`;
 }

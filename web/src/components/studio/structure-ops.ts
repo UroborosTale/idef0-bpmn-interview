@@ -294,6 +294,20 @@ export interface StructureOptions {
   skeletons?: boolean;
 }
 
+/**
+ * Список «подпроцесс → операции» из модели — для предзаполнения мастера структуры: аналитик правит готовый список,
+ * а не набирает его с нуля. Функции — узлы без bpmn_scope (шаги диаграмм операций в структуру не входят).
+ */
+export function outlineFromModel(m: M): string {
+  const isFn = (n: ProcessNode) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope;
+  const lines: string[] = [];
+  for (const fn of m.nodes.filter((n) => isFn(n) && !n.idef0_parent)) {
+    lines.push(fn.name);
+    for (const kid of m.nodes.filter((n) => isFn(n) && n.idef0_parent === fn.id)) lines.push(`    ${kid.name}`);
+  }
+  return lines.join("\n");
+}
+
 /** Добавляет в модель подпроцессы и операции из списка; при необходимости — код процесса, группу и заготовки диаграмм. */
 export function applyStructure(m: M, items: OutlineItem[], opts: StructureOptions = {}): M {
   let model = m;

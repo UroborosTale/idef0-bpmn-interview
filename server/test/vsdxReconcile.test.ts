@@ -3,6 +3,8 @@ import JSZip from "jszip";
 import { buildVsdx } from "../src/export/vsdx.js";
 import { applyDeletions, applyIdef0Edits, applySheetEdits, parseVsdx, reconcileVsdxEdit } from "../src/pipeline/vsdxImport.js";
 import { structuredModel } from "./fixtures.js";
+import { emptyModel } from "../src/types/model.js";
+import { emptyModel } from "../src/types/model.js";
 
 /** Правка файла так, как её делает Visio: меняется содержимое страницы внутри пакета. */
 async function edit(buf: Buffer, page: number, fn: (xml: string) => string): Promise<Buffer> {
@@ -106,6 +108,32 @@ describe("фигуры из палитры Visio (без меток pm_*)", () =
     expect(changes.shapeMap.every((x) => x.page === "BPMN B002.01.01" && changes.added.includes(x.nodeId))).toBe(true);
   });
 
+  it("новая фигура на общей схеме процесса становится шагом без bpmn_scope (раньше такие фигуры пропускались)", async () => {
+    const m = structuredModel();
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN"); // общая схема: метки pm_scope у страницы нет
+    const edited = await edit(buf, page, (xml) => xml.replace("</Shapes>", shape(9201, "Задача.60", "rect", "Шаг с нуля", 400, 300, 150, 90) + "</Shapes>"));
+    const { model, changes } = reconcileVsdxEdit(m, await parseVsdx(edited));
+    const added = model.nodes.filter((n) => changes.added.includes(n.id));
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({ type: "task", name: "Шаг с нуля", bpmn_scope: null });
+    expect(added[0].tags).toEqual(expect.arrayContaining(["from_diagram_import", "added_externally"]));
+    expect(changes.shapeMap).toEqual([{ page: "BPMN", shapeId: "9201", nodeId: added[0].id }]);
+  });
+
+  it("режим «рисовать с нуля»: фигура на общей схеме пустой модели становится шагом, заглушки начала и конца — нет", async () => {
+    const m = emptyModel({ id: "proc_blank", name: "Найм сотрудника" });
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "BPMN"); // в пустой модели это единственная страница BPMN
+    const edited = await edit(buf, page, (xml) => xml.replace("</Shapes>", shape(9301, "Задача.70", "rect", "Первая задача", 400, 300, 150, 90) + "</Shapes>"));
+    const { model, changes } = reconcileVsdxEdit(m, await parseVsdx(edited));
+    expect(changes.added).toHaveLength(1);
+    const added = model.nodes.filter((n) => changes.added.includes(n.id));
+    expect(added[0]).toMatchObject({ type: "task", name: "Первая задача", bpmn_scope: null });
+    // «Начало процесса» / «Завершение процесса» нарисованы выгрузкой как заглушки (pm_k = synth) — шагами не становятся
+    expect(model.nodes.some((n) => n.name === "Начало процесса" || n.name === "Завершение процесса")).toBe(false);
+  });
+
   it("шлюзы «включающий» и «событийный», события с типом (сообщение, таймер, завершение) распознаются по имени фигуры палитры", async () => {
     const m = structuredModel();
     const buf = await buildVsdx(m);
@@ -181,12 +209,107 @@ describe("размер листа, заданный в Visio", () => {
   });
 });
 
+describe("IDEF0: блоки и стрелки, нарисованные в Visio", () => {
+  /** Блок функции без меток модели: так его рисует палитра оболочки (прямоугольник с названием). */
+  const block = (id: number, text: string, x: number, y: number, w: number, h: number) =>
+    `<Shape ID="${id}" NameU="Sheet.${id}" Type="Shape"><Cell N="PinX" V="${x}"/><Cell N="PinY" V="${y}"/><Cell N="Width" V="${w}"/><Cell N="Height" V="${h}"/><Cell N="LocPinX" V="${w / 2}"/><Cell N="LocPinY" V="${h / 2}"/><Section N="Geometry" IX="0"><Cell N="NoFill" V="0"/><Cell N="NoLine" V="0"/>` +
+    [[0, 0], [w, 0], [w, h], [0, h], [0, 0]].map(([px, py], i) => `<Row T="${i === 0 ? "MoveTo" : "LineTo"}" IX="${i + 1}"><Cell N="X" V="${px}"/><Cell N="Y" V="${py}"/></Row>`).join("") +
+    `</Section><Text>${text}</Text></Shape>`;
+  /** Соединитель Visio с координатами концов (дюймы, y вверх): направление задаётся наконечником на конце. */
+  const connector = (id: number, text: string, bx: number, by: number, ex: number, ey: number) =>
+    `<Shape ID="${id}" NameU="Dynamic connector.${id}" Type="Shape"><Cell N="BeginX" V="${bx}"/><Cell N="BeginY" V="${by}"/><Cell N="EndX" V="${ex}"/><Cell N="EndY" V="${ey}"/><Cell N="BeginArrow" V="0"/><Cell N="EndArrow" V="4"/><Text>${text}</Text></Shape>`;
+
+  it("блоки становятся функциями, а стрелки — входом, управлением, выходом и связью по стороне блока", async () => {
+    const m = emptyModel({ id: "proc_draw", name: "Рисуем с нуля" });
+    const buf = await buildVsdx(m);
+    const page = await pageNo(buf, "IDEF0 A0"); // верхняя диаграмма пустой модели: блоков ещё нет
+    const edited = await edit(buf, page, (xml) =>
+      xml.replace(
+        "</Shapes>",
+        block(9501, "Первая функция", 2, 6, 1.5, 1) +
+          block(9502, "Вторая функция", 6, 6, 1.5, 1) +
+          connector(9601, "Документ", 2.75, 6, 5.25, 6) + // из правой стороны первой в левую второго — связь «выход → вход»
+          connector(9602, "Правила", 2, 8, 2, 6.5) + // сверху в блок — управление
+          connector(9603, "Результат", 6.75, 6, 9, 6) + // из правой стороны в пустое место — выход
+          "</Shapes>"
+      )
+    );
+    const model = emptyModel({ id: "proc_draw", name: "Рисуем с нуля" });
+    const c = applyIdef0Edits(model, (await parseVsdx(edited)).idef0);
+
+    expect(c.added).toHaveLength(2);
+    const a = model.nodes.find((n) => n.id === c.added[0])!;
+    const b = model.nodes.find((n) => n.id === c.added[1])!;
+    expect(a).toMatchObject({ type: "task", name: "Первая функция", idef0_parent: null, bpmn_scope: null });
+    expect(a.tags).toEqual(expect.arrayContaining(["from_diagram_import", "added_externally"]));
+    expect(b.name).toBe("Вторая функция");
+
+    // связь: одна и та же сущность у источника в выходах, у потребителя во входах
+    const link = c.addedArrows.find((x) => x.kind === "link")!;
+    expect(link.nodeId).toBe(b.id);
+    expect(a.outputs).toContain(link.entityId);
+    expect(b.inputs).toContain(link.entityId);
+    expect(model.data.find((d) => d.id === link.entityId)!.name).toBe("Документ");
+
+    // управление приходит сверху
+    const ctl = c.addedArrows.find((x) => x.kind === "control")!;
+    expect(ctl.nodeId).toBe(a.id);
+    expect(a.controls).toContain(ctl.entityId);
+    expect(model.controls.find((x) => x.id === ctl.entityId)!.name).toBe("Правила");
+
+    // выход уходит в пустое место (второй конец соединителя ни к чему не приклеен)
+    const out = c.addedArrows.find((x) => x.kind === "output")!;
+    expect(out.nodeId).toBe(b.id);
+    expect(b.outputs).toContain(out.entityId);
+
+    // оболочке отдаются метки: какая фигура стала функцией и какая стрелка — сущностью
+    expect(c.shapeMap.map((x) => x.shapeId).sort()).toEqual(["9501", "9502"]);
+    expect(c.arrowMap.map((x) => x.shapeId).sort()).toEqual(["9601", "9602", "9603"]);
+    expect(c.arrowMap.find((x) => x.shapeId === "9601")!.link).toBe(`link|${b.id}|${link.entityId}`);
+    expect(c.skipped).toBe(0);
+  });
+
+  /** Номер страницы файла по имени из разбора: страницы Visio названы уникально. */
+  const pageByName = async (buf: Buffer, name: string): Promise<number> => {
+    const xml = await (await JSZip.loadAsync(buf)).file("visio/pages/pages.xml")!.async("string");
+    const names = [...xml.matchAll(/<Page ID="\d+" NameU="([^"]+)"/g)].map((m) => m[1]);
+    const i = names.indexOf(name);
+    if (i < 0) throw new Error(`нет страницы «${name}»: ${names.join(", ")}`);
+    return i + 1;
+  };
+
+  it("блок на странице декомпозиции становится подфункцией; на контекстной не создаётся", async () => {
+    const m = structuredModel();
+    const parsed = await parseVsdx(await buildVsdx(m));
+    const child = parsed.idef0.find((p) => p.parent); // страница декомпозиции: знает свою функцию
+    const ctx = parsed.idef0.find((p) => p.context); // контекстная: один блок процесса
+    expect(child && ctx).toBeTruthy();
+
+    const buf = await buildVsdx(m);
+    const page = await pageByName(buf, child!.name);
+    const edited = await edit(buf, page, (xml) => xml.replace("</Shapes>", block(9701, "Новая подфункция", 2, 6, 1.5, 1) + "</Shapes>"));
+    const model = structuredModel();
+    const c = applyIdef0Edits(model, (await parseVsdx(edited)).idef0);
+    expect(c.added).toHaveLength(1);
+    const fn = model.nodes.find((n) => n.id === c.added[0])!;
+    expect(fn).toMatchObject({ name: "Новая подфункция", idef0_parent: child!.parent });
+
+    // контекстная диаграмма: новые блоки не создаются
+    const ctxModel = structuredModel();
+    const ctxPage = await pageByName(buf, ctx!.name);
+    const ctxEdited = await edit(buf, ctxPage, (xml) => xml.replace("</Shapes>", block(9801, "Лишний блок", 2, 6, 1.5, 1) + "</Shapes>"));
+    const ctxChanges = applyIdef0Edits(ctxModel, (await parseVsdx(ctxEdited)).idef0);
+    expect(ctxChanges.added).toHaveLength(0);
+    expect(ctxChanges.skipped).toBeGreaterThan(0);
+  });
+});
+
 describe("правки IDEF0 и удаление фигур из Visio", () => {
   it("файл без правок: ничего не переименовано и не пропало", async () => {
     const m = structuredModel();
     const parsed = await parseVsdx(await buildVsdx(m));
     const c = applyIdef0Edits(JSON.parse(JSON.stringify(m)), parsed.idef0);
-    expect(c).toEqual({ functions: [], arrows: [], missingFunctions: [], missingArrows: [] });
+    expect(c).toEqual({ functions: [], arrows: [], missingFunctions: [], missingArrows: [], added: [], addedArrows: [], shapeMap: [], arrowMap: [], skipped: 0 });
   });
 
   it("блок и стрелка IDEF0 переименованы в Visio — названия функции и сущности меняются в модели", async () => {

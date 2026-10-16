@@ -52,6 +52,9 @@ export interface VsdxNode {
   box: VsdxBox;
   /** id шага модели у собственной выгрузки (метка pm_id): по нему правки из Visio возвращаются в существующую модель. */
   pmId?: string;
+  /** Фигура-заглушка собственной выгрузки (метка pm_k = synth): синтетические «Начало процесса» / «Завершение процесса»,
+   *  которых в модели нет (bpmn.ts). Шагом из заглушки не делаем, иначе приём правок создал бы события из ничего. */
+  synth?: boolean;
 }
 export interface VsdxContainer {
   /** id роли собственной выгрузки; у чужих файлов не задан. */
@@ -69,6 +72,9 @@ export interface VsdxEdge {
   pmId?: string;
   /** id соединителя в Visio (по нему оболочка помечает новую стрелку id потока модели). */
   shapeId?: string;
+  /** Начало и конец соединителя в координатах страницы (px, y вниз): по ним для IDEF0 определяется сторона блока. */
+  begin?: [number, number];
+  end?: [number, number];
 }
 export interface VsdxPage {
   name: string;
@@ -83,6 +89,8 @@ export interface VsdxPage {
   edges: VsdxEdge[];
   /** Рамка листа этой страницы (метка pm_k = sheet), если она есть. */
   sheet?: VsdxSheet;
+  /** Соединители с одним неприклеенным концом (у страниц IDEF0): выход блока в пустое место или вход «снаружи». */
+  loose?: VsdxEdge[];
   /** Блоки и стрелки IDEF0 с метками (для страниц IDEF0 собственной выгрузки). */
   idef0Marks?: VsdxIdef0Mark[];
 }
@@ -105,10 +113,26 @@ export interface VsdxIdef0Mark {
   link?: string;
   text: string;
   shapeId: string;
+  /** Положение фигуры (px, y вниз): по нему видно, к какой стороне блока приклеена новая стрелка. */
+  box?: VsdxBox;
 }
 export interface VsdxIdef0Page {
   name: string;
+  /** Код диаграммы из метки pm_page («idef0:A0» → «A0»). */
+  code?: string;
+  /** Функция, чью декомпозицию изображает страница (метка pm_parent); у верхней диаграммы не задана. */
+  parent?: string;
+  /** Контекстная диаграмма (метка pm_ctx): один блок процесса, новые блоки туда не рисуют. */
+  context?: boolean;
+  /** Страница выгружена как «только чтение» (метка pm_ro): правки из неё не принимаются. */
+  readOnly?: boolean;
   marks: VsdxIdef0Mark[];
+  /** Фигуры без меток модели, нарисованные в Visio: новые блоки функций. */
+  nodes?: VsdxNode[];
+  /** Соединители без меток модели: новые стрелки ICOM. */
+  edges?: VsdxEdge[];
+  /** Стрелки с одним неприклеенным концом: выход блока в пустое место или вход «снаружи». */
+  loose?: VsdxEdge[];
   /** Что нарисовано при выгрузке (pm_manifest): функции и стрелки; нужны, чтобы увидеть удалённое. */
   manifest?: { fn: string[]; ar: string[] };
 }
@@ -436,7 +460,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
       warnings.push(`Страница «${name}» не найдена в пакете — пропущена.`);
       continue;
     }
-    const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings);
+    const page = readPage(parser.parse(xml).PageContents ?? {}, pi, name, pageH, masterNames, { props: masterProps, size: masterSize }, warnings, isIdef0);
     if (page.sheet) sheets.push(page.sheet);
     if (isIdef0) {
       let manifest: VsdxIdef0Page["manifest"];
@@ -446,7 +470,18 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
       } catch {
         /* повреждённая метка — как будто её нет */
       }
-      idef0.push({ name, marks: page.idef0Marks ?? [], ...(manifest ? { manifest } : {}) });
+      idef0.push({
+        name,
+        ...(pageUser.pm_page && pageUser.pm_page !== "idef0" ? { code: String(pageUser.pm_page).replace(/^idef0:?/, "") } : {}),
+        ...(pageUser.pm_parent ? { parent: pageUser.pm_parent } : {}),
+        ...(pageUser.pm_ctx === "1" ? { context: true } : {}),
+        ...(pageUser.pm_ro === "1" ? { readOnly: true } : {}),
+        marks: page.idef0Marks ?? [],
+        ...(page.nodes.length ? { nodes: page.nodes } : {}),
+        ...(page.edges.length ? { edges: page.edges } : {}),
+        ...(page.loose?.length ? { loose: page.loose } : {}),
+        ...(manifest ? { manifest } : {}),
+      });
       continue;
     }
     if (pageUser.pm_page === "bpmn") {
@@ -466,7 +501,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   return { pages, sheets, idef0, warnings };
 }
 
-function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[]): VsdxPage {
+function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[], idef0 = false): VsdxPage {
   // все фигуры страницы, включая вложенные в группы
   const all: Shp[] = [];
   let truncated = false;
@@ -564,7 +599,15 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     const vb = s.bpmn;
     // у собственной выгрузки вид задаёт метка pm_*, а подтип, триггер и признаки — свойства фигуры (их правят в «Данных фигуры» Visio)
     const byProps: Kind | undefined = pk ? undefined : vb.kind === "pool" ? "lane" : vb.kind === "flow" ? "ignore" : vb.kind;
-    let kind: Kind = pk ? (geo.diamond ? "gateway" : geo.ellipse ? "event" : "task") : byProps ?? classify(s.name, geo, connected.has(s.id), s.box);
+    let kind: Kind = pk
+      ? geo.diamond
+        ? "gateway"
+        : geo.ellipse
+          ? "event"
+          : "task"
+      : // на странице IDEF0 блок функции — это прямоугольник с названием, и стрелки к нему могут быть ещё не проведены
+        // (на BPMN без связей фигура считается примечанием и пропускается — там правило остаётся прежним)
+        (byProps ?? (idef0 && !geo.diamond && !geo.ellipse ? "task" : classify(s.name, geo, connected.has(s.id), s.box)));
     // подпроцесс собственной выгрузки отличает маркер «+» во второй секции геометрии
     if (pk && kind === "task" && arr<X>(s.shape.Section).some((x) => attr(x, "N") === "Geometry" && attr(x, "IX") === "1")) kind = "subprocess";
     if (kind === "lane") {
@@ -576,7 +619,7 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     if (!s.box.w || !s.box.h) continue;
     // у собственной выгрузки название — текущий текст фигуры (его правят в Visio); метка pm_n — запасное, если текст стёрт
     const text = pk ? clean(textDeep(s) || (s.user.pm_n ?? "")) : textDeep(s);
-    const node: VsdxNode = { key: `${pageIndex}:${s.id}`, shapeId: s.id, kind, text, box: s.box, ...(pk === "node" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) };
+    const node: VsdxNode = { key: `${pageIndex}:${s.id}`, shapeId: s.id, kind, text, box: s.box, ...(pk === "node" && s.user.pm_id ? { pmId: s.user.pm_id } : {}), ...(pk === "synth" ? { synth: true } : {}) };
     if (vb) lost.push(...vb.lost);
     if (kind === "task" || kind === "subprocess") {
       const sub = vb?.taskType ?? TASK_SUBTYPES.find(([re]) => re.test(s.name))?.[1];
@@ -622,15 +665,25 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
 
   const edges: VsdxEdge[] = [];
   let loose = 0;
+  // стрелки IDEF0 с одним неприклеенным концом: «блок → пустое место» — это выход, «пустое место → блок» — вход
+  const idef0Loose: VsdxEdge[] = [];
   const skippedFlows = { association: 0, message: 0 };
   for (const s of all) {
     if (!isConnector(s)) continue;
+    // стрелки IDEF0 нашей выгрузки уже привязаны к сущностям модели (метка pm_k = arrow): их читает разбор IDEF0-меток,
+    // иначе следующий приём правок создал бы по ним новые сущности
+    if (idef0 && s.user.pm_k === "arrow") continue;
     const ft = s.bpmn.flowType;
     if (ft === "association" || ft === "message") {
       skippedFlows[ft]++;
       continue;
     }
     const c = cells(s.shape);
+    // координаты концов: у соединителей на странице — абсолютные (в px, y вниз)
+    const ends: { begin?: [number, number]; end?: [number, number] } = {
+      ...(c.has("BeginX") && c.has("BeginY") ? { begin: [numOf(c, "BeginX") * IN, pageH * IN - numOf(c, "BeginY") * IN] as [number, number] } : {}),
+      ...(c.has("EndX") && c.has("EndY") ? { end: [numOf(c, "EndX") * IN, pageH * IN - numOf(c, "EndY") * IN] as [number, number] } : {}),
+    };
     const g = glued.get(s.id) ?? {};
     let from = nodeOf(g.begin);
     let to = nodeOf(g.end);
@@ -639,11 +692,13 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     if (!to && c.has("EndX")) to = nodeAt(numOf(c, "EndX"), numOf(c, "EndY"));
     if (!from || !to || from === to) {
       if (c.has("BeginX") || glued.has(s.id)) loose++;
+      // у страниц IDEF0 берём и такие стрелки: один конец у блока, второй — в пустом месте (выход блока или вход «снаружи»)
+      if (idef0 && from !== to && (from || to)) idef0Loose.push({ from: from ? `${pageIndex}:${from}` : "", to: to ? `${pageIndex}:${to}` : "", label: textOf(s.shape), shapeId: s.id, ...ends });
       continue;
     }
     // стрелка на начале, а не на конце — направление обратное
     if (numOf(c, "BeginArrow") > 0 && numOf(c, "EndArrow") === 0) [from, to] = [to, from];
-    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), shapeId: s.id, ...(s.bpmn.condition === "default" ? { isDefault: true } : {}), ...(s.user.pm_k === "flow" && s.user.pm_id ? { pmId: s.user.pm_id } : {}) });
+    edges.push({ from: `${pageIndex}:${from}`, to: `${pageIndex}:${to}`, label: textOf(s.shape), shapeId: s.id, ...(s.bpmn.condition === "default" ? { isDefault: true } : {}), ...(s.user.pm_k === "flow" && s.user.pm_id ? { pmId: s.user.pm_id } : {}), ...ends });
   }
   if (loose) warnings.push(`На странице «${pageName}» ${loose} соедин. не привязаны к шагам — пропущены.`);
   if (skippedFlows.association) warnings.push(`На странице «${pageName}» ассоциации (${skippedFlows.association}) пропущены: они связывают шаги с примечаниями и данными, а не задают порядок.`);
@@ -667,9 +722,9 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
   for (const s of all) {
     const k = s.user.pm_k;
     if ((k !== "fn" && k !== "arrow") || !s.user.pm_id) continue;
-    idef0Marks.push({ k, id: s.user.pm_id, ...(s.user.pm_c ? { code: s.user.pm_c } : {}), was: s.user.pm_n ?? "", ...(s.user.pm_a ? { link: s.user.pm_a } : {}), text: textDeep(s), shapeId: s.id });
+    idef0Marks.push({ k, id: s.user.pm_id, ...(s.user.pm_c ? { code: s.user.pm_c } : {}), was: s.user.pm_n ?? "", ...(s.user.pm_a ? { link: s.user.pm_a } : {}), text: textDeep(s), shapeId: s.id, box: s.box });
   }
-  return { name: pageName, nodes, containers: lanes, edges, ...(sheet ? { sheet } : {}), ...(idef0Marks.length ? { idef0Marks } : {}) };
+  return { name: pageName, nodes, containers: lanes, edges, ...(idef0Loose.length ? { loose: idef0Loose } : {}), ...(sheet ? { sheet } : {}), ...(idef0Marks.length ? { idef0Marks } : {}) };
 }
 
 // --- модель ---
@@ -881,8 +936,12 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
         }
         continue;
       }
-      if (n.pmId || !page.scope || !nodeById.has(page.scope)) continue; // чужая метка или страница без операции — не угадываем
-      // новая фигура, нарисованная в Visio на странице операции
+      // новая фигура, нарисованная в Visio: на странице операции или на общей схеме процесса.
+      // У общей схемы метки pm_scope нет (vsdx.ts), и шаги такой диаграммы в модели идут без bpmn_scope
+      // (types/model.ts) — поэтому отсутствие scope не повод отбрасывать фигуру: иначе в сессии без кода
+      // процесса и без операций (режим «рисовать с нуля») нарисовать шаг в Visio негде.
+      if (n.synth || n.pmId || (page.scope && !nodeById.has(page.scope))) continue; // заглушка выгрузки, чужая метка или ссылка на несуществующую операцию — не угадываем
+      // новая фигура, нарисованная в Visio
       const [cx, cy] = centre(n.box);
       const lane = leaves.filter((c) => cx >= c.box.x && cx <= c.box.x + c.box.w && cy >= c.box.y && cy <= c.box.y + c.box.h).sort((a, b) => area(a.box) - area(b.box))[0];
       const role = lane?.laneId && out.roles.some((r) => r.id === lane.laneId) ? lane.laneId : null;
@@ -903,7 +962,7 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
         duration: null,
         frequency: null,
         idef0_parent: null,
-        bpmn_scope: page.scope,
+        bpmn_scope: page.scope ?? null,
         status: text ? "confirmed" : "hypothesis",
         confidence: text ? 0.8 : 0.4,
         source: [{ fragment_id: "diagram_import", quote: `${page.name}: ${n.shapeId}` }],
@@ -982,6 +1041,16 @@ export interface Idef0EditChanges {
   /** Блоки и стрелки, удалённые в Visio (в модели остались). */
   missingFunctions: string[];
   missingArrows: string[];
+  /** Новые функции, созданные по блокам, нарисованным в Visio (режим «рисовать с нуля»). */
+  added: string[];
+  /** Новые стрелки ICOM, созданные по соединителям из Visio. */
+  addedArrows: { kind: string; nodeId: string; entityId: string }[];
+  /** Фигура Visio → созданная функция: оболочка помечает фигуру метками модели. */
+  shapeMap: { page: string; shapeId: string; nodeId: string }[];
+  /** Соединитель Visio → созданная стрелка; link — метка pm_a («вид|функция|сущность»). */
+  arrowMap: { page: string; shapeId: string; entityId: string; link: string }[];
+  /** Сколько нарисованных фигур пропущено: без подписи, на контекстной странице, на странице «только чтение». */
+  skipped: number;
 }
 
 /**
@@ -989,7 +1058,7 @@ export interface Idef0EditChanges {
  * IDEF0 не создаются, удалённые только перечисляются (удаляет их applyDeletions по подтверждению).
  */
 export function applyIdef0Edits(model: ProcessLogicModel, pages: VsdxIdef0Page[]): Idef0EditChanges {
-  const out: Idef0EditChanges = { functions: [], arrows: [], missingFunctions: [], missingArrows: [] };
+  const out: Idef0EditChanges = { functions: [], arrows: [], missingFunctions: [], missingArrows: [], added: [], addedArrows: [], shapeMap: [], arrowMap: [], skipped: 0 };
   const seenFn = new Set<string>();
   const seenAr = new Set<string>();
   const nodeById = new Map(model.nodes.map((n) => [n.id, n] as const));
@@ -1025,6 +1094,128 @@ export function applyIdef0Edits(model: ProcessLogicModel, pages: VsdxIdef0Page[]
         }
       }
     }
+    // --- нарисованное в Visio (у этих фигур меток pm_* нет): блоки функций и стрелки ICOM ---
+    const parentId = page.parent && nodeById.has(page.parent) ? page.parent : null;
+    // контекстная диаграмма — один блок процесса, страница «только чтение» — утверждённая версия: там не создаём
+    const drawable = !page.readOnly && !page.context && (!page.parent || parentId !== null);
+    const boxById = new Map<string, VsdxBox>();
+    for (const m of page.marks) if (m.k === "fn" && m.box) boxById.set(m.shapeId, m.box);
+    const nodeIdByShape = new Map<string, string>();
+    for (const m of page.marks) if (m.k === "fn") nodeIdByShape.set(m.shapeId, m.id);
+    /** Сторона блока, у которой лежит конец стрелки: в IDEF0 сторона и задаёт вид связи (Порт: вход слева, управление сверху, выход справа, механизм снизу). */
+    const sideAt = (box: VsdxBox | undefined, p?: [number, number]): "T" | "L" | "B" | "R" | null => {
+      if (!box || !p) return null;
+      if (p[0] < box.x - 16 || p[0] > box.x + box.w + 16 || p[1] < box.y - 16 || p[1] > box.y + box.h + 16) return null;
+      const d: [("T" | "L" | "B" | "R"), number][] = [
+        ["T", Math.abs(p[1] - box.y)],
+        ["L", Math.abs(p[0] - box.x)],
+        ["B", Math.abs(p[1] - (box.y + box.h))],
+        ["R", Math.abs(p[0] - (box.x + box.w))],
+      ];
+      d.sort((a, b) => a[1] - b[1]);
+      return d[0][0];
+    };
+    // сущности стрелок создаются по подписи, если такой ещё нет: данные — для входа/выхода/связи, регламент — для управления, роль — для механизма
+    const dataByName = (name: string) => model.data.find((d) => d.name === name) ?? (() => { const d = { id: `d_${nanoid(6)}`, name, kind: "data" as const, source: [] }; model.data.push(d); return d; })();
+    const controlByName = (name: string) => model.controls.find((c) => c.name === name) ?? (() => { const c = { id: `c_${nanoid(6)}`, name, kind: "rule" as const, source: [] }; model.controls.push(c); return c; })();
+    const roleByName = (name: string) => model.roles.find((r) => r.name === name) ?? (() => { const r = { id: `r_${nanoid(6)}`, name, kind: "internal" as const, source: [] }; model.roles.push(r); return r; })();
+
+    for (const n of page.nodes ?? []) {
+      if (!drawable) {
+        out.skipped++;
+        continue;
+      }
+      const fn: ProcessNode = {
+        id: `fn_${nanoid(8)}`,
+        type: "task",
+        name: clean(n.text) || "Новая функция",
+        role_id: null,
+        system_ids: [],
+        inputs: [],
+        outputs: [],
+        controls: [],
+        duration: null,
+        frequency: null,
+        idef0_parent: parentId,
+        bpmn_scope: null,
+        status: "confirmed",
+        confidence: 0.8,
+        source: [{ fragment_id: "diagram_import", quote: `${page.name}: ${n.shapeId}` }],
+        requirement_ids: [],
+        tags: ["from_diagram_import", "added_externally"],
+        confirmed_by: [],
+      };
+      model.nodes.push(fn);
+      nodeById.set(fn.id, fn);
+      boxById.set(n.shapeId, n.box);
+      nodeIdByShape.set(n.shapeId, fn.id);
+      out.added.push(fn.id);
+      out.shapeMap.push({ page: page.name, shapeId: n.shapeId, nodeId: fn.id });
+    }
+
+    for (const e of [...(page.edges ?? []), ...(page.loose ?? [])]) {
+      const shapeOf = (k: string) => (k ? k.slice(k.indexOf(":") + 1) : "");
+      const srcId = nodeIdByShape.get(shapeOf(e.from));
+      const dstId = nodeIdByShape.get(shapeOf(e.to));
+      const name = clean(e.label);
+      const head = sideAt(boxById.get(shapeOf(e.to)), e.end);
+      const tail = sideAt(boxById.get(shapeOf(e.from)), e.begin);
+      // безымянной стрелке нечего дать в модель, а концы без блока (например, соединитель между примечаниями) не стрелка ICOM
+      if (!drawable || !name || (!srcId && !dstId) || (!head && !tail)) {
+        out.skipped++;
+        continue;
+      }
+      const src = srcId ? nodeById.get(srcId) : undefined;
+      const dst = dstId ? nodeById.get(dstId) : undefined;
+      let kind: string;
+      let entityId: string;
+      let nodeId: string;
+      if (dst && head) {
+        nodeId = dst.id;
+        if (head === "T") {
+          const c = controlByName(name);
+          dst.controls = [...dst.controls, c.id];
+          kind = "control";
+          entityId = c.id;
+        } else if (head === "B") {
+          const r = roleByName(name);
+          dst.role_id = r.id;
+          kind = "role";
+          entityId = r.id;
+        } else if (head === "L" && src && tail === "R") {
+          // «выход → вход»: одна и та же сущность у источника в выходах, у потребителя во входах
+          const d = dataByName(name);
+          src.outputs = [...src.outputs, d.id];
+          dst.inputs = [...dst.inputs, d.id];
+          kind = "link";
+          entityId = d.id;
+        } else if (head === "L") {
+          const d = dataByName(name);
+          dst.inputs = [...dst.inputs, d.id];
+          kind = "input";
+          entityId = d.id;
+        } else {
+          // голова у правой стороны блока: стрелка из него выходит
+          const d = dataByName(name);
+          dst.outputs = [...dst.outputs, d.id];
+          kind = "output";
+          entityId = d.id;
+        }
+      } else if (src && tail === "R") {
+        // выход в пустое место (второй конец ни к чему не приклеен)
+        const d = dataByName(name);
+        src.outputs = [...src.outputs, d.id];
+        kind = "output";
+        entityId = d.id;
+        nodeId = src.id;
+      } else {
+        out.skipped++;
+        continue;
+      }
+      out.addedArrows.push({ kind, nodeId, entityId });
+      if (e.shapeId) out.arrowMap.push({ page: page.name, shapeId: e.shapeId, entityId, link: `${kind}|${nodeId}|${entityId}` });
+    }
+
     for (const id of page.manifest?.fn ?? []) if (!seenFn.has(id) && nodeById.has(id)) out.missingFunctions.push(id);
     for (const l of page.manifest?.ar ?? []) if (!seenAr.has(l)) out.missingArrows.push(l);
   }

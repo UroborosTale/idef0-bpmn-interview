@@ -399,6 +399,8 @@ export interface Idef0Result {
 
 export interface SessionMeta {
   processName: string;
+  /** Код процесса в реестре (вида B002.00.00), заданный при создании. */
+  code?: string | null;
   department?: string;
   owner?: string;
   modelType: "AS-IS" | "TO-BE";
@@ -441,7 +443,7 @@ export interface VersionSnapshot {
 export interface SessionRecord {
   id: string;
   title: string;
-  mode: "A" | "B";
+  mode: "A" | "B" | "blank"; // "blank" — «рисовать с нуля» (режим Г)
   status: "draft" | "processing" | "ready" | "interviewing" | "completed";
   meta: SessionMeta;
   fragments: Fragment[];
@@ -485,7 +487,7 @@ export interface InterviewTrack {
 export interface SessionListItem {
   id: string;
   title: string;
-  mode: "A" | "B";
+  mode: "A" | "B" | "blank";
   status: SessionRecord["status"];
   meta: SessionMeta;
   updatedAt: string;

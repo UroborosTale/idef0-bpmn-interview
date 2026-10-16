@@ -5,7 +5,8 @@ import type { LLMProvider, LLMFragmentInput, ExtractionChunkResult } from "../ll
 import { normalizeChunk } from "../llm/schema.js";
 import { withLlmContext } from "../llm/usage.js";
 
-export const CHUNK_SIZE = 18;
+/** Сколько фрагментов уходит в один вызов LLM. Переопределяется PM_CHUNK_SIZE (например, 1000 — считать документ целиком). */
+export const CHUNK_SIZE = Number(process.env.PM_CHUNK_SIZE) || 18;
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -105,12 +106,67 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
   const nodes: ProcessNode[] = [];
   const flows: ProcessFlow[] = [];
   const statements: Statement[] = [];
+  // Операции процесса (ФТ-3): блоки IDEF0, у каждого своя диаграмма BPMN из действий с operation_name.
+  const opByKey = new Map<string, ProcessNode>();
+  const opSteps = new Map<string, string[]>(); // id операции → id её действий
+  const opOrder = new Map<string, number>(); // id операции → порядок первого действия
+  // Подпроцессы (глубина декомпозиции 2+): блоки уровня 0, операции становятся их детьми.
+  const subByKey = new Map<string, ProcessNode>();
+  const opSubName = new Map<string, string>(); // id операции → название подпроцесса из ответа LLM
+
+  const newFunctionNode = (id: string, name: string, source: { fragment_id: string; quote: string }, confidence: number): ProcessNode => ({
+    id,
+    type: "task",
+    name: name.trim(),
+    role_id: null,
+    system_ids: [],
+    inputs: [],
+    outputs: [],
+    controls: [],
+    duration: null,
+    frequency: null,
+    idef0_parent: null,
+    bpmn_scope: null,
+    status: confidence >= 0.6 ? "confirmed" : "hypothesis",
+    confidence,
+    source: [source],
+    requirement_ids: [],
+    tags: [],
+    confirmed_by: [],
+  });
+
+  const ensureSubprocess = (name: string, source: { fragment_id: string; quote: string }, confidence: number): ProcessNode => {
+    const key = normKey(name);
+    const known = subByKey.get(key);
+    if (known) {
+      known.source.push(source);
+      return known;
+    }
+    const sub = newFunctionNode(`sp${subByKey.size + 1}`, name, source, confidence);
+    subByKey.set(key, sub);
+    return sub;
+  };
+
+  const ensureOperation = (name: string, source: { fragment_id: string; quote: string }, confidence: number): ProcessNode => {
+    const key = normKey(name);
+    const known = opByKey.get(key);
+    if (known) {
+      known.source.push(source);
+      return known;
+    }
+    const op = newFunctionNode(`op${opByKey.size + 1}`, name, source, confidence);
+    opByKey.set(key, op);
+    opSteps.set(op.id, []);
+    return op;
+  };
 
   let goal = opts.metaGoal;
   let trigger = opts.metaTrigger;
   let result = opts.metaResult;
 
   let globalOrder = 0;
+  // Глубина декомпозиции из паспорта: 2+ — операции группируются в подпроцессы, 1 — только операции процесса.
+  const depth = Math.max(1, opts.decompositionDepth ?? 2);
   const report: ExtractionReport = opts.report ?? { failedChunks: [], dropped: 0, unverified: 0 };
 
   for (let ci = 0; ci < chunks.length; ci++) {
@@ -126,7 +182,7 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     try {
       const raw = await provider.extractChunk(
         llmInput,
-        { processName: opts.processName, modelType: opts.modelType, fewShotContext: ci === 0 ? opts.fewShotContext : undefined },
+        { processName: opts.processName, modelType: opts.modelType, fewShotContext: ci === 0 ? opts.fewShotContext : undefined, decompositionDepth: depth },
         { model: opts.llmModel }
       );
       // ответ LLM не доверяем: проверяем форму и сверяем цитаты с текстом
@@ -161,6 +217,16 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     // map order_hint (chunk-local) -> node id, для последующей сборки flows
     const orderToNodeId = new Map<number, string>();
 
+    // подпроцессы и операции этого чанка: создаём блоки раньше действий, чтобы они шли перед своими действиями
+    for (const s of chunkResult.subprocesses ?? []) {
+      ensureSubprocess(s.name, { fragment_id: s.source_fragment_id, quote: s.quote }, s.confidence);
+    }
+    for (const o of chunkResult.operations ?? []) {
+      const op = ensureOperation(o.name, { fragment_id: o.source_fragment_id, quote: o.quote }, o.confidence);
+      // принадлежность операции подпроцессу: разворачивается на глубине 2+ (по Соглашению глубже функций нет)
+      if (depth >= 2 && o.subprocess_name && !opSubName.has(op.id)) opSubName.set(op.id, o.subprocess_name);
+    }
+
     for (const n of chunkResult.nodes ?? []) {
       globalOrder += 1;
       const nodeId = `n${globalOrder}`;
@@ -183,6 +249,8 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
         (cn) => upsert(controls, cn, "ctl", { kind: "rule" } as any, { fragment_id: n.source_fragment_id, quote: n.quote }).id
       );
 
+      // действие принадлежит операции — его диаграмме BPMN; операции без действия остаются на общей схеме
+      const op = n.operation_name ? ensureOperation(n.operation_name, { fragment_id: n.source_fragment_id, quote: n.quote }, n.confidence) : null;
       const node: ProcessNode = {
         id: nodeId,
         type: n.type,
@@ -196,6 +264,7 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
         duration: n.duration ?? null,
         frequency: n.frequency ?? null,
         idef0_parent: null,
+        bpmn_scope: op?.id ?? null,
         status: n.confidence >= 0.6 ? "confirmed" : "hypothesis",
         confidence: n.confidence,
         source: [{ fragment_id: n.source_fragment_id, quote: n.quote }],
@@ -205,6 +274,11 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
       };
       nodes.push(node);
       orderToNodeId.set(n.order_hint, nodeId);
+      if (op) {
+        opSteps.get(op.id)!.push(nodeId);
+        const prev = opOrder.get(op.id);
+        if (prev === undefined || globalOrder < prev) opOrder.set(op.id, globalOrder);
+      }
 
       if (n.condition_branches && n.condition_branches.length > 0) {
         node.subtype = node.subtype || "exclusive";
@@ -252,6 +326,67 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     if (!flows.some((f) => f.from === a.id)) {
       flows.push({ id: `flow${flows.length + 1}`, from: a.id, to: b.id, condition: null, source: [], confirmed_by: [] });
     }
+  }
+
+  // Сборка структуры (ФТ-3): операции становятся блоками общей схемы, а связи между действиями разных операций —
+  // связями операций, тогда как сами действия остаются внутри диаграммы своей операции (bpmn_scope).
+  // Без операций (короткий процесс или офлайн-экстрактор) модель остаётся плоской, как раньше.
+  // Операция без действий блоком не становится: LLM иногда называет операцией само действие — иначе на общей схеме
+  // появляются пустые блоки-дубликаты действий (видно на живом прогоне интервью).
+  const usedOps = [...opByKey.values()].filter((op) => (opSteps.get(op.id) ?? []).length > 0);
+  if (usedOps.length > 0) {
+    // Глубина 2+: операции с подпроцессом становятся его детьми (уровень 1), подпроцесс — блоком уровня 0.
+    // Подпроцесс с единственной операцией уровень не создаёт: лишний слой без содержания.
+    const usedSubIds = new Set<string>();
+    for (const op of usedOps) {
+      const subName = opSubName.get(op.id);
+      if (!subName) continue;
+      const key = normKey(subName);
+      const sub = subByKey.get(key);
+      if (!sub) continue;
+      const siblings = usedOps.filter((o) => { const n = opSubName.get(o.id); return !!n && normKey(n) === key; });
+      if (siblings.length < 2) continue;
+      op.idef0_parent = sub.id;
+      usedSubIds.add(sub.id);
+    }
+
+    const scopeOf = new Map<string, string>();
+    for (const [opId, stepIds] of opSteps) for (const s of stepIds) scopeOf.set(s, opId);
+    const owner = (id: string) => scopeOf.get(id) ?? id;
+    const kept: ProcessFlow[] = [];
+    const seen = new Set<string>();
+    for (const f of flows) {
+      const a = owner(f.from);
+      const b = owner(f.to);
+      // связь внутри одной операции (или внутри общей схемы) остаётся между шагами; связь уровня операций — как есть
+      if (a === b || ((a === f.from && b === f.to) && !scopeOf.has(f.from) && !scopeOf.has(f.to))) {
+        kept.push(f);
+        continue;
+      }
+      // выведенная связка плоской модели (source: []) между разными операциями не переносится: она была нужна,
+      // чтобы не распадался плоский поток, а у операций будет своя связь (ниже, по порядку действий)
+      if (f.source.length === 0) continue;
+      const key = `${a}|${b}|${f.condition ?? ""}`;
+      if (seen.has(key)) continue; // одно и то же направление между операциями — одной связью
+      seen.add(key);
+      kept.push({ ...f, from: a, to: b });
+    }
+    flows.length = 0;
+    flows.push(...kept);
+
+    // операции, у которых не осталось ни одной связи, выстраиваем в порядке их действий: общая схема не должна распадаться
+    const wired = new Set<string>();
+    for (const f of flows) {
+      wired.add(f.from);
+      wired.add(f.to);
+    }
+    const ordered = [...usedOps].sort((a, b) => (opOrder.get(a.id) ?? 0) - (opOrder.get(b.id) ?? 0));
+    for (let i = 0; i < ordered.length - 1; i++) {
+      if (wired.has(ordered[i].id)) continue;
+      flows.push({ id: `flow${flows.length + 1}`, from: ordered[i].id, to: ordered[i + 1].id, condition: null, source: [], confirmed_by: [] });
+    }
+    for (const sub of subByKey.values()) if (usedSubIds.has(sub.id)) nodes.push(sub);
+    for (const op of usedOps) nodes.push(op);
   }
 
   const model: ProcessLogicModel = {

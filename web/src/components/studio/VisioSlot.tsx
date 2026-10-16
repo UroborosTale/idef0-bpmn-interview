@@ -230,7 +230,7 @@ export default function VisioSlot({ sessionId, updatedAt, diagram, toolbar, susp
         )}
       </div>
       <div className="visio-body">
-        {diagram.kind === "bpmn" && <ShapePalette onExisting={toolbar.onExisting} />}
+        <ShapePalette mode={diagram.kind === "idef0" ? "idef0" : "bpmn"} onExisting={toolbar.onExisting} />
         <div ref={ref} className="visio-slot" data-visio-slot>
           Visio открывается на этом месте…
         </div>

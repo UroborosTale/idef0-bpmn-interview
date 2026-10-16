@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { normalizedProcessCode } from "../components/studio/quick-fixes";
 import type { SessionMeta } from "../types";
 
 function fileToBase64(file: File): Promise<string> {
@@ -28,6 +29,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
   const [diagramFormat, setDiagramFormat] = useState<DiagramFormat>("bpmn");
   const [diagramFile, setDiagramFile] = useState<File | null>(null);
   const [processName, setProcessName] = useState("");
+  const [processCode, setProcessCode] = useState("");
   const [owner, setOwner] = useState("");
   const [department, setDepartment] = useState("");
   const [modelType, setModelType] = useState<"AS-IS" | "TO-BE">("AS-IS");
@@ -47,6 +49,12 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
       setError("Укажите название процесса");
       return;
     }
+    // код процесса — необязательный, но если задан, приводим к виду B002.00.00 (по нему нумеруются функции и шаги)
+    const code = processCode.trim() ? normalizedProcessCode(processCode) : null;
+    if (processCode.trim() && !code) {
+      setError("Код не по шаблону: буква группы (A, B, C) и номер в реестре, например B002.");
+      return;
+    }
     if (mode === "diagram" && !diagramFile) {
       setError("Выберите файл диаграммы");
       return;
@@ -56,6 +64,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
     try {
       const meta: SessionMeta = {
         processName: processName.trim(),
+        ...(code ? { code } : {}),
         owner: owner.trim() || undefined,
         department: department.trim() || undefined,
         modelType,
@@ -111,6 +120,15 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
           <input value={processName} onChange={(e) => setProcessName(e.target.value)} placeholder="например, Согласование заявки на закупку" />
         </div>
 
+        <div className="form-row">
+          <label>Код процесса</label>
+          <input value={processCode} onChange={(e) => setProcessCode(e.target.value)} placeholder="например, B002" />
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Необязательно. Код вида B002 (можно ввести «B2» или «Б2») — приложение приведёт его к B002.00.00. По коду функции и шаги
+            нумеруются по Соглашению, а операции получают диаграммы. Без кода его можно задать потом в «Мастере структуры».
+          </div>
+        </div>
+
         <div className="two-col">
           <div className="form-row">
             <label>Владелец процесса</label>
@@ -132,7 +150,14 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
           </div>
           <div className="form-row">
             <label>Глубина декомпозиции IDEF0</label>
-            <input type="number" min={1} max={4} value={depth} onChange={(e) => setDepth(Number(e.target.value) || 2)} />
+            <select value={depth >= 2 ? 2 : 1} onChange={(e) => setDepth(Number(e.target.value) || 2)}>
+              <option value={1}>1 — операции процесса</option>
+              <option value={2}>2 — подпроцессы и операции</option>
+            </select>
+            <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+              Глубина 2: при разборе интервью операции группируются в подпроцессы (как в эталоне B002). Глубина 1: операции
+              процесса без подпроцессов. По Соглашению глубже операций функций нет.
+            </p>
           </div>
         </div>
 

@@ -28,6 +28,7 @@ sessionsRouter.post("/sessions", (req, res) => {
   }
   const meta: SessionMeta = {
     processName: body.meta.processName,
+    code: body.meta.code,
     department: body.meta.department,
     owner: body.meta.owner,
     modelType: body.meta.modelType ?? "AS-IS",
@@ -51,6 +52,7 @@ sessionsRouter.post("/sessions/blank", async (req, res) => {
   }
   const meta: SessionMeta = {
     processName: body.meta.processName.trim(),
+    code: body.meta.code,
     department: body.meta.department,
     owner: body.meta.owner,
     modelType: body.meta.modelType ?? "AS-IS",
@@ -58,8 +60,8 @@ sessionsRouter.post("/sessions/blank", async (req, res) => {
     notations: body.meta.notations ?? ["IDEF0", "BPMN"],
     confidential: body.meta.confidential ?? false,
   };
-  const session = createSession({ title: body.title || meta.processName, mode: "A", meta });
-  const model = emptyModel({ id: `proc_${Date.now()}`, name: meta.processName, owner: meta.owner, department: meta.department, type: meta.modelType, decomposition_depth: meta.decompositionDepth, notations: meta.notations });
+  const session = createSession({ title: body.title || meta.processName, mode: "blank", meta });
+  const model = emptyModel({ id: `proc_${Date.now()}`, name: meta.processName, code: meta.code, owner: meta.owner, department: meta.department, type: meta.modelType, decomposition_depth: meta.decompositionDepth, notations: meta.notations });
   const bpmn = await generateBpmn(model);
   updateSession(session.id, { model, validation: validateModel(model), bpmnXml: bpmn.xml, idef0: generateIdef0(model), status: "ready", diagramsStale: false });
   logAudit(session.id, "analyst", "blank_session_created");

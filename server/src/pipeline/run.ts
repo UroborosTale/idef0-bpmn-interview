@@ -83,6 +83,8 @@ export async function runPipeline(
   });
 
   model.gaps = detectGaps(model);
+  // Код процесса, заданный аналитиком при создании сессии: если извлечение код не нашло, берём его
+  if (meta.code && !model.process.code) model.process.code = meta.code;
   const validation = [...reportIssues(report), ...validateModel(model)];
   const bpmn = await generateBpmn(model);
   const idef0 = generateIdef0(model);

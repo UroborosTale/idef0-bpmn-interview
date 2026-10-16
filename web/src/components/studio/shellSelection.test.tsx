@@ -159,6 +159,41 @@ describe("выделение между студией и Visio", () => {
     expect(saved.nodes.find((n) => n.id === "b")!.system_ids).toContain("s1");
   });
 
+  it("палитра: у исполнителей и нормативных документов есть «Новый…» — объект создаётся и сразу привязан к шагу", async () => {
+    sessionStorage.clear();
+    const onSave = vi.fn(async () => true);
+    render(<Studio session={session()} busy={false} onSave={onSave} />);
+    const lastMenu = () => post.mock.calls.map((c) => c[0] as { t: string; id?: string; items?: { id?: string; label?: string }[] }).filter((m) => m.t === "menu").at(-1)!;
+    const pickItem = async (menuId: string, item: string) => {
+      await act(async () => listeners.forEach((h) => h({ data: { t: "menu-pick", id: menuId, item } })));
+      await act(async () => new Promise((r) => setTimeout(r, 10)));
+    };
+    type Saved = { roles: { id: string; name: string }[]; controls: { id: string; name: string }[]; nodes: { id: string; role_id: string | null; controls: string[] }[] };
+    const lastSaved = () => (onSave.mock.calls.at(-1) as unknown as [Saved])[0];
+    fromShell({ t: "visio-select", kind: "node", id: "b" });
+
+    // исполнитель: без «Новый…» в пустой модели палитра ничего не предлагала, а дорожку в Visio добавить было нечем
+    vi.stubGlobal("prompt", vi.fn(() => "Новый исполнитель"));
+    fireEvent.click(document.querySelector('[aria-label="Исполнители"]')!);
+    const rolesMenu = lastMenu();
+    expect(rolesMenu.items!.map((i) => i.id)).toContain("new-role");
+    await pickItem(rolesMenu.id!, "new-role");
+    const role = lastSaved().roles.find((r) => r.name === "Новый исполнитель")!;
+    expect(role).toBeTruthy();
+    expect(lastSaved().nodes.find((n) => n.id === "b")!.role_id).toBe(role.id);
+
+    // нормативный документ: то же самое, отметкой «управление»
+    vi.stubGlobal("prompt", vi.fn(() => "Правила обучения"));
+    fireEvent.click(document.querySelector('[aria-label="Нормативные документы"]')!);
+    const ctlMenu = lastMenu();
+    expect(ctlMenu.items!.map((i) => i.id)).toContain("new-ctl");
+    await pickItem(ctlMenu.id!, "new-ctl");
+    const control = lastSaved().controls.find((c) => c.name === "Правила обучения")!;
+    expect(control).toBeTruthy();
+    expect(lastSaved().nodes.find((n) => n.id === "b")!.controls).toContain(control.id);
+    vi.unstubAllGlobals();
+  });
+
   it("кнопка «Лист»: формат A3 и книжная ориентация записываются в настройки листа модели", async () => {
     sessionStorage.clear();
     const onSave = vi.fn(async () => true);

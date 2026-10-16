@@ -20,10 +20,15 @@ const Role = z.object({ name: str, kind: z.enum(["internal", "external"]).catch(
 const System = z.object({ name: str, ...sourced });
 const Data = z.object({ name: str, kind: z.enum(["document", "data"]).catch("document"), ...sourced });
 const Control = z.object({ name: str, kind: z.enum(["regulation", "rule", "norm"]).catch("rule"), ...sourced });
+/** Операция процесса: этап, к которому относятся действия (node.operation_name). */
+const Operation = z.object({ name: str, subprocess_name: optStr, ...sourced });
+/** Подпроцесс — группа операций (уровень 0); спрашивается при глубине декомпозиции 2+. */
+const Subprocess = z.object({ name: str, ...sourced });
 const Node = z.object({
   type: z.enum(["task", "event", "gateway", "subprocess"]),
   subtype: optStr.transform((v) => v ?? undefined),
   name: str,
+  operation_name: optStr,
   role_name: optStr,
   system_names: names,
   input_names: names,
@@ -93,6 +98,8 @@ export function normalizeChunk(raw: unknown, fragments: LLMFragmentInput[]): { r
     systems: parseList(System, obj.systems, check).map(fix),
     data: parseList(Data, obj.data, check).map(fix),
     controls: parseList(Control, obj.controls, check).map(fix),
+    operations: parseList(Operation, obj.operations, check).map(fix),
+    subprocesses: parseList(Subprocess, obj.subprocesses, check).map(fix),
     nodes: parseList(Node, obj.nodes, check).map(fix) as ExtractionChunkResult["nodes"],
     flows: parseList(Flow, obj.flows, check).map(fix),
     statements: parseList(Statement, obj.statements, check).map(fix),

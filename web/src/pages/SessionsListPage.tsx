@@ -52,7 +52,7 @@ export default function SessionsListPage({ onOpen, onCreateNew }: { onOpen: (id:
               </div>
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className={`pill mode-${s.mode}`}>{s.mode === "B" ? "Интервью" : "Текст"}</span>
+              <span className={`pill mode-${s.mode}`}>{s.mode === "B" ? "Интервью" : s.mode === "blank" ? "С нуля" : "Текст"}</span>
               <span className={`pill status-${s.status}`}>{STATUS_LABEL[s.status] ?? s.status}</span>
               {s.gapsOpen > 0 && <span className="pill">{s.gapsOpen} пробел(ов)</span>}
               {s.hasErrors && <span className="pill errors">ошибки валидации</span>}

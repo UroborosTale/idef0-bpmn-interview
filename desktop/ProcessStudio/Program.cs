@@ -392,8 +392,10 @@ internal sealed class MainForm : Form
             var c = doc.RootElement.GetProperty("changes");
             int n(string k) => c.GetProperty(k).GetArrayLength();
             visio.TagCreated(c);
+            // IDEF0: блоки и стрелки, нарисованные на диаграмме, тоже получают метки модели (у стрелок ещё вид связи pm_a)
+            if (c.TryGetProperty("idef0", out var idf) && (idf.GetProperty("added").GetArrayLength() > 0 || idf.GetProperty("addedArrows").GetArrayLength() > 0)) visio.TagCreatedIdef0(idf);
             var changed = n("renamed") + n("added") + n("addedFlows") + n("flowsRenamed");
-            status.Text = (auto ? "Автоматически: " : "") + $"правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}" + (n("missing") + n("missingFlows") > 0 ? $"; удалено в Visio {n("missing")} шагов и {n("missingFlows")} стрелок (в модели остались)" : "") + (c.TryGetProperty("deleted", out var del) && del.GetProperty("nodes").GetInt32() + del.GetProperty("flows").GetInt32() > 0 ? $"; из модели удалено: объектов {del.GetProperty("nodes").GetInt32()}, стрелок {del.GetProperty("flows").GetInt32()}" : "");
+            status.Text = (auto ? "Автоматически: " : "") + $"правки приняты: переименовано {n("renamed")}, новых шагов {n("added")}, стрелок {n("addedFlows")}" + (c.TryGetProperty("idef0", out var idfStat) ? (idfStat.GetProperty("added").GetArrayLength() + idfStat.GetProperty("addedArrows").GetArrayLength() > 0 ? $"; IDEF0: новых блоков {idfStat.GetProperty("added").GetArrayLength()}, стрелок {idfStat.GetProperty("addedArrows").GetArrayLength()}" : "") : "") + (n("missing") + n("missingFlows") > 0 ? $"; удалено в Visio {n("missing")} шагов и {n("missingFlows")} стрелок (в модели остались)" : "") + (c.TryGetProperty("deleted", out var del) && del.GetProperty("nodes").GetInt32() + del.GetProperty("flows").GetInt32() > 0 ? $"; из модели удалено: объектов {del.GetProperty("nodes").GetInt32()}, стрелок {del.GetProperty("flows").GetInt32()}" : "");
             if (!auto || changed > 0) PostToWeb("{\"t\":\"session\",\"session\":" + doc.RootElement.GetProperty("session").GetRawText() + "}");
             return json;
         }

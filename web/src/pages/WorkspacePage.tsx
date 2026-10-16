@@ -174,7 +174,7 @@ export default function WorkspacePage({
       tabs: [
         ...(session.mode === "B" ? [{ key: "chat" as Tab, label: "Интервью" }] : []),
         { key: "studio", label: "Студия" },
-        { key: "text", label: "Текст" },
+        ...(session.mode === "blank" ? [] : [{ key: "text" as Tab, label: "Текст" }]),
         { key: "bpmn", label: "BPMN (просмотр)" },
         { key: "idef0", label: "IDEF0 (просмотр)" },
         { key: "model", label: "Модель (данные)" },
@@ -233,7 +233,7 @@ export default function WorkspacePage({
         <button onClick={onBack}>← Назад</button>
         <h2 style={{ margin: 0 }}>{session.title}</h2>
         <span className={`pill status-${session.status}`}>{session.status}</span>
-        {session.diagramsStale && (
+        {session.diagramsStale && !desk && (
           <button onClick={() => withBusy(async () => setSession(await api.rebuildDiagrams(sessionId)))}>
             Пересобрать диаграммы (модель изменена)
           </button>
