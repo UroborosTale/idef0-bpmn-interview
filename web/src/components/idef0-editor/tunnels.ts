@@ -9,6 +9,8 @@ type M = ProcessLogicModel;
  * нарушением баланса декомпозиции. Туннелируются только входы, выходы, управление и управление-данные.
  */
 export type TunnelEnd = "up" | "down";
+/** Вид помеченного конца стрелки: «none» — конец прикреплён, «tunnel» — скобки туннеля, «boundary» — штрих «Граница». */
+export type ArrowMark = "none" | "tunnel" | "boundary";
 
 export const canTunnel = (kind: ArrowKind): boolean => TUNNEL_KINDS.has(kind);
 
@@ -17,19 +19,34 @@ export function tunnelOf(m: M, a: { nodeId: string; kind: ArrowKind; entityId: s
   return { up: !!t?.up, down: !!t?.down };
 }
 
-export function setArrowTunnel(m: M, a: { nodeId: string; kind: ArrowKind; entityId: string }, end: TunnelEnd, on: boolean): M {
+/** Что стоит на конце стрелки: прикреплён / скобки туннеля / штрих «Граница» (Business Studio). */
+export function markOf(m: M, a: { nodeId: string; kind: ArrowKind; entityId: string }, end: TunnelEnd): ArrowMark {
+  const t = m.nodes.find((n) => n.id === a.nodeId)?.tunnels?.[arrowRouteKey(a.kind, a.entityId)];
+  if ((end === "up" ? t?.upKind : t?.downKind) === "boundary") return "boundary";
+  return (end === "up" ? t?.up : t?.down) ? "tunnel" : "none";
+}
+
+export function setArrowMark(m: M, a: { nodeId: string; kind: ArrowKind; entityId: string }, end: TunnelEnd, mark: ArrowMark): M {
   if (!canTunnel(a.kind)) return m;
-  const key = arrowRouteKey(a.kind, a.entityId);
+  const kindField = end === "up" ? "upKind" : "downKind";
   return {
     ...m,
     nodes: m.nodes.map((n) => {
       if (n.id !== a.nodeId) return n;
       const tunnels = { ...(n.tunnels ?? {}) };
-      const next = { ...(tunnels[key] ?? {}) };
-      if (on) next[end] = true;
-      else delete next[end];
-      if (Object.keys(next).length === 0) delete tunnels[key];
-      else tunnels[key] = next;
+      const next: Record<string, boolean | string> = { ...(tunnels[arrowRouteKey(a.kind, a.entityId)] ?? {}) };
+      if (mark === "none") {
+        delete next[end];
+        delete next[kindField];
+      } else if (mark === "tunnel") {
+        next[end] = true;
+        delete next[kindField];
+      } else {
+        delete next[end];
+        next[kindField] = "boundary";
+      }
+      if (Object.keys(next).length === 0) delete tunnels[arrowRouteKey(a.kind, a.entityId)];
+      else tunnels[arrowRouteKey(a.kind, a.entityId)] = next as { up?: boolean; down?: boolean };
       const { tunnels: _old, ...rest } = n;
       return Object.keys(tunnels).length === 0 ? (rest as typeof n) : { ...rest, tunnels };
     }),

@@ -299,8 +299,12 @@ export function validateModel(model: Omit<ProcessLogicModel, "gaps">): Validatio
       data: new Set(kids.flatMap((k) => k.control_data_ids ?? [])),
     };
     // туннель снимает стрелку с проверки: у родителя down — «в декомпозиции её нет», у дочерней up — «выше её нет»
-    const tunnelDown = (kind: string, id: string) => !!parent.tunnels?.[`${kind}:${id}`]?.down;
-    const tunnelUp = (kind: string, id: string) => kids.some((k) => k.tunnels?.[`${kind}:${id}`]?.up);
+    // «Граница» (upKind/downKind: boundary) снимает конец стрелки с проверки так же, как туннель: стрелка кончается
+    // на рамке диаграммы и дальше не идёт (как в Business Studio).
+    const marked = (t: { up?: boolean; down?: boolean; upKind?: string; downKind?: string } | undefined, end: "up" | "down") =>
+      end === "up" ? !!t?.up || t?.upKind === "boundary" : !!t?.down || t?.downKind === "boundary";
+    const tunnelDown = (kind: string, id: string) => marked(parent.tunnels?.[`${kind}:${id}`], "down");
+    const tunnelUp = (kind: string, id: string) => kids.some((k) => marked(k.tunnels?.[`${kind}:${id}`], "up"));
     const pIn = parent.inputs;
     const pCtl = parent.controls;
     const pData = parent.control_data_ids ?? [];

@@ -37,6 +37,10 @@ export const arrowRouteKey = (kind: ArrowKind, entityId: string) => `${kind}:${e
 export interface ArrowTunnel {
   up?: boolean;
   down?: boolean;
+  /** Вид помеченного конца: «tunnel» — скобки (стрелка продолжается на другой диаграмме), «boundary» — штрих:
+   *  стрелка кончается на рамке диаграммы и дальше не идёт (как «Граница» в Business Studio). */
+  upKind?: "tunnel" | "boundary";
+  downKind?: "tunnel" | "boundary";
 }
 export const TUNNEL_KINDS: ReadonlySet<ArrowKind> = new Set<ArrowKind>(["input", "output", "control", "controlData"]);
 
@@ -51,20 +55,26 @@ export interface TunnelArc {
  * Скобки «( )» у помеченных концов стрелки: у свободного конца (tunnelUp) и у блока (tunnelDown). Скобки охватывают
  * конец стрелки: центр на 7 px внутрь от конца, расстояние между скобками 10 px, высота 14 px.
  */
-export function tunnelArcs(a: { kind: ArrowKind; points: Pt[]; tunnelUp?: boolean; tunnelDown?: boolean }): TunnelArc[] {
+export function tunnelArcs(a: { kind: ArrowKind; points: Pt[]; tunnelUp?: boolean; tunnelDown?: boolean; boundaryUp?: boolean; boundaryDown?: boolean }): TunnelArc[] {
   const pts = a.points;
-  if (pts.length < 2 || !TUNNEL_KINDS.has(a.kind) || (!a.tunnelUp && !a.tunnelDown)) return [];
+  if (pts.length < 2 || !TUNNEL_KINDS.has(a.kind) || (!a.tunnelUp && !a.tunnelDown && !a.boundaryUp && !a.boundaryDown)) return [];
   const last = pts.length - 1;
   const freeAtEnd = FREE_END[a.kind] === "end";
   const free = freeAtEnd ? { at: pts[last], from: pts[last - 1] } : { at: pts[0], from: pts[1] };
   const block = freeAtEnd ? { at: pts[0], from: pts[1] } : { at: pts[last], from: pts[last - 1] };
   const out: TunnelArc[] = [];
-  for (const [on, end] of [[a.tunnelUp, free], [a.tunnelDown, block]] as const) {
+  for (const [on, boundary, end] of [[a.tunnelUp, false, free], [a.tunnelDown, false, block], [a.boundaryUp, true, free], [a.boundaryDown, true, block]] as const) {
     if (!on) continue;
     const len = Math.hypot(end.at[0] - end.from[0], end.at[1] - end.from[1]) || 1;
     const t = [(end.at[0] - end.from[0]) / len, (end.at[1] - end.from[1]) / len];
     const n = [-t[1], t[0]];
     const c = [end.at[0] - t[0] * 7, end.at[1] - t[1] * 7];
+    if (boundary) {
+      // «Граница»: один прямой штрих поперёк стрелки у самого конца (ctl в середине — кривая вырождается в отрезок,
+      // поэтому редактор, SVG и Visio рисуют его одной и той же веткой кода).
+      out.push({ from: [c[0] + n[0] * 8, c[1] + n[1] * 8], ctl: [c[0], c[1]], to: [c[0] - n[0] * 8, c[1] - n[1] * 8] });
+      continue;
+    }
     for (const s of [-1, 1]) {
       const b = [c[0] + t[0] * s * 5, c[1] + t[1] * s * 5];
       out.push({
@@ -175,6 +185,9 @@ export interface Arrow {
   /** Туннель у свободного конца (стрелки нет на диаграмме выше) и у блока (нет на диаграмме ниже): скобки у этих концов. */
   tunnelUp?: boolean;
   tunnelDown?: boolean;
+  /** Конец стрелки помечен «Границей» — штрих на конце (см. tunnelArcs). */
+  boundaryUp?: boolean;
+  boundaryDown?: boolean;
   /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
   manual?: boolean;
   /** Подпись не рисуется: механизм общий для нескольких блоков, подпись стоит на «шине» у одной из его стрелок. */
@@ -488,6 +501,15 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     const t = fnNodes.find((n) => n.id === a.nodeId)?.tunnels?.[arrowRouteKey(a.kind, a.entityId)];
     if (t?.up) a.tunnelUp = true;
     if (t?.down) a.tunnelDown = true;
+    // «Граница»: штрих на конце вместо скобок туннеля (вид помеченного конца из паспорта процесса)
+    if (t?.upKind === "boundary") {
+      a.boundaryUp = true;
+      a.tunnelUp = false;
+    }
+    if (t?.downKind === "boundary") {
+      a.boundaryDown = true;
+      a.tunnelDown = false;
+    }
   }
   return { functions, arrows };
 }

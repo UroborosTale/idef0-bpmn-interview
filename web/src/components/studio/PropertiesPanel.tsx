@@ -8,7 +8,7 @@ import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
 import { removeArrow, setArrowIcom } from "../idef0-editor/ops";
 import { resetArrow, routeOf, setArrowRoute } from "../idef0-editor/arrow-edit";
-import { canTunnel, setArrowTunnel, tunnelOf } from "../idef0-editor/tunnels";
+import { canTunnel, markOf, setArrowMark, tunnelOf, type ArrowMark } from "../idef0-editor/tunnels";
 import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
 import { MessageCard, PoolCard } from "./PoolCards";
@@ -337,13 +337,29 @@ export default function PropertiesPanel({
           </button>
         </div>
         {canTunnel(a.kind) && (
-          <Section title="Туннель" open={tunnelOf(model, a).up || tunnelOf(model, a).down}>
-            <p className="muted prop-note">Туннель рисуется скобками у конца стрелки: она не продолжается на соседней диаграмме. Туннелированная стрелка не считается нарушением баланса декомпозиции.</p>
+          <Section
+            title="Туннель и граница"
+            open={tunnelOf(model, a).up || tunnelOf(model, a).down || markOf(model, a, "up") === "boundary" || markOf(model, a, "down") === "boundary"}
+          >
+            <p className="muted prop-note">
+              Туннель рисуется скобками у конца стрелки: она не продолжается на соседней диаграмме. «Граница» рисуется штрихом: стрелка
+              кончается на рамке диаграммы и дальше не идёт (как в Business Studio). Оба вида не считаются нарушением баланса декомпозиции.
+            </p>
             <label className="prop-check">
-              <input type="checkbox" checked={tunnelOf(model, a).up} onChange={(e) => onChange(setArrowTunnel(model, a, "up", e.target.checked))} /> У свободного конца: нет на диаграмме выше
+              У свободного конца (стрелка с диаграммы выше)
+              <select value={markOf(model, a, "up")} onChange={(e) => onChange(setArrowMark(model, a, "up", e.target.value as ArrowMark))}>
+                <option value="none">Стрелка прикреплена</option>
+                <option value="tunnel">Туннель (скобки): нет на диаграмме выше</option>
+                <option value="boundary">Граница (штрих): конец на рамке диаграммы</option>
+              </select>
             </label>
             <label className="prop-check">
-              <input type="checkbox" checked={tunnelOf(model, a).down} onChange={(e) => onChange(setArrowTunnel(model, a, "down", e.target.checked))} /> У блока: нет в декомпозиции функции
+              У блока (стрелка в декомпозиции функции)
+              <select value={markOf(model, a, "down")} onChange={(e) => onChange(setArrowMark(model, a, "down", e.target.value as ArrowMark))}>
+                <option value="none">Стрелка прикреплена</option>
+                <option value="tunnel">Туннель (скобки): нет в декомпозиции функции</option>
+                <option value="boundary">Граница (штрих): конец на рамке диаграммы</option>
+              </select>
             </label>
           </Section>
         )}

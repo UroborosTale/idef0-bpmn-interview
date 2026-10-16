@@ -44,6 +44,9 @@ export interface Idef0Arrow {
   /** Туннель: скобки у свободного конца и у блока (shared/idef0Layout.ts, tunnelArcs). */
   tunnelUp?: boolean;
   tunnelDown?: boolean;
+  /** «Граница» на конце стрелки: штрих вместо скобок туннеля. */
+  boundaryUp?: boolean;
+  boundaryDown?: boolean;
 }
 
 export interface Idef0Block {
@@ -127,6 +130,8 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     endNode: a.kind === "output" ? undefined : a.nodeId,
     ...(a.tunnelUp ? { tunnelUp: true } : {}),
     ...(a.tunnelDown ? { tunnelDown: true } : {}),
+    ...(a.boundaryUp ? { boundaryUp: true } : {}),
+    ...(a.boundaryDown ? { boundaryDown: true } : {}),
   }));
 
   // стрелки на границе диаграммы — это её внешние входы, управление, выходы и механизмы (для A-0)
@@ -281,7 +286,7 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   for (const a of d.arrows) {
     const path = a.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
     parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.1" marker-end="url(#arrow)" />`);
-    if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
+    if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
     if (lab) {
       parts.push(`<text x="${lab.x}" y="${lab.y}" font-size="10.5" text-anchor="${lab.anchor}" font-family="Arial, sans-serif" fill="#000000">${lab.text.split("\n").map((line, i) => `<tspan x="${lab.x}" dy="${i === 0 ? 0 : 12}">${esc(line)}</tspan>`).join("")}</text>`);

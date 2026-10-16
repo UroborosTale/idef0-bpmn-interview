@@ -119,7 +119,7 @@ export interface ProcessNode {
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
   /** Туннели внешних стрелок IDEF0 этой функции (скобки у конца): ключ «вид:сущность»; up — нет на диаграмме выше, down — нет в декомпозиции. */
-  tunnels?: Record<string, { up?: boolean; down?: boolean }>;
+  tunnels?: Record<string, { up?: boolean; down?: boolean; upKind?: "tunnel" | "boundary"; downKind?: "tunnel" | "boundary" }>;
   /** Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность». */
   arrow_routes?: Record<string, ArrowRoute>;
   /** Ручное смещение значков документов и хранилищ BPMN от автоматического места: ключ «вид:сущность». */

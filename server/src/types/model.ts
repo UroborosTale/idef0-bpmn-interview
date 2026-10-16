@@ -176,8 +176,19 @@ export const ProcessNode = z.object({
   layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   // Туннели внешних стрелок IDEF0 (скобки у конца): ключ «вид:сущность» (input:d1, control:c1, output:d2, controlData:d3);
   // up — стрелка не продолжается на диаграмме выше, down — на диаграмме ниже (в декомпозиции функции). Туннель снимает
-  // стрелку с проверки баланса декомпозиции.
-  tunnels: z.record(z.string(), z.object({ up: z.boolean().optional(), down: z.boolean().optional() })).optional(),
+  // стрелку с проверки баланса декомпозиции; upKind/downKind: «tunnel» — скобки (по умолчанию), «boundary» — штрих
+  // «Граница»: стрелка кончается на рамке диаграммы (как в Business Studio), проверка баланса её тоже пропускает.
+  tunnels: z
+    .record(
+      z.string(),
+      z.object({
+        up: z.boolean().optional(),
+        down: z.boolean().optional(),
+        upKind: z.enum(["tunnel", "boundary"]).optional(),
+        downKind: z.enum(["tunnel", "boundary"]).optional(),
+      })
+    )
+    .optional(),
   // Позиция блока на диаграмме IDEF0 A0 (редактор IDEF0); без неё блоки идут по диагонали.
   idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   // Ручные маршруты стрелок IDEF0, привязанных к этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1, system:s1…).

@@ -531,7 +531,7 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       arrowSize: 0,
     });
     // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
-    for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown })) {
+    for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) {
       const pts: Pt[] = [0, 0.25, 0.5, 0.75, 1].map((u) => [(1 - u) ** 2 * arc.from[0] + 2 * (1 - u) * u * arc.ctl[0] + u ** 2 * arc.to[0], (1 - u) ** 2 * arc.from[1] + 2 * (1 - u) * u * arc.ctl[1] + u ** 2 * arc.to[1]]);
       page.polyline(pts, { weightPt: 0.9, line: "#4677bf" });
     }
