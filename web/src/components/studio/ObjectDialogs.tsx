@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PARAMS, PARAM_SLOTS, PARAM_SLOT_LABELS, type ParamDisplay, type ParamSlot, type ParamSlotId } from "@shared/paramDisplay";
+import type { ConnectionIssue } from "@shared/connectionCheck";
 import type { ProcessNode } from "../../types";
 
 type Link = NonNullable<ProcessNode["hyperlinks"]>[number];
@@ -18,6 +19,36 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
         {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * «Проверка соединения» (В10): проблемные концы стрелок диаграммы IDEF0 — дубль сущности у блока,
+ * одна запись как вход и выход, ссылка на запись, которой нет в справочнике.
+ */
+export function ConnectionCheckDialog({ issues, onClose }: { issues: ConnectionIssue[]; onClose: () => void }) {
+  return (
+    <Modal title="Проверка соединения" onClose={onClose} wide>
+      {issues.length === 0 ? (
+        <p className="muted">Проблемных концов не найдено: у каждого блока сущности указаны один раз и есть в справочниках.</p>
+      ) : (
+        <>
+          <p className="muted">
+            Замечаний: {issues.length}. Исправьте концы стрелок в панели «Свойства» или в справочниках.
+          </p>
+          <ul className="modal-list" aria-label="Проблемные концы стрелок">
+            {issues.map((i) => (
+              <li key={i.id} data-issue-kind={i.kind}>
+                {i.message}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <div className="obj-actions">
+        <button onClick={onClose}>Закрыть</button>
+      </div>
+    </Modal>
   );
 }
 

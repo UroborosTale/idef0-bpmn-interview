@@ -17,7 +17,8 @@ import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geomet
 import { addFunction } from "../idef0-editor/ops";
 import { deleteNode, duplicateNode, replaceNodeObject, setEventDirection, setEventPosition, setEventTrigger, updateNode } from "../bpmn-editor/model-ops";
 import ChoiceDialog from "../ChoiceDialog";
-import { HyperlinksDialog, ParamsDialog } from "./ObjectDialogs";
+import { HyperlinksDialog, ParamsDialog, ConnectionCheckDialog } from "./ObjectDialogs";
+import { checkConnections, type ConnectionIssue } from "@shared/connectionCheck";
 import { allowedTriggers, eventSpec, type TriggerType } from "@shared/events";
 import { diagramSvg, download, sheetBox, svgToPng } from "./export-image";
 import { sheetPrintHtml, sheetPrintSetup } from "@shared/sheetPrint";
@@ -130,6 +131,8 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const [wizardOpen, setWizardOpen] = useState(false);
   /** Окно объекта по пункту меню фигуры: гиперссылки, показ параметров, смена объекта. */
   const [objDialog, setObjDialog] = useState<{ kind: "links" | "params" | "change"; id: string } | null>(null);
+  // В10: «Проверка соединения» — список замечаний по концам стрелок текущей диаграммы IDEF0
+  const [connCheck, setConnCheck] = useState<ConnectionIssue[] | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [tasks, setTasks] = useState<AgentTaskRow[]>([]);
   const [questions, setQuestions] = useState<AgentQuestionRow[]>([]);
@@ -1041,6 +1044,11 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                     <RibbonIcon name="icom" />
                   </button>
                 )}
+                {active.kind === "idef0" && (
+                  <button className="ribbon-icon" aria-label="Проверка соединения" onClick={() => setConnCheck(checkConnections(draft, active.parent))} title="Проверка соединения: проблемные концы стрелок текущей диаграммы IDEF0 (дубли сущностей, записи не из справочника)">
+                    <RibbonIcon name="checks" />
+                  </button>
+                )}
               </>
             )}
             <button className="rb" onClick={() => open(bpmnDoc())}>
@@ -1330,6 +1338,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           />
         );
       })()}
+      {connCheck && <ConnectionCheckDialog issues={connCheck} onClose={() => setConnCheck(null)} />}
       {wizardOpen && <StructureWizard model={draft} onApply={(next) => h.commit(seed(next, null))} onClose={() => setWizardOpen(false)} />}
       {notice && (
         <div className="bpe-banner" role="alert">
