@@ -9,8 +9,9 @@ type M = ProcessLogicModel;
  * нарушением баланса декомпозиции. Туннелируются только входы, выходы, управление и управление-данные.
  */
 export type TunnelEnd = "up" | "down";
-/** Вид помеченного конца стрелки: «none» — конец прикреплён, «tunnel» — скобки туннеля, «boundary» — штрих «Граница». */
-export type ArrowMark = "none" | "tunnel" | "boundary";
+/** Вид помеченного конца стрелки: «none» — конец прикреплён, «tunnel» — скобки туннеля, «boundary» — штрих «Граница»,
+ *  «offpage» — ссылка на диаграмму: значок страницы у конца (В11, стрелка показана на другой диаграмме). */
+export type ArrowMark = "none" | "tunnel" | "boundary" | "offpage";
 
 export const canTunnel = (kind: ArrowKind): boolean => TUNNEL_KINDS.has(kind);
 
@@ -19,10 +20,11 @@ export function tunnelOf(m: M, a: { nodeId: string; kind: ArrowKind; entityId: s
   return { up: !!t?.up, down: !!t?.down };
 }
 
-/** Что стоит на конце стрелки: прикреплён / скобки туннеля / штрих «Граница» (Business Studio). */
+/** Что стоит на конце стрелки: прикреплён / скобки туннеля / штрих «Граница» / значок «ссылка на диаграмму». */
 export function markOf(m: M, a: { nodeId: string; kind: ArrowKind; entityId: string }, end: TunnelEnd): ArrowMark {
   const t = m.nodes.find((n) => n.id === a.nodeId)?.tunnels?.[arrowRouteKey(a.kind, a.entityId)];
-  if ((end === "up" ? t?.upKind : t?.downKind) === "boundary") return "boundary";
+  const kind = end === "up" ? t?.upKind : t?.downKind;
+  if (kind === "boundary" || kind === "offpage") return kind;
   return (end === "up" ? t?.up : t?.down) ? "tunnel" : "none";
 }
 
@@ -43,7 +45,7 @@ export function setArrowMark(m: M, a: { nodeId: string; kind: ArrowKind; entityI
         delete next[kindField];
       } else {
         delete next[end];
-        next[kindField] = "boundary";
+        next[kindField] = mark; // «boundary» или «offpage»
       }
       if (Object.keys(next).length === 0) delete tunnels[arrowRouteKey(a.kind, a.entityId)];
       else tunnels[arrowRouteKey(a.kind, a.entityId)] = next as { up?: boolean; down?: boolean };

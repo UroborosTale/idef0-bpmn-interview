@@ -551,6 +551,11 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     });
     // В9: ICOM-код у конца у блока — часть диаграммы, как в Business Studio
     if (a.code && a.codeAt) page.label(a.code, { x: a.codeAt[0], y: a.codeAt[1] - 9, anchor: a.codeAnchor ?? "start", w: 30 }, { fontPx: 9, color: "#475569" });
+    // В11: значок «ссылка на диаграмму» у помеченного конца
+    for (const m of a.offpageAt ?? []) {
+      page.rect(m[0] - 5, m[1] - 6, 10, 12, { fill: "#ffffff", weightPt: 0.75 });
+      page.polyline([[m[0] + 1, m[1] - 6], [m[0] + 1, m[1] - 2], [m[0] + 5, m[1] - 2]], { weightPt: 0.75 });
+    }
     // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
     for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) {
       const pts: Pt[] = [0, 0.25, 0.5, 0.75, 1].map((u) => [(1 - u) ** 2 * arc.from[0] + 2 * (1 - u) * u * arc.ctl[0] + u ** 2 * arc.to[0], (1 - u) ** 2 * arc.from[1] + 2 * (1 - u) * u * arc.ctl[1] + u ** 2 * arc.to[1]]);

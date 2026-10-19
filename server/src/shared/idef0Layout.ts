@@ -38,9 +38,10 @@ export interface ArrowTunnel {
   up?: boolean;
   down?: boolean;
   /** Вид помеченного конца: «tunnel» — скобки (стрелка продолжается на другой диаграмме), «boundary» — штрих:
-   *  стрелка кончается на рамке диаграммы и дальше не идёт (как «Граница» в Business Studio). */
-  upKind?: "tunnel" | "boundary";
-  downKind?: "tunnel" | "boundary";
+   *  стрелка кончается на рамке диаграммы и дальше не идёт (как «Граница» в Business Studio), «offpage» — ссылка
+   *  на диаграмму: значок страницы у конца (В11). */
+  upKind?: "tunnel" | "boundary" | "offpage";
+  downKind?: "tunnel" | "boundary" | "offpage";
 }
 export const TUNNEL_KINDS: ReadonlySet<ArrowKind> = new Set<ArrowKind>(["input", "output", "control", "controlData"]);
 
@@ -84,6 +85,27 @@ export function tunnelArcs(a: { kind: ArrowKind; points: Pt[]; tunnelUp?: boolea
       });
     }
   }
+  return out;
+}
+
+/**
+ * В11: значки «ссылка на диаграмму» (OffPageReference) у помеченных концов стрелки. Центр страницы — на 12 px
+ * внутрь от конца: значок стоит перед наконечником и не выходит за рамку диаграммы.
+ */
+export function offpageMarks(a: { kind: ArrowKind; points: Pt[]; offpageUp?: boolean; offpageDown?: boolean }): Pt[] {
+  const pts = a.points;
+  if (pts.length < 2 || (!a.offpageUp && !a.offpageDown)) return [];
+  const last = pts.length - 1;
+  const freeAtEnd = FREE_END[a.kind] === "end";
+  const free = freeAtEnd ? { at: pts[last], from: pts[last - 1] } : { at: pts[0], from: pts[1] };
+  const block = freeAtEnd ? { at: pts[0], from: pts[1] } : { at: pts[last], from: pts[last - 1] };
+  const out: Pt[] = [];
+  const put = (end: { at: Pt; from: Pt }) => {
+    const len = Math.hypot(end.at[0] - end.from[0], end.at[1] - end.from[1]) || 1;
+    out.push([end.at[0] - ((end.at[0] - end.from[0]) / len) * 12, end.at[1] - ((end.at[1] - end.from[1]) / len) * 12]);
+  };
+  if (a.offpageUp) put(free);
+  if (a.offpageDown) put(block);
   return out;
 }
 
@@ -188,6 +210,9 @@ export interface Arrow {
   /** Конец стрелки помечен «Границей» — штрих на конце (см. tunnelArcs). */
   boundaryUp?: boolean;
   boundaryDown?: boolean;
+  /** В11: конец стрелки — ссылка на диаграмму («OffPageReference»): у конца рисуется значок страницы. */
+  offpageUp?: boolean;
+  offpageDown?: boolean;
   /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
   manual?: boolean;
   /** Подпись не рисуется: механизм общий для нескольких блоков, подпись стоит на «шине» у одной из его стрелок. */
@@ -565,6 +590,15 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     }
     if (t?.downKind === "boundary") {
       a.boundaryDown = true;
+      a.tunnelDown = false;
+    }
+    // В11: ссылка на диаграмму — значок страницы у конца вместо скобок туннеля
+    if (t?.upKind === "offpage") {
+      a.offpageUp = true;
+      a.tunnelUp = false;
+    }
+    if (t?.downKind === "offpage") {
+      a.offpageDown = true;
       a.tunnelDown = false;
     }
   }

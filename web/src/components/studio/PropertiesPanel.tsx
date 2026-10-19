@@ -8,7 +8,7 @@ import { idef0Codes, type ArrowKind } from "../idef0-editor/geometry";
 import AssignmentsEditor from "./AssignmentsEditor";
 import { removeArrow, setArrowIcom } from "../idef0-editor/ops";
 import { resetArrow, routeOf, setArrowRoute } from "../idef0-editor/arrow-edit";
-import { canTunnel, markOf, setArrowMark, tunnelOf, type ArrowMark } from "../idef0-editor/tunnels";
+import { canTunnel, markOf, setArrowMark, type ArrowMark } from "../idef0-editor/tunnels";
 import EntryCard from "./EntryCard";
 import { PoolsEditor } from "./MessagesEditor";
 import { MessageCard, PoolCard } from "./PoolCards";
@@ -339,11 +339,12 @@ export default function PropertiesPanel({
         {canTunnel(a.kind) && (
           <Section
             title="Туннель и граница"
-            open={tunnelOf(model, a).up || tunnelOf(model, a).down || markOf(model, a, "up") === "boundary" || markOf(model, a, "down") === "boundary"}
+            open={markOf(model, a, "up") !== "none" || markOf(model, a, "down") !== "none"}
           >
             <p className="muted prop-note">
               Туннель рисуется скобками у конца стрелки: она не продолжается на соседней диаграмме. «Граница» рисуется штрихом: стрелка
-              кончается на рамке диаграммы и дальше не идёт (как в Business Studio). Оба вида не считаются нарушением баланса декомпозиции.
+              кончается на рамке диаграммы. «Ссылка на диаграмму» — значок страницы: стрелка показана на другой диаграмме (как
+              OffPageReference в Business Studio). Все три вида не считаются нарушением баланса декомпозиции.
             </p>
             <label className="prop-check">
               У свободного конца (стрелка с диаграммы выше)
@@ -351,6 +352,7 @@ export default function PropertiesPanel({
                 <option value="none">Стрелка прикреплена</option>
                 <option value="tunnel">Туннель (скобки): нет на диаграмме выше</option>
                 <option value="boundary">Граница (штрих): конец на рамке диаграммы</option>
+                <option value="offpage">Ссылка на диаграмму (значок страницы)</option>
               </select>
             </label>
             <label className="prop-check">
@@ -359,6 +361,7 @@ export default function PropertiesPanel({
                 <option value="none">Стрелка прикреплена</option>
                 <option value="tunnel">Туннель (скобки): нет в декомпозиции функции</option>
                 <option value="boundary">Граница (штрих): конец на рамке диаграммы</option>
+                <option value="offpage">Ссылка на диаграмму (значок страницы)</option>
               </select>
             </label>
           </Section>

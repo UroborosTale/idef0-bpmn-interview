@@ -1,5 +1,5 @@
 import { type ResolvedStyle } from "@shared/shapeStyles";
-import { FREE_END, tunnelArcs } from "@shared/idef0Layout";
+import { FREE_END, offpageMarks, tunnelArcs } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 
@@ -139,6 +139,13 @@ export function ArrowShape({ arrow, selected, showLabel = true, showCode = false
       <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.2 : 1.1} markerEnd={selected ? "url(#i0-arrow-sel)" : "url(#i0-arrow)"} />
       {tunnelArcs(arrow).map((arc, i) => (
         <path key={`t${i}`} data-tunnel d={`M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}`} fill="none" stroke={color} strokeWidth={1.4} pointerEvents="none" />
+      ))}
+      {/* В11: значок «ссылка на диаграмму» у помеченного конца */}
+      {offpageMarks(arrow).map((c, i) => (
+        <g key={`o${i}`} data-offpage pointerEvents="none">
+          <rect x={c[0] - 5} y={c[1] - 6} width={10} height={12} fill="#fff" stroke={color} strokeWidth={1} />
+          <path d={`M${c[0] + 1} ${c[1] - 6} v4 h4`} fill="none" stroke={color} strokeWidth={1} />
+        </g>
       ))}
       {showLabel && (
         <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none" {...(arrow.side === "left" || arrow.side === "right" ? { stroke: "#fff", strokeWidth: 4, paintOrder: "stroke" } : {})}>

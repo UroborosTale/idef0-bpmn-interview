@@ -177,15 +177,16 @@ export const ProcessNode = z.object({
   // Туннели внешних стрелок IDEF0 (скобки у конца): ключ «вид:сущность» (input:d1, control:c1, output:d2, controlData:d3);
   // up — стрелка не продолжается на диаграмме выше, down — на диаграмме ниже (в декомпозиции функции). Туннель снимает
   // стрелку с проверки баланса декомпозиции; upKind/downKind: «tunnel» — скобки (по умолчанию), «boundary» — штрих
-  // «Граница»: стрелка кончается на рамке диаграммы (как в Business Studio), проверка баланса её тоже пропускает.
+  // «Граница»: стрелка кончается на рамке диаграммы, «offpage» — ссылка на диаграмму: значок страницы у конца (В11,
+  // стрелка показана на другой диаграмме). Проверка баланса пропускает все помеченные концы.
   tunnels: z
     .record(
       z.string(),
       z.object({
         up: z.boolean().optional(),
         down: z.boolean().optional(),
-        upKind: z.enum(["tunnel", "boundary"]).optional(),
-        downKind: z.enum(["tunnel", "boundary"]).optional(),
+        upKind: z.enum(["tunnel", "boundary", "offpage"]).optional(),
+        downKind: z.enum(["tunnel", "boundary", "offpage"]).optional(),
       })
     )
     .optional(),

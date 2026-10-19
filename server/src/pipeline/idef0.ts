@@ -1,6 +1,6 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
-import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 import { FRAME_FONT, frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
 export type { ArrowKind, LabelSide, Pt };
@@ -40,6 +40,8 @@ export interface Idef0Arrow {
   code?: string;
   codeAt?: Pt;
   codeAnchor?: "start" | "end";
+  /** В11: места значков «ссылка на диаграмму» (OffPageReference) у помеченных концов. */
+  offpageAt?: Pt[];
   /** Какая связь модели нарисована: функция, сущность и вид (для обратного чтения правок из Visio). */
   ref?: { kind: ArrowKind; nodeId: string; entityId: string };
   /** Блоки, к которым приклеены начало и конец стрелки (в Visio — концы соединителя). */
@@ -131,6 +133,7 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     ...(a.code ? { code: a.code } : {}),
     ...(a.codeAt ? { codeAt: a.codeAt } : {}),
     ...(a.codeAnchor ? { codeAnchor: a.codeAnchor } : {}),
+    ...(a.offpageUp || a.offpageDown ? { offpageAt: offpageMarks(a) } : {}),
     ref: { kind: a.kind, nodeId: a.nodeId, entityId: a.entityId },
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
     startNode: a.fromId ?? (a.kind === "output" ? a.nodeId : undefined),
@@ -295,6 +298,8 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
     parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.1" marker-end="url(#arrow)" />`);
     if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
+    // В11: значок «ссылка на диаграмму» у помеченного конца
+    for (const m of a.offpageAt ?? []) parts.push(`<g><rect x="${m[0] - 5}" y="${m[1] - 6}" width="10" height="12" fill="#ffffff" stroke="#1f2937" stroke-width="1" /><path d="M${m[0] + 1} ${m[1] - 6} v4 h4" fill="none" stroke="#1f2937" stroke-width="1" /></g>`);
     // В9: ICOM-код у конца у блока (I1/C1/O1/M1) — на печати и в SVG так же, как в редакторе
     if (a.code && a.codeAt) parts.push(`<text x="${a.codeAt[0]}" y="${a.codeAt[1]}" font-size="9" text-anchor="${a.codeAnchor ?? "start"}" font-family="Arial, sans-serif" fill="#475569">${esc(a.code)}</text>`);
     if (lab) {

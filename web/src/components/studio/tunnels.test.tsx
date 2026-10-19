@@ -24,6 +24,11 @@ describe("туннели стрелок IDEF0: операции", () => {
     expect(boundary.nodes.find((n) => n.id === "o1")!.tunnels).toEqual({ "input:d1": { upKind: "boundary", down: true } });
     expect(markOf(boundary, a, "up")).toBe("boundary");
     expect(tunnelOf(boundary, a)).toEqual({ up: false, down: true });
+    // В11: «ссылка на диаграмму» — третий вид конца, тоже вместо туннеля
+    const offpage = setArrowMark(boundary, a, "up", "offpage");
+    expect(offpage.nodes.find((n) => n.id === "o1")!.tunnels).toEqual({ "input:d1": { upKind: "offpage", down: true } });
+    expect(markOf(offpage, a, "up")).toBe("offpage");
+    expect(tunnelOf(offpage, a)).toEqual({ up: false, down: true });
     const off = setArrowMark(setArrowMark(boundary, a, "up", "none"), a, "down", "none");
     expect(off.nodes.find((n) => n.id === "o1")).not.toHaveProperty("tunnels");
     expect(tunnelOf(off, a)).toEqual({ up: false, down: false });
@@ -51,6 +56,16 @@ describe("туннели стрелок IDEF0: отрисовка", () => {
     expect(draw({ boundaryUp: true })).toBe(1); // штрих: одна прямая линия поперёк стрелки
     expect(draw({ boundaryUp: true, boundaryDown: true })).toBe(2);
   });
+
+  it("В11: ссылка на диаграмму — значок страницы у помеченного конца", () => {
+    const marks = (flags: { offpageUp?: boolean; offpageDown?: boolean }) => {
+      const a = { ...arrowOf(structuredModel(), "input:o1:d1"), ...flags };
+      return render(<svg><ArrowShape arrow={a} selected={false} /></svg>).container.querySelectorAll("[data-offpage]").length;
+    };
+    expect(marks({})).toBe(0);
+    expect(marks({ offpageUp: true })).toBe(1);
+    expect(marks({ offpageUp: true, offpageDown: true })).toBe(2);
+  });
 });
 
 describe("туннели стрелок IDEF0: панель свойств", () => {
@@ -74,6 +89,11 @@ describe("туннели стрелок IDEF0: панель свойств", () 
     fireEvent.change(screen.getByLabelText(/У свободного конца/), { target: { value: "boundary" } });
     expect(r.model().nodes.find((n) => n.id === "o1")!.tunnels).toEqual({ "input:d4": { upKind: "boundary" } });
     expect(unbalanced(r.model())).toEqual([]);
+    // В11: «ссылка на диаграмму» — тоже помеченный конец
+    fireEvent.change(screen.getByLabelText(/У свободного конца/), { target: { value: "offpage" } });
+    expect(r.model().nodes.find((n) => n.id === "o1")!.tunnels).toEqual({ "input:d4": { upKind: "offpage" } });
+    expect(unbalanced(r.model())).toEqual([]);
+    expect((screen.getByLabelText(/У свободного конца/) as HTMLSelectElement).value).toBe("offpage");
     fireEvent.change(screen.getByLabelText(/У свободного конца/), { target: { value: "none" } });
     expect(r.model().nodes.find((n) => n.id === "o1")).not.toHaveProperty("tunnels");
     expect(unbalanced(r.model())).toHaveLength(1);
