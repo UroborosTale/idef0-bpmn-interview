@@ -1,0 +1,38 @@
+﻿лог: 20.97 МБ
+типов: 619
+=== пространства (топ-12) ===
+Byte.ORM.AppPlatform                         374
+<>c                                          29
+EnumWindowsProc                              2
+<>c__DisplayClass124_0                       2
+<>c__DisplayClass23_0                        2
+<>c__DisplayClass122_0                       2
+<>c__DisplayClass10_0                        2
+ObtainOfficeIDMethod                         2
+Результат                                    2
+<>c__DisplayClass43_0                        2
+<>c__DisplayClass29_0                        2
+<>c__DisplayClass17_0                        2
+=== окна/редакторы (первые 22) ===
+Byte.ORM.AppPlatform.DiscretePeriodSelectionWindow
+Byte.ORM.AppPlatform.ListWindow
+Byte.ORM.AppPlatform.ValueSelectionDialogueWindow
+Byte.ORM.AppPlatform.ValueSelectionFromListWindow
+Byte.ORM.AppPlatform.ObjectPermissionsWindow
+Byte.ORM.AppPlatform.RenameObjectWindow
+Byte.ORM.AppPlatform.ObjectDeletionWindow
+Byte.ORM.AppPlatform.ImportPackageUniversalWindow
+Byte.ORM.AppPlatform.ConnectionCheckWindow
+Byte.ORM.AppPlatform.ReportTemplateBindingWindow
+Byte.ORM.AppPlatform.RepositoryWindow
+Byte.ORM.AppPlatform.ReportTemplateWindow
+Byte.ORM.AppPlatform.TipWindow
+Byte.ORM.AppPlatform.ImportWindow
+Byte.ORM.AppPlatform.PeriodSelectionForReportWindow
+Byte.ORM.AppPlatform.FilterPropertiesWindow
+Byte.ORM.AppPlatform.FilterWindow
+Byte.ORM.AppPlatform.BindingEditingWindow
+Byte.ORM.AppPlatform.ObjectPropertiesWindow
+Byte.ORM.AppPlatform.ValueSelectionFromSetWindow
+Byte.ORM.AppPlatform.TableWindow
+Byte.ORM.AppPlatform.SimpleFilterWindow
