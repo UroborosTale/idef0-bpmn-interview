@@ -173,7 +173,9 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], el
     const allFlows = [...flows, ...(ex?.extraFlows ?? [])];
     const routes = routeFlows(all, allFlows, ex?.obstacles ?? []);
     const q = routeQuality(all, allFlows, routes, ex?.obstacles ?? []);
-    return { value: q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400, routes, flows: allFlows };
+    // наложения стрелок (две линии идут по одной прямой) — такой же дефект, как и в выборе рядов ниже:
+    // без этого слагаемого подбор мог «не видеть» дефект, который потом отбраковывал итоговый выбор
+    return { value: q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(routes) * 400, routes, flows: allFlows };
   }
   const score = (p: Placement): number => evaluate(p).value;
   /** Фигуры, у которых есть пересекающиеся стрелки: именно их перестановки могут что-то дать. */

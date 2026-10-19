@@ -63,43 +63,43 @@ extra data 679,216 18×20 «Заявка на закупку» link[688,240 688,
 extra store 621,334 18×20 «ERP «Закупки»» link[630,334 630,330]
 extra annotation 100,570 180×60 «Положение о закупках» link[630,330 190,570]
 extra annotation 320,570 180×60 «Заявка полна, если заполнены наименование, количество, обоснование и срок» link[1200,180 410,570]
-# BPMN C090.01.02 1991×670
-lane r_erp 80,60 1811×150
-lane r_head 80,210 1811×150
-lane r_fin 80,360 1811×150
-shape Node_o12_start event/start 175,117 36×36 «Заявка на закупку получена»
-shape Node_o12_route task/service 365,90 150×90 «Направить заявку на согласование»
-shape Node_o12_split gateway/parallel 555,110 50×50 «Параллельное согласование»
-shape Node_o12_byNeed task/user 745,240 150×90 «Согласовать заявку по потребности»
-shape Node_o12_overdue event/intermediate 749,312 36×36 «Срок согласования истёк»
-shape Node_o12_esc event/intermediate 935,267 36×36 «Просрочка согласования эскалирована»
-shape Node_o12_stop event/end 1125,267 36×36 «Согласование прекращено»
-shape Node_o12_budget task/business_rule 745,390 150×90 «Проверить наличие бюджета»
-shape Node_o12_enough gateway/exclusive 1125,410 50×50 «Бюджет достаточен?»
-shape Node_o12_reject task/service 1315,90 150×90 «Зафиксировать отказ в заявке»
-shape Node_o12_noBudget event/end 1315,417 36×36 «Заявка отклонена из-за нехватки бюджета»
-shape Node_o12_join gateway/parallel 1495,136 50×50 «Согласование завершено»
-shape Node_o12_record task/service 1575,90 150×90 «Зафиксировать решение о согласовании»
-shape Node_o12_approved event/end 1755,117 36×36 «Заявка согласована»
-edge Flow_o12_f1 Node_o12_start→Node_o12_route [211,135 365,135]
-edge Flow_o12_f2 Node_o12_route→Node_o12_split [515,135 555,135]
-edge Flow_o12_f3 Node_o12_split→Node_o12_byNeed [605,135 687,135 687,285 745,285]
-edge Flow_o12_f4 Node_o12_split→Node_o12_budget [580,160 580,435 745,435]
-edge Flow_o12_f5 Node_o12_budget→Node_o12_enough [895,435 1125,435]
-edge Flow_o12_f6 Node_o12_enough→Node_o12_reject [1175,435 1257,435 1257,135 1315,135] «Нет»
-edge Flow_o12_f7 Node_o12_reject→Node_o12_noBudget [1390,180 1390,310.5 1333,310.5 1333,417]
-edge Flow_o12_f8 Node_o12_enough→Node_o12_join [1150,460 1150,504 1526.5,504 1526.5,179.5] «Да»
-edge Flow_o12_f9 Node_o12_byNeed→Node_o12_join [820,330 820,354 1513.5,354 1513.5,179.5]
-edge Flow_o12_f10 Node_o12_join→Node_o12_record [1545,161 1562,161 1562,135 1575,135]
-edge Flow_o12_f11 Node_o12_record→Node_o12_approved [1725,135 1755,135]
-edge Flow_o12_f12 Node_o12_overdue→Node_o12_esc [767,348 767,372 953,372 953,303]
-edge Flow_o12_f13 Node_o12_esc→Node_o12_stop [971,285 1125,285]
-extra data 811,216 18×20 «Заявка на закупку» link[820,236 820,240]
-extra data 1381,66 18×20 «Отклонённая заявка на закупку» link[1390,90 1390,86]
-extra data 1641,66 18×20 «Согласованная заявка на закупку» link[1650,90 1650,86]
-extra store 1641,184 18×20 «ERP «Закупки»» link[1650,184 1650,180]
-extra annotation 100,570 180×60 «Бюджет закупок на год» link[820,480 190,570]
-extra annotation 320,570 180×60 «Бюджет достаточен, если сумма заявки не превышает остаток по статье расходов» link[820,480 410,570]
+# BPMN C090.01.02 1754×670
+lane r_erp 80,60 1574×150
+lane r_head 80,210 1574×150
+lane r_fin 80,360 1574×150
+shape Node_o12_start event/start 152,117 36×36 «Заявка на закупку получена»
+shape Node_o12_route task/service 398,90 150×90 «Направить заявку на согласование»
+shape Node_o12_split gateway/parallel 578,110 50×50 «Параллельное согласование»
+shape Node_o12_byNeed task/user 658,240 150×90 «Согласовать заявку по потребности»
+shape Node_o12_overdue event/intermediate 662,312 36×36 «Срок согласования истёк»
+shape Node_o12_esc event/intermediate 905,267 36×36 «Просрочка согласования эскалирована»
+shape Node_o12_stop event/end 1038,267 36×36 «Согласование прекращено»
+shape Node_o12_budget task/business_rule 658,390 150×90 «Проверить наличие бюджета»
+shape Node_o12_enough gateway/exclusive 1038,410 50×50 «Бюджет достаточен?»
+shape Node_o12_reject task/service 218,116 150×90 «Зафиксировать отказ в заявке»
+shape Node_o12_noBudget event/end 518,417 36×36 «Заявка отклонена из-за нехватки бюджета»
+shape Node_o12_join gateway/parallel 1071.3,110 50×50 «Согласование завершено»
+shape Node_o12_record task/service 1278,90 150×90 «Зафиксировать решение о согласовании»
+shape Node_o12_approved event/end 1518,117 36×36 «Заявка согласована»
+edge Flow_o12_f1 Node_o12_start→Node_o12_route [170,117 170,66 473,66 473,90]
+edge Flow_o12_f2 Node_o12_route→Node_o12_split [548,135 578,135]
+edge Flow_o12_f3 Node_o12_split→Node_o12_byNeed [628,135 645,135 645,285 658,285]
+edge Flow_o12_f4 Node_o12_split→Node_o12_budget [603,160 603,435 658,435]
+edge Flow_o12_f5 Node_o12_budget→Node_o12_enough [808,435 1038,435]
+edge Flow_o12_f6 Node_o12_enough→Node_o12_reject [1063,460 1063,504 293,504 293,206] «Нет»
+edge Flow_o12_f7 Node_o12_reject→Node_o12_noBudget [368,161 385,161 385,435 518,435]
+edge Flow_o12_f8 Node_o12_enough→Node_o12_join [1063,410 1063,337 1096.3,337 1096.3,160] «Да»
+edge Flow_o12_f9 Node_o12_byNeed→Node_o12_join [808,285 891.5,285 891.5,135 1071.3,135]
+edge Flow_o12_f10 Node_o12_join→Node_o12_record [1121.3,135 1278,135]
+edge Flow_o12_f11 Node_o12_record→Node_o12_approved [1428,135 1518,135]
+edge Flow_o12_f12 Node_o12_overdue→Node_o12_esc [680,348 680,372 923,372 923,303]
+edge Flow_o12_f13 Node_o12_esc→Node_o12_stop [941,285 1038,285]
+extra data 724,216 18×20 «Заявка на закупку» link[733,236 733,240]
+extra data 284,92 18×20 «Отклонённая заявка на закупку» link[293,116 293,112]
+extra data 1344,66 18×20 «Согласованная заявка на закупку» link[1353,90 1353,86]
+extra store 1344,184 18×20 «ERP «Закупки»» link[1353,184 1353,180]
+extra annotation 100,570 180×60 «Бюджет закупок на год» link[733,480 190,570]
+extra annotation 320,570 180×60 «Бюджет достаточен, если сумма заявки не превышает остаток по статье расходов» link[733,480 410,570]
 # BPMN C090.02.01 1612×720
 lane r_erp 80,60 1432×150
 lane r_buyer 80,210 1432×260
