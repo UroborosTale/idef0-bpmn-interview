@@ -289,7 +289,8 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
     if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
     if (lab) {
-      parts.push(`<text x="${lab.x}" y="${lab.y}" font-size="10.5" text-anchor="${lab.anchor}" font-family="Arial, sans-serif" fill="#000000">${lab.text.split("\n").map((line, i) => `<tspan x="${lab.x}" dy="${i === 0 ? 0 : 12}">${esc(line)}</tspan>`).join("")}</text>`);
+      // белая обводка (paint-order: stroke) — как в редакторе: линия стрелки не перечёркивает подпись
+      parts.push(`<text x="${lab.x}" y="${lab.y}" font-size="10.5" text-anchor="${lab.anchor}" font-family="Arial, sans-serif" fill="#000000" stroke="#ffffff" stroke-width="3" paint-order="stroke">${lab.text.split("\n").map((line, i) => `<tspan x="${lab.x}" dy="${i === 0 ? 0 : 12}">${esc(line)}</tspan>`).join("")}</text>`);
     }
   }
   d.footer.forEach((line, i) => {
