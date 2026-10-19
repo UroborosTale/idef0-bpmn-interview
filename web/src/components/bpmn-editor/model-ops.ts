@@ -75,7 +75,18 @@ const mapNode = (m: M, id: string, fn: (n: ProcessNode) => ProcessNode): M => ({
 export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpResult {
   const size = sizeOf(spec);
   const lane = laneIndexAtY(m, cy);
-  const [x, y] = clampIntoLane(m, spec, snap(cx - size.w / 2), snapTop(cy - size.h / 2, size.h), lane);
+  let [x, y] = clampIntoLane(m, spec, snap(cx - size.w / 2), snapTop(cy - size.h / 2, size.h), lane);
+  // Фигура из палитры не должна вставать на уже занятое место: два щелчка по палитре ставили фигуры друг на друга.
+  // Ищем свободное место правее занятого, оставаясь в той же дорожке (аналог VisioPane.FreeSpot в оболочке).
+  const boxes = m.nodes.filter((n) => n.layout && n.type !== "pool").map((n) => boxOf(n));
+  const hit = (bx: number, by: number) => boxes.find((b) => bx < b.x + b.w && b.x < bx + size.w && by < b.y + b.h && b.y < by + size.h);
+  for (let guard = 0; guard < 50; guard++) {
+    const blocker = hit(x, y);
+    if (!blocker) break;
+    const next = clampIntoLane(m, spec, snap(blocker.x + blocker.w + 20), y, lane);
+    if (next[0] === x) break; // дорожка кончилась — дальше двигать некуда
+    [x, y] = next;
+  }
   const node: ProcessNode = {
     id: nextId("n", m.nodes.map((n) => n.id)),
     type: spec.type,
