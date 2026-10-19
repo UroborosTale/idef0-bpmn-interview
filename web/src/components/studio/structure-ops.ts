@@ -318,22 +318,26 @@ export function applyStructure(m: M, items: OutlineItem[], opts: StructureOption
     return id;
   };
   const created: ProcessNode[] = [];
-  let parent: string | null = null;
-  const ops: string[] = [];
-  for (const it of items) {
-    const id = newId();
-    if (it.level === 0) parent = id;
-    else ops.push(id);
+  const isFn = (n: ProcessNode) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope;
+  const keyOf = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ");
+  /**
+   * Мастер открывается с текущей структурой из модели, поэтому повторное применение не должно ничего удваивать:
+   * функция с тем же именем под тем же родителем уже есть — берём её (и её id как родителя для следующих строк).
+   */
+  const existing = (parentId: string | null, name: string) =>
+    model.nodes.find((n) => isFn(n) && (n.idef0_parent ?? null) === parentId && keyOf(n.name) === keyOf(name)) ??
+    created.find((n) => (n.idef0_parent ?? null) === parentId && keyOf(n.name) === keyOf(name));
+  const add = (id: string, name: string, parentId: string | null): void => {
     created.push({
       id,
       type: "task",
-      name: it.name,
+      name,
       role_id: null,
       system_ids: [],
       inputs: [],
       outputs: [],
       controls: [],
-      idef0_parent: it.level === 0 ? null : parent,
+      idef0_parent: parentId,
       status: "confirmed",
       confidence: 1,
       source: [],
@@ -341,6 +345,25 @@ export function applyStructure(m: M, items: OutlineItem[], opts: StructureOption
       tags: [],
       confirmed_by: [],
     });
+  };
+  let parent: string | null = null;
+  const ops: string[] = [];
+  for (const it of items) {
+    if (it.level === 0) {
+      const found = existing(null, it.name);
+      if (found) {
+        parent = found.id;
+        continue;
+      }
+      const id = newId();
+      parent = id;
+      add(id, it.name, null);
+    } else {
+      if (existing(parent, it.name)) continue;
+      const id = newId();
+      ops.push(id);
+      add(id, it.name, parent);
+    }
   }
   const code = opts.code?.trim() ? normalizedProcessCode(opts.code) : null;
   model = {
