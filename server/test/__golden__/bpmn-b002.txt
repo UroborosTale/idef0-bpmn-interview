@@ -302,108 +302,108 @@ extra store 881,184 18×20 «Microsoft Visio» link[890,184 890,180]
 extra store 701,320 18×20 «Microsoft Visio» link[710,320 710,316]
 extra data 1681,66 18×20 «Отчет о результатах анализа соответствия» link[1690,90 1690,86]
 extra store 1681,184 18×20 «Microsoft Word» link[1690,184 1690,180]
-# BPMN B002.03.01 3261×350
-lane r_spec 80,60 3081×150
-shape Node_o31_start event/start 175,117 36×36 «Завершено моделирование текущего процесса»
-shape Node_o31_card task/user 365,90 150×90 «Создать карточку процесса»
-shape Node_o31_data task/user 555,90 150×90 «Заполнить данные по процессу»
-shape Node_o31_study task/user 745,90 150×90 «Изучить нормативную документацию по процессу»
-shape Node_o31_collect task/user 935,90 150×90 «Собрать данные по процессу из нормативной документации»
-shape Node_o31_assign task/user 1125,90 150×90 «Назначить интервью с владельцем процесса»
-shape Node_o31_timer event/timer 1315,117 36×36 «Наступление интервью»
-shape Node_o31_interview task/business_rule 1505,90 150×90 «Интервьюировать по вопросам процесса»
-shape Node_o31_comment1 task/user 1695,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape Node_o31_finish task/user 1885,90 150×90 «Завершить задачу по проведению первичного интервью»
-shape Node_o31_notify task/service 2075,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape Node_o31_chain task/user 2265,90 150×90 «Создать продуктовую цепочку»
-shape Node_o31_attach task/user 2455,90 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
-shape Node_o31_comment2 task/user 2645,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
-shape Node_o31_approve subprocess 2835,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape Node_o31_end event/end 3025,117 36×36 «Проведено интервью»
-edge Flow_o31_f1 Node_o31_start→Node_o31_card [211,135 365,135]
-edge Flow_o31_f2 Node_o31_card→Node_o31_data [515,135 555,135]
-edge Flow_o31_f3 Node_o31_data→Node_o31_study [705,135 745,135]
-edge Flow_o31_f4 Node_o31_study→Node_o31_collect [895,135 935,135]
-edge Flow_o31_f5 Node_o31_collect→Node_o31_assign [1085,135 1125,135]
-edge Flow_o31_f6 Node_o31_assign→Node_o31_timer [1275,135 1315,135]
-edge Flow_o31_f7 Node_o31_timer→Node_o31_interview [1351,135 1505,135]
-edge Flow_o31_f8 Node_o31_interview→Node_o31_comment1 [1655,135 1695,135]
-edge Flow_o31_f9 Node_o31_comment1→Node_o31_finish [1845,135 1885,135]
-edge Flow_o31_f10 Node_o31_finish→Node_o31_notify [2035,135 2075,135]
-edge Flow_o31_f11 Node_o31_notify→Node_o31_chain [2225,135 2265,135]
-edge Flow_o31_f12 Node_o31_chain→Node_o31_attach [2415,135 2455,135]
-edge Flow_o31_f13 Node_o31_attach→Node_o31_comment2 [2605,135 2645,135]
-edge Flow_o31_f14 Node_o31_comment2→Node_o31_approve [2795,135 2835,135]
-edge Flow_o31_f15 Node_o31_approve→Node_o31_end [2995,135 3025,135]
-extra store 431,184 18×20 «ELMA365» link[440,184 440,180]
-extra store 621,184 18×20 «ELMA365» link[630,184 630,180]
-extra store 811,184 18×20 «Intranet.kmzlift.ru» link[820,184 820,180]
-extra data 1001,66 18×20 «Протокол интервью» link[1010,90 1010,86]
-extra store 1001,184 18×20 «Microsoft Word» link[1010,184 1010,180]
-extra store 1191,184 18×20 «Outlook» link[1200,184 1200,180]
-extra data 1515.5,66 18×20 «Чек-лист интервью» link[1524.5,86 1524.5,90]
-extra data 1626.5,66 18×20 «Протокол интервью» link[1635.5,90 1635.5,86]
-extra store 1761,184 18×20 «ELMA365» link[1770,184 1770,180]
-extra store 1951,184 18×20 «ELMA365» link[1960,184 1960,180]
-extra store 2141,184 18×20 «ELMA365» link[2150,184 2150,180]
-extra data 2275.5,66 18×20 «Протокол интервью» link[2284.5,86 2284.5,90]
-extra data 2386.5,66 18×20 «Продуктовая цепочка» link[2395.5,90 2395.5,86]
-extra data 2521,66 18×20 «Продуктовая цепочка» link[2530,86 2530,90]
-extra store 2521,184 18×20 «ELMA365» link[2530,184 2530,180]
-extra store 2711,184 18×20 «ELMA365» link[2720,184 2720,180]
-# BPMN B002.03.02 3831×350
-lane r_spec 80,60 3651×150
-shape Node_o32_start1 event/start 365,117 36×36 «Проведено интервью»
-shape Node_o32_start2 event/start 431,143 36×36 «Завершено моделирование текущего процесса»
-shape Node_o32_join gateway/parallel 555,110 50×50 «Слияние потоков»
-shape Node_o32_go task/manual 745,90 150×90 «Выехать на место работы сотрудника»
-shape Node_o32_shift_start event/timer 935,117 36×36 «Начало смены»
-shape Node_o32_greet task/manual 1125,90 150×90 «Приветствовать сотрудника»
-shape Node_o32_introduce task/manual 1315,90 150×90 «Представить себя сотруднику»
-shape Node_o32_open task/user 1505,90 150×90 «Открыть программу ELMA365 на планшете»
-shape Node_o32_add task/user 1695,90 150×90 «Добавить сотрудника»
-shape Node_o32_fill task/user 1885,90 150×90 «Заполнить данные сотрудника»
-shape Node_o32_create task/user 2075,90 150×90 «Нажать «Создать»»
-shape Node_o32_fix_start task/user 2265,90 150×90 «Фиксировать время начала операции сотрудника»
-shape Node_o32_work_kind task/user 2455,90 150×90 «Фиксировать Вид работ»
-shape Node_o32_work_sub task/user 2645,90 150×90 «Фиксировать подвид работ»
-shape Node_o32_software task/user 2835,90 150×90 «Заполнить ПО, которым пользуется сотрудник»
-shape Node_o32_comment task/user 3025,90 150×90 «Заполнить поле с комментарием по работе сотрудника»
-shape Node_o32_shift_end event/timer 3215,117 36×36 «Конец смены»
-shape Node_o32_report task/user 3405,90 150×90 «Оформить результаты ФРД в презентацию»
-shape Node_o32_end event/end 3595,117 36×36 «ФРД проведено»
-edge Flow_o32_f1 Node_o32_start1→Node_o32_join [383,153 383,203 580,203 580,160]
-edge Flow_o32_f2 Node_o32_start2→Node_o32_join [467,161 523,161 523,135 555,135]
-edge Flow_o32_f3 Node_o32_join→Node_o32_go [605,135 745,135]
-edge Flow_o32_f4 Node_o32_go→Node_o32_shift_start [895,135 935,135]
-edge Flow_o32_f5 Node_o32_shift_start→Node_o32_greet [971,135 1125,135]
-edge Flow_o32_f6 Node_o32_greet→Node_o32_introduce [1275,135 1315,135]
-edge Flow_o32_f7 Node_o32_introduce→Node_o32_open [1465,135 1505,135]
-edge Flow_o32_f8 Node_o32_open→Node_o32_add [1655,135 1695,135]
-edge Flow_o32_f9 Node_o32_add→Node_o32_fill [1845,135 1885,135]
-edge Flow_o32_f10 Node_o32_fill→Node_o32_create [2035,135 2075,135]
-edge Flow_o32_f11 Node_o32_create→Node_o32_fix_start [2225,135 2265,135]
-edge Flow_o32_f12 Node_o32_fix_start→Node_o32_work_kind [2415,135 2455,135]
-edge Flow_o32_f13 Node_o32_work_kind→Node_o32_work_sub [2605,135 2645,135]
-edge Flow_o32_f14 Node_o32_work_sub→Node_o32_software [2795,135 2835,135]
-edge Flow_o32_f15 Node_o32_software→Node_o32_comment [2985,135 3025,135]
-edge Flow_o32_f16 Node_o32_comment→Node_o32_shift_end [3175,135 3215,135]
-edge Flow_o32_f17 Node_o32_shift_end→Node_o32_report [3251,135 3405,135]
-edge Flow_o32_f18 Node_o32_report→Node_o32_end [3555,135 3595,135]
-extra store 1571,184 18×20 «ELMA365» link[1580,184 1580,180]
-extra store 1761,184 18×20 «ELMA365» link[1770,184 1770,180]
-extra store 1951,184 18×20 «ELMA365» link[1960,184 1960,180]
-extra store 2141,184 18×20 «ELMA365» link[2150,184 2150,180]
-extra store 2331,184 18×20 «ELMA365» link[2340,184 2340,180]
-extra data 2521,66 18×20 «Справочник «Виды работ»» link[2530,86 2530,90]
-extra store 2521,184 18×20 «ELMA365» link[2530,184 2530,180]
-extra data 2711,66 18×20 «Справочник «Подвид работ»» link[2720,86 2720,90]
-extra store 2711,184 18×20 «ELMA365» link[2720,184 2720,180]
-extra data 2901,66 18×20 «Справочник «Программное обеспечение»» link[2910,86 2910,90]
-extra store 2901,184 18×20 «ELMA365» link[2910,184 2910,180]
-extra store 3091,184 18×20 «ELMA365» link[3100,184 3100,180]
-extra data 3471,66 18×20 «Результаты ФРД ООО «РУ КМЗ»» link[3480,90 3480,86]
-extra store 3471,184 18×20 «PowerPoint» link[3480,184 3480,180]
+# BPMN B002.03.01 2200×490
+lane r_spec 80,60 2020×290
+shape Node_o31_start event/start 140,117 36×36 «Завершено моделирование текущего процесса»
+shape Node_o31_card task/user 330,90 150×90 «Создать карточку процесса»
+shape Node_o31_data task/user 520,90 150×90 «Заполнить данные по процессу»
+shape Node_o31_study task/user 710,90 150×90 «Изучить нормативную документацию по процессу»
+shape Node_o31_collect task/user 900,90 150×90 «Собрать данные по процессу из нормативной документации»
+shape Node_o31_assign task/user 1090,90 150×90 «Назначить интервью с владельцем процесса»
+shape Node_o31_timer event/timer 1280,117 36×36 «Наступление интервью»
+shape Node_o31_interview task/business_rule 1470,90 150×90 «Интервьюировать по вопросам процесса»
+shape Node_o31_comment1 task/user 1660,90 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape Node_o31_finish task/user 1850,90 150×90 «Завершить задачу по проведению первичного интервью»
+shape Node_o31_notify task/service 140,230 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
+shape Node_o31_chain task/user 330,230 150×90 «Создать продуктовую цепочку»
+shape Node_o31_attach task/user 520,230 150×90 «Прикрепить файл к задаче по составлению продуктовой цепочки»
+shape Node_o31_comment2 task/user 710,230 150×90 «Заполнить текстовый комментарий по проведению первичного интервью»
+shape Node_o31_approve subprocess 900,230 160×90 «Согласовать с руководителем отдела корпоративных технологий»
+shape Node_o31_end event/end 1090,257 36×36 «Проведено интервью»
+edge Flow_o31_f1 Node_o31_start→Node_o31_card [176,135 330,135]
+edge Flow_o31_f2 Node_o31_card→Node_o31_data [480,135 520,135]
+edge Flow_o31_f3 Node_o31_data→Node_o31_study [670,135 710,135]
+edge Flow_o31_f4 Node_o31_study→Node_o31_collect [860,135 900,135]
+edge Flow_o31_f5 Node_o31_collect→Node_o31_assign [1050,135 1090,135]
+edge Flow_o31_f6 Node_o31_assign→Node_o31_timer [1240,135 1280,135]
+edge Flow_o31_f7 Node_o31_timer→Node_o31_interview [1316,135 1470,135]
+edge Flow_o31_f8 Node_o31_interview→Node_o31_comment1 [1620,135 1660,135]
+edge Flow_o31_f9 Node_o31_comment1→Node_o31_finish [1810,135 1850,135]
+edge Flow_o31_f10 Node_o31_finish→Node_o31_notify [1925,90 1925,42 215,42 215,230]
+edge Flow_o31_f11 Node_o31_notify→Node_o31_chain [290,275 330,275]
+edge Flow_o31_f12 Node_o31_chain→Node_o31_attach [480,275 520,275]
+edge Flow_o31_f13 Node_o31_attach→Node_o31_comment2 [670,275 710,275]
+edge Flow_o31_f14 Node_o31_comment2→Node_o31_approve [860,275 900,275]
+edge Flow_o31_f15 Node_o31_approve→Node_o31_end [1060,275 1090,275]
+extra store 396,184 18×20 «ELMA365» link[405,184 405,180]
+extra store 586,184 18×20 «ELMA365» link[595,184 595,180]
+extra store 776,184 18×20 «Intranet.kmzlift.ru» link[785,184 785,180]
+extra data 966,66 18×20 «Протокол интервью» link[975,90 975,86]
+extra store 966,184 18×20 «Microsoft Word» link[975,184 975,180]
+extra store 1156,184 18×20 «Outlook» link[1165,184 1165,180]
+extra data 1480.5,66 18×20 «Чек-лист интервью» link[1489.5,86 1489.5,90]
+extra data 1591.5,66 18×20 «Протокол интервью» link[1600.5,90 1600.5,86]
+extra store 1726,184 18×20 «ELMA365» link[1735,184 1735,180]
+extra store 1916,184 18×20 «ELMA365» link[1925,184 1925,180]
+extra store 206,324 18×20 «ELMA365» link[215,324 215,320]
+extra data 340.5,206 18×20 «Протокол интервью» link[349.5,226 349.5,230]
+extra data 451.5,206 18×20 «Продуктовая цепочка» link[460.5,230 460.5,226]
+extra data 586,206 18×20 «Продуктовая цепочка» link[595,226 595,230]
+extra store 586,324 18×20 «ELMA365» link[595,324 595,320]
+extra store 776,324 18×20 «ELMA365» link[785,324 785,320]
+# BPMN B002.03.02 2200×490
+lane r_spec 80,60 2020×290
+shape Node_o32_start1 event/start 140,117 36×36 «Проведено интервью»
+shape Node_o32_start2 event/start 330,117 36×36 «Завершено моделирование текущего процесса»
+shape Node_o32_join gateway/parallel 520,110 50×50 «Слияние потоков»
+shape Node_o32_go task/manual 710,90 150×90 «Выехать на место работы сотрудника»
+shape Node_o32_shift_start event/timer 900,117 36×36 «Начало смены»
+shape Node_o32_greet task/manual 1090,90 150×90 «Приветствовать сотрудника»
+shape Node_o32_introduce task/manual 1280,90 150×90 «Представить себя сотруднику»
+shape Node_o32_open task/user 1470,90 150×90 «Открыть программу ELMA365 на планшете»
+shape Node_o32_add task/user 1660,90 150×90 «Добавить сотрудника»
+shape Node_o32_fill task/user 1850,90 150×90 «Заполнить данные сотрудника»
+shape Node_o32_create task/user 140,230 150×90 «Нажать «Создать»»
+shape Node_o32_fix_start task/user 330,230 150×90 «Фиксировать время начала операции сотрудника»
+shape Node_o32_work_kind task/user 520,230 150×90 «Фиксировать Вид работ»
+shape Node_o32_work_sub task/user 710,230 150×90 «Фиксировать подвид работ»
+shape Node_o32_software task/user 900,230 150×90 «Заполнить ПО, которым пользуется сотрудник»
+shape Node_o32_comment task/user 1090,230 150×90 «Заполнить поле с комментарием по работе сотрудника»
+shape Node_o32_shift_end event/timer 1280,257 36×36 «Конец смены»
+shape Node_o32_report task/user 1470,230 150×90 «Оформить результаты ФРД в презентацию»
+shape Node_o32_end event/end 1660,257 36×36 «ФРД проведено»
+edge Flow_o32_f1 Node_o32_start1→Node_o32_join [158,117 158,86 545,86 545,110]
+edge Flow_o32_f2 Node_o32_start2→Node_o32_join [366,135 520,135]
+edge Flow_o32_f3 Node_o32_join→Node_o32_go [570,135 710,135]
+edge Flow_o32_f4 Node_o32_go→Node_o32_shift_start [860,135 900,135]
+edge Flow_o32_f5 Node_o32_shift_start→Node_o32_greet [936,135 1090,135]
+edge Flow_o32_f6 Node_o32_greet→Node_o32_introduce [1240,135 1280,135]
+edge Flow_o32_f7 Node_o32_introduce→Node_o32_open [1430,135 1470,135]
+edge Flow_o32_f8 Node_o32_open→Node_o32_add [1620,135 1660,135]
+edge Flow_o32_f9 Node_o32_add→Node_o32_fill [1810,135 1850,135]
+edge Flow_o32_f10 Node_o32_fill→Node_o32_create [1925,90 1925,66 215,66 215,230]
+edge Flow_o32_f11 Node_o32_create→Node_o32_fix_start [290,275 330,275]
+edge Flow_o32_f12 Node_o32_fix_start→Node_o32_work_kind [480,275 520,275]
+edge Flow_o32_f13 Node_o32_work_kind→Node_o32_work_sub [670,275 710,275]
+edge Flow_o32_f14 Node_o32_work_sub→Node_o32_software [860,275 900,275]
+edge Flow_o32_f15 Node_o32_software→Node_o32_comment [1050,275 1090,275]
+edge Flow_o32_f16 Node_o32_comment→Node_o32_shift_end [1240,275 1280,275]
+edge Flow_o32_f17 Node_o32_shift_end→Node_o32_report [1316,275 1470,275]
+edge Flow_o32_f18 Node_o32_report→Node_o32_end [1620,275 1660,275]
+extra store 1536,184 18×20 «ELMA365» link[1545,184 1545,180]
+extra store 1726,184 18×20 «ELMA365» link[1735,184 1735,180]
+extra store 1916,184 18×20 «ELMA365» link[1925,184 1925,180]
+extra store 206,324 18×20 «ELMA365» link[215,324 215,320]
+extra store 396,324 18×20 «ELMA365» link[405,324 405,320]
+extra data 586,206 18×20 «Справочник «Виды работ»» link[595,226 595,230]
+extra store 586,324 18×20 «ELMA365» link[595,324 595,320]
+extra data 776,206 18×20 «Справочник «Подвид работ»» link[785,226 785,230]
+extra store 776,324 18×20 «ELMA365» link[785,324 785,320]
+extra data 966,206 18×20 «Справочник «Программное обеспечение»» link[975,226 975,230]
+extra store 966,324 18×20 «ELMA365» link[975,324 975,320]
+extra store 1156,324 18×20 «ELMA365» link[1165,324 1165,320]
+extra data 1536,206 18×20 «Результаты ФРД ООО «РУ КМЗ»» link[1545,230 1545,226]
+extra store 1536,324 18×20 «PowerPoint» link[1545,324 1545,320]
 # BPMN B002.03.03 4851×460
 lane r_spec 80,60 4671×260
 shape Node_o33_start1 event/start 175,117 36×36 «ФРД проведено»

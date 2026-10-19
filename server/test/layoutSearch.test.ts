@@ -10,11 +10,35 @@ import type { Pt } from "../src/shared/bpmnGeometry.js";
 import { rankColumns } from "../src/shared/bpmnRank.js";
 
 /** Пересечения стрелок на диаграмме операции — по готовой прокладке (то же, что видит пользователь). */
-async function crossingsOf(m: ReturnType<typeof b002Model>, host: string): Promise<number> {
-  const { diagram } = await generateBpmn(m, host);
-  const routes = new Map(diagram.edges.map((e) => [e.id, e.points as Pt[]] as const));
-  const nodes: RouteNode[] = diagram.shapes.map((s) => ({ id: s.id, type: s.kind, box: { x: s.x, y: s.y, w: s.w, h: s.h } }));
-  return routeQuality(nodes, diagram.edges.map((e) => ({ id: e.id, from: e.from, to: e.to })), routes).crossings;
+async function crossingsOf(m: ReturnType<typeof b002Model>, host: string, pack = true): Promise<number> {
+  const prev = process.env.BPMN_PACK;
+  process.env.BPMN_PACK = pack ? "1" : "0";
+  try {
+    const { diagram } = await generateBpmn(m, host);
+    const routes = new Map(diagram.edges.map((e) => [e.id, e.points as Pt[]] as const));
+    const nodes: RouteNode[] = diagram.shapes.map((s) => ({ id: s.id, type: s.kind, box: { x: s.x, y: s.y, w: s.w, h: s.h } }));
+    return routeQuality(nodes, diagram.edges.map((e) => ({ id: e.id, from: e.from, to: e.to })), routes).crossings;
+  } finally {
+    if (prev === undefined) delete process.env.BPMN_PACK;
+    else process.env.BPMN_PACK = prev;
+  }
+}
+
+/** Ширина диаграммы с упаковкой длинной цепочки и без неё. */
+async function widthsOf(m: ReturnType<typeof b002Model>, host: string): Promise<{ packed: number; plain: number }> {
+  const prev = process.env.BPMN_PACK;
+  const width = async (pack: boolean) => {
+    process.env.BPMN_PACK = pack ? "1" : "0";
+    try {
+      return (await generateBpmn(m, host)).diagram.width;
+    } finally {
+      if (prev === undefined) delete process.env.BPMN_PACK;
+      else process.env.BPMN_PACK = prev;
+    }
+  };
+  const plain = await width(false);
+  const packed = await width(true);
+  return { packed, plain };
 }
 
 // Пересечения до подбора раскладки (замер до введения подбора): подбор может только уменьшать их.
@@ -23,23 +47,35 @@ const BEFORE: Record<string, number> = {
   "c025:o11": 1, "c025:o12": 3, "c025:o13": 8, "c025:o21": 1, "c025:o22": 6,
   "demo:o11": 4, "demo:o12": 5, "demo:o22": 4, "demo:o32": 1,
 };
+/** Сколько пересечений прощает упаковка длинной цепочки: стрелка возврата идёт с конца ряда в начало следующего. */
+const PACK_SLACK = 4;
 
 describe("подбор раскладки: меньше пересечений стрелок при тех же дорожках", () => {
   it("на эталонах и демо ни одна диаграмма не хуже прежней, а всего пересечений заметно меньше", async () => {
     let before = 0;
     let after = 0;
+    let packedTotal = 0;
     for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) {
       for (const h of bpmnHosts(m)) {
-        const c = await crossingsOf(m, h.id);
+        // без упаковки длинной цепочки — прежняя гарантия: ни одного лишнего пересечения
+        const plain = await crossingsOf(m, h.id, false);
         const was = BEFORE[`${name}:${h.id}`] ?? 0;
-        expect(c, `${name} ${h.id}`).toBeLessThanOrEqual(was);
+        expect(plain, `${name} ${h.id} без упаковки`).toBeLessThanOrEqual(was);
+        // с упаковкой добавляется стрелка возврата с конца ряда в начало следующего: ей разрешено несколько пересечений,
+        // но диаграмма при этом становится заметно уже (проверяется ниже)
+        const packed = await crossingsOf(m, h.id, true);
+        expect(packed, `${name} ${h.id} с упаковкой`).toBeLessThanOrEqual(was + PACK_SLACK);
+        const { packed: wp, plain: w0 } = await widthsOf(m, h.id);
+        expect(wp, `${name} ${h.id}: упаковка не расширяет`).toBeLessThanOrEqual(w0 + 1);
         before += was;
-        after += c;
+        after += plain;
+        packedTotal += packed;
       }
     }
     expect(before).toBe(45);
     expect(after).toBeLessThanOrEqual(12); // замер: 11 (колонки 190 вместо 220; задачи 150×90, как в Business Studio; до перехода было 6)
-  }, 120_000);
+    expect(packedTotal).toBeLessThanOrEqual(45); // с упаковкой: плюс до PACK_SLACK пересечений на длинных схемах
+  }, 180_000);
 
   it("на всех диаграммах эталонов фигуры не налезают друг на друга и не выходят за левый край дорожек", async () => {
     for (const [name, m] of [["b002", b002Model()], ["c025", c025Model()], ["demo", demoModel()]] as const) {

@@ -3,7 +3,7 @@ import * as ElkNS from "elkjs";
 // elkjs публикует CJS-модуль с default-совместимой формой; в NodeNext-режиме
 // TS не всегда разрешает интероп автоматически, поэтому берём конструктор
 // явно (как это делает сам bpmn-generator-подобный тулинг).
-import { LANE_H, MIN_X, START_Y, laneTops, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
+import { LANE_H, MAX_LANE_H, MIN_X, START_Y, laneTops, waypoints, type EndKinds } from "../shared/bpmnGeometry.js";
 import { rankColumns } from "../shared/bpmnRank.js";
 import { ROW_PITCH, branchRows, collinearOverlaps } from "../shared/bpmnRows.js";
 import { MIN_EVALUATIONS, crossingCount, evaluationsFor, routeFlows, routeQuality, type RouteFlow, type RouteNode } from "../shared/bpmnRouting.js";
@@ -136,6 +136,16 @@ const COLUMN_X0 = 60 - 25;
 const EXTRA_MOVES_MAX_FLOWS = 40;
 /** Больше узлов — без ELK, раскладкой по столбцам (на 500 узлах ELK занимал секунды и блокировал сервер). */
 const ELK_MAX_NODES = 150;
+/** Упаковка длинной цепочки: сколько столбцов пробуем в ряду. Меньше столбцов — уже диаграмма, но больше рядов. */
+const PACK_COL_OPTIONS = [6, 8, 10, 12, 14];
+/** Шаг рядов при упаковке: больше обычного ROW_PITCH, чтобы между рядами прошла стрелка возврата. */
+const PACK_ROW_PITCH = 140;
+/** Заворачивать начинаем, только если диаграмма уже этого (px): короткие схемы остаются как есть. */
+const PACK_TRIGGER_W = 2400;
+/** Упаковка принимается, только если диаграмма стала уже хотя бы на столько. */
+const PACK_MIN_GAIN = 0.15;
+/** Сколько лишних пересечений стрелок прощаем упаковке (стрелка возврата идёт через ряды). */
+const PACK_EXTRA_CROSSINGS = 4;
 
 /**
  * Раскладка по столбцам (shared/bpmnRank.ts): столбец — длиннейший путь от начала, строка — дорожка, в ячейке одна фигура. Ветки
@@ -367,7 +377,9 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
   // ветки шлюза — рядами внутри дорожки; дорожка растёт, чтобы вместить ряды. Из трёх вариантов (без рядов, первая ветвь вниз,
   // первая ветвь вверх) берётся тот, у которого стрелки лучше по той же оценке, что и при подборе столбцов.
   const flowsForScore: RouteFlow[] = edgeList.map((e) => ({ id: e.id, from: e.viaBoundary ?? e.from, to: e.to }));
-  const scoreBoxes = (bx: Map<string, LayoutBox>): number => {
+  const scoreBoxes = (bx: Map<string, LayoutBox>): number => measure(bx).score;
+  /** Та же оценка с раскладкой по частям: упаковке важно не добавить стрелок сквозь фигуры. */
+  const measure = (bx: Map<string, LayoutBox>): { score: number; cuts: number; crossings: number; labelHits: number; collinear: number; length: number } => {
     const ex = extras?.(bx);
     const routeNodes: RouteNode[] = nodes.map((n) => {
       const b = bx.get(n.id)!;
@@ -377,7 +389,8 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     const allFlows = [...flowsForScore, ...(ex?.extraFlows ?? [])];
     const routes = routeFlows(all, allFlows, ex?.obstacles ?? []);
     const q = routeQuality(all, allFlows, routes, ex?.obstacles ?? []);
-    return q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinearOverlaps(routes) * 400;
+    const collinear = collinearOverlaps(routes);
+    return { score: q.crossings * 10 + q.cuts * 40 + q.labels * 6 + q.labelClash * 8 + q.length / 400 + collinear * 400, cuts: q.cuts, crossings: q.crossings, labelHits: q.labels, collinear, length: q.length };
   };
   const withRows = (firstDown: boolean, compress: boolean): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
     const rows = branchRows(nodes, edgeList, boxes, firstDown);
@@ -407,6 +420,49 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
     return { boxes: placed, heights };
   };
   let heightsFinal = [...laneHeights];
+  /**
+   * Упаковка длинной цепочки: ряд шире PACK_TRIGGER_W заворачивается в несколько рядов внутри дорожки
+   * (столбец = номер шага по модулю PACK_COLS, ряд = сколько раз по PACK_COLS уложилось). Дорожка растёт на ROW_PITCH
+   * за каждый лишний ряд, чтобы фигуры не выходили за её границы. Пробуем только на длинных схемах и берём вариант,
+   * если прокладка стрелок не стала заметно хуже: возврат с конца ряда в начало следующего — самый дорогой участок.
+   */
+  const packLongChain = (cols: number): { boxes: Map<string, LayoutBox>; heights: number[] } | null => {
+    // ручные позиции не трогаем: если аналитик расставил фигуры сам, упаковка их сломает
+    if (nodes.some((n) => n.fixed)) return null;
+    const lane = new Map(nodes.map((n) => [n.id, n.laneIndex] as const));
+    const { rank } = rankColumns({
+      ids: nodes.map((n) => n.id),
+      lane,
+      edges: edgeList.map((e) => ({ from: e.from, to: e.to })),
+      verticalFrom: new Set(nodes.filter((n) => n.type === "gateway").map((n) => n.id)),
+    });
+    const maxRank = Math.max(0, ...[...rank.values()]);
+    if (maxRank < cols) return null; // заворачивать нечего: все шаги и так в один ряд
+    const rowOf = new Map(nodes.map((n) => [n.id, Math.floor((rank.get(n.id) ?? 0) / cols)] as const));
+    const maxRow = Math.max(0, ...[...rowOf.values()]);
+    // все дорожки одной высоты, ряды идут сквозь диаграмму: стрелка возврата проходит в промежутке между рядами
+    // и не задевает фигуры соседних дорожек
+    const bandH = 90;
+    const laneH = Math.max(...laneHeights, bandH + maxRow * PACK_ROW_PITCH + 60);
+    if (laneH > MAX_LANE_H) return null;
+    const heights = laneHeights.map(() => laneH);
+    const tops = laneTops(heights);
+    const top = (laneH - (bandH + maxRow * PACK_ROW_PITCH)) / 2;
+    const boxes = new Map<string, LayoutBox>();
+    for (const n of nodes) {
+      const r = rank.get(n.id) ?? 0;
+      const row = rowOf.get(n.id) ?? 0;
+      const y0 = tops[n.laneIndex] ?? START_Y;
+      boxes.set(n.id, {
+        x: START_X + (r % cols) * COLUMN_W,
+        y: y0 + top + row * PACK_ROW_PITCH + (bandH - n.height) / 2,
+        width: n.width,
+        height: n.height,
+      });
+    }
+    return { boxes, heights };
+  };
+
   if (process.env.LAYOUT_SEARCH !== "0" && nodes.length >= 4 && edgeList.length >= 3) {
     let bestScore = scoreBoxes(boxes);
     for (const compress of [false, true]) {
@@ -418,6 +474,30 @@ export async function layoutLayered(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[]
         const sc = scoreBoxes(cand.boxes) - Math.max(0, widthGain) * 10;
         if (sc < bestScore - 1e-9) (bestScore = sc, boxes = cand.boxes, heightsFinal = cand.heights);
       }
+    }
+  }
+  // упаковка длинной цепочки — последней: ряды веток её не перебивают, она сама решает, лучше ли стала прокладка
+  // (BPMN_PACK=0 отключает упаковку: так тест сравнивает раскладку с ней и без неё)
+  if (process.env.LAYOUT_SEARCH !== "0" && process.env.BPMN_PACK !== "0") {
+    const widthOfBoxes = (bx: Map<string, LayoutBox>) => Math.max(0, ...[...bx.values()].map((b) => b.x + b.width));
+    const base = { w: widthOfBoxes(boxes), q: measure(boxes) };
+    let best: { boxes: Map<string, LayoutBox>; heights: number[]; w: number; area: number } | null = null;
+    // длинные схемы: короткие не трогаем, иначе упаковка переставляет то, что и так помещается
+    for (const cols of base.w >= PACK_TRIGGER_W ? PACK_COL_OPTIONS : []) {
+      const cand = packLongChain(cols);
+      if (!cand) continue;
+      const w = widthOfBoxes(cand.boxes);
+      // сужение должно быть заметным, а прокладка — не хуже: ни одной новой стрелки сквозь фигуру и не больше PACK_EXTRA_CROSSINGS пересечений
+      if (w > base.w * (1 - PACK_MIN_GAIN)) continue;
+      const q = measure(cand.boxes);
+      // прокладка не хуже: ни одной новой стрелки сквозь фигуру, ни новых задетых подписей и не больше PACK_EXTRA_CROSSINGS пересечений
+      if (q.cuts > base.q.cuts || q.labelHits > base.q.labelHits || q.crossings > base.q.crossings + PACK_EXTRA_CROSSINGS) continue;
+      const area = w * cand.heights.reduce((s, h) => s + h, 0);
+      if (!best || area < best.area - 1e-6 || (Math.abs(area - best.area) < 1e-6 && w < best.w)) best = { ...cand, w, area };
+    }
+    if (best) {
+      boxes = best.boxes;
+      heightsFinal = best.heights;
     }
   }
 
