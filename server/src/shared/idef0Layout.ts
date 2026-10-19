@@ -194,6 +194,11 @@ export interface Arrow {
   labelHidden?: boolean;
   /** Стрелка общего механизма с подписью: подпись одной строкой над «шиной», от её начала. */
   bus?: boolean;
+  /** ICOM-код на конце у блока (I1, C2, O1, M1): номер — на сущность в классе, как в Business Studio. */
+  code?: string;
+  /** Где рисовать код: сразу снаружи блока у того конца, которым стрелка входит в него или выходит. */
+  codeAt?: Pt;
+  codeAnchor?: "start" | "end";
 }
 
 export interface FunctionBlock<N extends NodeLike = NodeLike> {
@@ -561,6 +566,45 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     if (t?.downKind === "boundary") {
       a.boundaryDown = true;
       a.tunnelDown = false;
+    }
+  }
+  // В9: ICOM-коды на концах стрелок (I1/C1/O1/M1). Номер — на сущность в классе, в порядке блоков и положения
+  // вдоль стороны блока (как в Business Studio); у «разбитой» стрелки код один на всех её отрезках.
+  const ICOM: Record<ArrowKind, string> = { input: "I", link: "I", control: "C", controlData: "C", controlLink: "C", output: "O", role: "M", system: "M" };
+  const blockIndex = new Map(functions.map((f, i) => [f.node.id, i] as const));
+  const endAtBlock = (a: Arrow): Pt => {
+    const b = blockOf.get(a.nodeId)!.box;
+    const dist = (p: Pt) => Math.min(Math.abs(p[0] - b.x), Math.abs(p[0] - (b.x + b.w))) + Math.min(Math.abs(p[1] - b.y), Math.abs(p[1] - (b.y + b.h)));
+    const p0 = a.points[0];
+    const p1 = a.points[a.points.length - 1];
+    return dist(p0) <= dist(p1) ? p0 : p1;
+  };
+  const numbered = new Map<string, number>();
+  const ordered = [...arrows].sort((x, y) => {
+    const ex = endAtBlock(x);
+    const ey = endAtBlock(y);
+    return (blockIndex.get(x.nodeId) ?? 0) - (blockIndex.get(y.nodeId) ?? 0) || ex[1] - ey[1] || ex[0] - ey[0];
+  });
+  for (const a of ordered) {
+    const cls = ICOM[a.kind];
+    const key = `${cls}:${a.entityId}`;
+    let n = numbered.get(key);
+    if (n === undefined) numbered.set(key, (n = [...numbered.keys()].filter((k) => k.startsWith(`${cls}:`)).length + 1));
+    a.code = `${cls}${n}`;
+    const b = blockOf.get(a.nodeId)!.box;
+    const e = endAtBlock(a);
+    if (Math.abs(e[0] - b.x) < 0.5) {
+      a.codeAt = [e[0] - 4, e[1] - 4];
+      a.codeAnchor = "end";
+    } else if (Math.abs(e[0] - (b.x + b.w)) < 0.5) {
+      a.codeAt = [e[0] + 4, e[1] - 4];
+      a.codeAnchor = "start";
+    } else if (Math.abs(e[1] - b.y) < 0.5) {
+      a.codeAt = [e[0] + 4, e[1] - 4];
+      a.codeAnchor = "start";
+    } else {
+      a.codeAt = [e[0] + 4, e[1] + 12];
+      a.codeAnchor = "start";
     }
   }
   return { functions, arrows };

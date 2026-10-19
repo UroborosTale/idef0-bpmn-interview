@@ -7,16 +7,18 @@ export interface DisplayOptions {
   labels: boolean;
   bpmnNumbers: boolean;
   idef0Numbers: boolean;
+  /** ICOM-коды на концах стрелок IDEF0 (I1/C1/O1/M1) — отдельно от кодов блоков. */
+  idef0Icom: boolean;
 }
 
-export const DEFAULT_DISPLAY: DisplayOptions = { labels: true, bpmnNumbers: false, idef0Numbers: true };
+export const DEFAULT_DISPLAY: DisplayOptions = { labels: true, bpmnNumbers: false, idef0Numbers: true, idef0Icom: false };
 
 /** Прочитать запомненную настройку; повреждённое значение и недоступное хранилище дают значения по умолчанию. */
 export function loadDisplay(key: string): DisplayOptions {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? "null");
     const flag = (x: unknown, d: boolean) => (typeof x === "boolean" ? x : d);
-    return { labels: flag(v?.labels, DEFAULT_DISPLAY.labels), bpmnNumbers: flag(v?.bpmnNumbers, DEFAULT_DISPLAY.bpmnNumbers), idef0Numbers: flag(v?.idef0Numbers, DEFAULT_DISPLAY.idef0Numbers) };
+    return { labels: flag(v?.labels, DEFAULT_DISPLAY.labels), bpmnNumbers: flag(v?.bpmnNumbers, DEFAULT_DISPLAY.bpmnNumbers), idef0Numbers: flag(v?.idef0Numbers, DEFAULT_DISPLAY.idef0Numbers), idef0Icom: flag(v?.idef0Icom, DEFAULT_DISPLAY.idef0Icom) };
   } catch {
     return DEFAULT_DISPLAY;
   }

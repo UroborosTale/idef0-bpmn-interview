@@ -769,7 +769,7 @@ export default function Idef0Editor({
                 </text>
               )}
               {layout.arrows.map((a) => (
-                <ArrowShape key={a.key} arrow={a} showLabel={display.labels} selected={curSel?.kind === "arrow" && curSel.id === a.key} />
+                <ArrowShape key={a.key} arrow={a} showLabel={display.labels} showCode={display.idef0Icom} selected={curSel?.kind === "arrow" && curSel.id === a.key} />
               ))}
               {layout.functions.map((f) => (
                 <BlockShape key={f.node.id} fn={f} style={blockStyle} showCode={display.idef0Numbers} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />

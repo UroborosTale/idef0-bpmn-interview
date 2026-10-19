@@ -524,6 +524,8 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       // стрелки контекстной диаграммы — только оформление
       page.polyline(a.points, { endArrow: true, weightPt: 0.75, line: "#4677bf", arrowSize: 0 });
       if (lab) page.label(lab.text, { x: lab.x, y: lab.y - 12, anchor: lab.anchor, w: labelBoxW(lab.text), h: lab.text.split("\n").length * 14.5 }, { fontPx: 10.5, color: "#000000", ...(a.side === "left" || a.side === "right" ? { fill: "#ffffff" } : {}) }); // подпись на линии стоит на белой подложке
+      // В9: ICOM-код у конца у блока — и на контекстной диаграмме тоже
+      if (a.code && a.codeAt) page.label(a.code, { x: a.codeAt[0], y: a.codeAt[1] - 9, anchor: a.codeAnchor ?? "start", w: 30 }, { fontPx: 9, color: "#475569" });
       continue;
     }
     const first = a.points[0];
@@ -547,6 +549,8 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       color: "#4677bf",
       arrowSize: 0,
     });
+    // В9: ICOM-код у конца у блока — часть диаграммы, как в Business Studio
+    if (a.code && a.codeAt) page.label(a.code, { x: a.codeAt[0], y: a.codeAt[1] - 9, anchor: a.codeAnchor ?? "start", w: 30 }, { fontPx: 9, color: "#475569" });
     // скобки туннеля — оформление: ломаные по дуге, при чтении правок игнорируются
     for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) {
       const pts: Pt[] = [0, 0.25, 0.5, 0.75, 1].map((u) => [(1 - u) ** 2 * arc.from[0] + 2 * (1 - u) * u * arc.ctl[0] + u ** 2 * arc.to[0], (1 - u) ** 2 * arc.from[1] + 2 * (1 - u) * u * arc.ctl[1] + u ** 2 * arc.to[1]]);

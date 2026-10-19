@@ -36,6 +36,10 @@ export interface Idef0Arrow {
   /** Подпись скрыта (общий механизм) или стоит над «шиной» (bus). */
   labelHidden?: boolean;
   bus?: boolean;
+  /** В9: ICOM-код у конца у блока (I1/C1/O1/M1) и место его отрисовки. */
+  code?: string;
+  codeAt?: Pt;
+  codeAnchor?: "start" | "end";
   /** Какая связь модели нарисована: функция, сущность и вид (для обратного чтения правок из Visio). */
   ref?: { kind: ArrowKind; nodeId: string; entityId: string };
   /** Блоки, к которым приклеены начало и конец стрелки (в Visio — концы соединителя). */
@@ -124,6 +128,9 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     labelOffset: a.labelOffset,
     ...(a.labelHidden ? { labelHidden: true } : {}),
     ...(a.bus ? { bus: true } : {}),
+    ...(a.code ? { code: a.code } : {}),
+    ...(a.codeAt ? { codeAt: a.codeAt } : {}),
+    ...(a.codeAnchor ? { codeAnchor: a.codeAnchor } : {}),
     ref: { kind: a.kind, nodeId: a.nodeId, entityId: a.entityId },
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
     startNode: a.fromId ?? (a.kind === "output" ? a.nodeId : undefined),
@@ -288,6 +295,8 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
     parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.1" marker-end="url(#arrow)" />`);
     if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
+    // В9: ICOM-код у конца у блока (I1/C1/O1/M1) — на печати и в SVG так же, как в редакторе
+    if (a.code && a.codeAt) parts.push(`<text x="${a.codeAt[0]}" y="${a.codeAt[1]}" font-size="9" text-anchor="${a.codeAnchor ?? "start"}" font-family="Arial, sans-serif" fill="#475569">${esc(a.code)}</text>`);
     if (lab) {
       // белая обводка (paint-order: stroke) — как в редакторе: линия стрелки не перечёркивает подпись
       parts.push(`<text x="${lab.x}" y="${lab.y}" font-size="10.5" text-anchor="${lab.anchor}" font-family="Arial, sans-serif" fill="#000000" stroke="#ffffff" stroke-width="3" paint-order="stroke">${lab.text.split("\n").map((line, i) => `<tspan x="${lab.x}" dy="${i === 0 ? 0 : 12}">${esc(line)}</tspan>`).join("")}</text>`);

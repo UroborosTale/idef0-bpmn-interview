@@ -11,8 +11,8 @@ import Studio from "./Studio";
 describe("вид диаграмм: настройка", () => {
   it("значения по умолчанию, запоминание и повреждённое хранилище", () => {
     expect(loadDisplay("k")).toEqual(DEFAULT_DISPLAY);
-    saveDisplay("k", { labels: false, bpmnNumbers: true, idef0Numbers: false });
-    expect(loadDisplay("k")).toEqual({ labels: false, bpmnNumbers: true, idef0Numbers: false });
+    saveDisplay("k", { labels: false, bpmnNumbers: true, idef0Numbers: false, idef0Icom: true });
+    expect(loadDisplay("k")).toEqual({ labels: false, bpmnNumbers: true, idef0Numbers: false, idef0Icom: true });
     localStorage.setItem("k", "{не json");
     expect(loadDisplay("k")).toEqual(DEFAULT_DISPLAY);
     localStorage.setItem("k", JSON.stringify({ labels: "нет", bpmnNumbers: true }));
@@ -56,6 +56,11 @@ describe("вид диаграмм: фигуры", () => {
     const arrowText = (show: boolean) => render(<svg><ArrowShape arrow={arrow} selected={false} showLabel={show} /></svg>).container.textContent!;
     expect(arrowText(true).length).toBeGreaterThanOrEqual(arrowText(false).length);
     expect(arrowText(false)).toBe("");
+    // ICOM-код на конце стрелки — отдельный слой: без кода в данных его нет, с кодом он виден только при showCode
+    const coded = { ...(arrow as Record<string, unknown>), code: "I1", codeAt: [10, 10], codeAnchor: "start" } as never;
+    const codeText = (show: boolean) => render(<svg><ArrowShape arrow={coded} selected={false} showLabel={false} showCode={show} /></svg>).container.textContent!;
+    expect(codeText(true)).toBe("I1");
+    expect(codeText(false)).toBe("");
   });
 });
 
@@ -94,6 +99,11 @@ describe("окно студии: «Подписи» и «Номера»", () => 
     expect(before).toBeGreaterThan(0);
     fireEvent.click(btn("Подписи"));
     expect(arrowLabels()).toBe(0);
+    // В9: ICOM-коды на концах стрелок включаются отдельной кнопкой
+    expect(document.querySelectorAll("[data-icom-code]")).toHaveLength(0);
+    fireEvent.click(btn("Коды ICOM"));
+    expect(document.querySelectorAll("[data-icom-code]").length).toBeGreaterThan(0);
+    expect(btn("Коды ICOM").className).toMatch(/toggled/);
   });
 
   it("на диаграммах других видов кнопок нет", () => {

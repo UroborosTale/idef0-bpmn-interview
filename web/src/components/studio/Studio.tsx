@@ -1030,6 +1030,17 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                 >
                   <RibbonIcon name="numbers" />
                 </button>
+                {active.kind === "idef0" && (
+                  <button
+                    className={`ribbon-icon ${display.idef0Icom ? "toggled" : ""}`}
+                    aria-label="Коды ICOM"
+                    aria-pressed={display.idef0Icom}
+                    onClick={() => setDisplay({ idef0Icom: !display.idef0Icom })}
+                    title="ICOM-коды на концах стрелок: I — вход, C — управление, O — выход, M — механизм (I1, C1, O1, M1)"
+                  >
+                    <RibbonIcon name="icom" />
+                  </button>
+                )}
               </>
             )}
             <button className="rb" onClick={() => open(bpmnDoc())}>

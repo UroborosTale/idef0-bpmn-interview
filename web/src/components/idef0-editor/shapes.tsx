@@ -129,7 +129,7 @@ export function ArrowHandles({ arrow, labelAt, k }: { arrow: Arrow; labelAt: { x
   return <g data-arrow-handles>{out}</g>;
 }
 
-export function ArrowShape({ arrow, selected, showLabel = true }: { arrow: Arrow; selected: boolean; showLabel?: boolean }) {
+export function ArrowShape({ arrow, selected, showLabel = true, showCode = false }: { arrow: Arrow; selected: boolean; showLabel?: boolean; showCode?: boolean }) {
   const d = arrow.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
   const color = selected ? ACCENT : ARROW;
   const lab = labelSpec(arrow);
@@ -147,6 +147,12 @@ export function ArrowShape({ arrow, selected, showLabel = true }: { arrow: Arrow
               {line}
             </tspan>
           ))}
+        </text>
+      )}
+      {showCode && arrow.code && arrow.codeAt && (
+        // В9: ICOM-код у конца стрелки (I1/C1/O1/M1) — как «Номера» у блоков, включается отдельно
+        <text data-icom-code={arrow.code} x={arrow.codeAt[0]} y={arrow.codeAt[1]} textAnchor={arrow.codeAnchor ?? "start"} fontSize={9} fontFamily="Arial, sans-serif" fill="#475569" pointerEvents="none">
+          {arrow.code}
         </text>
       )}
     </g>
