@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import type { ProcessLogicModel } from "../../types";
 import { useViewport } from "../editor-core/hooks";
-import { diagramLayout, diagramWidth, isBoundary, modelExtents, positionsFromBpmnXml, withLayout } from "./geometry";
+import { diagramLayout, diagramWidth, isBoundary, laneBandAt, modelExtents, positionsFromBpmnXml, withLayout } from "./geometry";
 import { ArrowDefs, ArtifactShape, FlowShape, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, nodeStyle } from "./shapes";
 
 /**
@@ -77,7 +77,7 @@ export default function BpmnDiagram({
             <ArtifactShape key={a.key} artifact={a} />
           ))}
           {shown.map((n) => (
-            <NodeShape key={n.id} node={n} style={nodeStyle(model ?? undefined, n, isBoundary(n, shown))} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
+            <NodeShape key={n.id} node={n} style={nodeStyle(model ?? undefined, n, isBoundary(n, shown))} box={boxes.get(n.id)!} selected={selectedId === n.id} hot={false} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} laneBand={model ? laneBandAt(model, boxes.get(n.id)!) : null} />
           ))}
           {[...markers].map(([blockId, list]) => (boxes.has(blockId) ? <TriggerMarkers key={blockId} box={boxes.get(blockId)!} markers={list} selectedId={selectedId} /> : null))}
         </g>

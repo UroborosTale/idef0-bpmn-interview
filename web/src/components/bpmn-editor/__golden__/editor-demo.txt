@@ -57,7 +57,7 @@ shape o12_record task/service 1460,90 150×90 «Зафиксировать ре�
 shape o12_approved event/end 1700,117 36×36 «Заявка согласована»
 flow o12_f1 o12_start→o12_route [216,135 320,135]
 flow o12_f2 o12_route→o12_split [470,135 560,135]
-flow o12_f3 o12_split→o12_byNeed [610,135 667,135 667,285 700,285]
+flow o12_f3 o12_split→o12_byNeed [610,135 904,135 904,285 850,285]
 flow o12_f4 o12_split→o12_budget [585,160 585,435 700,435]
 flow o12_f5 o12_budget→o12_enough [850,435 940,435]
 flow o12_f6 o12_enough→o12_reject [990,435 1047,435 1047,135 1080,135] «Нет»
@@ -165,7 +165,7 @@ artifact o31_ask:input:d_contract 576,216 18×20 edge[585,236 585,240] «Дог�
 artifact o31_receive:output:d_arrived 1906,366 18×20 edge[1915,390 1915,386] «Поставленное оборудование»
 pool p_suppl 500,690 170×40 «Поставщики»
 message o31_m1 o31_ask→p_suppl [585,330 585,522 563.8,522 563.8,690]
-message o31_m2 p_suppl→o31_status [606.3,690 606.3,508.5 768,508.5 768,303]
+message o31_m2 p_suppl→o31_status [606.3,690 606.3,502 768,502 768,303]
 # редактор BPMN C090.03.02
 shape o32_start event/start 180,417 36×36 «Поставка прибыла и приёмка подготовлена»
 shape o32_count task/manual 320,390 150×90 «Проверить комплектность поставки»

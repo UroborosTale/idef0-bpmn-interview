@@ -1,0 +1,79 @@
+import { describe, expect, it } from "vitest";
+import { generateBpmn } from "../src/pipeline/bpmn.js";
+import { b002Model } from "../src/reference/b002.js";
+import { c025Model } from "../src/reference/c025.js";
+import { demoModel } from "../src/reference/demo.js";
+import { bpmnHosts } from "../src/shared/codes.js";
+import { labelBox, labelSide } from "../src/shared/bpmnLabels.js";
+import { nudgeOffLaneBorders } from "../src/shared/bpmnRouting.js";
+
+/**
+ * Замечание с осмотра (C025.02.01): поток «Уведомление об отчислении» шёл по низу полосы дорожек, а подпись
+ * события упиралась в линию дорожки. Правила: отрезок отводится от линии дорожки, подпись — в свою дорожку.
+ */
+describe("линии дорожек: отрезки и подписи", () => {
+  it("горизонтальный отрезок на линии дорожки отводится на 8 px, вертикальный не трогается", () => {
+    const pts: [number, number][] = [
+      [0, 100],
+      [50, 100],
+      [50, 200],
+    ];
+    expect(nudgeOffLaneBorders(pts, [100])).toEqual([
+      [0, 108],
+      [50, 108],
+      [50, 200],
+    ]);
+    // вниз отводить некуда — занято фигурой: уводим наверх
+    const blocked = nudgeOffLaneBorders(
+      [
+        [0, 100],
+        [50, 100],
+      ],
+      [100],
+      [{ x: 0, y: 102, w: 60, h: 12 }]
+    );
+    expect(blocked).toEqual([
+      [0, 92],
+      [50, 92],
+    ]);
+  });
+
+  it("на эталонах ни один горизонтальный отрезок стрелки не лежит на линии дорожки", async () => {
+    for (const build of [b002Model, c025Model, demoModel]) {
+      const m = build();
+      for (const h of bpmnHosts(m)) {
+        const r = await generateBpmn(m, h.id);
+        const borders = [...new Set(r.diagram.lanes.flatMap((l) => [l.y, l.y + l.h]))];
+        for (const e of r.diagram.edges) {
+          for (let i = 0; i < e.points.length - 1; i++) {
+            const [x0, y0] = e.points[i];
+            const [x1, y1] = e.points[i + 1];
+            if (y0 !== y1) continue;
+            const on = borders.find((b) => Math.abs(b - y0) <= 3);
+            expect(on, `${h.name}: ${e.id} [${x0},${y0}]-[${x1},${y1}]`).toBeUndefined();
+          }
+        }
+      }
+    }
+  });
+
+  it("подпись события или шлюза остаётся в своей дорожке", async () => {
+    for (const build of [b002Model, c025Model, demoModel]) {
+      const m = build();
+      for (const h of bpmnHosts(m)) {
+        const r = await generateBpmn(m, h.id);
+        for (const s of r.diagram.shapes) {
+          if (s.kind !== "event" && s.kind !== "gateway") continue;
+          const band = r.diagram.lanes.find((l) => s.y >= l.y - 0.5 && s.y + s.h <= l.y + l.h + 0.5);
+          if (!band) continue;
+          const box = { x: s.x, y: s.y, w: s.w, h: s.h };
+          const side = labelSide(box, s.name, band);
+          const rect = labelBox(box, s.name, side)!;
+          const inside = rect.y >= band.y + 1.5 && rect.y + rect.h <= band.y + band.h - 1.5;
+          // либо подпись целиком в дорожке, либо места нет ни снизу, ни сверху — тогда остаётся снизу
+          if (!inside) expect(side, `${h.name}: ${s.name}`).toBe("below");
+        }
+      }
+    }
+  });
+});

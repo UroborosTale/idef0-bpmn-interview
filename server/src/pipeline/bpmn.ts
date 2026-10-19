@@ -2,7 +2,7 @@ import { canHaveDefaultFlow, loopXml, type LoopKind } from "../shared/loops.js";
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
 import { LANE_H, LANE_X, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
-import { fixedRoute, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
+import { fixedRoute, nudgeOffLaneBorders, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
 import { diagramTriggers } from "../shared/bpmnTriggers.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
@@ -534,29 +534,36 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const withArtifacts = new Set(artifacts.filter((a) => !isStoreArtifact(a)).map((a) => a.nodeId));
   const withStores = new Set(artifacts.filter(isStoreArtifact).map((a) => a.nodeId));
   const toBox = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
+  // полосы дорожек: подпись события или шлюза не должна выходить за свою полосу, а отрезок — идти по её линии
+  const laneBands = layout.laneBounds.map((b) => ({ top: b.y, bottom: b.y + b.height }));
+  const laneBandOf = (b: { y: number; h: number }) => laneBands.find((band) => b.y >= band.top - 0.5 && b.y + b.h <= band.bottom + 0.5) ?? null;
+  const laneBorderYs = [...new Set(laneBands.flatMap((band) => [band.top, band.bottom]))];
   const routeNodes: RouteNode[] = [
     ...nodes.flatMap((n) => {
       const b = layout.boxes.get(nodeIdOf(n.id));
-      return b ? [{ id: nodeIdOf(n.id), box: toBox(b), type: n.type, boundary: isBoundary(n), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name }] : [];
+      return b ? [{ id: nodeIdOf(n.id), box: toBox(b), type: n.type, boundary: isBoundary(n), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name, laneBand: laneBandOf(toBox(b)) ?? undefined }] : [];
     }),
     ...synthEvents.flatMap((se) => {
       const b = layout.boxes.get(se.id);
-      return b ? [{ id: se.id, box: toBox(b), type: "event", label: se.name }] : [];
+      return b ? [{ id: se.id, box: toBox(b), type: "event", label: se.name, laneBand: laneBandOf(toBox(b)) ?? undefined }] : [];
     }),
     ...[...poolRects].map(([id, r]) => ({ id: `Pool_${id}`, box: r, type: "pool" })),
   ];
+  // линия не должна сливаться с рамкой дорожки (замечание с осмотра): отводим горизонтальные отрезки от её линий
+  const avoidBoxes = [...allBoxes.values(), ...artifacts.map(artifactObstacle)];
+  const offBorders = (routes: Map<string, [number, number][]>) => new Map([...routes].map(([id, pts]) => [id, nudgeOffLaneBorders(pts, laneBorderYs, avoidBoxes)] as const));
   const messageFlows = messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true, fixed: fixedRoute(m.route) }));
-  const routed = routeFlows(
+  const routed = offBorders(routeFlows(
     routeNodes,
     // ручной маршрут стрелки учитывается и в XML — кроме стрелок к свёрнутым событиям: их стороны заданы для диаграммы без события
     [...flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: tview.hidden.has(f.to) || tview.hidden.has(f.from) ? undefined : fixedRoute(f.route) })), ...synthFlows.map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
     artifacts.map(artifactObstacle)
-  );
-  const routedView = routeFlows(
+  ));
+  const routedView = offBorders(routeFlows(
     routeNodes.filter((n) => !isHidden(n.id)),
     [...tview.flows.map((f) => ({ id: `flow:${f.id}`, from: nodeIdOf(f.from), to: nodeIdOf(f.to), fixed: fixedRoute(f.route) })), ...synthFlows.filter((sf) => !isHidden(sf.from) && !isHidden(sf.to)).map((sf) => ({ id: `flow:${sf.id}`, from: sf.from, to: sf.to })), ...messageFlows],
     artifacts.map(artifactObstacle)
-  );
+  ));
 
   const edgesXml: string[] = [];
   const waypointsOf = (points: [number, number][]) => points.map(([x, y]) => `<di:waypoint x="${Math.round(x)}" y="${Math.round(y)}" />`).join("");

@@ -35,12 +35,31 @@ export const LABEL_CHARS = 20;
 export const LABEL_LINES = 3;
 const LABEL_CHAR_W = 5.8; // средняя ширина знака при кегле 11
 const LABEL_LINE_H = 13;
+const LABEL_GAP = 3; // просвет между фигурой и подписью
+const LANE_LABEL_MARGIN = 2; // подпись не должна касаться линии дорожки
 
-/** Рамка подписи под фигурой: по ней стрелки обходят текст. Подпись по умолчанию стоит по центру оси фигуры. */
-export function labelBox(b: Box, text: string): Box | null {
+/** Сторона подписи фигуры: под фигурой, а если до линии дорожки места нет — над ней. */
+export type LabelSide = "below" | "above";
+
+/**
+ * Где рисовать подпись события или шлюза. Подпись всегда стоит под фигурой, но у фигуры, стоящей внизу дорожки,
+ * она упиралась в линию дорожки (замечание с осмотра): тогда подпись уходит наверх — если и там есть место.
+ * Правило одно на редактор, Visio и SVG-выгрузки, поэтому подпись везде стоит одинаково.
+ */
+export function labelSide(b: Box, text: string, band?: { top: number; bottom: number } | null): LabelSide {
+  const rows = wrapText(text, LABEL_CHARS, LABEL_LINES).length;
+  if (rows === 0 || !band) return "below";
+  const h = rows * LABEL_LINE_H;
+  if (b.y + b.h + LABEL_GAP + h <= band.bottom - LANE_LABEL_MARGIN) return "below";
+  return b.y - LABEL_GAP - h >= band.top + LANE_LABEL_MARGIN ? "above" : "below";
+}
+
+/** Рамка подписи фигуры: по ней стрелки обходят текст. Подпись по умолчанию стоит по центру оси фигуры. */
+export function labelBox(b: Box, text: string, side: LabelSide = "below"): Box | null {
   const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
   if (lines.length === 0) return null;
   const w = Math.max(...lines.map((l) => l.length)) * LABEL_CHAR_W + 4;
-  return { x: b.x + b.w / 2 - w / 2, y: b.y + b.h + 3, w, h: lines.length * LABEL_LINE_H };
+  const h = lines.length * LABEL_LINE_H;
+  return { x: b.x + b.w / 2 - w / 2, y: side === "above" ? b.y - LABEL_GAP - h : b.y + b.h + LABEL_GAP, w, h };
 }
 

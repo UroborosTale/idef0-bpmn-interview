@@ -13,6 +13,7 @@ import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
 import { TASK_ICON_PAD, taskIcon } from "../shared/taskIcons.js";
 import { paramText, shownParams } from "../shared/paramDisplay.js";
 import { ARTIFACT_LABEL_W } from "../shared/bpmnArtifacts.js";
+import { labelSide } from "../shared/bpmnLabels.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -84,6 +85,8 @@ interface Style {
   noMargins?: boolean;
   /** Текст вне фигуры: блок шириной w под нижним краем с зазором gap (подписи событий и шлюзов). */
   textBelow?: { w: number; h: number; gap: number };
+  /** То же, но над верхним краем: у фигуры внизу дорожки подпись не помещается. */
+  textAbove?: { w: number; h: number; gap: number };
   /** Теги модели (ячейки User): pm_k — вид элемента, pm_id — id в модели, остальные — по виду. */
   tag?: Record<string, string>;
   /** Ключ для приклейки соединителей. */
@@ -233,6 +236,19 @@ export class Page {
         `<Cell N="VerticalAlign" V="0"/>`,
         `<Cell N="TxtPinX" V="${num(W / 2)}" F="Width*0.5"/>`,
         `<Cell N="TxtPinY" V="${num(-(t.gap + t.h / 2) * PX)}"/>`,
+        `<Cell N="TxtWidth" V="${num(t.w * PX)}"/>`,
+        `<Cell N="TxtHeight" V="${num(t.h * PX)}"/>`,
+        `<Cell N="TxtLocPinX" V="${num((t.w / 2) * PX)}" F="TxtWidth*0.5"/>`,
+        `<Cell N="TxtLocPinY" V="${num((t.h / 2) * PX)}" F="TxtHeight*0.5"/>`
+      );
+    }
+    if (style.textAbove) {
+      // блок текста над фигурой, выровненный по низу: подпись у нижней границы дорожки уходит наверх
+      const t = style.textAbove;
+      cells.push(
+        `<Cell N="VerticalAlign" V="2"/>`,
+        `<Cell N="TxtPinX" V="${num(W / 2)}" F="Width*0.5"/>`,
+        `<Cell N="TxtPinY" V="${num((t.gap + t.h / 2) * PX)}"/>`,
         `<Cell N="TxtWidth" V="${num(t.w * PX)}"/>`,
         `<Cell N="TxtHeight" V="${num(t.h * PX)}"/>`,
         `<Cell N="TxtLocPinX" V="${num((t.w / 2) * PX)}" F="TxtWidth*0.5"/>`,
@@ -713,7 +729,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
     });
   }
 
-  for (const s of d.shapes) drawBpmnShape(page, s, model);
+  for (const s of d.shapes) drawBpmnShape(page, s, model, false, d.lanes);
   // что было нарисовано: по этому списку импорт отличает удалённое в Visio от появившегося в модели позже
   page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId && !e.flowId.startsWith("DerivedFlow_") ? [e.flowId] : [])) });
   return page;
@@ -777,8 +793,11 @@ function drawPoolsAndMessages(page: Page, d: BpmnDiagramData) {
   }
 }
 
-function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = false) {
+function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = false, lanes?: BpmnDiagramData["lanes"]) {
   const { x, y, w, h } = s;
+  // подпись события или шлюза остаётся в своей дорожке (shared/bpmnLabels.ts): у фигуры внизу дорожки она уходит наверх
+  const band = lanes?.find((l) => y >= l.y - 0.5 && y + h <= l.y + l.h + 0.5);
+  const above = !!band && labelSide({ x, y, w, h }, s.name, { top: band.y, bottom: band.y + band.h }) === "above";
   // plain — фигура для палитры оболочки: без меток модели (метки ставит приём правок, когда фигура становится шагом)
   const tag: Record<string, string> = plain ? {} : s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
   const props = visioShapeProps(s);
@@ -797,10 +816,10 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
     const isEnd = position === "end";
     const inner: GeomPart[] = isStart || isEnd ? [] : [{ kind: "ellipse", cx: w / 2, cy: h / 2, rx: w / 2 - 4, ry: h / 2 - 4 }];
     const glyphs = triggerGlyph(s.event?.trigger ?? "none", s.event?.throwing ?? false);
-    page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 9.3, textBelow: { w: 120, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
+    page.ellipse(x, y, w, h, { fill: isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933", weightPt: isEnd ? 3.2 : 1.3, dash: position === "boundary" && s.interrupting === false, text: s.name, fontPx: 9.3, ...(above ? { textAbove: { w: 120, h: 30, gap: 3 } } : { textBelow: { w: 120, h: 30, gap: 3 } }), tag, key: s.id, props, ...look }, [...inner, ...eventGlyph(glyphs, w, h)]);
     drawEventFilled(page, glyphs, x, y, w, h);
   } else if (s.kind === "gateway") {
-    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name === "Слияние потоков" ? "" : s.name, fontPx: 9.3, textBelow: { w: 130, h: 30, gap: 3 }, tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
+    page.diamond(x, y, w, h, { fill: "#ffff99", weightPt: 1.3, text: s.name === "Слияние потоков" ? "" : s.name, fontPx: 9.3, ...(above ? { textAbove: { w: 130, h: 30, gap: 3 } } : { textBelow: { w: 130, h: 30, gap: 3 } }), tag, key: s.id, props, ...look }, gatewayGlyph(s.subtype, w, h));
     // как в Business Studio, значок шлюза — жирный: «X» и «+» рисуются толстыми линиями поверх тонкого значка фигуры
     const [cx, cy] = [x + w / 2, y + h / 2];
     const sub = s.subtype ?? "exclusive";

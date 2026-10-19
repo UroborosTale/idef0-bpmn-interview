@@ -1,5 +1,5 @@
 import type { ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, routeFlowsDetailed, routeQuality } from "@shared/bpmnRouting";
+import { MIN_EVALUATIONS, evaluationsFor, fixedRoute, nudgeOffLaneBorders, routeFlowsDetailed, routeQuality } from "@shared/bpmnRouting";
 import { rankColumns } from "@shared/bpmnRank";
 import { ROW_PITCH, branchRows, collinearOverlaps } from "@shared/bpmnRows";
 import { diagramTriggers, type TriggerView } from "@shared/bpmnTriggers";
@@ -121,6 +121,14 @@ export const laneTop = (m: ProcessLogicModel, i: number): number => laneTops(lan
 export const laneHeight = (m: ProcessLogicModel, i: number): number => laneHeights(m)[i] ?? LANE_H;
 /** Нижняя граница последней дорожки. */
 export const lanesBottom = (m: ProcessLogicModel): number => START_Y + laneHeights(m).reduce((s, h) => s + h, 0);
+
+/** Полоса дорожки под фигурой: подпись события или шлюза не должна выходить за её линии (shared/bpmnLabels.ts). */
+export function laneBandAt(m: ProcessLogicModel, box: Box): { top: number; bottom: number } | null {
+  const heights = laneHeights(m);
+  const i = laneIndexAtY(m, box.y + box.h / 2);
+  const top = laneTop(m, i);
+  return heights[i] === undefined ? null : { top, bottom: top + heights[i] };
+}
 
 export function laneIndexOfRole(m: ProcessLogicModel, roleId: string | null | undefined): number {
   const i = roleId ? m.roles.findIndex((r) => r.id === roleId) : -1;
@@ -386,11 +394,14 @@ export function diagramLayout(m: ProcessLogicModel) {
   const poolIds = new Set(extras.pools.map((p) => p.pool.id));
   const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
   const info = routeFlowsDetailed(
-    [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
+    [...shown.map((n) => ({ id: n.id, box: boxes.get(n.id)!, type: n.type, boundary: isBoundary(n, shown), artifacts: withArtifacts.has(n.id), stores: withStores.has(n.id), label: n.name, laneBand: laneBandAt(m, boxes.get(n.id)!) ?? undefined })), ...extras.pools.map((p) => ({ id: `pool:${p.pool.id}`, box: p.box, type: "pool" }))],
     [...flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) })), ...extras.messages.map(({ message }) => ({ id: `msg:${message.id}`, from: end(message.from), to: end(message.to), message: true, fixed: fixedRoute(message.route) }))],
     extras.artifacts.map(artifactObstacle)
   );
-  const routes = new Map([...info].map(([id, r]) => [id, r.pts] as const));
+  // линия не должна сливаться с рамкой дорожки (замечание с осмотра): горизонтальные отрезки у линий дорожек отводим
+  const borders = [...laneTops(laneHeights(m)), lanesBottom(m)];
+  const avoid = [...boxes.values(), ...extras.artifacts.map(artifactObstacle), ...extras.pools.map((p) => p.box)];
+  const routes = new Map([...info].map(([id, r]) => [id, nudgeOffLaneBorders(r.pts, borders, avoid)] as const));
   // фигуры, у нижней вершины которых проходит стрелка: подпись таких фигур сдвигается левее линии
   const bottomUsed = new Set<string>();
   for (const f of flows) {

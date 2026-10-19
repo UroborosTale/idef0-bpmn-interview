@@ -11,7 +11,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, configuredWidth, diagramLayout, diagramWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
+import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, configuredWidth, diagramLayout, diagramWidth, isBoundary, laneBandAt, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
 import { positionOnSide } from "@shared/bpmnManual";
 import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
@@ -967,7 +967,7 @@ export default function BpmnEditor({
               ))}
 
               {shown.map((n) => (
-                <NodeShape key={n.id} node={n} style={nodeStyle(draft, n, isBoundary(n, shown))} showLabel={display.labels} code={numbers?.get(n.id)} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} />
+                <NodeShape key={n.id} node={n} style={nodeStyle(draft, n, isBoundary(n, shown))} showLabel={display.labels} code={numbers?.get(n.id)} box={boxes.get(n.id)!} selected={inGroup ? groupIds.includes(n.id) : curSel?.kind === "node" && curSel.id === n.id} hot={connectHot === n.id} boundary={isBoundary(n, shown)} labelLeft={bottomUsed.has(n.id)} hasMarkers={markers.has(n.id)} laneBand={laneBandAt(draft, boxes.get(n.id)!)} />
               ))}
 
               {inGroup && (() => {

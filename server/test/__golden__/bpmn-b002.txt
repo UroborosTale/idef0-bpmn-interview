@@ -372,8 +372,8 @@ shape Node_o32_comment task/user 3025,90 150×90 «Заполнить поле �
 shape Node_o32_shift_end event/timer 3215,117 36×36 «Конец смены»
 shape Node_o32_report task/user 3405,90 150×90 «Оформить результаты ФРД в презентацию»
 shape Node_o32_end event/end 3595,117 36×36 «ФРД проведено»
-edge Flow_o32_f1 Node_o32_start1→Node_o32_join [401,135 555,135]
-edge Flow_o32_f2 Node_o32_start2→Node_o32_join [449,179 449,203 580,203 580,160]
+edge Flow_o32_f1 Node_o32_start1→Node_o32_join [383,153 383,203 580,203 580,160]
+edge Flow_o32_f2 Node_o32_start2→Node_o32_join [467,161 523,161 523,135 555,135]
 edge Flow_o32_f3 Node_o32_join→Node_o32_go [605,135 745,135]
 edge Flow_o32_f4 Node_o32_go→Node_o32_shift_start [895,135 935,135]
 edge Flow_o32_f5 Node_o32_shift_start→Node_o32_greet [971,135 1125,135]

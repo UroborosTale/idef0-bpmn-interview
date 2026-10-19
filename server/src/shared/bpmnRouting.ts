@@ -14,7 +14,7 @@
  */
 
 import type { Box, EndKinds, Pt } from "./bpmnGeometry.js";
-import { labelBox } from "./bpmnLabels.js";
+import { labelBox, labelSide } from "./bpmnLabels.js";
 import { orthogonalPath } from "./bpmnManual.js";
 
 export type Side = "L" | "R" | "T" | "B";
@@ -32,14 +32,49 @@ export interface RouteNode {
   stores?: boolean;
   /** Название события или шлюза: оно подписано под фигурой, и чужие стрелки обходят текст (у задач название внутри фигуры). */
   label?: string;
+  /** Полоса дорожки фигуры: если подпись не влезает под фигурой до линии дорожки, она уходит наверх (shared/bpmnLabels.ts). */
+  laneBand?: { top: number; bottom: number };
 }
 
 /** Рамки подписей событий и шлюзов; owner — фигура-хозяин: её собственные стрелки подпись не задевают (редактор сдвигает подпись от линии). */
 function labelsOf(nodes: RouteNode[]): { owner: string; box: Box }[] {
   return nodes.flatMap((n) => {
-    const box = n.label && (n.type === "event" || n.type === "gateway") ? labelBox(n.box, n.label) : null;
+    const box = n.label && (n.type === "event" || n.type === "gateway") ? labelBox(n.box, n.label, labelSide(n.box, n.label, n.laneBand)) : null;
     return box ? [{ owner: n.id, box }] : [];
   });
+}
+
+/** Насколько близко к линии дорожки отрезок считается «идущим по линии» и насколько он от неё отходит. */
+const BORDER_PAD = 3;
+const BORDER_SHIFT = 8;
+
+/**
+ * Горизонтальные отрезки, идущие по линии дорожки, отводятся в сторону: иначе линия сливается с рамкой дорожки
+ * (замечание с осмотра — поток «Уведомление об отчислении» шёл по низу полосы дорожек). Отвод — на 8 px, только
+ * если там нет фигур и значков; вертикальные отрезки не трогаются, поэтому пересечение дорожек остаётся возможным.
+ */
+export function nudgeOffLaneBorders(points: Pt[], borders: number[], avoid: Box[] = []): Pt[] {
+  if (points.length < 2 || borders.length === 0) return points;
+  const out = points.map((p) => [p[0], p[1]] as Pt);
+  const blocked = (lo: number, hi: number, y: number) => avoid.some((b) => lo < b.x + b.w && b.x < hi && y > b.y && y < b.y + b.h);
+  for (let i = 0; i < out.length - 1; i++) {
+    const [x0, y0] = out[i];
+    const [x1, y1] = out[i + 1];
+    if (y0 !== y1) continue; // только горизонтальные: вертикальный отрезок — это как раз переход между дорожками
+    const border = borders.find((t) => Math.abs(t - y0) <= BORDER_PAD);
+    if (border === undefined) continue;
+    const lo = Math.min(x0, x1);
+    const hi = Math.max(x0, x1);
+    const first = y0 >= border ? 1 : -1;
+    for (const dir of [first, -first]) {
+      const ny = border + dir * BORDER_SHIFT;
+      if (blocked(lo, hi, ny)) continue;
+      out[i][1] = ny;
+      out[i + 1][1] = ny;
+      break;
+    }
+  }
+  return out;
 }
 
 export interface RouteFlow {

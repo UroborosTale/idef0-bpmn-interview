@@ -8,6 +8,7 @@ import { TASK_ICON_PAD, taskIcon } from "@shared/taskIcons";
 /** Подсказка к значку типа задачи. */
 const TASK_TYPE_TITLES: Record<string, string> = { user: "Пользовательская задача", service: "Сервисная задача", manual: "Ручная задача", send: "Отправка сообщения", receive: "Получение сообщения", script: "Сценарий", business_rule: "Бизнес-правило" };
 import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
+import { labelSide } from "@shared/bpmnLabels";
 import { LANE_X, LABEL_W, LABEL_CHARS, LABEL_LINES, flowLabelPoint, laneCount, laneHeights, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
 const INK = "#1e293b";
@@ -70,14 +71,17 @@ export function nodeStyle(m: StyledModel | undefined, node: ProcessNode, boundar
   return kind ? styleOf(m, kind) : undefined;
 }
 
-/** Подпись под фигурой; left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
-function Label({ cx, y, text, left = false, color = INK, size = 11 }: { cx: number; y: number; text: string; left?: boolean; color?: string; size?: number }) {
+/** Подпись фигуры: под ней, а если до линии дорожки места нет — над ней (above). left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
+function Label({ box, text, above = false, left = false, color = INK, size = 11 }: { box: Box; text: string; above?: boolean; left?: boolean; color?: string; size?: number }) {
   const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
+  const cx = box.x + box.w / 2;
+  const lh = Math.round((size * 13) / 11);
   const x = left ? cx - 8 : cx;
+  const y = above ? box.y - 6 - (lines.length - 1) * lh : box.y + box.h + 14;
   return (
     <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={size} fill={color} pointerEvents="none">
       {lines.map((l, i) => (
-        <tspan key={i} x={x} dy={i === 0 ? 0 : Math.round((size * 13) / 11)}>
+        <tspan key={i} x={x} dy={i === 0 ? 0 : lh}>
           {l}
         </tspan>
       ))}
@@ -85,10 +89,12 @@ function Label({ cx, y, text, left = false, color = INK, size = 11 }: { cx: numb
   );
 }
 
-export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false, hasMarkers = false, style, showLabel = true, code }: { style?: ResolvedStyle; showLabel?: boolean; code?: string; node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean; hasMarkers?: boolean }) {
+export function NodeShape({ node, box, selected, hot, boundary = false, labelLeft = false, hasMarkers = false, style, showLabel = true, code, laneBand }: { style?: ResolvedStyle; showLabel?: boolean; code?: string; node: ProcessNode; box: Box; selected: boolean; hot: boolean; boundary?: boolean; labelLeft?: boolean; hasMarkers?: boolean; laneBand?: { top: number; bottom: number } | null }) {
   const { x, y, w, h } = box;
   const cx = x + w / 2;
   const cy = y + h / 2;
+  // подпись события или шлюза остаётся в своей дорожке: у фигуры внизу дорожки она уходит наверх
+  const above = (node.type === "event" || node.type === "gateway") && labelSide(box, node.name, laneBand) === "above";
   const stroke = selected ? ACCENT : hot ? "#16a34a" : style?.line ?? INK;
   const ink = style?.text ?? INK;
   const size = style?.font_size;
@@ -107,7 +113,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
         <circle cx={cx} cy={cy} r={w / 2} fill={style?.fill ?? (isStart ? "#99ff66" : isEnd ? "#ff8262" : "#ff9933")} {...common} strokeWidth={isEnd ? sw + 2 : sw} strokeDasharray={boundary && node.interrupting === false ? "4 3" : dash} />
         {!isStart && !isEnd && <circle cx={cx} cy={cy} r={w / 2 - 4} fill="none" stroke={stroke} strokeWidth={1} strokeDasharray={boundary && node.interrupting === false ? "3 2" : undefined} />}
         <EventGlyph cx={cx} cy={cy} trigger={spec.trigger} throwing={spec.throwing} />
-        {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
+        {showLabel && <Label box={box} text={node.name} above={above} left={labelLeft} color={ink} size={size} />}
       </g>
     );
   } else if (node.type === "gateway") {
@@ -115,7 +121,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
       <g>
         <path d={`M${cx} ${y} L${x + w} ${cy} L${cx} ${y + h} L${x} ${cy} Z`} fill={style?.fill ?? "#ffff99"} {...common} strokeLinejoin="round" />
         <GatewayGlyph cx={cx} cy={cy} subtype={node.subtype} />
-        {showLabel && <Label cx={cx} y={y + h + 14} text={node.name} left={labelLeft} color={ink} size={size} />}
+        {showLabel && <Label box={box} text={node.name} above={above} left={labelLeft} color={ink} size={size} />}
       </g>
     );
   } else {
