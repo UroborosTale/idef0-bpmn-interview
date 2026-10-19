@@ -78,7 +78,7 @@ export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpRe
   let [x, y] = clampIntoLane(m, spec, snap(cx - size.w / 2), snapTop(cy - size.h / 2, size.h), lane);
   // Фигура из палитры не должна вставать на уже занятое место: два щелчка по палитре ставили фигуры друг на друга.
   // Ищем свободное место правее занятого, оставаясь в той же дорожке (аналог VisioPane.FreeSpot в оболочке).
-  const boxes = m.nodes.filter((n) => n.layout && n.type !== "pool").map((n) => boxOf(n));
+  const boxes = m.nodes.filter((n) => n.layout).map((n) => boxOf(n));
   const hit = (bx: number, by: number) => boxes.find((b) => bx < b.x + b.w && b.x < bx + size.w && by < b.y + b.h && b.y < by + size.h);
   for (let guard = 0; guard < 50; guard++) {
     const blocker = hit(x, y);

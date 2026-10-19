@@ -74,8 +74,8 @@ describe("BPMN: операции над моделью", () => {
     const a = addNodeAt(m, { type: "task", name: "Первая" }, 400, cy);
     const b = addNodeAt(a.model, { type: "task", name: "Вторая" }, 400, cy);
     const xOf = (model: typeof b.model, id: string) => model.nodes.find((n) => n.id === id)!.layout!.x;
-    expect(xOf(b.model, b.id)).toBeGreaterThan(xOf(a.model, a.id));
-    expect(xOf(b.model, b.id) - xOf(a.model, a.id)).toBeGreaterThanOrEqual(150);
+    expect(xOf(b.model, b.id!)).toBeGreaterThan(xOf(a.model, a.id!));
+    expect(xOf(b.model, b.id!) - xOf(a.model, a.id!)).toBeGreaterThanOrEqual(150);
   });
 
 

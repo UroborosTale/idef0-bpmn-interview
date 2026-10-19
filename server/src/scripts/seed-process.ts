@@ -54,4 +54,11 @@ if (saved.status !== 200) {
   console.error("Не удалось записать модель:", saved.body?.error ?? saved.status);
   process.exit(1);
 }
+// PUT модели помечает диаграммы устаревшими (они были собраны из пустой модели) — собираем их из эталона,
+// иначе сессия открывается с «Пересобрать диаграммы (модель изменена)» и пустыми схемами
+const rebuilt = await call("POST", `/sessions/${created.body.id}/rebuild-diagrams`);
+if (rebuilt.status !== 200 || rebuilt.body?.diagramsStale !== false) {
+  console.error("Не удалось пересобрать диаграммы:", rebuilt.body?.error ?? rebuilt.status);
+  process.exit(1);
+}
 console.log(`Загружено (${entry.title}): сессия ${created.body.id}.\nОткройте в студии: /s/${created.body.id}`);

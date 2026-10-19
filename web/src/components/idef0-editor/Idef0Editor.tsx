@@ -940,6 +940,7 @@ export default function Idef0Editor({
               view={view}
               size={{ w: wrapRef.current?.clientWidth ?? 800, h: wrapRef.current?.clientHeight ?? 400 }}
               onCenter={(wx, wy) => centerOn({ x: wx, y: wy, w: 0, h: 0 })}
+              stamp={frameOn ? frameGeo.footer : undefined}
             />
           )}
           <div className="bpe-corner muted">
