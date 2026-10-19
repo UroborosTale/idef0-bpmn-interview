@@ -109,6 +109,16 @@ export function offpageMarks(a: { kind: ArrowKind; points: Pt[]; offpageUp?: boo
   return out;
 }
 
+/** В12: примечание к функции — жёлтый блок справа от неё; ширина 150, строки по 22 знака. */
+export const NOTE_W = 150;
+export const NOTE_GAP = 12;
+
+export function noteBox(b: Box, text: string): { x: number; y: number; w: number; h: number; lines: string[] } | null {
+  const lines = wrapText(text, 22, 8);
+  if (lines.length === 0) return null;
+  return { x: b.x + b.w + NOTE_GAP, y: b.y, w: NOTE_W, h: Math.max(34, lines.length * 13 + 10), lines };
+}
+
 /**
  * Стороны стрелки в направлении от начала к концу: из какой стороны выходит начало (куда идёт первый отрезок) и в какую сторону
  * смотрит нормаль у конца (с какой стороны подходит последний отрезок). Для orthogonalPath и ручек редактора.

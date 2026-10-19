@@ -1,6 +1,6 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
-import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, noteBox, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 import { FRAME_FONT, frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
 export type { ArrowKind, LabelSide, Pt };
@@ -64,6 +64,8 @@ export interface Idef0Block {
   w: number;
   h: number;
   hasChildren?: boolean;
+  /** В12: примечание к функции — жёлтый блок справа от неё (редактор, SVG и Visio рисуют его одинаково). */
+  note?: string;
 }
 
 /** Диаграмма в структурированном виде: из неё строятся и SVG, и VSDX. */
@@ -121,7 +123,7 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
   const code = parentId ? codes.get(parentId) ?? "A?" : processCodeOf(model);
   const layout = layoutIdef0(model, parentId);
 
-  const blocks: Idef0Block[] = layout.functions.map((f) => ({ nodeId: f.node.id, code: f.code, name: f.node.name, ...f.box, hasChildren: f.hasChildren }));
+  const blocks: Idef0Block[] = layout.functions.map((f) => ({ nodeId: f.node.id, code: f.code, name: f.node.name, ...f.box, hasChildren: f.hasChildren, ...(f.node.note ? { note: f.node.note } : {}) }));
   const arrows: Idef0Arrow[] = layout.arrows.map((a) => ({
     points: a.points,
     label: a.label,
@@ -291,6 +293,12 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
       // отметка «есть декомпозиция»: квадрат с плюсом в правом нижнем углу
       const [mx, my] = [b.x + b.w - 18, b.y + b.h - 18];
       parts.push(`<rect x="${mx}" y="${my}" width="12" height="12" fill="#fff" stroke="#1f2937" /><path d="M${mx + 3},${my + 6} H${mx + 9} M${mx + 6},${my + 3} V${my + 9}" stroke="#1f2937" />`);
+    }
+    // В12: примечание к функции — жёлтый блок справа от неё
+    const nb = b.note ? noteBox({ x: b.x, y: b.y, w: b.w, h: b.h }, b.note) : null;
+    if (nb) {
+      parts.push(`<rect x="${nb.x}" y="${nb.y}" width="${nb.w}" height="${nb.h}" fill="#fef9c3" stroke="#a16207" stroke-width="1" />`);
+      nb.lines.forEach((line, i) => parts.push(`<text x="${nb.x + 5}" y="${nb.y + 14 + i * 13}" font-size="10" font-family="Arial, sans-serif" fill="#422006">${esc(line)}</text>`));
     }
   }
   for (const a of d.arrows) {

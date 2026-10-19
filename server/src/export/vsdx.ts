@@ -3,7 +3,7 @@ import type { ProcessLogicModel } from "../types/model.js";
 import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame, FRAME_FONT, FRAME_H } from "../shared/idef0Frame.js";
-import { tunnelArcs } from "../shared/idef0Layout.js";
+import { noteBox, tunnelArcs } from "../shared/idef0Layout.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
 import { LABEL_W, LANE_X } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
@@ -516,6 +516,12 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_c: b.code, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     // у блока контекстной диаграммы в правом нижнем углу — номер блока «0», как в Business Studio
     if (!editable) page.label("0", { x: b.x + b.w - 6, y: b.y + b.h - 18, anchor: "end", w: 30 }, { fontPx: 10, color: "#000000" });
+    // В12: примечание к функции — жёлтый блок справа от неё
+    const nb = b.note ? noteBox({ x: b.x, y: b.y, w: b.w, h: b.h }, b.note) : null;
+    if (nb) {
+      page.rect(nb.x, nb.y, nb.w, nb.h, { fill: "#fef9c3", line: "#a16207", weightPt: 0.75 });
+      nb.lines.forEach((line, i) => page.label(line, { x: nb.x + 5, y: nb.y + 4 + i * 13, anchor: "start", w: nb.w - 8 }, { fontPx: 8.5, color: "#422006" }));
+    }
   }
 
   for (const a of d.arrows) {

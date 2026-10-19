@@ -1,5 +1,5 @@
 import { type ResolvedStyle } from "@shared/shapeStyles";
-import { FREE_END, offpageMarks, tunnelArcs } from "@shared/idef0Layout";
+import { FREE_END, noteBox, offpageMarks, tunnelArcs } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 
@@ -53,6 +53,23 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
           <path d={`M${x + w - 18},${y + h - 14} H${x + w - 10} M${x + w - 14},${y + h - 18} V${y + h - 10}`} stroke={INK} strokeWidth={1.4} pointerEvents="none" />
         </g>
       )}
+      {/* В12: примечание к функции — жёлтый блок справа от неё (то же место, что в SVG и Visio) */}
+      {(() => {
+        const nb = fn.node.note ? noteBox(fn.box, fn.node.note) : null;
+        if (!nb) return null;
+        return (
+          <g data-fn-note={fn.node.id} pointerEvents="none">
+            <rect x={nb.x} y={nb.y} width={nb.w} height={nb.h} fill="#fef9c3" stroke="#a16207" strokeWidth={1} />
+            <text x={nb.x + 5} y={nb.y + 14} fontSize={10} fontFamily="Arial, sans-serif" fill="#422006">
+              {nb.lines.map((l, i) => (
+                <tspan key={i} x={nb.x + 5} dy={i === 0 ? 0 : 13}>
+                  {l}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      })()}
     </g>
   );
 }

@@ -62,6 +62,13 @@ describe("вид диаграмм: фигуры", () => {
     expect(codeText(true)).toBe("I1");
     expect(codeText(false)).toBe("");
   });
+
+  it("В12: примечание к функции рисуется жёлтым блоком справа", () => {
+    const fn = { node: { ...structuredModel().nodes.find((n) => n.id === "o1")!, note: "Сверить с юристом" }, box: { x: 0, y: 0, w: 200, h: 80 }, code: "A1", hasChildren: false } as never;
+    const { container } = render(<svg><BlockShape fn={fn} selected={false} hot={false} /></svg>);
+    expect(container.querySelector("[data-fn-note]")).toBeTruthy();
+    expect(container.textContent).toContain("Сверить");
+  });
 });
 
 describe("окно студии: «Подписи» и «Номера»", () => {
