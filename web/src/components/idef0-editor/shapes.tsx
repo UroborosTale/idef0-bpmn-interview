@@ -2,6 +2,8 @@ import { type ResolvedStyle } from "@shared/shapeStyles";
 import { FREE_END, noteBox, offpageMarks, tunnelArcs } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
+import { noteLines } from "./notes";
+import type { FreeNote } from "../../types";
 
 /** Рамка листа (клетки, контур, штамп NODE / TITLE / NO.) — общая с редактором BPMN. */
 export { FrameLayer } from "../editor-core/sheetFrame";
@@ -70,6 +72,50 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
           </g>
         );
       })()}
+    </g>
+  );
+}
+
+/**
+ * В12: свободный текстовый блок на диаграмме — жёлтый прямоугольник с текстом (положение и размер в модели).
+ * Клик — выбор, двойной щелчок — правка текста, × в углу выбранного блока — удалить.
+ */
+export function FreeNoteShape({ note, selected, onSelect, onEdit, onDelete }: { note: FreeNote; selected: boolean; onSelect: () => void; onEdit: () => void; onDelete: () => void }) {
+  const lines = noteLines(note.text, note.w);
+  return (
+    <g
+      data-free-note={note.id}
+      style={{ cursor: "move" }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onSelect();
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onEdit();
+      }}
+    >
+      <rect x={note.x} y={note.y} width={note.w} height={note.h} fill="#fef9c3" stroke={selected ? ACCENT : "#a16207"} strokeWidth={selected ? 2.2 : 1} />
+      <text x={note.x + 6} y={note.y + 16} fontSize={10.5} fontFamily="Arial, sans-serif" fill="#422006" pointerEvents="none">
+        {lines.map((l, i) => (
+          <tspan key={i} x={note.x + 6} dy={i === 0 ? 0 : 13}>
+            {l}
+          </tspan>
+        ))}
+      </text>
+      {selected && (
+        <g
+          data-note-delete
+          style={{ cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <circle cx={note.x + note.w - 9} cy={note.y + 9} r={6} fill="#fff" stroke="#a16207" strokeWidth={1} />
+          <path d={`M${note.x + note.w - 12} ${note.y + 6} l6 6 M${note.x + note.w - 6} ${note.y + 6} l-6 6`} stroke="#a16207" strokeWidth={1.2} fill="none" />
+        </g>
+      )}
     </g>
   );
 }

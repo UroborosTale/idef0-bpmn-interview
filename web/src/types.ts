@@ -80,6 +80,16 @@ export interface ControlEntity {
   reference?: string | null;
 }
 
+/** В12: свободный текстовый блок на диаграмме IDEF0 (жёлтый прямоугольник с текстом). */
+export interface FreeNote {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface ProcessNode {
   id: string;
   type: "task" | "event" | "gateway" | "subprocess";
@@ -339,6 +349,8 @@ export interface ProcessLogicModel {
   diagram_widths?: Record<string, number>;
   /** Рамка листа и сетка диаграмм IDEF0: ключ — id функции, "" — верхняя диаграмма. */
   idef0_frames?: Record<string, IdefFrame>;
+  /** В12: свободные текстовые блоки на диаграммах IDEF0: ключ — id функции, "" — верхняя диаграмма. */
+  idef0_notes?: Record<string, FreeNote[]>;
   /** Рамка листа и сетка диаграмм BPMN: ключ — id операции, "" — общая схема процесса. */
   bpmn_frames?: Record<string, IdefFrame>;
   accepted_issues: AcceptedIssue[];

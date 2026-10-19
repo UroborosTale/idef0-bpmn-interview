@@ -15,12 +15,13 @@ import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, 
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
 import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { ArrowHandles, ArrowShape, BlockShape, FrameLayer, Idef0Defs } from "./shapes";
+import { ArrowHandles, ArrowShape, BlockShape, FrameLayer, FreeNoteShape, Idef0Defs } from "./shapes";
+import { addNote, deleteNote, notesOf, updateNote } from "./notes";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
 // стрелка выделена по ключу, а если ключ сменился (вход стал управлением) — находится по функции и сущности
-type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string; nodeId?: string; entityId?: string } | null;
+type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string; nodeId?: string; entityId?: string } | { kind: "note"; id: string } | null;
 const arrowSelOf = (a: Pick<Arrow, "key" | "nodeId" | "entityId">): Sel => ({ kind: "arrow", id: a.key, nodeId: a.nodeId, entityId: a.entityId });
 type Zone = "input" | "control";
 type Drag =
@@ -121,7 +122,7 @@ export default function Idef0Editor({
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
   const arrowOf = (s: Extract<Sel, { kind: "arrow" }>) =>
     layout.arrows.find((a) => a.key === s.id) ?? (s.nodeId ? layout.arrows.find((a) => a.nodeId === s.nodeId && a.entityId === s.entityId) : undefined);
-  const curSel: Sel = !sel ? null : sel.kind === "fn" ? (blocks.has(sel.id) ? sel : null) : ((a) => (a ? arrowSelOf(a) : null))(arrowOf(sel));
+  const curSel: Sel = !sel ? null : sel.kind === "fn" ? (blocks.has(sel.id) ? sel : null) : sel.kind === "note" ? sel : ((a) => (a ? arrowSelOf(a) : null))(arrowOf(sel));
 
   /** Выбранная стрелка в её сегодняшнем виде (с ручным маршрутом, если он есть). */
   const arrowSel = curSel?.kind === "arrow" ? layout.arrows.find((a) => a.key === curSel.id) : undefined;
@@ -134,6 +135,7 @@ export default function Idef0Editor({
   const toSelection = (s: Sel): Selection => {
     if (!s) return null;
     if (s.kind === "fn") return { kind: "node", id: s.id };
+    if (s.kind === "note") return null; // у свободного текстового блока нет карточки в панели
     const arrow = layout.arrows.find((a) => a.key === s.id);
     return arrow ? { kind: "arrow", arrow } : null;
   };
@@ -544,6 +546,15 @@ export default function Idef0Editor({
     addAt([cx, cy]);
   };
 
+  /** В12: свободный текстовый блок — справа от диаграммы, с правкой текста сразу после создания. */
+  const addFreeNote = () => {
+    const right = Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w));
+    const bottom = Math.max(120, ...layout.functions.map((f) => f.box.y + f.box.h));
+    const r = addNote(draftRef.current, cur, right + 40, Math.max(40, bottom - 60));
+    commit(r.model, { kind: "note", id: r.id });
+    setEditing(`note:${r.id}`);
+  };
+
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     if (e.dataTransfer.getData("application/x-idef0-new")) addAt(toWorld(e.clientX, e.clientY));
@@ -663,6 +674,9 @@ export default function Idef0Editor({
   };
 
   const selectedFn = curSel?.kind === "fn" ? blocks.get(curSel.id) : undefined;
+  // В12: свободные текстовые блоки текущей диаграммы
+  const notes = notesOf(draft, cur);
+  const editingNote = editing?.startsWith("note:") ? notes.find((n) => n.id === editing.slice(5)) : undefined;
   const editingFn = editing ? blocks.get(editing) : undefined;
   /** Правка названия стрелки (редактируется запись документа, регламента, системы или исполнителя: подпись меняется у всех стрелок). */
   const editingArrow = editing?.startsWith("arrow:") ? layout.arrows.find((a) => a.key === editing.slice(6)) : undefined;
@@ -719,6 +733,9 @@ export default function Idef0Editor({
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
             </button>
+            <button onClick={addFreeNote} title="Добавить свободный текстовый блок на диаграмму (В12)">
+              Примечание
+            </button>
             <span className="bpe-sep" />
             <span className="bpe-crumbs" title="Уровень декомпозиции">
               {crumbs.map((c, i) => (
@@ -773,6 +790,20 @@ export default function Idef0Editor({
               ))}
               {layout.functions.map((f) => (
                 <BlockShape key={f.node.id} fn={f} style={blockStyle} showCode={display.idef0Numbers} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
+              ))}
+              {/* В12: свободные текстовые блоки (жёлтые) поверх блоков */}
+              {notes.map((nt) => (
+                <FreeNoteShape
+                  key={nt.id}
+                  note={nt}
+                  selected={curSel?.kind === "note" && curSel.id === nt.id}
+                  onSelect={() => pick({ kind: "note", id: nt.id })}
+                  onEdit={() => {
+                    pick({ kind: "note", id: nt.id });
+                    setEditing(`note:${nt.id}`);
+                  }}
+                  onDelete={() => commit(deleteNote(draftRef.current, nt.id), null)}
+                />
               ))}
 
               {arrowSel && !editing && <ArrowHandles arrow={arrowSel} labelAt={labelSpec(arrowSel)} k={view.k} />}
@@ -839,6 +870,18 @@ export default function Idef0Editor({
               box={editingFn.box}
               view={view}
               onCommit={(v) => commit(updateNode(draftRef.current, editingFn.node.id, { name: v }))}
+              onDone={() => setEditing(null)}
+            />
+          )}
+          {editingNote && (
+            <RenameOverlay
+              key={editingNote.id}
+              name={editingNote.text}
+              box={editingNote}
+              view={view}
+              allowEmpty
+              placeholder="Текст примечания"
+              onCommit={(v) => commit(updateNote(draftRef.current, editingNote.id, { text: v }))}
               onDone={() => setEditing(null)}
             />
           )}

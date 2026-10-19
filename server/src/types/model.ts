@@ -469,6 +469,9 @@ export const ProcessLogicModel = z.object({
   idef0_frames: z.record(z.string(), SheetFrame).optional(),
   // То же для диаграмм BPMN: ключ — id операции, "" — общая схема процесса.
   bpmn_frames: z.record(z.string(), SheetFrame).optional(),
+  // В12: свободные текстовые блоки на диаграммах IDEF0: ключ — id функции ("" — верхняя диаграмма), значение — блоки
+  // с текстом и положением. Примечание к самой функции хранится в note узла (это отдельный жёлтый блок у блока).
+  idef0_notes: z.record(z.string(), z.array(z.object({ id: z.string(), text: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number() }))).optional(),
   diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
   // Наборы объектов для фильтра навигатора и выгрузки; без поля наборов нет.

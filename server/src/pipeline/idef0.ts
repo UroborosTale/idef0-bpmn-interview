@@ -1,6 +1,7 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { isStructured, processCodeOf } from "../shared/codes.js";
 import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, noteBox, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { wrapText } from "../shared/bpmnLabels.js";
 import { FRAME_FONT, frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
 export type { ArrowKind, LabelSide, Pt };
@@ -76,6 +77,8 @@ export interface Idef0DiagramData {
   height: number;
   blocks: Idef0Block[];
   arrows: Idef0Arrow[];
+  /** В12: свободные текстовые блоки диаграммы (положение и размер из модели). */
+  notes?: { id: string; text: string; x: number; y: number; w: number; h: number }[];
   footer: string[];
 }
 
@@ -156,8 +159,12 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
   };
 
   const ext2 = idef0Extents(layout);
+  // В12: свободные текстовые блоки диаграммы — часть её полотна
+  const notes = model.idef0_notes?.[parentId ?? ""] ?? [];
+  const width = Math.max(ext2.w, 0, ...notes.map((n) => n.x + n.w + 20));
+  const height = Math.max(ext2.h, 0, ...notes.map((n) => n.y + n.h + 20));
   return {
-    data: { code, title: `${code} — ${parent ? parent.name : model.process.name}`, width: ext2.w, height: ext2.h, blocks, arrows, footer: [] },
+    data: { code, title: `${code} — ${parent ? parent.name : model.process.name}`, width, height, blocks, arrows, footer: [], ...(notes.length ? { notes } : {}) },
     ext,
   };
 }
@@ -300,6 +307,13 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
       parts.push(`<rect x="${nb.x}" y="${nb.y}" width="${nb.w}" height="${nb.h}" fill="#fef9c3" stroke="#a16207" stroke-width="1" />`);
       nb.lines.forEach((line, i) => parts.push(`<text x="${nb.x + 5}" y="${nb.y + 14 + i * 13}" font-size="10" font-family="Arial, sans-serif" fill="#422006">${esc(line)}</text>`));
     }
+  }
+  // В12: свободные текстовые блоки диаграммы (жёлтые)
+  for (const n of d.notes ?? []) {
+    parts.push(`<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" fill="#fef9c3" stroke="#a16207" stroke-width="1" />`);
+    wrapText(n.text, Math.max(8, Math.floor((n.w - 10) / 6.4)), 12).forEach((line, i) =>
+      parts.push(`<text x="${n.x + 6}" y="${n.y + 16 + i * 13}" font-size="10.5" font-family="Arial, sans-serif" fill="#422006">${esc(line)}</text>`)
+    );
   }
   for (const a of d.arrows) {
     const path = a.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");

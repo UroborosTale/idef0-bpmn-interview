@@ -13,7 +13,7 @@ import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
 import { TASK_ICON_PAD, taskIcon } from "../shared/taskIcons.js";
 import { paramText, shownParams } from "../shared/paramDisplay.js";
 import { ARTIFACT_LABEL_W } from "../shared/bpmnArtifacts.js";
-import { labelSide } from "../shared/bpmnLabels.js";
+import { labelSide, wrapText } from "../shared/bpmnLabels.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -522,6 +522,14 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       page.rect(nb.x, nb.y, nb.w, nb.h, { fill: "#fef9c3", line: "#a16207", weightPt: 0.75 });
       nb.lines.forEach((line, i) => page.label(line, { x: nb.x + 5, y: nb.y + 4 + i * 13, anchor: "start", w: nb.w - 8 }, { fontPx: 8.5, color: "#422006" }));
     }
+  }
+
+  // В12: свободные текстовые блоки диаграммы
+  for (const n of d.notes ?? []) {
+    page.rect(n.x, n.y, n.w, n.h, { fill: "#fef9c3", line: "#a16207", weightPt: 0.75 });
+    wrapText(n.text, Math.max(8, Math.floor((n.w - 10) / 6.4)), 12).forEach((line, i) =>
+      page.label(line, { x: n.x + 6, y: n.y + 4 + i * 13, anchor: "start", w: n.w - 10 }, { fontPx: 9, color: "#422006" })
+    );
   }
 
   for (const a of d.arrows) {

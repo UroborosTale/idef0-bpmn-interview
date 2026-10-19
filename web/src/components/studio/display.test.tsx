@@ -5,7 +5,7 @@ import { session, structuredModel } from "../../test/fixtures";
 import { DEFAULT_DISPLAY, loadDisplay, saveDisplay } from "../editor-core/display";
 import { NodeShape } from "../bpmn-editor/shapes";
 import { FlowShape } from "../bpmn-editor/shapes";
-import { ArrowShape, BlockShape } from "../idef0-editor/shapes";
+import { ArrowShape, BlockShape, FreeNoteShape } from "../idef0-editor/shapes";
 import Studio from "./Studio";
 
 describe("вид диаграмм: настройка", () => {
@@ -68,6 +68,16 @@ describe("вид диаграмм: фигуры", () => {
     const { container } = render(<svg><BlockShape fn={fn} selected={false} hot={false} /></svg>);
     expect(container.querySelector("[data-fn-note]")).toBeTruthy();
     expect(container.textContent).toContain("Сверить");
+  });
+
+  it("В12: свободный текстовый блок рисуется, выделяется и удаляется по ×", () => {
+    const note = { id: "note1", text: "Допущение: сроки уточняются", x: 10, y: 20, w: 180, h: 60 };
+    const del = vi.fn();
+    const { container } = render(<svg><FreeNoteShape note={note} selected onSelect={() => undefined} onEdit={() => undefined} onDelete={del} /></svg>);
+    expect(container.querySelector("[data-free-note]")).toBeTruthy();
+    expect(container.textContent).toContain("Допущение");
+    fireEvent.click(container.querySelector("[data-note-delete]")!);
+    expect(del).toHaveBeenCalled();
   });
 });
 
