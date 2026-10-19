@@ -265,8 +265,8 @@ export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; s
           <path d={`M${x + w - 7} ${y} V${y + 7} H${x + w}`} fill="none" />
         </g>
       )}
-      <text x={x + w / 2} y={a.kind === "store" ? y + h + 9 : y - 3} textAnchor="middle" fontSize={8} fill={GREY} pointerEvents="none">
-        {a.name.length > 14 ? a.name.slice(0, 13) + "…" : a.name}
+      <text x={x + w + 3} y={y + h / 2 + 3.5} textAnchor="start" fontSize={10} fill={GREY} pointerEvents="none">
+        {a.name.length > 18 ? a.name.slice(0, 17) + "…" : a.name}
       </text>
     </g>
   );

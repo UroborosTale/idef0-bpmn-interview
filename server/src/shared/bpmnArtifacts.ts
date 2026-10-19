@@ -84,21 +84,23 @@ export interface Artifact {
 
 export const ARTIFACT_W = 18;
 export const ARTIFACT_H = 20;
-/** Отступ значка от границы задачи: отступ, значок и подпись (4 + 20 + 11) укладываются в 35 пикселей над или под задачей в дорожке. */
+/** Отступ значка от границы задачи: значок укладывается в 30 пикселей над или под задачей в дорожке. */
 const ARTIFACT_GAP = 4;
-/** Подпись значка (кегль 8): до 14 знаков, около 60 пикселей в ширину и 11 в высоту. */
-const ARTIFACT_LABEL_W = 60;
-const ARTIFACT_LABEL_H = 11;
+/** Подпись значка (кегль 10) стоит справа от него: до 18 знаков, около 96 пикселей в ширину. */
+export const ARTIFACT_LABEL_W = 96;
+/** Ширина подписи значка по её тексту (кегль 10, до 18 знаков) — по ней считаются промежутки между значками. */
+export const artifactLabelWidth = (name: string): number => Math.min(name.length, 18) * 5 + 4;
 
 /** Хранилище данных (информационная система) стоит под задачей; документы — над ней. */
 export const isStoreArtifact = (a: { kind: ArtifactKind }) => a.kind === "store";
 
-/** Рамка значка вместе с подписью — по ней стрелки обходят значок. Подпись документа стоит над ним, подпись хранилища — под ним. */
-export const artifactObstacle = (a: { box: Box; kind: ArtifactKind }): Box => {
-  const w = Math.max(a.box.w, ARTIFACT_LABEL_W);
-  const x = a.box.x + a.box.w / 2 - w / 2;
-  return isStoreArtifact(a) ? { x, y: a.box.y, w, h: a.box.h + ARTIFACT_LABEL_H } : { x, y: a.box.y - ARTIFACT_LABEL_H, w, h: a.box.h + ARTIFACT_LABEL_H };
-};
+/** Рамка значка вместе с подписью — по ней стрелки обходят значок. Подпись стоит справа от значка, по его высоте. */
+export const artifactObstacle = (a: { box: Box; kind: ArtifactKind }): Box => ({
+  x: a.box.x,
+  y: a.box.y,
+  w: a.box.w + ARTIFACT_LABEL_W,
+  h: a.box.h,
+});
 
 /**
  * Значки данных задачи. Документы (входы и выходы) — ряд над задачей, хранилища данных (информационные системы: 1С, ELMA…) —
@@ -135,9 +137,8 @@ export function artifactsOf(
 
     const row = (items: typeof docs, below: boolean) => {
       if (items.length === 0) return;
-      // расстояние между соседними значками — по ширине их подписей (кегль 8, до 14 знаков), чтобы подписи не налезали друг на друга
-      const labelW = (name: string) => Math.min(name.length, 14) * 4.6 + 2;
-      const wanted = items.slice(1).map((it, i) => Math.max(ARTIFACT_W + 6, (labelW(items[i].name) + labelW(it.name)) / 2 + 3));
+      // расстояние между соседними значками — по ширине подписи левого значка (подпись идёт справа от него)
+      const wanted = items.slice(1).map((_it, i) => Math.max(ARTIFACT_W + 6, ARTIFACT_W + artifactLabelWidth(items[i].name) + 4));
       // ряд не шире задачи с запасом по 20 пикселей: если подписи не помещаются, значки сближаются (но не ближе 10 пикселей)
       const room = host.w + 40 - ARTIFACT_W;
       const sum = wanted.reduce((t, g) => t + g, 0);

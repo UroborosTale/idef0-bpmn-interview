@@ -2,16 +2,16 @@
 shape s1 task 130,1590 150×90 «Подготовка закупки»
 shape s2 task 320,1590 150×90 «Выбор поставщика»
 shape s3 task 510,1590 150×90 «Поставка и приёмка»
-artifact s1:input:d_need 126.6,1566 18×20 edge[135.6,1586 140,1590] «Потребность в оборудовании»
+artifact s1:input:d_need 110,1566 18×20 edge[119,1586 140,1590] «Потребность в оборудовании»
 artifact s1:output:d_approvedReq 196,1566 18×20 edge[205,1590 205,1586] «Согласованная заявка на закупку»
-artifact s1:output:d_rejectedReq 265.4,1566 18×20 edge[270,1590 274.4,1586] «Отклонённая заявка на закупку»
+artifact s1:output:d_rejectedReq 282,1566 18×20 edge[270,1590 291,1586] «Отклонённая заявка на закупку»
 artifact s1:store:s_erp 196,1684 18×20 edge[205,1684 205,1680] «ERP «Закупки»»
-artifact s2:input:d_approvedReq 351.3,1566 18×20 edge[360.3,1586 360.3,1590] «Согласованная заявка на закупку»
-artifact s2:output:d_contract 420.7,1566 18×20 edge[429.7,1590 429.7,1586] «Договор поставки»
+artifact s2:input:d_approvedReq 328,1566 18×20 edge[337,1586 337,1590] «Согласованная заявка на закупку»
+artifact s2:output:d_contract 444,1566 18×20 edge[453,1590 453,1586] «Договор поставки»
 artifact s2:store:s_erp 386,1684 18×20 edge[395,1684 395,1680] «ERP «Закупки»»
-artifact s3:input:d_contract 506.6,1566 18×20 edge[515.6,1586 520,1590] «Договор поставки»
-artifact s3:output:d_act 576,1566 18×20 edge[585,1590 585,1586] «Акт приёмки оборудования»
-artifact s3:output:d_inUse 645.4,1566 18×20 edge[650,1590 654.4,1586] «Оборудование в эксплуатации»
+artifact s3:input:d_contract 490,1566 18×20 edge[499,1586 520,1590] «Договор поставки»
+artifact s3:output:d_act 572.1,1566 18×20 edge[581.1,1590 581.1,1586] «Акт приёмки оборудования»
+artifact s3:output:d_inUse 662,1566 18×20 edge[650,1590 671,1586] «Оборудование в эксплуатации»
 artifact s3:store:s_erp 576,1684 18×20 edge[585,1684 585,1680] «ERP «Закупки»»
 # редактор BPMN C090.01.01
 shape o11_start1 event/start 180,267 36×36 «Потребность в оборудовании выявлена»
@@ -37,8 +37,8 @@ flow o11_f8 o11_ok→o11_send [1345,160 1345,285 1460,285] «Да»
 flow o11_f9 o11_send→o11_done [1610,285 1700,285]
 flow o11_f10 o11_late→o11_remind [532,348 532,372 775,372 775,180]
 flow o11_f11 o11_remind→o11_endRemind [850,135 940,135]
-artifact o11_fill:input:d_need 541.3,216 18×20 edge[550.3,236 550.3,240] «Потребность в оборудовании»
-artifact o11_fill:output:d_request 610.7,216 18×20 edge[619.7,240 619.7,236] «Заявка на закупку»
+artifact o11_fill:input:d_need 518,216 18×20 edge[527,236 527,240] «Потребность в оборудовании»
+artifact o11_fill:output:d_request 634,216 18×20 edge[643,240 643,236] «Заявка на закупку»
 artifact o11_fill:store:s_erp 576,334 18×20 edge[585,334 585,330] «ERP «Закупки»»
 # редактор BPMN C090.01.02
 shape o12_start event/start 180,117 36×36 «Заявка на закупку получена»
@@ -120,17 +120,17 @@ shape o22_signedBack task/receive 1840,390 150×90 «Получить догов
 shape o22_end event/end 2080,417 36×36 «Договор заключён»
 flow o22_f1 o22_start→o22_m0 [216,435 370,435]
 flow o22_f2 o22_m0→o22_draft [420,435 510,435]
-flow o22_f3 o22_draft→o22_calc [660,435 682,435 682,135 700,135]
+flow o22_f3 o22_draft→o22_calc [660,435 775,435 775,180]
 flow o22_f4 o22_calc→o22_split [850,135 940,135]
 flow o22_f5 o22_split→o22_legal [965,160 965,585 1070,585] «Есть нестандартные условия»
 flow o22_f6 o22_split→o22_finance [990,135 1042,135 1042,285 1070,285] «Сумма договора свыше 1 млн руб.»
 flow o22_f7 o22_legal→o22_join [1230,585 1535,585 1535,460]
-flow o22_f8 o22_finance→o22_join [1150,240 1150,216 1535,216 1535,410]
+flow o22_f8 o22_finance→o22_join [1230,285 1535,285 1535,410]
 flow o22_f9 o22_join→o22_sign [1560,435 1650,435]
 flow o22_f10 o22_sign→o22_signedBack [1800,435 1840,435]
 flow o22_f11 o22_signedBack→o22_end [1990,435 2080,435]
 flow o22_f12 o22_violation→o22_rework [1092,648 1092,672 1345,672 1345,480]
-flow o22_f13 o22_rework→o22_m0 [1345,390 1345,206 395,206 395,410]
+flow o22_f13 o22_rework→o22_m0 [1345,390 1345,342 395,342 395,410]
 artifact o22_draft:input:d_chosen 576,366 18×20 edge[585,386 585,390] «Выбранное коммерческое предложение»
 artifact o22_draft:store:s_edo 576,484 18×20 edge[585,484 585,480] «Система электронного документооборота»
 artifact o22_sign:output:d_contract 1716,366 18×20 edge[1725,390 1725,386] «Договор поставки»
@@ -180,15 +180,15 @@ shape o32_failed event/end 1320,267 36×36 «Приёмка не пройден�
 shape o32_act task/user 1080,390 150×90 «Подписать акт приёмки»
 shape o32_register task/service 1270,90 150×90 «Поставить оборудование на учёт»
 shape o32_end event/end 1510,117 36×36 «Оборудование введено в эксплуатацию»
-flow o32_f1 o32_start→o32_count [216,435 320,435]
-flow o32_f2 o32_count→o32_pay [470,435 482,435 482,135 510,135]
-flow o32_f3 o32_pay→o32_quality [660,135 682,135 682,285 700,285]
+flow o32_f1 o32_start→o32_count [198,453 198,504 395,504 395,480]
+flow o32_f2 o32_count→o32_pay [320,435 296,435 296,146.7 510,146.7]
+flow o32_f3 o32_pay→o32_quality [510,123.3 486,123.3 486,285 700,285]
 flow o32_f4 o32_quality→o32_okq [850,285 940,285]
 flow o32_f5 o32_okq→o32_act [965,310 965,435 1080,435] «Да»
 flow o32_f6 o32_okq→o32_cancel [990,285 1130,285] «Нет»
 flow o32_f7 o32_cancel→o32_failed [1166,285 1320,285]
-flow o32_f8 o32_act→o32_register [1230,435 1252,435 1252,135 1270,135]
-flow o32_f9 o32_register→o32_end [1420,135 1510,135]
+flow o32_f8 o32_act→o32_register [1230,435 1474,435 1474,146.7 1420,146.7]
+flow o32_f9 o32_register→o32_end [1420,123.3 1477,123.3 1477,135 1510,135]
 flow o32_f10 o32_undo→o32_refund [532,198 532,222 775,222 775,180]
 flow o32_f11 o32_refund→o32_refunded [850,135 940,135]
 artifact o32_count:input:d_arrived 386,366 18×20 edge[395,386 395,390] «Поставленное оборудование»

@@ -6,12 +6,12 @@ artifact s1:input:d_minutes 110,516 18×20 edge[119,536 140,540] «Пункт п
 artifact s1:input:d_incoming 167.3,516 18×20 edge[176.3,536 176.3,540] «Информация о вновь выявленном процессе»
 artifact s1:output:d_kbProject 224.7,516 18×20 edge[233.7,540 233.7,536] «Проект свода знаний процесса»
 artifact s1:output:d_procProject 282,516 18×20 edge[270,540 291,536] «Проект процесса»
-artifact s2:input:d_results 316.6,516 18×20 edge[325.6,536 330,540] «Информация об итогах реализации процессов»
+artifact s2:input:d_results 300,516 18×20 edge[309,536 330,540] «Информация об итогах реализации процессов»
 artifact s2:output:d_eff 386,516 18×20 edge[395,540 395,536] «Информация об эффективности реализации процесса»
-artifact s2:output:d_ineff 455.4,516 18×20 edge[460,540 464.4,536] «Информация о неэффективности реализации процесса»
-artifact s3:input:d_ineff 506.6,516 18×20 edge[515.6,536 520,540] «Информация о неэффективности реализации процесса»
+artifact s2:output:d_ineff 472,516 18×20 edge[460,540 481,536] «Информация о неэффективности реализации процесса»
+artifact s3:input:d_ineff 490,516 18×20 edge[499,536 520,540] «Информация о неэффективности реализации процесса»
 artifact s3:output:d_optProject 576,516 18×20 edge[585,540 585,536] «Проект оптимизированного процесса»
-artifact s3:output:d_optKb 645.4,516 18×20 edge[650,540 654.4,536] «Проект свода знаний оптимизированного процесса»
+artifact s3:output:d_optKb 662,516 18×20 edge[650,540 671,536] «Проект свода знаний оптимизированного процесса»
 # редактор BPMN B002.01.01
 shape o11_start1 event/start 180,117 36×36 «Информация о вновь выявленном процессе получена»
 shape o11_start2 event/start 370,117 36×36 «Пункт протокола совещания получен»
@@ -36,9 +36,9 @@ flow o11_f7 o11_owner→o11_author [1420,135 1460,135]
 flow o11_f8 o11_author→o11_status [1610,135 1650,135]
 flow o11_f9 o11_status→o11_m2 [1800,135 1890,135]
 flow o11_f10 o11_m2→o11_need [1940,135 2080,135]
-flow o11_f11 o11_need→o11_end [2105,110 2105,31 2478,31 2478,117] «Нет»
+flow o11_f11 o11_need→o11_end [2105,110 2105,42 2478,42 2478,117] «Нет»
 flow o11_f12 o11_need→o11_load [2130,135 2220,135] «Да»
-flow o11_f13 o11_load→o11_m2 [2295,90 2295,21 1915,21 1915,110]
+flow o11_f13 o11_load→o11_m2 [2295,90 2295,32 1915,32 1915,110]
 artifact o11_open:input:d_registry 766,66 18×20 edge[775,86 775,90] «Реестр процессов ООО «РУ КМЗ»»
 artifact o11_open:store:s_excel 766,184 18×20 edge[775,184 775,180] «Excel»
 artifact o11_code:output:d_registryActual 956,66 18×20 edge[965,90 965,86] «Актуальный реестр процессов ООО «РУ КМЗ»»
@@ -91,13 +91,13 @@ artifact o12_study:store:s_intranet 766,184 18×20 edge[775,184 775,180] «Intra
 artifact o12_collect:output:d_protocol 956,66 18×20 edge[965,90 965,86] «Протокол интервью»
 artifact o12_collect:store:s_word 956,184 18×20 edge[965,184 965,180] «Microsoft Word»
 artifact o12_assign:store:s_outlook 1146,184 18×20 edge[1155,184 1155,180] «Outlook»
-artifact o12_interview:input:d_checklist 1491.3,66 18×20 edge[1500.3,86 1500.3,90] «Чек-лист интервью»
-artifact o12_interview:output:d_protocol 1560.7,66 18×20 edge[1569.7,90 1569.7,86] «Протокол интервью»
+artifact o12_interview:input:d_checklist 1470.5,66 18×20 edge[1479.5,86 1479.5,90] «Чек-лист интервью»
+artifact o12_interview:output:d_protocol 1581.5,66 18×20 edge[1590.5,90 1590.5,86] «Протокол интервью»
 artifact o12_comment1:store:s_elma 1716,184 18×20 edge[1725,184 1725,180] «ELMA365»
 artifact o12_finish:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
 artifact o12_notify:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
-artifact o12_chain:input:d_protocol 2251.3,66 18×20 edge[2260.3,86 2260.3,90] «Протокол интервью»
-artifact o12_chain:output:d_chain 2320.7,66 18×20 edge[2329.7,90 2329.7,86] «Продуктовая цепочка»
+artifact o12_chain:input:d_protocol 2230.5,66 18×20 edge[2239.5,86 2239.5,90] «Протокол интервью»
+artifact o12_chain:output:d_chain 2341.5,66 18×20 edge[2350.5,90 2350.5,86] «Продуктовая цепочка»
 artifact o12_attach:input:d_chain 2476,66 18×20 edge[2485,86 2485,90] «Продуктовая цепочка»
 artifact o12_attach:store:s_elma 2476,184 18×20 edge[2485,184 2485,180] «ELMA365»
 artifact o12_comment2:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
@@ -156,43 +156,43 @@ flow o13_f24 o13_approve3→o13_kb [4650,135 4690,135]
 flow o13_f25 o13_kb→o13_task_kk [4840,135 4880,135]
 flow o13_f26 o13_task_kk→o13_end [5030,135 5120,135]
 artifact o13_idef0_0:output:d_idef0_0 386,66 18×20 edge[395,90 395,86] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o13_idef0_0:store:s_visio 351.3,184 18×20 edge[360.3,184 360.3,180] «Microsoft Visio»
-artifact o13_idef0_0:store:s_bs 420.7,184 18×20 edge[429.7,184 429.7,180] «Business studio»
+artifact o13_idef0_0:store:s_visio 335.5,184 18×20 edge[344.5,184 344.5,180] «Microsoft Visio»
+artifact o13_idef0_0:store:s_bs 436.5,184 18×20 edge[445.5,184 445.5,180] «Business studio»
 artifact o13_idef0_1:output:d_idef0_1 576,66 18×20 edge[585,90 585,86] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o13_idef0_1:store:s_visio 541.3,184 18×20 edge[550.3,184 550.3,180] «Microsoft Visio»
-artifact o13_idef0_1:store:s_bs 610.7,184 18×20 edge[619.7,184 619.7,180] «Business studio»
-artifact o13_idef0_attach:input:d_idef0_0 731.3,66 18×20 edge[740.3,86 740.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o13_idef0_attach:input:d_idef0_1 800.7,66 18×20 edge[809.7,86 809.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o13_idef0_1:store:s_visio 525.5,184 18×20 edge[534.5,184 534.5,180] «Microsoft Visio»
+artifact o13_idef0_1:store:s_bs 626.5,184 18×20 edge[635.5,184 635.5,180] «Business studio»
+artifact o13_idef0_attach:input:d_idef0_0 708,66 18×20 edge[717,86 717,90] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o13_idef0_attach:input:d_idef0_1 824,66 18×20 edge[833,86 833,90] «Диаграмма процесса IDEF0 (1 уровень)»
 artifact o13_idef0_attach:store:s_elma 766,184 18×20 edge[775,184 775,180] «ELMA365»
 artifact o13_idef0_comment:store:s_elma 956,184 18×20 edge[965,184 965,180] «ELMA365»
-artifact o13_assign:input:d_checklist 1301.3,66 18×20 edge[1310.3,86 1310.3,90] «Чек-лист интервью»
-artifact o13_assign:output:d_protocol 1370.7,66 18×20 edge[1379.7,90 1379.7,86] «Протокол интервью»
+artifact o13_assign:input:d_checklist 1280.5,66 18×20 edge[1289.5,86 1289.5,90] «Чек-лист интервью»
+artifact o13_assign:output:d_protocol 1391.5,66 18×20 edge[1400.5,90 1400.5,86] «Протокол интервью»
 artifact o13_comment_i:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
 artifact o13_finish_i:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
 artifact o13_notify:store:s_elma 2286,184 18×20 edge[2295,184 2295,180] «ELMA365»
 artifact o13_bpmn:output:d_bpmn 2476,66 18×20 edge[2485,90 2485,86] «Диаграмма процесса BPMN 2.0»
-artifact o13_bpmn:store:s_visio 2441.3,184 18×20 edge[2450.3,184 2450.3,180] «Microsoft Visio»
-artifact o13_bpmn:store:s_bs 2510.7,184 18×20 edge[2519.7,184 2519.7,180] «Business studio»
+artifact o13_bpmn:store:s_visio 2425.5,184 18×20 edge[2434.5,184 2434.5,180] «Microsoft Visio»
+artifact o13_bpmn:store:s_bs 2526.5,184 18×20 edge[2535.5,184 2535.5,180] «Business studio»
 artifact o13_bpmn_attach:input:d_bpmn 2666,66 18×20 edge[2675,86 2675,90] «Диаграмма процесса BPMN 2.0»
 artifact o13_bpmn_attach:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
 artifact o13_bpmn_comment:store:s_elma 2856,184 18×20 edge[2865,184 2865,180] «ELMA365»
 artifact o13_atlas:output:d_atlas 3046,66 18×20 edge[3055,90 3055,86] «Атлас процессов»
 artifact o13_atlas:store:s_visio 3046,184 18×20 edge[3055,184 3055,180] «Microsoft Visio»
-artifact o13_wi:input:d_wiTpl 3201.3,66 18×20 edge[3210.3,86 3210.3,90] «Шаблон рабочей инструкции»
-artifact o13_wi:output:d_wi 3270.7,66 18×20 edge[3279.7,90 3279.7,86] «Рабочая инструкция»
+artifact o13_wi:input:d_wiTpl 3178,66 18×20 edge[3187,86 3187,90] «Шаблон рабочей инструкции»
+artifact o13_wi:output:d_wi 3294,66 18×20 edge[3303,90 3303,86] «Рабочая инструкция»
 artifact o13_wi:store:s_visio 3236,184 18×20 edge[3245,184 3245,180] «Microsoft Visio»
 artifact o13_wi_attach:input:d_wi 3426,66 18×20 edge[3435,86 3435,90] «Рабочая инструкция»
 artifact o13_wi_attach:store:s_elma 3426,184 18×20 edge[3435,184 3435,180] «ELMA365»
 artifact o13_wi_comment:store:s_elma 3616,184 18×20 edge[3625,184 3625,180] «ELMA365»
-artifact o13_reg:input:d_regTpl 3961.3,66 18×20 edge[3970.3,86 3970.3,90] «Шаблон регламента процесса»
-artifact o13_reg:output:d_reg 4030.7,66 18×20 edge[4039.7,90 4039.7,86] «Регламент процесса»
+artifact o13_reg:input:d_regTpl 3938,66 18×20 edge[3947,86 3947,90] «Шаблон регламента процесса»
+artifact o13_reg:output:d_reg 4054,66 18×20 edge[4063,90 4063,86] «Регламент процесса»
 artifact o13_reg:store:s_word 3996,184 18×20 edge[4005,184 4005,180] «Microsoft Word»
 artifact o13_reg_attach:input:d_reg 4186,66 18×20 edge[4195,86 4195,90] «Регламент процесса»
 artifact o13_reg_attach:store:s_elma 4186,184 18×20 edge[4195,184 4195,180] «ELMA365»
 artifact o13_reg_comment:store:s_elma 4376,184 18×20 edge[4385,184 4385,180] «ELMA365»
-artifact o13_kb:input:d_reg 4686.6,66 18×20 edge[4695.6,86 4700,90] «Регламент процесса»
+artifact o13_kb:input:d_reg 4670,66 18×20 edge[4679,86 4700,90] «Регламент процесса»
 artifact o13_kb:input:d_wi 4756,66 18×20 edge[4765,86 4765,90] «Рабочая инструкция»
-artifact o13_kb:output:d_kbProject 4825.4,66 18×20 edge[4830,90 4834.4,86] «Проект свода знаний процесса»
+artifact o13_kb:output:d_kbProject 4842,66 18×20 edge[4830,90 4851,86] «Проект свода знаний процесса»
 artifact o13_kb:store:s_word 4756,184 18×20 edge[4765,184 4765,180] «Microsoft Word»
 artifact o13_task_kk:store:s_elma 4946,184 18×20 edge[4955,184 4955,180] «ELMA365»
 # редактор BPMN B002.02.01
@@ -219,7 +219,7 @@ shape o21_end_dev event/end 3790,117 36×36 «Составлен перечен�
 flow o21_f1 o21_start→o21_get [216,135 320,135]
 flow o21_f2 o21_get→o21_enough [470,135 560,135]
 flow o21_f3 o21_enough→o21_ask [610,135 700,135] «Нет»
-flow o21_f4 o21_enough→o21_m1 [585,110 585,31 1155,31 1155,110] «Да»
+flow o21_f4 o21_enough→o21_m1 [585,110 585,42 1155,42 1155,110] «Да»
 flow o21_f5 o21_ask→o21_recv [850,135 890,135]
 flow o21_f6 o21_recv→o21_m1 [1040,135 1130,135]
 flow o21_f7 o21_m1→o21_study_reg [1180,135 1270,135]
@@ -230,7 +230,7 @@ flow o21_f11 o21_find→o21_found [1990,135 2080,135]
 flow o21_f12 o21_found→o21_fix_ok [2130,135 2220,135] «Нет»
 flow o21_f13 o21_fix_ok→o21_approve [2370,135 2400,135]
 flow o21_f14 o21_approve→o21_end_ok [2560,135 2650,135]
-flow o21_f15 o21_found→o21_by_object [2105,110 2105,31 2865,31 2865,90] «Да»
+flow o21_f15 o21_found→o21_by_object [2105,110 2105,42 2865,42 2865,90] «Да»
 flow o21_f16 o21_by_object→o21_by_weight [2940,135 2980,135]
 flow o21_f17 o21_by_weight→o21_by_freq [3130,135 3170,135]
 flow o21_f18 o21_by_freq→o21_by_impact [3320,135 3360,135]
@@ -323,13 +323,13 @@ artifact o31_study:store:s_intranet 766,184 18×20 edge[775,184 775,180] «Intra
 artifact o31_collect:output:d_protocol 956,66 18×20 edge[965,90 965,86] «Протокол интервью»
 artifact o31_collect:store:s_word 956,184 18×20 edge[965,184 965,180] «Microsoft Word»
 artifact o31_assign:store:s_outlook 1146,184 18×20 edge[1155,184 1155,180] «Outlook»
-artifact o31_interview:input:d_checklist 1491.3,66 18×20 edge[1500.3,86 1500.3,90] «Чек-лист интервью»
-artifact o31_interview:output:d_protocol 1560.7,66 18×20 edge[1569.7,90 1569.7,86] «Протокол интервью»
+artifact o31_interview:input:d_checklist 1470.5,66 18×20 edge[1479.5,86 1479.5,90] «Чек-лист интервью»
+artifact o31_interview:output:d_protocol 1581.5,66 18×20 edge[1590.5,90 1590.5,86] «Протокол интервью»
 artifact o31_comment1:store:s_elma 1716,184 18×20 edge[1725,184 1725,180] «ELMA365»
 artifact o31_finish:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»
 artifact o31_notify:store:s_elma 2096,184 18×20 edge[2105,184 2105,180] «ELMA365»
-artifact o31_chain:input:d_protocol 2251.3,66 18×20 edge[2260.3,86 2260.3,90] «Протокол интервью»
-artifact o31_chain:output:d_chain 2320.7,66 18×20 edge[2329.7,90 2329.7,86] «Продуктовая цепочка»
+artifact o31_chain:input:d_protocol 2230.5,66 18×20 edge[2239.5,86 2239.5,90] «Протокол интервью»
+artifact o31_chain:output:d_chain 2341.5,66 18×20 edge[2350.5,90 2350.5,86] «Продуктовая цепочка»
 artifact o31_attach:input:d_chain 2476,66 18×20 edge[2485,86 2485,90] «Продуктовая цепочка»
 artifact o31_attach:store:s_elma 2476,184 18×20 edge[2485,184 2485,180] «ELMA365»
 artifact o31_comment2:store:s_elma 2666,184 18×20 edge[2675,184 2675,180] «ELMA365»
@@ -477,22 +477,22 @@ flow o34_f10 o34_wi_attach→o34_wi_comment [1990,135 2030,135]
 flow o34_f11 o34_wi_comment→o34_approve2 [2180,135 2210,135]
 flow o34_f12 o34_approve2→o34_end [2370,135 2460,135]
 artifact o34_idef0_0:output:d_idef0_0 386,66 18×20 edge[395,90 395,86] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o34_idef0_0:store:s_visio 351.3,184 18×20 edge[360.3,184 360.3,180] «Microsoft Visio»
-artifact o34_idef0_0:store:s_bs 420.7,184 18×20 edge[429.7,184 429.7,180] «Business studio»
+artifact o34_idef0_0:store:s_visio 335.5,184 18×20 edge[344.5,184 344.5,180] «Microsoft Visio»
+artifact o34_idef0_0:store:s_bs 436.5,184 18×20 edge[445.5,184 445.5,180] «Business studio»
 artifact o34_idef0_1:output:d_idef0_1 576,66 18×20 edge[585,90 585,86] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact o34_idef0_1:store:s_visio 541.3,184 18×20 edge[550.3,184 550.3,180] «Microsoft Visio»
-artifact o34_idef0_1:store:s_bs 610.7,184 18×20 edge[619.7,184 619.7,180] «Business studio»
-artifact o34_idef0_attach:input:d_idef0_0 731.3,66 18×20 edge[740.3,86 740.3,90] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact o34_idef0_attach:input:d_idef0_1 800.7,66 18×20 edge[809.7,86 809.7,90] «Диаграмма процесса IDEF0 (1 уровень)»
+artifact o34_idef0_1:store:s_visio 525.5,184 18×20 edge[534.5,184 534.5,180] «Microsoft Visio»
+artifact o34_idef0_1:store:s_bs 626.5,184 18×20 edge[635.5,184 635.5,180] «Business studio»
+artifact o34_idef0_attach:input:d_idef0_0 708,66 18×20 edge[717,86 717,90] «Диаграмма процесса IDEF0 (0 уровень)»
+artifact o34_idef0_attach:input:d_idef0_1 824,66 18×20 edge[833,86 833,90] «Диаграмма процесса IDEF0 (1 уровень)»
 artifact o34_idef0_attach:store:s_elma 766,184 18×20 edge[775,184 775,180] «ELMA365»
 artifact o34_idef0_comment:store:s_elma 956,184 18×20 edge[965,184 965,180] «ELMA365»
 artifact o34_bpmn:output:d_bpmn 1336,66 18×20 edge[1345,90 1345,86] «Диаграмма процесса BPMN 2.0»
-artifact o34_bpmn:store:s_visio 1301.3,184 18×20 edge[1310.3,184 1310.3,180] «Microsoft Visio»
-artifact o34_bpmn:store:s_bs 1370.7,184 18×20 edge[1379.7,184 1379.7,180] «Business studio»
+artifact o34_bpmn:store:s_visio 1285.5,184 18×20 edge[1294.5,184 1294.5,180] «Microsoft Visio»
+artifact o34_bpmn:store:s_bs 1386.5,184 18×20 edge[1395.5,184 1395.5,180] «Business studio»
 artifact o34_atlas:output:d_atlas 1526,66 18×20 edge[1535,90 1535,86] «Атлас процессов»
 artifact o34_atlas:store:s_visio 1526,184 18×20 edge[1535,184 1535,180] «Microsoft Visio»
-artifact o34_wi:input:d_wiTpl 1681.3,66 18×20 edge[1690.3,86 1690.3,90] «Шаблон рабочей инструкции»
-artifact o34_wi:output:d_wi 1750.7,66 18×20 edge[1759.7,90 1759.7,86] «Рабочая инструкция»
+artifact o34_wi:input:d_wiTpl 1658,66 18×20 edge[1667,86 1667,90] «Шаблон рабочей инструкции»
+artifact o34_wi:output:d_wi 1774,66 18×20 edge[1783,90 1783,86] «Рабочая инструкция»
 artifact o34_wi:store:s_visio 1716,184 18×20 edge[1725,184 1725,180] «Microsoft Visio»
 artifact o34_wi_attach:input:d_wi 1906,66 18×20 edge[1915,86 1915,90] «Рабочая инструкция»
 artifact o34_wi_attach:store:s_elma 1906,184 18×20 edge[1915,184 1915,180] «ELMA365»

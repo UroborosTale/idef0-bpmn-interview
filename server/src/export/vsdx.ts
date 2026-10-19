@@ -12,6 +12,7 @@ import { visioFlowProps, visioShapeProps, type VisioPropOut } from "../shared/vi
 import { ownStyle, type StyleKind } from "../shared/shapeStyles.js";
 import { TASK_ICON_PAD, taskIcon } from "../shared/taskIcons.js";
 import { paramText, shownParams } from "../shared/paramDisplay.js";
+import { ARTIFACT_LABEL_W } from "../shared/bpmnArtifacts.js";
 
 /**
  * Экспорт в Microsoft Visio (.vsdx): пакет OPC с XML страниц. Диаграммы строятся из тех же
@@ -673,12 +674,13 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
     if (e.link) page.polyline(e.link, { weightPt: 0.8, line: "#64748b", dash: true });
     if (e.kind === "data") {
       page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1 });
-      page.label(e.name, { x: e.x + e.w / 2, y: e.y - 14, w: 90 }, { fontPx: 9 });
+      // подпись справа от значка, по его высоте (кегль 10) — как в редакторе: над задачей для неё нет места
+      page.label(e.name, { x: e.x + e.w + 3, y: e.y + e.h / 2 - 8, anchor: "start", w: ARTIFACT_LABEL_W }, { fontPx: 10 });
     } else if (e.kind === "store") {
       // хранилище данных: цилиндр (корпус и две дуги крышки)
       const r = Math.min(4, e.h / 5);
       page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1, roundingPx: r }, [{ kind: "path", pts: [[0, r * 1.6], [e.w, r * 1.6]] }]);
-      page.label(e.name, { x: e.x + e.w / 2, y: e.y - 14, w: 90 }, { fontPx: 9 });
+      page.label(e.name, { x: e.x + e.w + 3, y: e.y + e.h / 2 - 8, anchor: "start", w: ARTIFACT_LABEL_W }, { fontPx: 10 });
     } else {
       // аннотация — скобка «[» с названием справа от неё; привязка к задаче — пунктиром (выше)
       page.add(

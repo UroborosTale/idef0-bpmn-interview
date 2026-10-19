@@ -8,20 +8,20 @@ shape Node_s2 task 555,240 150×90 «Выбор поставщика»
 shape Node_s3 task 745,390 150×90 «Поставка и приёмка»
 shape SynthStart event/start 175,567 36×36 «Начало процесса»
 shape SynthEnd event/end 935,567 36×36 «Завершение процесса»
-edge Flow_DerivedFlow_1 Node_s1→Node_s2 [515,135 537,135 537,285 555,285]
-edge Flow_DerivedFlow_2 Node_s2→Node_s3 [705,285 943.4,285 943.4,435 895,435]
+edge Flow_DerivedFlow_1 Node_s1→Node_s2 [515,135 817,135 817,285 705,285]
+edge Flow_DerivedFlow_2 Node_s2→Node_s3 [555,285 531,285 531,435 745,435]
 edge Flow_SynthFlow_s_s1 SynthStart→Node_s1 [211,585 300,585 300,135 365,135]
-edge Flow_SynthFlow_e_s3 Node_s3→SynthEnd [745,435 721,435 721,585 935,585]
-extra data 361.6,66 18×20 «Потребность в оборудовании» link[370.6,86 375,90]
+edge Flow_SynthFlow_e_s3 Node_s3→SynthEnd [895,435 953,435 953,567]
+extra data 345,66 18×20 «Потребность в оборудовании» link[354,86 375,90]
 extra data 431,66 18×20 «Согласованная заявка на закупку» link[440,90 440,86]
-extra data 500.4,66 18×20 «Отклонённая заявка на закупку» link[505,90 509.4,86]
+extra data 517,66 18×20 «Отклонённая заявка на закупку» link[505,90 526,86]
 extra store 431,184 18×20 «ERP «Закупки»» link[440,184 440,180]
-extra data 586.3,216 18×20 «Согласованная заявка на закупку» link[595.3,236 595.3,240]
-extra data 655.7,216 18×20 «Договор поставки» link[664.7,240 664.7,236]
+extra data 563,216 18×20 «Согласованная заявка на закупку» link[572,236 572,240]
+extra data 679,216 18×20 «Договор поставки» link[688,240 688,236]
 extra store 621,334 18×20 «ERP «Закупки»» link[630,334 630,330]
-extra data 741.6,366 18×20 «Договор поставки» link[750.6,386 755,390]
-extra data 811,366 18×20 «Акт приёмки оборудования» link[820,390 820,386]
-extra data 880.4,366 18×20 «Оборудование в эксплуатации» link[885,390 889.4,386]
+extra data 725,366 18×20 «Договор поставки» link[734,386 755,390]
+extra data 807.1,366 18×20 «Акт приёмки оборудования» link[816.1,390 816.1,386]
+extra data 897,366 18×20 «Оборудование в эксплуатации» link[885,390 906,386]
 extra store 811,484 18×20 «ERP «Закупки»» link[820,484 820,480]
 extra annotation 100,720 180×60 «Положение о закупках» link[440,180 190,720]
 extra annotation 320,720 180×60 «Бюджет закупок на год» link[440,180 410,720]
@@ -58,8 +58,8 @@ edge Flow_o11_f8 Node_o11_ok→Node_o11_send [1365,135 1390,135 1390,240] «Да
 edge Flow_o11_f9 Node_o11_send→Node_o11_done [1465,285 1505,285]
 edge Flow_o11_f10 Node_o11_late→Node_o11_remind [577,348 577,372 820,372 820,180]
 edge Flow_o11_f11 Node_o11_remind→Node_o11_endRemind [895,135 935,135]
-extra data 586.3,216 18×20 «Потребность в оборудовании» link[595.3,236 595.3,240]
-extra data 655.7,216 18×20 «Заявка на закупку» link[664.7,240 664.7,236]
+extra data 563,216 18×20 «Потребность в оборудовании» link[572,236 572,240]
+extra data 679,216 18×20 «Заявка на закупку» link[688,240 688,236]
 extra store 621,334 18×20 «ERP «Закупки»» link[630,334 630,330]
 extra annotation 100,570 180×60 «Положение о закупках» link[630,330 190,570]
 extra annotation 320,570 180×60 «Заявка полна, если заполнены наименование, количество, обоснование и срок» link[1200,180 410,570]
@@ -146,7 +146,7 @@ shape Node_o22_draft task/user 555,390 150×90 «Подготовить прое
 shape Node_o22_calc task/script 745,90 150×90 «Рассчитать сумму договора»
 shape Node_o22_split gateway/inclusive 935,110 50×50 «Какие проверки нужны?»
 shape Node_o22_legal subprocess 1125,540 160×90 «Проведение юридической экспертизы договора»
-shape Node_o22_finance subprocess 1315,240 160×90 «Проведение финансовой проверки договора»
+shape Node_o22_finance subprocess 1125,240 160×90 «Проведение финансовой проверки договора»
 shape Node_o22_violation event/intermediate 1129,612 36×36 «Нарушение выявлено»
 shape Node_o22_rework task/user 1315,390 150×90 «Вернуть проект договора на доработку»
 shape Node_o22_join gateway/inclusive 1505,410 50×50 «Проверки завершены»
@@ -155,17 +155,17 @@ shape Node_o22_signedBack task/receive 1885,390 150×90 «Получить до�
 shape Node_o22_end event/end 2075,417 36×36 «Договор заключён»
 edge Flow_o22_f1 Node_o22_start→Node_o22_m0 [211,435 365,435]
 edge Flow_o22_f2 Node_o22_m0→Node_o22_draft [415,435 555,435]
-edge Flow_o22_f3 Node_o22_draft→Node_o22_calc [705,435 727,435 727,135 745,135]
+edge Flow_o22_f3 Node_o22_draft→Node_o22_calc [705,435 820,435 820,180]
 edge Flow_o22_f4 Node_o22_calc→Node_o22_split [895,135 935,135]
 edge Flow_o22_f5 Node_o22_split→Node_o22_legal [960,160 960,585 1125,585] «Есть нестандартные условия»
-edge Flow_o22_f6 Node_o22_split→Node_o22_finance [985,135 1162,135 1162,285 1315,285] «Сумма договора свыше 1 млн руб.»
-edge Flow_o22_f7 Node_o22_legal→Node_o22_join [1205,540 1205,366 1530,366 1530,410]
-edge Flow_o22_f8 Node_o22_finance→Node_o22_join [1475,285 1579,285 1579,435 1555,435]
-edge Flow_o22_f9 Node_o22_join→Node_o22_sign [1530,460 1530,504 1770,504 1770,480]
+edge Flow_o22_f6 Node_o22_split→Node_o22_finance [985,135 1067,135 1067,285 1125,285] «Сумма договора свыше 1 млн руб.»
+edge Flow_o22_f7 Node_o22_legal→Node_o22_join [1285,585 1530,585 1530,460]
+edge Flow_o22_f8 Node_o22_finance→Node_o22_join [1285,285 1530,285 1530,410]
+edge Flow_o22_f9 Node_o22_join→Node_o22_sign [1555,435 1695,435]
 edge Flow_o22_f10 Node_o22_sign→Node_o22_signedBack [1845,435 1885,435]
 edge Flow_o22_f11 Node_o22_signedBack→Node_o22_end [2035,435 2075,435]
-edge Flow_o22_f12 Node_o22_violation→Node_o22_rework [1147,648 1147,672 1409.5,672 1409.5,480]
-edge Flow_o22_f13 Node_o22_rework→Node_o22_m0 [1370.5,480 1370.5,664 390,664 390,460]
+edge Flow_o22_f12 Node_o22_violation→Node_o22_rework [1147,648 1147,672 1390,672 1390,480]
+edge Flow_o22_f13 Node_o22_rework→Node_o22_m0 [1390,390 1390,342 390,342 390,410]
 extra data 621,366 18×20 «Выбранное коммерческое предложение» link[630,386 630,390]
 extra store 621,484 18×20 «Система электронного документооборота» link[630,484 630,480]
 extra data 1761,366 18×20 «Договор поставки» link[1770,390 1770,386]
@@ -220,23 +220,23 @@ shape Node_o32_quality task/user 758,240 150×90 «Проверить качес
 shape Node_o32_okq gateway/exclusive 998,260 50×50 «Оборудование принято?»
 shape Node_o32_cancel event/intermediate 1195,267 36×36 «Покупка отменена»
 shape Node_o32_failed event/end 1378,267 36×36 «Приёмка не пройдена»
-shape Node_o32_act task/user 1378,390 150×90 «Подписать акт приёмки»
+shape Node_o32_act task/user 1195,390 150×90 «Подписать акт приёмки»
 shape Node_o32_register task/service 1378,90 150×90 «Поставить оборудование на учёт»
 shape Node_o32_end event/end 1618,117 36×36 «Оборудование введено в эксплуатацию»
 edge Flow_o32_f1 Node_o32_start→Node_o32_count [188,435 278,435]
 edge Flow_o32_f2 Node_o32_count→Node_o32_pay [428,435 485,435 485,135 518,135]
 edge Flow_o32_f3 Node_o32_pay→Node_o32_quality [668,135 725,135 725,285 758,285]
 edge Flow_o32_f4 Node_o32_quality→Node_o32_okq [908,285 998,285]
-edge Flow_o32_f5 Node_o32_okq→Node_o32_act [1023,310 1023,435 1378,435] «Да»
+edge Flow_o32_f5 Node_o32_okq→Node_o32_act [1023,310 1023,435 1195,435] «Да»
 edge Flow_o32_f6 Node_o32_okq→Node_o32_cancel [1048,285 1195,285] «Нет»
 edge Flow_o32_f7 Node_o32_cancel→Node_o32_failed [1231,285 1378,285]
-edge Flow_o32_f8 Node_o32_act→Node_o32_register [1528,435 1552,435 1552,146.7 1528,146.7]
+edge Flow_o32_f8 Node_o32_act→Node_o32_register [1345,435 1582,435 1582,146.7 1528,146.7]
 edge Flow_o32_f9 Node_o32_register→Node_o32_end [1528,123.3 1585,123.3 1585,135 1618,135]
 edge Flow_o32_f10 Node_o32_undo→Node_o32_refund [540,198 540,222 833,222 833,180]
 edge Flow_o32_f11 Node_o32_refund→Node_o32_refunded [908,135 998,135]
 extra data 344,366 18×20 «Поставленное оборудование» link[353,386 353,390]
 extra store 584,184 18×20 «ERP «Закупки»» link[593,184 593,180]
-extra data 1444,366 18×20 «Акт приёмки оборудования» link[1453,390 1453,386]
+extra data 1261,366 18×20 «Акт приёмки оборудования» link[1270,390 1270,386]
 extra data 1444,66 18×20 «Оборудование в эксплуатации» link[1453,90 1453,86]
 extra store 1444,184 18×20 «ERP «Закупки»» link[1453,184 1453,180]
 extra annotation 100,570 180×60 «Инструкция по приёмке оборудования» link[833,330 190,570]

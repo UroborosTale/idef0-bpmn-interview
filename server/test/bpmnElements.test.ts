@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateBpmn } from "../src/pipeline/bpmn.js";
 import { carryOverManualEdits } from "../src/pipeline/carryOver.js";
-import { artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../src/shared/bpmnArtifacts.js";
+import { ARTIFACT_W, artifactLabelWidth, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../src/shared/bpmnArtifacts.js";
 import { hasVerbalNoun, looksLikeFact } from "../src/shared/rules.js";
 import { mergeScope, scopeView } from "../src/shared/scope.js";
 import { validateModel } from "../src/shared/validate.js";
@@ -189,21 +189,20 @@ describe("добавочные элементы: общая геометрия",
     for (const a of arts) {
       if (a.kind === "store") {
         expect(a.box.y).toBeGreaterThanOrEqual(180); // низ задачи
-        expect(a.box.y + a.box.h + 11).toBeLessThanOrEqual(180 + 35); // со своей подписью — внутри дорожки
+        expect(a.box.y + a.box.h).toBeLessThanOrEqual(180 + 30); // значок целиком внутри дорожки
       } else {
         expect(a.box.y + a.box.h).toBeLessThanOrEqual(100); // верх задачи
-        expect(a.box.y - 11).toBeGreaterThanOrEqual(100 - 35);
+        expect(a.box.y).toBeGreaterThanOrEqual(100 - 30);
       }
       expect(a.box.x).toBeGreaterThanOrEqual(200 - 20 - 22);
       expect(a.box.x + a.box.w).toBeLessThanOrEqual(300 + 20 + 22);
     }
   });
 
-  it("подписи соседних значков не налезают друг на друга: расстояние между значками не меньше полусуммы ширин подписей", () => {
+  it("подписи соседних значков не налезают друг на друга: подпись идёт справа от значка, промежуток — по её ширине", () => {
     const names = { data: new Map([["a", "Потребность"], ["b", "Заявка на закупку"]]), systems: new Map() };
     const arts = artifactsOf([node("t", { inputs: ["a", "b"] })] as never[], boxes, names);
-    const labelW = (n: string) => Math.min(n.length, 14) * 4.6 + 2;
-    expect(arts[1].box.x - arts[0].box.x).toBeGreaterThanOrEqual((labelW("Потребность") + labelW("Заявка на закупку")) / 2);
+    expect(arts[1].box.x - arts[0].box.x).toBeGreaterThanOrEqual(ARTIFACT_W + artifactLabelWidth("Потребность") + 4);
   });
 
   it("хранилища данных идут правее граничных событий и обходят вертикаль потока сообщений, а документы от них не зависят", () => {
