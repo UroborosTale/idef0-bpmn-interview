@@ -49,3 +49,40 @@ describe("свободные текстовые блоки IDEF0", () => {
     for (const c of children) expect(c.notes ?? []).toEqual([]);
   });
 });
+
+describe("рисунки IDEF0", () => {
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+  const m = () => {
+    const model = b002Model();
+    model.idef0_images = { "": [{ id: "img1", name: "схема.png", data: png, x: 1000, y: 800, w: 300, h: 200 }] };
+    return model;
+  };
+
+  it("рисунок попадает в данные диаграммы и в SVG, полотно расширяется под него", () => {
+    const model = m();
+    const { root } = buildIdef0Diagrams(model);
+    expect(root.images).toHaveLength(1);
+    expect(root.images![0].name).toBe("схема.png");
+    expect(root.width).toBeGreaterThanOrEqual(1000 + 300 + 20);
+    const svg = generateIdef0(model).decompositionSvg;
+    expect(svg).toContain("<image");
+    expect(svg).toContain(png);
+  });
+
+  it("рисунки привязаны к своей диаграмме: в декомпозиции функции их нет", () => {
+    const model = m();
+    const { children } = buildIdef0Diagrams(model);
+    for (const c of children) expect(c.images ?? []).toEqual([]);
+  });
+});
+
+describe("метка фигуры IDEF0", () => {
+  it("метка попадает в блоки диаграммы и в SVG над блоком", () => {
+    const model = b002Model();
+    const fn = model.nodes.find((n) => !n.bpmn_scope && !n.idef0_parent)!;
+    fn.shapeLabel = "Основной";
+    const { root } = buildIdef0Diagrams(model);
+    expect(root.blocks.find((b) => b.nodeId === fn.id)?.shapeLabel).toBe("Основной");
+    expect(generateIdef0(model).decompositionSvg).toContain(">Основной<");
+  });
+});

@@ -516,12 +516,21 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
     page.rect(b.x, b.y, b.w, b.h, { fill: own.fill ?? "#e8eef7", ...(own.line ? { line: own.line } : {}), weightPt: 1, runs, key: blockKey(b.nodeId), ports: pp.ports, tag: editable ? { pm_k: "fn", pm_id: b.nodeId, pm_n: b.name, pm_c: b.code, pm_x: String(Math.round(b.x)), pm_y: String(Math.round(b.y)) } : undefined });
     // у блока контекстной диаграммы в правом нижнем углу — номер блока «0», как в Business Studio
     if (!editable) page.label("0", { x: b.x + b.w - 6, y: b.y + b.h - 18, anchor: "end", w: 30 }, { fontPx: 10, color: "#000000" });
+    // В12: метка фигуры — короткая серая подпись над блоком
+    if (b.shapeLabel) page.label(b.shapeLabel, { x: b.x, y: b.y - 13, anchor: "start", w: Math.max(40, b.w) }, { fontPx: 8.5, color: "#6b7280" });
     // В12: примечание к функции — жёлтый блок справа от неё
     const nb = b.note ? noteBox({ x: b.x, y: b.y, w: b.w, h: b.h }, b.note) : null;
     if (nb) {
       page.rect(nb.x, nb.y, nb.w, nb.h, { fill: "#fef9c3", line: "#a16207", weightPt: 0.75 });
       nb.lines.forEach((line, i) => page.label(line, { x: nb.x + 5, y: nb.y + 4 + i * 13, anchor: "start", w: nb.w - 8 }, { fontPx: 8.5, color: "#422006" }));
     }
+  }
+
+  // В12: рисунки диаграммы. В Visio картинка не переносится (это отдельная часть пакета .vsdx):
+  // рисуем рамку с именем файла — видно, что рисунок на диаграмме есть, и как он называется.
+  for (const im of d.images ?? []) {
+    page.rect(im.x, im.y, im.w, im.h, { fill: "#f9fafb", line: "#9ca3af", weightPt: 0.75 });
+    page.label(im.name, { x: im.x + 4, y: im.y + 4, anchor: "start", w: im.w - 8 }, { fontPx: 8.5, color: "#6b7280" });
   }
 
   // В12: свободные текстовые блоки диаграммы

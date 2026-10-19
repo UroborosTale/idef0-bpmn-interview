@@ -67,6 +67,8 @@ export interface Idef0Block {
   hasChildren?: boolean;
   /** В12: примечание к функции — жёлтый блок справа от неё (редактор, SVG и Visio рисуют его одинаково). */
   note?: string;
+  /** В12: метка фигуры — короткая подпись над блоком. */
+  shapeLabel?: string;
 }
 
 /** Диаграмма в структурированном виде: из неё строятся и SVG, и VSDX. */
@@ -79,6 +81,8 @@ export interface Idef0DiagramData {
   arrows: Idef0Arrow[];
   /** В12: свободные текстовые блоки диаграммы (положение и размер из модели). */
   notes?: { id: string; text: string; x: number; y: number; w: number; h: number }[];
+  /** В12: рисунки диаграммы — картинка в data URL, положение и размер из модели. */
+  images?: { id: string; name: string; data: string; x: number; y: number; w: number; h: number }[];
   footer: string[];
 }
 
@@ -126,7 +130,15 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
   const code = parentId ? codes.get(parentId) ?? "A?" : processCodeOf(model);
   const layout = layoutIdef0(model, parentId);
 
-  const blocks: Idef0Block[] = layout.functions.map((f) => ({ nodeId: f.node.id, code: f.code, name: f.node.name, ...f.box, hasChildren: f.hasChildren, ...(f.node.note ? { note: f.node.note } : {}) }));
+  const blocks: Idef0Block[] = layout.functions.map((f) => ({
+    nodeId: f.node.id,
+    code: f.code,
+    name: f.node.name,
+    ...f.box,
+    hasChildren: f.hasChildren,
+    ...(f.node.note ? { note: f.node.note } : {}),
+    ...(f.node.shapeLabel ? { shapeLabel: f.node.shapeLabel } : {}),
+  }));
   const arrows: Idef0Arrow[] = layout.arrows.map((a) => ({
     points: a.points,
     label: a.label,
@@ -159,12 +171,23 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
   };
 
   const ext2 = idef0Extents(layout);
-  // В12: свободные текстовые блоки диаграммы — часть её полотна
+  // В12: свободные текстовые блоки и рисунки диаграммы — часть её полотна
   const notes = model.idef0_notes?.[parentId ?? ""] ?? [];
-  const width = Math.max(ext2.w, 0, ...notes.map((n) => n.x + n.w + 20));
-  const height = Math.max(ext2.h, 0, ...notes.map((n) => n.y + n.h + 20));
+  const images = model.idef0_images?.[parentId ?? ""] ?? [];
+  const width = Math.max(ext2.w, 0, ...notes.map((n) => n.x + n.w + 20), ...images.map((i) => i.x + i.w + 20));
+  const height = Math.max(ext2.h, 0, ...notes.map((n) => n.y + n.h + 20), ...images.map((i) => i.y + i.h + 20));
   return {
-    data: { code, title: `${code} — ${parent ? parent.name : model.process.name}`, width, height, blocks, arrows, footer: [], ...(notes.length ? { notes } : {}) },
+    data: {
+      code,
+      title: `${code} — ${parent ? parent.name : model.process.name}`,
+      width,
+      height,
+      blocks,
+      arrows,
+      footer: [],
+      ...(notes.length ? { notes } : {}),
+      ...(images.length ? { images } : {}),
+    },
     ext,
   };
 }
@@ -296,6 +319,8 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
     parts.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#e8eef7" stroke="#1f2937" stroke-width="${big ? 1.8 : 1.6}" />`);
     parts.push(textBlock(b.x + b.w / 2, b.y + b.h / 2 - (big ? 8 : 6), b.name, big ? 26 : 22, big ? 13 : 12));
     parts.push(`<text x="${b.x + (big ? 8 : 6)}" y="${b.y + b.h - (big ? 8 : 6)}" font-size="10" font-family="Arial, sans-serif" fill="#4b5563">${esc(b.code)}</text>`);
+    // В12: метка фигуры — короткая серая подпись над блоком
+    if (b.shapeLabel) parts.push(`<text x="${b.x}" y="${b.y - 4}" font-size="9" font-family="Arial, sans-serif" fill="#6b7280">${esc(b.shapeLabel)}</text>`);
     if (b.hasChildren) {
       // отметка «есть декомпозиция»: квадрат с плюсом в правом нижнем углу
       const [mx, my] = [b.x + b.w - 18, b.y + b.h - 18];
@@ -307,6 +332,11 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
       parts.push(`<rect x="${nb.x}" y="${nb.y}" width="${nb.w}" height="${nb.h}" fill="#fef9c3" stroke="#a16207" stroke-width="1" />`);
       nb.lines.forEach((line, i) => parts.push(`<text x="${nb.x + 5}" y="${nb.y + 14 + i * 13}" font-size="10" font-family="Arial, sans-serif" fill="#422006">${esc(line)}</text>`));
     }
+  }
+  // В12: рисунки диаграммы (растровые картинки лежат в модели в data URL)
+  for (const im of d.images ?? []) {
+    parts.push(`<rect x="${im.x}" y="${im.y}" width="${im.w}" height="${im.h}" fill="#ffffff" stroke="#9ca3af" stroke-width="1" />`);
+    parts.push(`<image x="${im.x}" y="${im.y}" width="${im.w}" height="${im.h}" preserveAspectRatio="xMidYMid meet" href="${esc(im.data)}" />`);
   }
   // В12: свободные текстовые блоки диаграммы (жёлтые)
   for (const n of d.notes ?? []) {

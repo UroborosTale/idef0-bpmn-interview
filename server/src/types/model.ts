@@ -200,6 +200,8 @@ export const ProcessNode = z.object({
   confidence: z.number().min(0).max(1).default(0.5),
   source: z.array(SourceRef).default([]),
   note: z.string().optional(),
+  // В12: метка фигуры — короткая подпись над блоком IDEF0 (в Business Studio — «Метка фигуры»).
+  shapeLabel: z.string().max(60).optional(),
   // --- PLM v2 (М2 аналитика, М6 трассировка требований) ---
   time_processing: z.string().nullable().optional(), // время обработки (в отличие от ожидания)
   time_waiting: z.string().nullable().optional(),
@@ -472,6 +474,24 @@ export const ProcessLogicModel = z.object({
   // В12: свободные текстовые блоки на диаграммах IDEF0: ключ — id функции ("" — верхняя диаграмма), значение — блоки
   // с текстом и положением. Примечание к самой функции хранится в note узла (это отдельный жёлтый блок у блока).
   idef0_notes: z.record(z.string(), z.array(z.object({ id: z.string(), text: z.string(), x: z.number(), y: z.number(), w: z.number(), h: z.number() }))).optional(),
+  // В12: рисунки на диаграммах IDEF0: ключ — id функции ("" — верхняя диаграмма). data — картинка целиком в data URL
+  // (png/jpeg, до 400 тыс. знаков): модель самодостаточна, ничего не теряется при переносе и выгрузке.
+  idef0_images: z
+    .record(
+      z.string(),
+      z.array(
+        z.object({
+          id: z.string(),
+          name: z.string().max(120),
+          data: z.string().max(400_000),
+          x: z.number(),
+          y: z.number(),
+          w: z.number(),
+          h: z.number(),
+        })
+      )
+    )
+    .optional(),
   diagram_widths: z.record(z.string(), z.number().min(MIN_DIAGRAM_W).max(MAX_DIAGRAM_W)).optional(),
   accepted_issues: z.array(AcceptedIssue).default([]),
   // Наборы объектов для фильтра навигатора и выгрузки; без поля наборов нет.

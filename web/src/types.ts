@@ -90,6 +90,17 @@ export interface FreeNote {
   h: number;
 }
 
+/** В12: рисунок на диаграмме IDEF0 — картинка в data URL, положение и размер в модели. */
+export interface FreeImage {
+  id: string;
+  name: string;
+  data: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface ProcessNode {
   id: string;
   type: "task" | "event" | "gateway" | "subprocess";
@@ -136,6 +147,8 @@ export interface ProcessNode {
   /** Ручное смещение значков документов и хранилищ BPMN от автоматического места: ключ «вид:сущность». */
   artifact_offsets?: Record<string, { dx: number; dy: number }>;
   note?: string;
+  /** В12: метка фигуры — короткая подпись над блоком IDEF0 (в Business Studio — «Метка фигуры»). */
+  shapeLabel?: string;
   status: "confirmed" | "hypothesis";
   confidence: number;
   source: SourceRef[];
@@ -351,6 +364,8 @@ export interface ProcessLogicModel {
   idef0_frames?: Record<string, IdefFrame>;
   /** В12: свободные текстовые блоки на диаграммах IDEF0: ключ — id функции, "" — верхняя диаграмма. */
   idef0_notes?: Record<string, FreeNote[]>;
+  /** В12: рисунки на диаграммах IDEF0: ключ — id функции, "" — верхняя диаграмма. */
+  idef0_images?: Record<string, FreeImage[]>;
   /** Рамка листа и сетка диаграмм BPMN: ключ — id операции, "" — общая схема процесса. */
   bpmn_frames?: Record<string, IdefFrame>;
   accepted_issues: AcceptedIssue[];

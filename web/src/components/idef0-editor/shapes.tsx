@@ -3,7 +3,7 @@ import { FREE_END, noteBox, offpageMarks, tunnelArcs } from "@shared/idef0Layout
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 import { noteLines } from "./notes";
-import type { FreeNote } from "../../types";
+import type { FreeImage, FreeNote } from "../../types";
 
 /** Рамка листа (клетки, контур, штамп NODE / TITLE / NO.) — общая с редактором BPMN. */
 export { FrameLayer } from "../editor-core/sheetFrame";
@@ -48,6 +48,12 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
           {fn.code}
         </text>
       )}
+      {/* В12: метка фигуры — короткая серая подпись над блоком (то же место, что в SVG и Visio) */}
+      {fn.node.shapeLabel && (
+        <text x={x} y={y - 4} fontSize={9} fontFamily="Arial, sans-serif" fill="#6b7280" pointerEvents="none" data-shape-label>
+          {fn.node.shapeLabel}
+        </text>
+      )}
       {fn.hasChildren && (
         // отметка «есть декомпозиция»: клик открывает диаграмму вложенных функций
         <g data-open={fn.node.id} style={{ cursor: "pointer" }}>
@@ -80,7 +86,25 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
  * В12: свободный текстовый блок на диаграмме — жёлтый прямоугольник с текстом (положение и размер в модели).
  * Клик — выбор, двойной щелчок — правка текста, × в углу выбранного блока — удалить.
  */
-export function FreeNoteShape({ note, selected, onSelect, onEdit, onDelete }: { note: FreeNote; selected: boolean; onSelect: () => void; onEdit: () => void; onDelete: () => void }) {
+export function FreeNoteShape({
+  note,
+  selected,
+  onSelect,
+  onEdit,
+  onDelete,
+  onGrab,
+  onGrabSize,
+}: {
+  note: FreeNote;
+  selected: boolean;
+  onSelect: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  /** Потянуть блок — жест ведёт редактор (ему нужны координаты листа и захват указателя). */
+  onGrab?: (e: React.PointerEvent) => void;
+  /** Потянуть угол — растянуть блок. */
+  onGrabSize?: (e: React.PointerEvent) => void;
+}) {
   const lines = noteLines(note.text, note.w);
   return (
     <g
@@ -89,6 +113,7 @@ export function FreeNoteShape({ note, selected, onSelect, onEdit, onDelete }: { 
       onPointerDown={(e) => {
         e.stopPropagation();
         onSelect();
+        onGrab?.(e);
       }}
       onDoubleClick={(e) => {
         e.stopPropagation();
@@ -115,6 +140,98 @@ export function FreeNoteShape({ note, selected, onSelect, onEdit, onDelete }: { 
           <circle cx={note.x + note.w - 9} cy={note.y + 9} r={6} fill="#fff" stroke="#a16207" strokeWidth={1} />
           <path d={`M${note.x + note.w - 12} ${note.y + 6} l6 6 M${note.x + note.w - 6} ${note.y + 6} l-6 6`} stroke="#a16207" strokeWidth={1.2} fill="none" />
         </g>
+      )}
+      {selected && (
+        <rect
+          data-note-resize
+          x={note.x + note.w - 5}
+          y={note.y + note.h - 5}
+          width={9}
+          height={9}
+          fill="#fff"
+          stroke="#a16207"
+          strokeWidth={1}
+          style={{ cursor: "nwse-resize" }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onGrabSize?.(e);
+          }}
+        />
+      )}
+    </g>
+  );
+}
+
+/**
+ * В12: рисунок на диаграмме — картинка в тонкой рамке. Клик — выбор, перенос — за картинку,
+ * угол выбранного рисунка — растянуть, × — удалить.
+ */
+export function ImageShape({
+  image,
+  selected,
+  onSelect,
+  onDelete,
+  onGrab,
+  onGrabSize,
+}: {
+  image: FreeImage;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onGrab?: (e: React.PointerEvent) => void;
+  onGrabSize?: (e: React.PointerEvent) => void;
+}) {
+  return (
+    <g
+      data-free-image={image.id}
+      style={{ cursor: "move" }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onSelect();
+        onGrab?.(e);
+      }}
+    >
+      <image href={image.data} x={image.x} y={image.y} width={image.w} height={image.h} preserveAspectRatio="xMidYMid meet" pointerEvents="none" />
+      <rect
+        x={image.x}
+        y={image.y}
+        width={image.w}
+        height={image.h}
+        fill="none"
+        stroke={selected ? ACCENT : "#9ca3af"}
+        strokeWidth={selected ? 2.2 : 1}
+        strokeDasharray={selected ? undefined : "4 3"}
+        pointerEvents="none"
+      />
+      {selected && (
+        <g
+          data-image-delete
+          style={{ cursor: "pointer" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <circle cx={image.x + image.w - 9} cy={image.y + 9} r={6} fill="#fff" stroke="#9ca3af" strokeWidth={1} />
+          <path d={`M${image.x + image.w - 12} ${image.y + 6} l6 6 M${image.x + image.w - 6} ${image.y + 6} l-6 6`} stroke="#6b7280" strokeWidth={1.2} fill="none" />
+        </g>
+      )}
+      {selected && (
+        <rect
+          data-image-resize
+          x={image.x + image.w - 5}
+          y={image.y + image.h - 5}
+          width={9}
+          height={9}
+          fill="#fff"
+          stroke="#9ca3af"
+          strokeWidth={1}
+          style={{ cursor: "nwse-resize" }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            onGrabSize?.(e);
+          }}
+        />
       )}
     </g>
   );

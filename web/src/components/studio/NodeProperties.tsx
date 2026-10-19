@@ -276,6 +276,9 @@ export default function NodeProperties({
         <Field label="Заметка">
           <CommitInput multiline value={node.note ?? ""} onCommit={(v) => set({ note: v.trim() || undefined })} />
         </Field>
+        <Field label="Метка фигуры">
+          <CommitInput value={node.shapeLabel ?? ""} onCommit={(v) => set({ shapeLabel: v.trim() || undefined })} />
+        </Field>
         {node.status === "hypothesis" && <button onClick={() => set({ status: "confirmed", confidence: 1 })}>Подтвердить (убрать «гипотезу»)</button>}
       </Section>
 

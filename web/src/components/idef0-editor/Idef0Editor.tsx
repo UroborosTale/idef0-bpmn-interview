@@ -15,13 +15,14 @@ import { MIN_POS, ancestorsOf, buildIdef0, idef0Codes, idef0Extents, labelSpec, 
 import { ARROW_GRID, addBend, clampFreeEnd, dragCorner, dragSegment, fractionAlong, hasManualRoute, removeBend, resetArrow, setFreeEnd, setLabelOffset, slideEnd } from "./arrow-edit";
 import { addFunction, linkFunctions, moveFunction, reconnectArrow, removeArrow, renameEntity, setArrowIcom, setFrame } from "./ops";
 import { alignLeft, alignTop, blocksInRect, boundsOf, copyFragment, deleteGroup, distributeHorizontally, distributeVertically, hasClipboard, hasDecomposition, moveGroup, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { ArrowHandles, ArrowShape, BlockShape, FrameLayer, FreeNoteShape, Idef0Defs } from "./shapes";
-import { addNote, deleteNote, notesOf, updateNote } from "./notes";
+import { ArrowHandles, ArrowShape, BlockShape, FrameLayer, FreeNoteShape, Idef0Defs, ImageShape } from "./shapes";
+import { addNote, deleteNote, moveNote, notesOf, resizeNote, updateNote } from "./notes";
+import { IMAGE_MAX_CHARS, addImage, deleteImage, imagesOf, moveImage, resizeImage } from "./images";
 import type { Selection } from "../studio/selection";
 
 type M = ProcessLogicModel;
 // стрелка выделена по ключу, а если ключ сменился (вход стал управлением) — находится по функции и сущности
-type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string; nodeId?: string; entityId?: string } | { kind: "note"; id: string } | null;
+type Sel = { kind: "fn"; id: string } | { kind: "arrow"; id: string; nodeId?: string; entityId?: string } | { kind: "note"; id: string } | { kind: "image"; id: string } | null;
 const arrowSelOf = (a: Pick<Arrow, "key" | "nodeId" | "entityId">): Sel => ({ kind: "arrow", id: a.key, nodeId: a.nodeId, entityId: a.entityId });
 type Zone = "input" | "control";
 type Drag =
@@ -31,6 +32,10 @@ type Drag =
   // лист двигают (edge = "move") или растягивают за край и угол (n, s, e, w, ne…): r0 — лист в начале жеста (x, y, w, h поля без штампа)
   | ({ kind: "frame"; startModel: M } & FrameDrag)
   | { kind: "group"; id: string; ids: string[]; base: M; startModel: M; x0: number; y0: number; moved: boolean }
+  // свободный текстовый блок или рисунок двигают (kind "free") или растягивают за угол ("freeSize");
+  // target говорит, что именно: у них одинаковый жест, но разные поля модели. w0/h0 — размер в начале жеста
+  | { kind: "free"; target: "note" | "image"; id: string; offX: number; offY: number; startModel: M; moved: boolean; sx: number; sy: number }
+  | { kind: "freeSize"; target: "note" | "image"; id: string; startModel: M; moved: boolean; x0: number; y0: number; w0: number; h0: number }
   | { kind: "connect"; from: string }
   // правка выбранной стрелки: a — стрелка в начале жеста (от её ломаной пересчитывается каждый шаг), start — модель до жеста
   | { kind: "aseg"; a: Arrow; i: number; axis: "x" | "y"; start: M; x0: number; y0: number; moved: boolean }
@@ -91,6 +96,7 @@ export default function Idef0Editor({
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [showMap, setShowMap] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);
   // цель при переносе стрелки или протягивании связи; zone — только когда зона блока что-то решает (вход или управление)
   const [connectHot, setConnectHot] = useState<{ id: string; zone: Zone | null } | null>(null);
@@ -122,7 +128,7 @@ export default function Idef0Editor({
   const blocks = new Map(layout.functions.map((f) => [f.node.id, f] as const));
   const arrowOf = (s: Extract<Sel, { kind: "arrow" }>) =>
     layout.arrows.find((a) => a.key === s.id) ?? (s.nodeId ? layout.arrows.find((a) => a.nodeId === s.nodeId && a.entityId === s.entityId) : undefined);
-  const curSel: Sel = !sel ? null : sel.kind === "fn" ? (blocks.has(sel.id) ? sel : null) : sel.kind === "note" ? sel : ((a) => (a ? arrowSelOf(a) : null))(arrowOf(sel));
+  const curSel: Sel = !sel ? null : sel.kind === "fn" ? (blocks.has(sel.id) ? sel : null) : sel.kind === "note" || sel.kind === "image" ? sel : ((a) => (a ? arrowSelOf(a) : null))(arrowOf(sel));
 
   /** Выбранная стрелка в её сегодняшнем виде (с ручным маршрутом, если он есть). */
   const arrowSel = curSel?.kind === "arrow" ? layout.arrows.find((a) => a.key === curSel.id) : undefined;
@@ -135,7 +141,7 @@ export default function Idef0Editor({
   const toSelection = (s: Sel): Selection => {
     if (!s) return null;
     if (s.kind === "fn") return { kind: "node", id: s.id };
-    if (s.kind === "note") return null; // у свободного текстового блока нет карточки в панели
+    if (s.kind === "note" || s.kind === "image") return null; // у свободного блока и рисунка нет карточки в панели
     const arrow = layout.arrows.find((a) => a.key === s.id);
     return arrow ? { kind: "arrow", arrow } : null;
   };
@@ -448,6 +454,15 @@ export default function Idef0Editor({
       if (!d.moved && Math.hypot(wx - d.x0, wy - d.y0) * view.k < 4) return;
       d.moved = true;
       setDraft(() => moveGroup(d.base, cur, d.ids, wx - d.x0, wy - d.y0));
+    } else if (d.kind === "free") {
+      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 4) return;
+      d.moved = true;
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      setDraft((m) => (d.target === "note" ? moveNote(m, d.id, snap(wx - d.offX), snap(wy - d.offY)) : moveImage(m, d.id, snap(wx - d.offX), snap(wy - d.offY))));
+    } else if (d.kind === "freeSize") {
+      const [wx, wy] = toWorld(e.clientX, e.clientY);
+      d.moved = true;
+      setDraft((m) => (d.target === "note" ? resizeNote(m, d.id, d.w0 + wx - d.x0, d.h0 + wy - d.y0) : resizeImage(m, d.id, d.w0 + wx - d.x0, d.h0 + wy - d.y0)));
     } else if (d.kind === "aseg" || d.kind === "acorner" || d.kind === "aend" || d.kind === "alabel") {
       arrowMove(d, e);
     } else {
@@ -474,6 +489,8 @@ export default function Idef0Editor({
         setMulti([]);
         pick({ kind: "fn", id: d.id });
       }
+    } else if ((d.kind === "free" || d.kind === "freeSize") && d.moved) {
+      h.recordPast(d.startModel);
     } else if (d.kind === "marquee") {
       const rect = marquee;
       setMarquee(null);
@@ -553,6 +570,29 @@ export default function Idef0Editor({
     const r = addNote(draftRef.current, cur, right + 40, Math.max(40, bottom - 60));
     commit(r.model, { kind: "note", id: r.id });
     setEditing(`note:${r.id}`);
+  };
+
+  /** Рисунок встаёт под текстовыми блоками справа от диаграммы, чтобы не накрыть блоки функций. */
+  const addFreeImage = () => fileRef.current?.click();
+  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // тот же файл можно выбрать снова
+    if (!file) return;
+    if (!/^image\/(png|jpeg)$/.test(file.type)) return showHint("Рисунок: подходят только PNG и JPEG");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = String(reader.result ?? "");
+      if (data.length > IMAGE_MAX_CHARS) return showHint(`Рисунок больше ${Math.round(IMAGE_MAX_CHARS / 1000)} тыс. знаков — уменьшите файл`);
+      const probe = new Image();
+      probe.onload = () => {
+        const right = Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w), ...notes.map((n) => n.x + n.w));
+        const r = addImage(draftRef.current, cur, { name: file.name, data, w: probe.naturalWidth, h: probe.naturalHeight }, right + 40, 40);
+        commit(r.model, { kind: "image", id: r.id });
+      };
+      probe.onerror = () => showHint("Не удалось прочитать рисунок");
+      probe.src = data;
+    };
+    reader.readAsDataURL(file);
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -676,6 +716,7 @@ export default function Idef0Editor({
   const selectedFn = curSel?.kind === "fn" ? blocks.get(curSel.id) : undefined;
   // В12: свободные текстовые блоки текущей диаграммы
   const notes = notesOf(draft, cur);
+  const images = imagesOf(draft, cur);
   const editingNote = editing?.startsWith("note:") ? notes.find((n) => n.id === editing.slice(5)) : undefined;
   const editingFn = editing ? blocks.get(editing) : undefined;
   /** Правка названия стрелки (редактируется запись документа, регламента, системы или исполнителя: подпись меняется у всех стрелок). */
@@ -736,6 +777,10 @@ export default function Idef0Editor({
             <button onClick={addFreeNote} title="Добавить свободный текстовый блок на диаграмму (В12)">
               Примечание
             </button>
+            <button onClick={addFreeImage} title="Вставить рисунок PNG или JPEG на диаграмму (В12)">
+              Рисунок
+            </button>
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={onPickImage} style={{ display: "none" }} data-image-input />
             <span className="bpe-sep" />
             <span className="bpe-crumbs" title="Уровень декомпозиции">
               {crumbs.map((c, i) => (
@@ -791,7 +836,26 @@ export default function Idef0Editor({
               {layout.functions.map((f) => (
                 <BlockShape key={f.node.id} fn={f} style={blockStyle} showCode={display.idef0Numbers} selected={inGroup ? groupIds.includes(f.node.id) : curSel?.kind === "fn" && curSel.id === f.node.id} hot={connectHot?.id === f.node.id} />
               ))}
-              {/* В12: свободные текстовые блоки (жёлтые) поверх блоков */}
+              {/* В12: рисунки (под текстовыми блоками) и свободные текстовые блоки (жёлтые) поверх блоков */}
+              {images.map((im) => (
+                <ImageShape
+                  key={im.id}
+                  image={im}
+                  selected={curSel?.kind === "image" && curSel.id === im.id}
+                  onSelect={() => pick({ kind: "image", id: im.id })}
+                  onDelete={() => commit(deleteImage(draftRef.current, im.id), null)}
+                  onGrab={(e) => {
+                    const [wx, wy] = toWorld(e.clientX, e.clientY);
+                    dragRef.current = { kind: "free", target: "image", id: im.id, offX: wx - im.x, offY: wy - im.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
+                    svgRef.current?.setPointerCapture(e.pointerId);
+                  }}
+                  onGrabSize={(e) => {
+                    const [wx, wy] = toWorld(e.clientX, e.clientY);
+                    dragRef.current = { kind: "freeSize", target: "image", id: im.id, startModel: draftRef.current, moved: false, x0: wx, y0: wy, w0: im.w, h0: im.h };
+                    svgRef.current?.setPointerCapture(e.pointerId);
+                  }}
+                />
+              ))}
               {notes.map((nt) => (
                 <FreeNoteShape
                   key={nt.id}
@@ -803,6 +867,16 @@ export default function Idef0Editor({
                     setEditing(`note:${nt.id}`);
                   }}
                   onDelete={() => commit(deleteNote(draftRef.current, nt.id), null)}
+                  onGrab={(e) => {
+                    const [wx, wy] = toWorld(e.clientX, e.clientY);
+                    dragRef.current = { kind: "free", target: "note", id: nt.id, offX: wx - nt.x, offY: wy - nt.y, startModel: draftRef.current, moved: false, sx: e.clientX, sy: e.clientY };
+                    svgRef.current?.setPointerCapture(e.pointerId);
+                  }}
+                  onGrabSize={(e) => {
+                    const [wx, wy] = toWorld(e.clientX, e.clientY);
+                    dragRef.current = { kind: "freeSize", target: "note", id: nt.id, startModel: draftRef.current, moved: false, x0: wx, y0: wy, w0: nt.w, h0: nt.h };
+                    svgRef.current?.setPointerCapture(e.pointerId);
+                  }}
                 />
               ))}
 

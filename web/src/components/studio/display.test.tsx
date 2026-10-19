@@ -5,7 +5,7 @@ import { session, structuredModel } from "../../test/fixtures";
 import { DEFAULT_DISPLAY, loadDisplay, saveDisplay } from "../editor-core/display";
 import { NodeShape } from "../bpmn-editor/shapes";
 import { FlowShape } from "../bpmn-editor/shapes";
-import { ArrowShape, BlockShape, FreeNoteShape } from "../idef0-editor/shapes";
+import { ArrowShape, BlockShape, FreeNoteShape, ImageShape } from "../idef0-editor/shapes";
 import Studio from "./Studio";
 
 describe("вид диаграмм: настройка", () => {
@@ -70,6 +70,12 @@ describe("вид диаграмм: фигуры", () => {
     expect(container.textContent).toContain("Сверить");
   });
 
+  it("В12: метка фигуры рисуется над блоком", () => {
+    const fn = { node: { ...structuredModel().nodes.find((n) => n.id === "o1")!, shapeLabel: "Основной" }, box: { x: 0, y: 0, w: 200, h: 80 }, code: "A1", hasChildren: false } as never;
+    const { container } = render(<svg><BlockShape fn={fn} selected={false} hot={false} /></svg>);
+    expect(container.querySelector("[data-shape-label]")?.textContent).toBe("Основной");
+  });
+
   it("В12: свободный текстовый блок рисуется, выделяется и удаляется по ×", () => {
     const note = { id: "note1", text: "Допущение: сроки уточняются", x: 10, y: 20, w: 180, h: 60 };
     const del = vi.fn();
@@ -77,6 +83,23 @@ describe("вид диаграмм: фигуры", () => {
     expect(container.querySelector("[data-free-note]")).toBeTruthy();
     expect(container.textContent).toContain("Допущение");
     fireEvent.click(container.querySelector("[data-note-delete]")!);
+    expect(del).toHaveBeenCalled();
+    // у выбранного блока есть угол для растягивания
+    expect(container.querySelector("[data-note-resize]")).toBeTruthy();
+  });
+
+  it("В12: рисунок на диаграмме — картинка в рамке, × удаляет", () => {
+    const png = "data:image/png;base64,iVBORw0KGgo=";
+    const del = vi.fn();
+    const { container } = render(
+      <svg>
+        <ImageShape image={{ id: "img1", name: "схема.png", data: png, x: 0, y: 0, w: 300, h: 200 }} selected onSelect={() => undefined} onDelete={del} />
+      </svg>
+    );
+    expect(container.querySelector("[data-free-image]")).toBeTruthy();
+    expect(container.querySelector("image")?.getAttribute("href")).toBe(png);
+    expect(container.querySelector("[data-image-resize]")).toBeTruthy();
+    fireEvent.click(container.querySelector("[data-image-delete]")!);
     expect(del).toHaveBeenCalled();
   });
 });

@@ -45,6 +45,17 @@ export function updateNote(m: M, id: string, patch: Partial<Omit<FreeNote, "id">
   return touched ? { ...m, idef0_notes: all } : m;
 }
 
+/** Наименьший блок: меньше — текст уже не читается. */
+export const NOTE_MIN = { w: 100, h: 40 };
+
+/** Перетаскивание: положение не уходит за край листа (0, 0). */
+export const moveNote = (m: M, id: string, x: number, y: number): M =>
+  updateNote(m, id, { x: Math.max(0, Math.round(x)), y: Math.max(0, Math.round(y)) });
+
+/** Растягивание за угол: размер не меньше NOTE_MIN. */
+export const resizeNote = (m: M, id: string, w: number, h: number): M =>
+  updateNote(m, id, { w: Math.max(NOTE_MIN.w, Math.round(w)), h: Math.max(NOTE_MIN.h, Math.round(h)) });
+
 export function deleteNote(m: M, id: string): M {
   const all = { ...(m.idef0_notes ?? {}) };
   let touched = false;
