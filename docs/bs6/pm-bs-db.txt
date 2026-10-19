@@ -1,0 +1,13 @@
+﻿=== файлы PostgreSQL ===
+     4476 КБ  \libcrypto-3-x64.dll
+     1808 КБ  \libiconv-2.dll
+      756 КБ  \libssl-3-x64.dll
+      709 КБ  \libzstd.dll
+      466 КБ  \pg_dump.exe
+      465 КБ  \libintl-9.dll
+      320 КБ  \libpq.dll
+      251 КБ  \pg_restore.exe
+      116 КБ  \liblz4.dll
+       88 КБ  \zlib1.dll
+       52 КБ  \libwinpthread-1.dll
+=== CREATE TABLE (первые 70) ===

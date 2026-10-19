@@ -1,0 +1,3098 @@
+[
+ {
+  "id": "204bf90f-801a-437f-887d-91b562414532",
+  "name": "BPMNRelationshipCategories",
+  "ru": null,
+  "items": [
+   {
+    "name": "Association",
+    "value": "16",
+    "ru": "Ассоциация"
+   },
+   {
+    "name": "ConditionalSequenceFlow",
+    "value": "4",
+    "ru": "Условный поток управления"
+   },
+   {
+    "name": "DefaultSequenceFlow",
+    "value": "8",
+    "ru": "Поток управления по умолчанию"
+   },
+   {
+    "name": "DirectionalAssociation",
+    "value": "1",
+    "ru": "Направленная ассоциация"
+   },
+   {
+    "name": "MessageFlow",
+    "value": "2",
+    "ru": "Поток сообщений"
+   },
+   {
+    "name": "SequenceFlow",
+    "value": "0",
+    "ru": "Поток управления"
+   }
+  ]
+ },
+ {
+  "id": "32c8547d-13eb-48d2-b0c4-a502a5b3c0ad",
+  "name": "VersionApproval_Obsolete",
+  "ru": null,
+  "items": [
+   {
+    "name": "Approved",
+    "value": "1",
+    "ru": "Согласовано"
+   },
+   {
+    "name": "Rejected",
+    "value": "2",
+    "ru": "Отклонено"
+   }
+  ]
+ },
+ {
+  "id": "786f4183-e0a8-4e40-b48f-4779bae11ba0",
+  "name": "ArrowSegmentTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "ObjectFlow",
+    "value": "2",
+    "ru": "Поток объектов"
+   },
+   {
+    "name": "Precedence",
+    "value": "1",
+    "ru": "Связь предшествования"
+   }
+  ]
+ },
+ {
+  "id": "ef40837f-ea31-404c-976e-566d3dc00e86",
+  "name": "RecurrenceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Daily",
+    "value": "2",
+    "ru": "Ежедневно"
+   },
+   {
+    "name": "Monthly",
+    "value": "8",
+    "ru": "Ежемесячно"
+   },
+   {
+    "name": "No",
+    "value": "1",
+    "ru": "Нет повторения"
+   },
+   {
+    "name": "Weekly",
+    "value": "4",
+    "ru": "Еженедельно"
+   },
+   {
+    "name": "Yearly",
+    "value": "16",
+    "ru": "Ежегодно"
+   }
+  ]
+ },
+ {
+  "id": "80cf299d-8d3f-46d0-90ac-a76be0038e29",
+  "name": "ConnectorExceptionsTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Allow",
+    "value": "2",
+    "ru": "Разрешить"
+   },
+   {
+    "name": "Deny",
+    "value": "3",
+    "ru": "Запретить"
+   },
+   {
+    "name": "NotUsed",
+    "value": "1",
+    "ru": "Не используется"
+   }
+  ]
+ },
+ {
+  "id": "fbc9c059-f924-4bb0-8dee-fe74660cf4fd",
+  "name": "VersionStatuses",
+  "ru": null,
+  "items": [
+   {
+    "name": "Archived",
+    "value": "16",
+    "ru": "Архивирована"
+   },
+   {
+    "name": "Draft",
+    "value": "2",
+    "ru": "Проект"
+   },
+   {
+    "name": "Publication",
+    "value": "8",
+    "ru": "Опубликована"
+   },
+   {
+    "name": "Recommended",
+    "value": "4",
+    "ru": "Рекомендована"
+   },
+   {
+    "name": "Working",
+    "value": "1",
+    "ru": "В работе"
+   }
+  ]
+ },
+ {
+  "id": "7e2dd40a-26e5-4b6a-90e0-4f0b7bb60b7c",
+  "name": "EventScopes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Global",
+    "value": "1",
+    "ru": "Глобальное"
+   },
+   {
+    "name": "Local",
+    "value": "2",
+    "ru": "Локальное"
+   }
+  ]
+ },
+ {
+  "id": "d21a1eb0-5557-4183-bf9d-5d90912e9b87",
+  "name": "EndingTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "EndDate",
+    "value": "4",
+    "ru": "Дата завершения"
+   },
+   {
+    "name": "NeverEnd",
+    "value": "1",
+    "ru": "Нет конечной даты"
+   },
+   {
+    "name": "NumberOfOccurrences",
+    "value": "2",
+    "ru": "Количество повторений"
+   }
+  ]
+ },
+ {
+  "id": "b6c20b7c-ee95-4d9c-a4a8-440bc808a628",
+  "name": "AuditStatuses",
+  "ru": null,
+  "items": [
+   {
+    "name": "Cancelled",
+    "value": "3",
+    "ru": "Отмененный"
+   },
+   {
+    "name": "Conducted",
+    "value": "2",
+    "ru": "Проведенный"
+   },
+   {
+    "name": "Draft",
+    "value": "0",
+    "ru": "Черновой"
+   },
+   {
+    "name": "Scheduled",
+    "value": "1",
+    "ru": "Запланированный"
+   }
+  ]
+ },
+ {
+  "id": "ea596e4c-ea7f-4bb2-846f-bea1d67c68c1",
+  "name": "ActivityRepositoryType",
+  "ru": null,
+  "items": [
+   {
+    "name": "InternalEditor",
+    "value": "1",
+    "ru": "Встроенный редактор"
+   },
+   {
+    "name": "MSVisio",
+    "value": "2",
+    "ru": "Microsoft Visio"
+   }
+  ]
+ },
+ {
+  "id": "10429b6a-584d-46bb-ad66-7fb6f642e31c",
+  "name": "WorkResourceGroups",
+  "ru": null,
+  "items": [
+   {
+    "name": "Group1",
+    "value": "1",
+    "ru": "Группа 1"
+   },
+   {
+    "name": "Group10",
+    "value": "10",
+    "ru": "Группа 10"
+   },
+   {
+    "name": "Group2",
+    "value": "2",
+    "ru": "Группа 2"
+   },
+   {
+    "name": "Group3",
+    "value": "3",
+    "ru": "Группа 3"
+   },
+   {
+    "name": "Group4",
+    "value": "4",
+    "ru": "Группа 4"
+   },
+   {
+    "name": "Group5",
+    "value": "5",
+    "ru": "Группа 5"
+   },
+   {
+    "name": "Group6",
+    "value": "6",
+    "ru": "Группа 6"
+   },
+   {
+    "name": "Group7",
+    "value": "7",
+    "ru": "Группа 7"
+   },
+   {
+    "name": "Group8",
+    "value": "8",
+    "ru": "Группа 8"
+   },
+   {
+    "name": "Group9",
+    "value": "9",
+    "ru": "Группа 9"
+   }
+  ]
+ },
+ {
+  "id": "9ab77810-d869-439f-bdec-e6f272d65472",
+  "name": "CategoriesOfRelationshipTypeBetweenTermAndFunctionalObject",
+  "ru": null,
+  "items": [
+   {
+    "name": "DoesNotSetStatus",
+    "value": "2",
+    "ru": "Не устанавливает статус"
+   },
+   {
+    "name": "SetsStatus",
+    "value": "1",
+    "ru": "Устанавливает статус"
+   }
+  ]
+ },
+ {
+  "id": "3dd70836-255e-488d-8bd3-72db52cab2e9",
+  "name": "ConnectorOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "ConnectFiguresOfDifferentTables",
+    "value": "16",
+    "ru": "Связывать фигуры разных таблиц"
+   },
+   {
+    "name": "CreateRelationshipWhenAddingToDiagram",
+    "value": "8",
+    "ru": "Создание связи помещением на диаграмму"
+   },
+   {
+    "name": "CreateRelationshipWhenConnectingToBorder",
+    "value": "4",
+    "ru": "Создание связи присоединением к границе"
+   },
+   {
+    "name": "CreateRelationshipWhenNestingFigure",
+    "value": "2",
+    "ru": "Создание связи вложением фигуры"
+   },
+   {
+    "name": "CreateRelationshipWithConnector",
+    "value": "1",
+    "ru": "Создание связи через коннектор"
+   }
+  ]
+ },
+ {
+  "id": "714d3723-84cb-4474-ae32-d0b193f735e1",
+  "name": "DiagramTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Chart",
+    "value": "2",
+    "ru": "График"
+   },
+   {
+    "name": "Histogram",
+    "value": "1",
+    "ru": "Гистограмма"
+   }
+  ]
+ },
+ {
+  "id": "2034160c-1281-4320-9dd3-e586ec971cb9",
+  "name": "DayScheduleTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Calendar",
+    "value": "2",
+    "ru": "Календарь"
+   },
+   {
+    "name": "StartAndEndTime",
+    "value": "1",
+    "ru": "Время начала и окончания"
+   }
+  ]
+ },
+ {
+  "id": "f42278f1-0230-41a4-ae90-b188fa8652f9",
+  "name": "TypesOfSurveyQuestions",
+  "ru": null,
+  "items": [
+   {
+    "name": "Checkbox",
+    "value": "1",
+    "ru": "Флажок"
+   },
+   {
+    "name": "ListOfAnswers",
+    "value": "2",
+    "ru": "Список вариантов"
+   }
+  ]
+ },
+ {
+  "id": "50a7eca0-90a2-48fb-aa09-fc7d89b9de16",
+  "name": "PortalSurveyState",
+  "ru": null,
+  "items": [
+   {
+    "name": "Completed",
+    "value": "70",
+    "ru": "Completed"
+   },
+   {
+    "name": "ErrorNotificationsSent",
+    "value": "65",
+    "ru": "Уведомления об ошибках высланы"
+   },
+   {
+    "name": "GeneratingPackages",
+    "value": "20",
+    "ru": "Формирует пакеты"
+   },
+   {
+    "name": "GeneratingStructure",
+    "value": "50",
+    "ru": "Формирует структуру"
+   },
+   {
+    "name": "NewSurveyCreated",
+    "value": "10",
+    "ru": "Создан новый"
+   },
+   {
+    "name": "NotificationsSent",
+    "value": "60",
+    "ru": "Уведомления высланы"
+   },
+   {
+    "name": "PackageGenerationError",
+    "value": "25",
+    "ru": "Ошибка формирования пакетов"
+   },
+   {
+    "name": "PackagesSent",
+    "value": "30",
+    "ru": "Пакеты отправлены"
+   },
+   {
+    "name": "ReportGenerationCompleted",
+    "value": "40",
+    "ru": "Отчеты построены"
+   },
+   {
+    "name": "ReportsGeneratedWithError",
+    "value": "35",
+    "ru": "Отчеты с ошибкой"
+   },
+   {
+    "name": "StructureGenerationCompleted",
+    "value": "58",
+    "ru": "Структура сформирована."
+   },
+   {
+    "name": "StructureGenerationError",
+    "value": "55",
+    "ru": "Ошибка формирования структуры"
+   }
+  ]
+ },
+ {
+  "id": "14596447-1c56-40b0-a94d-a268e3010580",
+  "name": "LineJoins",
+  "ru": null,
+  "items": [
+   {
+    "name": "BEVEL",
+    "value": "1",
+    "ru": null
+   },
+   {
+    "name": "MITER",
+    "value": "2",
+    "ru": null
+   },
+   {
+    "name": "ROUND",
+    "value": "3",
+    "ru": null
+   }
+  ]
+ },
+ {
+  "id": "6e40b05e-aa83-4fc6-b8d5-5bcef86d2c61",
+  "name": "VariableTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Date",
+    "value": "5",
+    "ru": "Дата"
+   },
+   {
+    "name": "Decimal",
+    "value": "2",
+    "ru": "Вещественный"
+   },
+   {
+    "name": "Duration",
+    "value": "7",
+    "ru": "Длительность"
+   },
+   {
+    "name": "Integer",
+    "value": "1",
+    "ru": "Целый"
+   },
+   {
+    "name": "Logic",
+    "value": "4",
+    "ru": "Логика"
+   },
+   {
+    "name": "String",
+    "value": "3",
+    "ru": "Строка"
+   },
+   {
+    "name": "Time",
+    "value": "6",
+    "ru": "Время"
+   }
+  ]
+ },
+ {
+  "id": "05034539-4986-4c09-b97c-81e93260b38c",
+  "name": "Priorities",
+  "ru": null,
+  "items": [
+   {
+    "name": "Priority1",
+    "value": "1",
+    "ru": "1 (низший)"
+   },
+   {
+    "name": "Priority10",
+    "value": "10",
+    "ru": "10 (высший)"
+   },
+   {
+    "name": "Priority2",
+    "value": "2",
+    "ru": "2"
+   },
+   {
+    "name": "Priority3",
+    "value": "3",
+    "ru": "3"
+   },
+   {
+    "name": "Priority4",
+    "value": "4",
+    "ru": "4"
+   },
+   {
+    "name": "Priority5",
+    "value": "5",
+    "ru": "5 (обычный)"
+   },
+   {
+    "name": "Priority6",
+    "value": "6",
+    "ru": "6"
+   },
+   {
+    "name": "Priority7",
+    "value": "7",
+    "ru": "7"
+   },
+   {
+    "name": "Priority8",
+    "value": "8",
+    "ru": "8"
+   },
+   {
+    "name": "Priority9",
+    "value": "9",
+    "ru": "9"
+   }
+  ]
+ },
+ {
+  "id": "91ae077b-2405-471c-86e3-2fe63e564141",
+  "name": "BPMNActivityTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "AbstractTask",
+    "value": "8",
+    "ru": "Абстрактная задача"
+   },
+   {
+    "name": "AdHoc",
+    "value": "7",
+    "ru": "Ad-Hoc процесс"
+   },
+   {
+    "name": "BusinessRuleTask",
+    "value": "120",
+    "ru": "Бизнес-правило"
+   },
+   {
+    "name": "EventSubprocess",
+    "value": "3",
+    "ru": "Событийный подпроцесс"
+   },
+   {
+    "name": "ManualTask",
+    "value": "88",
+    "ru": "Ручное выполнение"
+   },
+   {
+    "name": "ReceiveTask",
+    "value": "72",
+    "ru": "Получение сообщений"
+   },
+   {
+    "name": "ScriptTask",
+    "value": "136",
+    "ru": "Задача-сценарий"
+   },
+   {
+    "name": "SendTask",
+    "value": "56",
+    "ru": "Отправка сообщений"
+   },
+   {
+    "name": "ServiceTask",
+    "value": "40",
+    "ru": "Сервисная задача"
+   },
+   {
+    "name": "Subprocess",
+    "value": "1",
+    "ru": "Подпроцесс"
+   },
+   {
+    "name": "Transaction",
+    "value": "5",
+    "ru": "Транзакция"
+   },
+   {
+    "name": "UserTask",
+    "value": "24",
+    "ru": "Пользовательская задача"
+   }
+  ]
+ },
+ {
+  "id": "1eba6640-51b2-4579-a474-6b47ceff9faf",
+  "name": "KindsOfCenter",
+  "ru": null,
+  "items": [
+   {
+    "name": "AccountingCenter",
+    "value": "2",
+    "ru": "Центр учета"
+   },
+   {
+    "name": "ResponsibilityCenter",
+    "value": "1",
+    "ru": "Центр ответственности"
+   }
+  ]
+ },
+ {
+  "id": "cb1e212c-660c-4e07-8501-65a4ee469f3f",
+  "name": "SurveyDepth",
+  "ru": null,
+  "items": [
+   {
+    "name": "SurveyObjects",
+    "value": "1",
+    "ru": "Объектов опроса"
+   },
+   {
+    "name": "SurveyObjectsAndObjectsOfSurveyObjectReports",
+    "value": "2",
+    "ru": "Объектов опроса и объектов их отчетов"
+   }
+  ]
+ },
+ {
+  "id": "44ad6f8d-984e-43d6-9949-dbb21be52152",
+  "name": "ExecutionOrders",
+  "ru": null,
+  "items": [
+   {
+    "name": "WhenEnterTaskInstance",
+    "value": "1",
+    "ru": "В начале экземпляра операции"
+   },
+   {
+    "name": "WhenExitTaskInstance",
+    "value": "2",
+    "ru": "В конце экземпляра операции"
+   }
+  ]
+ },
+ {
+  "id": "a6ff085e-1bc2-40fe-b01e-35f72e91fed3",
+  "name": "SystemVariableTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "CurrentCostOfProcessInstance",
+    "value": "102",
+    "ru": "Текущая стоимость экземпляра процесса"
+   },
+   {
+    "name": "CurrentDate",
+    "value": "1",
+    "ru": "Текущая дата"
+   },
+   {
+    "name": "CurrentDurationOfProcessInstance",
+    "value": "101",
+    "ru": "Текущая длительность экземпляра процесса"
+   },
+   {
+    "name": "CurrentTime",
+    "value": "2",
+    "ru": "Текущее время"
+   },
+   {
+    "name": "None",
+    "value": "0",
+    "ru": "Нет"
+   },
+   {
+    "name": "NumberOfInstances",
+    "value": "20",
+    "ru": "Количество экземпляров"
+   },
+   {
+    "name": "NumberOfOccupiedInstances",
+    "value": "23",
+    "ru": "Количество занятых экземпляров"
+   },
+   {
+    "name": "NumberOfVacantInstances",
+    "value": "21",
+    "ru": "Количество свободных экземпляров"
+   },
+   {
+    "name": "Quantity",
+    "value": "10",
+    "ru": "Количество"
+   }
+  ]
+ },
+ {
+  "id": "47b07e84-b8bf-46cb-bca5-bc7956340264",
+  "name": "WaysOfFormulaUsage",
+  "ru": null,
+  "items": [
+   {
+    "name": "ActualValuesOnly",
+    "value": "2",
+    "ru": "Только для фактических значений"
+   },
+   {
+    "name": "PlanAndActualValues",
+    "value": "0",
+    "ru": "Для плановых и фактических значений"
+   },
+   {
+    "name": "PlanValuesOnly",
+    "value": "1",
+    "ru": "Только для плановых значений"
+   }
+  ]
+ },
+ {
+  "id": "ed8df84f-eaff-4acf-9abe-8bce6e394b3e",
+  "name": "MarksInWorkResourceInstanceUtilizationChronology",
+  "ru": null,
+  "items": [
+   {
+    "name": "BeginProcessing",
+    "value": "2",
+    "ru": "Начало выполнения"
+   },
+   {
+    "name": "BeginWorking",
+    "value": "1",
+    "ru": "Начало работы"
+   },
+   {
+    "name": "Continue",
+    "value": "4",
+    "ru": "Продолжение выполнения"
+   },
+   {
+    "name": "EndProcessing",
+    "value": "8",
+    "ru": "Окончание выполнения"
+   },
+   {
+    "name": "EndWorking",
+    "value": "32",
+    "ru": "Окончание работы"
+   },
+   {
+    "name": "Interrupt",
+    "value": "16",
+    "ru": "Прерывание выполнения"
+   }
+  ]
+ },
+ {
+  "id": "159abc91-025b-40d5-b42c-309509443c77",
+  "name": "FigureOnDropType",
+  "ru": null,
+  "items": [
+   {
+    "name": "Rectangle",
+    "value": "2",
+    "ru": "Прямоугольник"
+   },
+   {
+    "name": "SymbolIcon",
+    "value": "1",
+    "ru": "Иконка символа"
+   }
+  ]
+ },
+ {
+  "id": "959d5355-bd4d-4d5e-ae40-3e54ddd32675",
+  "name": "WeekNumbersInMonth",
+  "ru": null,
+  "items": [
+   {
+    "name": "First",
+    "value": "1",
+    "ru": "1"
+   },
+   {
+    "name": "Fourth",
+    "value": "8",
+    "ru": "4"
+   },
+   {
+    "name": "Last",
+    "value": "16",
+    "ru": "Последний"
+   },
+   {
+    "name": "Second",
+    "value": "2",
+    "ru": "2"
+   },
+   {
+    "name": "Third",
+    "value": "4",
+    "ru": "3"
+   }
+  ]
+ },
+ {
+  "id": "1695255b-29eb-4d3a-9773-7bd0c7662138",
+  "name": "AdditionalGraphicsModes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Complex",
+    "value": "2",
+    "ru": "Сложный"
+   },
+   {
+    "name": "Simple",
+    "value": "1",
+    "ru": "Простой"
+   }
+  ]
+ },
+ {
+  "id": "0deda03a-8c08-4d40-9bff-1a6cd75dc4e9",
+  "name": "LogicalOperatorsAndGateways",
+  "ru": null,
+  "items": [
+   {
+    "name": "AND",
+    "value": "1",
+    "ru": "И"
+   },
+   {
+    "name": "ComplexGateway",
+    "value": "64",
+    "ru": "Комплексный шлюз"
+   },
+   {
+    "name": "ExclusiveEventBasedGateway",
+    "value": "128",
+    "ru": "Эксклюзивный шлюз по событиям"
+   },
+   {
+    "name": "ExclusiveEventBasedGateway_ToStartProcess",
+    "value": "256",
+    "ru": "Эксклюзивный шлюз по событиям (для запуска процесса)"
+   },
+   {
+    "name": "ExclusiveGateway",
+    "value": "8",
+    "ru": "Эксклюзивный шлюз"
+   },
+   {
+    "name": "InclusiveGateway",
+    "value": "16",
+    "ru": "Неэксклюзивный шлюз"
+   },
+   {
+    "name": "OR",
+    "value": "2",
+    "ru": "ИЛИ"
+   },
+   {
+    "name": "ParallelEventBasedGateway_ToStartProcess",
+    "value": "512",
+    "ru": "Параллельный шлюз по событиям (для запуска процесса)"
+   },
+   {
+    "name": "ParallelGateway",
+    "value": "32",
+    "ru": "Параллельный шлюз"
+   },
+   {
+    "name": "XOR",
+    "value": "4",
+    "ru": "Исключающее ИЛИ"
+   }
+  ]
+ },
+ {
+  "id": "865298d5-f8f8-4809-9070-76e084fb492e",
+  "name": "ReusedControlPointProperties",
+  "ru": null,
+  "items": [
+   {
+    "name": "DataSource",
+    "value": "1",
+    "ru": "Источник данных"
+   },
+   {
+    "name": "EventType",
+    "value": "16",
+    "ru": "Тип события"
+   },
+   {
+    "name": "ParentProcessInstanceKey",
+    "value": "32",
+    "ru": "Ключ экземпляра процесса-родителя"
+   },
+   {
+    "name": "ProcessInstanceKey",
+    "value": "4",
+    "ru": "Ключ экземпляра процесса"
+   },
+   {
+    "name": "ProcessInstanceName",
+    "value": "64",
+    "ru": "Название экземпляра процесса."
+   },
+   {
+    "name": "ProcessKeyAndItsValue",
+    "value": "2",
+    "ru": "Ключ процесса и его значение"
+   },
+   {
+    "name": "Time",
+    "value": "8",
+    "ru": "Время"
+   }
+  ]
+ },
+ {
+  "id": "98f45d89-3a8a-4259-b955-1e85c4723552",
+  "name": "MeasureTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Folder",
+    "value": "256",
+    "ru": "Папка"
+   },
+   {
+    "name": "Measure",
+    "value": "1",
+    "ru": "Показатель"
+   }
+  ]
+ },
+ {
+  "id": "4a978b90-ef75-41a5-baf3-50558d06587b",
+  "name": "Locations",
+  "ru": null,
+  "items": [
+   {
+    "name": "Exterior",
+    "value": "2",
+    "ru": "Exterior"
+   },
+   {
+    "name": "Interior",
+    "value": "1",
+    "ru": "Interior"
+   }
+  ]
+ },
+ {
+  "id": "13d8c2d4-3e40-40e5-9f64-9ef3302b9c7d",
+  "name": "FixedCostRatePeriods",
+  "ru": null,
+  "items": [
+   {
+    "name": "PerDay",
+    "value": "2",
+    "ru": "в сутки"
+   },
+   {
+    "name": "PerHour",
+    "value": "1",
+    "ru": "в час"
+   },
+   {
+    "name": "PerMonth",
+    "value": "8",
+    "ru": "в месяц"
+   },
+   {
+    "name": "PerWeek",
+    "value": "4",
+    "ru": "в неделю"
+   },
+   {
+    "name": "PerYear",
+    "value": "16",
+    "ru": "в год"
+   }
+  ]
+ },
+ {
+  "id": "28c82146-91f9-4078-85af-0c297e389a54",
+  "name": "ArrowTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "BALL",
+    "value": "9",
+    "ru": null
+   },
+   {
+    "name": "CIRCLE",
+    "value": "2",
+    "ru": null
+   },
+   {
+    "name": "CROSS",
+    "value": "3",
+    "ru": null
+   },
+   {
+    "name": "DEFAULT",
+    "value": "1",
+    "ru": null
+   },
+   {
+    "name": "DIAMOND",
+    "value": "4",
+    "ru": null
+   },
+   {
+    "name": "NONE",
+    "value": "0",
+    "ru": null
+   },
+   {
+    "name": "NORMAL",
+    "value": "8",
+    "ru": null
+   },
+   {
+    "name": "SHORT",
+    "value": "7",
+    "ru": null
+   },
+   {
+    "name": "SIMPLE",
+    "value": "6",
+    "ru": null
+   },
+   {
+    "name": "TRIANGLE",
+    "value": "5",
+    "ru": null
+   }
+  ]
+ },
+ {
+  "id": "17f904bf-8795-42d4-8f69-a98f6f1400d7",
+  "name": "DashStyles",
+  "ru": null,
+  "items": [
+   {
+    "name": "DASH",
+    "value": "1",
+    "ru": "Штрих"
+   },
+   {
+    "name": "DOT",
+    "value": "2",
+    "ru": "Точка"
+   },
+   {
+    "name": "SOLID",
+    "value": "3",
+    "ru": "Сплошной"
+   }
+  ]
+ },
+ {
+  "id": "84939014-8c69-4792-8e17-3e85bdc62c38",
+  "name": "MeasureValuesChartOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "ActualValues",
+    "value": "2",
+    "ru": "Факт"
+   },
+   {
+    "name": "ActualValuesDataLabels",
+    "value": "16",
+    "ru": "Подписи данных факта"
+   },
+   {
+    "name": "ChangePeriodLabelsPosition",
+    "value": "32",
+    "ru": "Повернуть подписи периодов"
+   },
+   {
+    "name": "Legend",
+    "value": "4",
+    "ru": "Легенда"
+   },
+   {
+    "name": "PlanValues",
+    "value": "1",
+    "ru": "План"
+   },
+   {
+    "name": "PlanValuesDataLabels",
+    "value": "8",
+    "ru": "Подписи данных плана"
+   },
+   {
+    "name": "ShowPointsValues",
+    "value": "64",
+    "ru": "Отображать значения точек"
+   }
+  ]
+ },
+ {
+  "id": "f2034f4e-5917-4b5b-a361-4ca6e041b1f7",
+  "name": "PortalReportsSortingOrder",
+  "ru": null,
+  "items": [
+   {
+    "name": "OnDefault",
+    "value": "30",
+    "ru": "По умолчанию"
+   },
+   {
+    "name": "OnRequest",
+    "value": "10",
+    "ru": "По требованию"
+   },
+   {
+    "name": "Survey",
+    "value": "20",
+    "ru": "Опрос"
+   }
+  ]
+ },
+ {
+  "id": "844f5ac5-a601-4e77-a003-73b21eec68f4",
+  "name": "RandomVariableTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "RecurrenceStep",
+    "value": "1",
+    "ru": "Шаг повторения"
+   },
+   {
+    "name": "TimePoint",
+    "value": "0",
+    "ru": "Момент времени"
+   },
+   {
+    "name": "Timer",
+    "value": "2",
+    "ru": "Таймер"
+   }
+  ]
+ },
+ {
+  "id": "b0bc961c-6982-4765-83fc-1143e2ff3f6f",
+  "name": "ObjectSelectionRuleScopes",
+  "ru": null,
+  "items": [
+   {
+    "name": "GrantRolePermissionsForPortal",
+    "value": "3",
+    "ru": "Предоставление ролевых прав в портале"
+   },
+   {
+    "name": "ParticipationInSurvey",
+    "value": "2",
+    "ru": "Участие в опросе"
+   },
+   {
+    "name": "SurveyControl",
+    "value": "1",
+    "ru": "Контроль опроса"
+   }
+  ]
+ },
+ {
+  "id": "280527f8-5d72-4774-8a5d-5383fb632aac",
+  "name": "LineCaps",
+  "ru": null,
+  "items": [
+   {
+    "name": "FLAT",
+    "value": "1",
+    "ru": null
+   },
+   {
+    "name": "ROUND",
+    "value": "2",
+    "ru": null
+   },
+   {
+    "name": "SQUARE",
+    "value": "3",
+    "ru": null
+   }
+  ]
+ },
+ {
+  "id": "69c9cc6e-bf10-46a4-927e-560c0619e864",
+  "name": "ApplicationTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Application",
+    "value": "1",
+    "ru": "Информационная система"
+   },
+   {
+    "name": "ApplicationFunction",
+    "value": "4",
+    "ru": "Функция ИС"
+   },
+   {
+    "name": "ApplicationModule",
+    "value": "2",
+    "ru": "Модуль ИС"
+   },
+   {
+    "name": "Folder",
+    "value": "64",
+    "ru": "Папка"
+   }
+  ]
+ },
+ {
+  "id": "80624f05-8555-407a-b742-c7a90c7f36a9",
+  "name": "RelationshipDirectionOnNesting",
+  "ru": null,
+  "items": [
+   {
+    "name": "From_MovedShape",
+    "value": "2",
+    "ru": "Из – Накладываемая фигура"
+   },
+   {
+    "name": "From_TargetShape",
+    "value": "1",
+    "ru": "Из – Приемник"
+   }
+  ]
+ },
+ {
+  "id": "429abf44-975e-4675-b57b-c1cf27753839",
+  "name": "BudgetUnitTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Monetary",
+    "value": "1",
+    "ru": "Стоимостной"
+   },
+   {
+    "name": "PhysicalAndMonetary",
+    "value": "2",
+    "ru": "Натурально-стоимостной"
+   }
+  ]
+ },
+ {
+  "id": "99bd17cd-575c-4f5a-9ce1-e5f9172445f8",
+  "name": "MaterialResourceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Global",
+    "value": "1",
+    "ru": "Глобальный"
+   },
+   {
+    "name": "Local",
+    "value": "2",
+    "ru": "Локальный"
+   }
+  ]
+ },
+ {
+  "id": "61061ab9-6f7f-42bb-9bde-d6c4011a2bfa",
+  "name": "BPMNDataTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "InputData",
+    "value": "1",
+    "ru": "Входные данные"
+   },
+   {
+    "name": "None",
+    "value": "0",
+    "ru": "Нет"
+   },
+   {
+    "name": "OutputData",
+    "value": "2",
+    "ru": "Выходные данные"
+   }
+  ]
+ },
+ {
+  "id": "7a1aeff9-cdd8-413d-8b0c-128e9e19607b",
+  "name": "ActivityCodeTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "ElementaryCode",
+    "value": "2",
+    "ru": "Простой код"
+   },
+   {
+    "name": "FullCode",
+    "value": "4",
+    "ru": "Полный код"
+   },
+   {
+    "name": "No",
+    "value": "1",
+    "ru": "Нет"
+   }
+  ]
+ },
+ {
+  "id": "080566f0-69d3-410c-83be-7dd85ac53ba3",
+  "name": "ActionsWhenCreatingFigure",
+  "ru": null,
+  "items": [
+   {
+    "name": "CreateObject",
+    "value": "1",
+    "ru": "Создать объект"
+   },
+   {
+    "name": "SelectObjectFromRepository",
+    "value": "2",
+    "ru": "Выбрать объект из справочника"
+   },
+   {
+    "name": "SelectParentAndCreateAChildObject",
+    "value": "3",
+    "ru": "Выбрать родителя и создать дочерний объект"
+   },
+   {
+    "name": "UseDiagramObject",
+    "value": "5",
+    "ru": "Использовать объект Диаграмма"
+   },
+   {
+    "name": "UseObjectWhoseDiagramIsOpened",
+    "value": "4",
+    "ru": "Использовать объект, от которого открыта диаграмма"
+   }
+  ]
+ },
+ {
+  "id": "15453dd1-23a2-4942-b23e-a895919bef27",
+  "name": "ShapePositions",
+  "ru": null,
+  "items": [
+   {
+    "name": "AfterName",
+    "value": "9",
+    "ru": "После названия"
+   },
+   {
+    "name": "Bottom",
+    "value": "3",
+    "ru": "Снизу"
+   },
+   {
+    "name": "BottomLeft",
+    "value": "7",
+    "ru": "Снизу слева"
+   },
+   {
+    "name": "BottomRight",
+    "value": "8",
+    "ru": "Снизу справа"
+   },
+   {
+    "name": "Left",
+    "value": "4",
+    "ru": "Слева"
+   },
+   {
+    "name": "Right",
+    "value": "2",
+    "ru": "Справа"
+   },
+   {
+    "name": "TextAnnotationBottomLeft",
+    "value": "11",
+    "ru": null
+   },
+   {
+    "name": "TextAnnotationBottomRight",
+    "value": "13",
+    "ru": null
+   },
+   {
+    "name": "TextAnnotationTopLeft",
+    "value": "10",
+    "ru": null
+   },
+   {
+    "name": "TextAnnotationTopRight",
+    "value": "12",
+    "ru": null
+   },
+   {
+    "name": "Top",
+    "value": "1",
+    "ru": "Сверху"
+   },
+   {
+    "name": "TopLeft",
+    "value": "5",
+    "ru": "Сверху слева"
+   },
+   {
+    "name": "TopRight",
+    "value": "6",
+    "ru": "Сверху справа"
+   }
+  ]
+ },
+ {
+  "id": "0efe7567-7f66-4842-acbf-47716938efa7",
+  "name": "PortalStates",
+  "ru": null,
+  "items": [
+   {
+    "name": "GeneratingStructure",
+    "value": "2",
+    "ru": "Формирует структуру"
+   },
+   {
+    "name": "Started",
+    "value": "4",
+    "ru": "Запущен"
+   },
+   {
+    "name": "Starting",
+    "value": "8",
+    "ru": "Запускается"
+   },
+   {
+    "name": "Stopped",
+    "value": "1",
+    "ru": "Остановлен"
+   },
+   {
+    "name": "WaitingForStart",
+    "value": "16",
+    "ru": "Ожидает запуска"
+   }
+  ]
+ },
+ {
+  "id": "0f231380-de1a-4de6-bbee-236ef2821a3e",
+  "name": "ObjectiveValuesChartOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "Assessment",
+    "value": "1",
+    "ru": "Оценка достижения"
+   },
+   {
+    "name": "ChangePeriodLabelsPosition",
+    "value": "32",
+    "ru": "Повернуть подписи периодов"
+   },
+   {
+    "name": "DataLabels",
+    "value": "8",
+    "ru": "Подписи данных"
+   },
+   {
+    "name": "Legend",
+    "value": "4",
+    "ru": "Легенда"
+   },
+   {
+    "name": "ShowPointsValues",
+    "value": "64",
+    "ru": "Отображать значения точек"
+   }
+  ]
+ },
+ {
+  "id": "6e64b642-7a89-40b4-891c-12da558f6b5a",
+  "name": "EventTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "EndEvent",
+    "value": "8",
+    "ru": "Конечное событие"
+   },
+   {
+    "name": "IntermediateEventBoundary",
+    "value": "4",
+    "ru": "Промежуточное граничное событие"
+   },
+   {
+    "name": "IntermediateEventCatching",
+    "value": "2",
+    "ru": "Промежуточное событие Обработчик"
+   },
+   {
+    "name": "IntermediateEventThrowing",
+    "value": "1",
+    "ru": "Промежуточное событие Инициатор"
+   },
+   {
+    "name": "StartEvent",
+    "value": "0",
+    "ru": "Стартовое событие"
+   }
+  ]
+ },
+ {
+  "id": "931f18b4-67cf-40e9-bb9e-85dc694e682f",
+  "name": "DiagramDrawingModes",
+  "ru": null,
+  "items": [
+   {
+    "name": "DynamicGrid",
+    "value": "1",
+    "ru": "Свободный"
+   },
+   {
+    "name": "FixedGrid",
+    "value": "0",
+    "ru": "По сетке"
+   }
+  ]
+ },
+ {
+  "id": "38c4b95f-f1a9-4fa0-bf12-e05118c3b241",
+  "name": "OrgUnitTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Auxiliary",
+    "value": "2048",
+    "ru": "Служебный"
+   },
+   {
+    "name": "Department",
+    "value": "1",
+    "ru": "Подразделение"
+   },
+   {
+    "name": "ExternalOrgUnit",
+    "value": "4",
+    "ru": "Внешняя оргединица"
+   },
+   {
+    "name": "Folder",
+    "value": "64",
+    "ru": "Папка"
+   },
+   {
+    "name": "Position",
+    "value": "2",
+    "ru": "Должность"
+   },
+   {
+    "name": "Role",
+    "value": "8",
+    "ru": "Роль"
+   }
+  ]
+ },
+ {
+  "id": "a873d9f5-3848-4f46-a5f2-16f1430599f9",
+  "name": "DistributionTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Constant",
+    "value": "1",
+    "ru": "Константа"
+   },
+   {
+    "name": "Discrete",
+    "value": "2",
+    "ru": "Дискретный"
+   },
+   {
+    "name": "Erlang",
+    "value": "64",
+    "ru": "Гамма (Эрланга)"
+   },
+   {
+    "name": "Exponential",
+    "value": "32",
+    "ru": "Экспоненциальный"
+   },
+   {
+    "name": "Gamma",
+    "value": "256",
+    "ru": "Гамма"
+   },
+   {
+    "name": "Lognormal",
+    "value": "16",
+    "ru": "Логнормальный"
+   },
+   {
+    "name": "Normal",
+    "value": "8",
+    "ru": "Нормальный"
+   },
+   {
+    "name": "Triangular",
+    "value": "128",
+    "ru": "Треугольный"
+   },
+   {
+    "name": "Uniform",
+    "value": "4",
+    "ru": "Равномерный"
+   }
+  ]
+ },
+ {
+  "id": "21fca49f-c9e5-45ea-8a6c-b54a629369d5",
+  "name": "TypesOfActionToEliminateNonconformityOrCause",
+  "ru": null,
+  "items": [
+   {
+    "name": "Corrective",
+    "value": "1",
+    "ru": "Корректирующее"
+   },
+   {
+    "name": "Immediate",
+    "value": "0",
+    "ru": "Оперативное"
+   },
+   {
+    "name": "Preventive",
+    "value": "2",
+    "ru": "Предупреждающее"
+   }
+  ]
+ },
+ {
+  "id": "8c04eea0-914f-4bca-a0c6-b8a9dd9b56bd",
+  "name": "StrengthGrades",
+  "ru": null,
+  "items": [
+   {
+    "name": "Normal",
+    "value": "2",
+    "ru": "Нормальное влияние"
+   },
+   {
+    "name": "Strong",
+    "value": "4",
+    "ru": "Сильное влияние"
+   },
+   {
+    "name": "VeryStrong",
+    "value": "6",
+    "ru": "Очень сильное влияние"
+   },
+   {
+    "name": "VeryWeak",
+    "value": "0",
+    "ru": "Очень слабое влияние"
+   },
+   {
+    "name": "Weak",
+    "value": "1",
+    "ru": "Слабое влияние"
+   }
+  ]
+ },
+ {
+  "id": "1dac3330-137c-4f69-ad5a-eac7c119efdd",
+  "name": "CategoriesOfOrgChartRelationshipType",
+  "ru": null,
+  "items": [
+   {
+    "name": "AdditionalRelationship",
+    "value": "8",
+    "ru": "Ассоциация"
+   },
+   {
+    "name": "AdministrativeRelationship",
+    "value": "2",
+    "ru": "Административное подчинение"
+   },
+   {
+    "name": "FunctionalRelationship",
+    "value": "4",
+    "ru": "Функциональное подчинение"
+   },
+   {
+    "name": "HierarchicalRelationship",
+    "value": "1",
+    "ru": "Иерархическая связь"
+   },
+   {
+    "name": "RoleRelationship",
+    "value": "16",
+    "ru": "Ролевая связь"
+   }
+  ]
+ },
+ {
+  "id": "d7d1d638-3029-4ff8-ac72-6ff5b43fe12f",
+  "name": "BudgetTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Consolidated",
+    "value": "1",
+    "ru": "Сводный"
+   },
+   {
+    "name": "Operating",
+    "value": "3",
+    "ru": "Операционный"
+   },
+   {
+    "name": "Performance",
+    "value": "2",
+    "ru": "Функциональный"
+   }
+  ]
+ },
+ {
+  "id": "1255501e-5a03-4306-a192-5536c43b1291",
+  "name": "BPMNLoopTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "MultiInstanceParallelLoop",
+    "value": "2",
+    "ru": "Многоэкземплярный параллельный цикл"
+   },
+   {
+    "name": "MultiInstanceSequentialLoop",
+    "value": "4",
+    "ru": "Многоэкземплярный последовательный цикл"
+   },
+   {
+    "name": "None",
+    "value": "0",
+    "ru": "Нет"
+   },
+   {
+    "name": "StandardLoop",
+    "value": "1",
+    "ru": "Стандартный цикл"
+   }
+  ]
+ },
+ {
+  "id": "5810b466-7d5b-4161-865e-6faab62f474a",
+  "name": "EdgeStyles",
+  "ru": null,
+  "items": [
+   {
+    "name": "ArcEdgeStyle",
+    "value": "3",
+    "ru": "Арочный"
+   },
+   {
+    "name": "BridgeEdgeStyle",
+    "value": "4",
+    "ru": "Мостовой"
+   },
+   {
+    "name": "PolylineEdgeStyle",
+    "value": "2",
+    "ru": "Прямоугольный"
+   },
+   {
+    "name": "PolylineEdgeStyleStraight",
+    "value": "1",
+    "ru": "Прямой"
+   }
+  ]
+ },
+ {
+  "id": "3db4be38-b025-4549-bc7a-bd62d181ca18",
+  "name": "ObjectiveTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Folder",
+    "value": "128",
+    "ru": "Папка"
+   },
+   {
+    "name": "Objective",
+    "value": "1",
+    "ru": "Цель"
+   }
+  ]
+ },
+ {
+  "id": "341c99dc-6051-4867-b37f-2144ad82ae15",
+  "name": "GeneralEventTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "EndEvent",
+    "value": "3",
+    "ru": "Конечное событие"
+   },
+   {
+    "name": "IntermediateEvent",
+    "value": "2",
+    "ru": "Промежуточное событие"
+   },
+   {
+    "name": "StartEvent",
+    "value": "1",
+    "ru": "Стартовое событие"
+   }
+  ]
+ },
+ {
+  "id": "6a96f422-5d3e-4e1e-9837-4c6edd6b3c49",
+  "name": "PropertiesSource",
+  "ru": null,
+  "items": [
+   {
+    "name": "FromElement",
+    "value": "2",
+    "ru": "Из фигуры"
+   },
+   {
+    "name": "FromObject",
+    "value": "1",
+    "ru": "Из объекта"
+   }
+  ]
+ },
+ {
+  "id": "d7f4b803-a322-46a4-b449-125d405a12d6",
+  "name": "SymbolOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "DefaultSymbol",
+    "value": "4",
+    "ru": "Символ по умолчанию"
+   },
+   {
+    "name": "DontUseForExistingObject",
+    "value": "8",
+    "ru": "Не использовать для существующего объекта"
+   },
+   {
+    "name": "ShowInExpressFigures",
+    "value": "2",
+    "ru": "Показывать в быстрых фигурах"
+   },
+   {
+    "name": "ShowOnPalette",
+    "value": "1",
+    "ru": "Отображать на палитре"
+   }
+  ]
+ },
+ {
+  "id": "96aa2393-cd97-4db5-bd32-3a5b1298750e",
+  "name": "RandomVariableValueTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Decimal",
+    "value": "0",
+    "ru": "Вещественное"
+   },
+   {
+    "name": "Integer",
+    "value": "1",
+    "ru": "Целое"
+   },
+   {
+    "name": "LongTime",
+    "value": "3",
+    "ru": "Длинное время"
+   },
+   {
+    "name": "ShortTime",
+    "value": "2",
+    "ru": "Короткое время"
+   }
+  ]
+ },
+ {
+  "id": "01f25122-a8bd-4fcf-9281-216cf32328f9",
+  "name": "ToleranceRangeTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "LessOrEqualToA",
+    "value": "2",
+    "ru": "Меньше Либо Равно a"
+   },
+   {
+    "name": "LessThanA",
+    "value": "1",
+    "ru": "Меньше a"
+   },
+   {
+    "name": "MoreOrEqualToA",
+    "value": "4",
+    "ru": "Больше Либо Равно a"
+   },
+   {
+    "name": "MoreOrEqualToAButLessOrEqualToB",
+    "value": "8",
+    "ru": "Больше Либо Равно a Но Меньше Либо Равно b"
+   },
+   {
+    "name": "MoreOrEqualToAButLessThanB",
+    "value": "7",
+    "ru": "Больше Либо Равно a Но Меньше b"
+   },
+   {
+    "name": "MoreThanA",
+    "value": "3",
+    "ru": "Больше a"
+   },
+   {
+    "name": "MoreThanAButLessOrEqualToB",
+    "value": "6",
+    "ru": "Больше a Но Меньше Либо Равно b"
+   },
+   {
+    "name": "MoreThanAButLessThanB",
+    "value": "5",
+    "ru": "Больше a Но Меньше b"
+   }
+  ]
+ },
+ {
+  "id": "29f6274b-918f-48a7-bd1d-a5a3b8ef8b9a",
+  "name": "NonconformitySeverityLevels",
+  "ru": null,
+  "items": [
+   {
+    "name": "Critical",
+    "value": "0",
+    "ru": "Значительное"
+   },
+   {
+    "name": "Major",
+    "value": "2",
+    "ru": "Незначительное"
+   },
+   {
+    "name": "Minor",
+    "value": "1",
+    "ru": "Малозначительное"
+   }
+  ]
+ },
+ {
+  "id": "27a77cf9-0a97-4d42-8015-1419a3606b08",
+  "name": "EventTriggerTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Cancel",
+    "value": "64",
+    "ru": "Отмена"
+   },
+   {
+    "name": "Compensation",
+    "value": "128",
+    "ru": "Компенсация"
+   },
+   {
+    "name": "Conditional",
+    "value": "8",
+    "ru": "Условие"
+   },
+   {
+    "name": "Error",
+    "value": "32",
+    "ru": "Ошибка"
+   },
+   {
+    "name": "Escalation",
+    "value": "4",
+    "ru": "Эскалация"
+   },
+   {
+    "name": "Link",
+    "value": "16",
+    "ru": "Ссылка"
+   },
+   {
+    "name": "Message",
+    "value": "1",
+    "ru": "Сообщение"
+   },
+   {
+    "name": "Multiple",
+    "value": "512",
+    "ru": "Множественное"
+   },
+   {
+    "name": "None",
+    "value": "0",
+    "ru": "Неопределенное"
+   },
+   {
+    "name": "ParallelMultiple",
+    "value": "1024",
+    "ru": "Параллельное множественное"
+   },
+   {
+    "name": "Signal",
+    "value": "256",
+    "ru": "Сигнал"
+   },
+   {
+    "name": "Terminate",
+    "value": "2048",
+    "ru": "Завершение"
+   },
+   {
+    "name": "Timer",
+    "value": "2",
+    "ru": "Таймер"
+   }
+  ]
+ },
+ {
+  "id": "a33b0dfc-592e-4a00-b774-4d06d4656070",
+  "name": "VersionStatuses_Flags",
+  "ru": null,
+  "items": [
+   {
+    "name": "Archived",
+    "value": "16",
+    "ru": "Архивирована"
+   },
+   {
+    "name": "Draft",
+    "value": "2",
+    "ru": "Проект"
+   },
+   {
+    "name": "Publication",
+    "value": "8",
+    "ru": "Опубликована"
+   },
+   {
+    "name": "Recommended",
+    "value": "4",
+    "ru": "Рекомендована"
+   },
+   {
+    "name": "Working",
+    "value": "1",
+    "ru": "В работе"
+   }
+  ]
+ },
+ {
+  "id": "c8833b41-8014-4efe-a4fe-cb9724766b6e",
+  "name": "TemplateTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Quality",
+    "value": "1",
+    "ru": "Качественный"
+   },
+   {
+    "name": "Quantity",
+    "value": "2",
+    "ru": "Количественный"
+   }
+  ]
+ },
+ {
+  "id": "4dd695cc-4f77-4bca-9c99-e1b685c1c8f6",
+  "name": "BPMNEventTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "EndEvent",
+    "value": "1",
+    "ru": "Конечное событие"
+   },
+   {
+    "name": "IntermediateBoundaryEvent_Interrupting",
+    "value": "32",
+    "ru": "Граничное прерывающее событие"
+   },
+   {
+    "name": "IntermediateBoundaryEvent_NonInterrupting",
+    "value": "64",
+    "ru": "Граничное непрерывающее событие"
+   },
+   {
+    "name": "IntermediateEvent_Catching",
+    "value": "2",
+    "ru": "Промежуточное событие (Обработчик)"
+   },
+   {
+    "name": "IntermediateEvent_Throwing",
+    "value": "4",
+    "ru": "Промежуточное событие (Инициатор)"
+   },
+   {
+    "name": "StartEvent",
+    "value": "0",
+    "ru": "Стартовое событие"
+   },
+   {
+    "name": "StartEvent_Interrupting",
+    "value": "8",
+    "ru": "Стартовое прерывающее событие"
+   },
+   {
+    "name": "StartEvent_NonInterrupting",
+    "value": "16",
+    "ru": "Стартовое непрерывающее событие"
+   }
+  ]
+ },
+ {
+  "id": "ee4599d5-e6cb-4cfc-9da5-89940738b285",
+  "name": "BaseIntervalTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Day",
+    "value": "1",
+    "ru": "Сутки"
+   },
+   {
+    "name": "Year",
+    "value": "2",
+    "ru": "Год"
+   }
+  ]
+ },
+ {
+  "id": "6600a639-3ad8-42dc-86d0-8672b61062a3",
+  "name": "DocumentScopes",
+  "ru": null,
+  "items": [
+   {
+    "name": "External",
+    "value": "1",
+    "ru": "Внешний"
+   },
+   {
+    "name": "Internal",
+    "value": "0",
+    "ru": "Внутренний"
+   }
+  ]
+ },
+ {
+  "id": "e48aa9c5-9e7d-423a-85a0-57804bff46e6",
+  "name": "MeasureValueTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Quality",
+    "value": "1",
+    "ru": "Качественный"
+   },
+   {
+    "name": "Quantity",
+    "value": "0",
+    "ru": "Количественный"
+   }
+  ]
+ },
+ {
+  "id": "81ff5fdb-e503-4dba-a243-26b8ec882b88",
+  "name": "ActivityApprovementResults",
+  "ru": null,
+  "items": [
+   {
+    "name": "Approved",
+    "value": "1",
+    "ru": "Согласовано"
+   },
+   {
+    "name": "Rejected",
+    "value": "2",
+    "ru": "Отклонено"
+   }
+  ]
+ },
+ {
+  "id": "823ecf7a-5393-492c-9da7-3baadabf38ce",
+  "name": "VersionChangeTriggers",
+  "ru": null,
+  "items": [
+   {
+    "name": "Major",
+    "value": "1",
+    "ru": "Номер"
+   },
+   {
+    "name": "MajorMinor",
+    "value": "2",
+    "ru": "Номер, Редакция"
+   },
+   {
+    "name": "MajorMinorIteration",
+    "value": "3",
+    "ru": "Номер, Редакция, Итерация"
+   }
+  ]
+ },
+ {
+  "id": "06a92dec-b7d8-4bdd-92f7-db874af1eb5c",
+  "name": "TimeHorizons",
+  "ru": null,
+  "items": [
+   {
+    "name": "Lagging",
+    "value": "1",
+    "ru": "Отсроченный"
+   },
+   {
+    "name": "Leading",
+    "value": "2",
+    "ru": "Опережающий"
+   }
+  ]
+ },
+ {
+  "id": "59fe060b-5362-40dd-8823-4b46264be43e",
+  "name": "NonconformityStatuses",
+  "ru": null,
+  "items": [
+   {
+    "name": "AnalysisCompleted",
+    "value": "1",
+    "ru": "Анализ выполнен"
+   },
+   {
+    "name": "AnalysisInProgress",
+    "value": "0",
+    "ru": "Ведется анализ"
+   }
+  ]
+ },
+ {
+  "id": "1ae6d692-e346-414f-8811-5bf4efdc364d",
+  "name": "Scales",
+  "ru": null,
+  "items": [
+   {
+    "name": "large",
+    "value": "5",
+    "ru": null
+   },
+   {
+    "name": "medium",
+    "value": "4",
+    "ru": null
+   },
+   {
+    "name": "small",
+    "value": "3",
+    "ru": null
+   },
+   {
+    "name": "x_large",
+    "value": "6",
+    "ru": null
+   },
+   {
+    "name": "x_small",
+    "value": "2",
+    "ru": null
+   },
+   {
+    "name": "xx_large",
+    "value": "7",
+    "ru": null
+   },
+   {
+    "name": "xx_small",
+    "value": "1",
+    "ru": null
+   }
+  ]
+ },
+ {
+  "id": "ed8fb4c4-9fec-4288-b431-32b155cf4e52",
+  "name": "ArrowClasses",
+  "ru": null,
+  "items": [
+   {
+    "name": "Control",
+    "value": "3",
+    "ru": "Управление"
+   },
+   {
+    "name": "Input",
+    "value": "1",
+    "ru": "Вход"
+   },
+   {
+    "name": "Mechanism",
+    "value": "4",
+    "ru": "Механизм"
+   },
+   {
+    "name": "Output",
+    "value": "2",
+    "ru": "Выход"
+   },
+   {
+    "name": "Unknown",
+    "value": "5",
+    "ru": "Неопределен"
+   }
+  ]
+ },
+ {
+  "id": "1cdd2043-29a7-45bd-9561-316fd68798e2",
+  "name": "ResponsibilityCenterTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "ContributionMarginCenter",
+    "value": "3",
+    "ru": "Центр маржинального дохода"
+   },
+   {
+    "name": "CostCenter",
+    "value": "5",
+    "ru": "Центр затрат"
+   },
+   {
+    "name": "InvestmentCenter",
+    "value": "1",
+    "ru": "Центр инвестиций"
+   },
+   {
+    "name": "ProfitCenter",
+    "value": "2",
+    "ru": "Центр прибыли"
+   },
+   {
+    "name": "RevenueCenter",
+    "value": "4",
+    "ru": "Центр дохода"
+   }
+  ]
+ },
+ {
+  "id": "f416f68b-1557-4539-9644-9ec2049cc19e",
+  "name": "ActivityTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Action",
+    "value": "16",
+    "ru": "Действие"
+   },
+   {
+    "name": "Auxiliary",
+    "value": "2048",
+    "ru": "Служебный"
+   },
+   {
+    "name": "BasicFlowchart",
+    "value": "2",
+    "ru": "Basic Flowchart"
+   },
+   {
+    "name": "BPMN",
+    "value": "64",
+    "ru": "BPMN"
+   },
+   {
+    "name": "CrossFunctionalFlowchart",
+    "value": "8",
+    "ru": "Cross-functional Flowchart"
+   },
+   {
+    "name": "Decision",
+    "value": "512",
+    "ru": "Решение"
+   },
+   {
+    "name": "EPC",
+    "value": "32",
+    "ru": "EPC"
+   },
+   {
+    "name": "ExternalReference",
+    "value": "1024",
+    "ru": "Внешняя ссылка"
+   },
+   {
+    "name": "Folder",
+    "value": "1",
+    "ru": "Папка"
+   },
+   {
+    "name": "IDEF0",
+    "value": "4",
+    "ru": "IDEF0"
+   },
+   {
+    "name": "Reference",
+    "value": "256",
+    "ru": "Ссылка"
+   }
+  ]
+ },
+ {
+  "id": "a6135d1d-d373-494e-aa2d-210ff69b78b6",
+  "name": "PersonalPageItemsTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "AbsoluteHyperlink",
+    "value": "2",
+    "ru": "Абсолютная гиперссылка"
+   },
+   {
+    "name": "Report",
+    "value": "1",
+    "ru": "Отчет"
+   },
+   {
+    "name": "Separator",
+    "value": "0",
+    "ru": "Разделитель"
+   }
+  ]
+ },
+ {
+  "id": "46b11b75-81a9-43b1-8cf6-2347ffc436a0",
+  "name": "BudgetItemTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Expense",
+    "value": "2",
+    "ru": "Расход"
+   },
+   {
+    "name": "Income",
+    "value": "1",
+    "ru": "Доход"
+   }
+  ]
+ },
+ {
+  "id": "a1b4505e-9fcd-4393-94ac-6d3f9845713e",
+  "name": "MeasureValuesTrends",
+  "ru": null,
+  "items": [
+   {
+    "name": "Maximize",
+    "value": "1",
+    "ru": "Увеличение"
+   },
+   {
+    "name": "Minimize",
+    "value": "2",
+    "ru": "Уменьшение"
+   },
+   {
+    "name": "Stabilize",
+    "value": "0",
+    "ru": "Удержание в границах"
+   }
+  ]
+ },
+ {
+  "id": "97270cde-9aad-48e8-81d4-ba07dcb01163",
+  "name": "DocumentStatuses",
+  "ru": null,
+  "items": [
+   {
+    "name": "Draft",
+    "value": "0",
+    "ru": "Проект"
+   },
+   {
+    "name": "Obsolete",
+    "value": "2",
+    "ru": "Аннулирован"
+   },
+   {
+    "name": "Publication",
+    "value": "1",
+    "ru": "Действующий"
+   }
+  ]
+ },
+ {
+  "id": "2656f33d-8207-49e6-85ab-4f76e68fbf87",
+  "name": "MarksInProcessInstanceChronology",
+  "ru": null,
+  "items": [
+   {
+    "name": "End",
+    "value": "64",
+    "ru": "Окончание"
+   },
+   {
+    "name": "InQueue",
+    "value": "8",
+    "ru": "Ожидание в очереди"
+   },
+   {
+    "name": "Processing",
+    "value": "16",
+    "ru": "Выполнение"
+   },
+   {
+    "name": "Start",
+    "value": "1",
+    "ru": "Начало"
+   },
+   {
+    "name": "TechnologicalWaiting",
+    "value": "2",
+    "ru": "Технологическое ожидание"
+   },
+   {
+    "name": "WaitingForValidValueOfVariableInstance",
+    "value": "4",
+    "ru": "Ожидание валидного значения экземпляра переменной"
+   }
+  ]
+ },
+ {
+  "id": "f3dd143f-6418-49e8-9f27-be5399ac97b4",
+  "name": "FixedCostsAllocationBases",
+  "ru": null,
+  "items": [
+   {
+    "name": "Cost",
+    "value": "2",
+    "ru": "Стоимость"
+   },
+   {
+    "name": "ProcessingTime",
+    "value": "1",
+    "ru": "Время выполнения"
+   }
+  ]
+ },
+ {
+  "id": "72ba88c9-b8c2-462a-a087-c35d47fa77f9",
+  "name": "ResourceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "FixedCosts",
+    "value": "4",
+    "ru": "Постоянные затраты"
+   },
+   {
+    "name": "Material",
+    "value": "2",
+    "ru": "Материальный"
+   },
+   {
+    "name": "Work",
+    "value": "1",
+    "ru": "Временной"
+   }
+  ]
+ },
+ {
+  "id": "19ab2ea7-ce96-4489-a7ec-3cfb499c6745",
+  "name": "AllowToChangeAnswer",
+  "ru": null,
+  "items": [
+   {
+    "name": "DuringBrowserSession",
+    "value": "1",
+    "ru": "В течение сессии браузера"
+   },
+   {
+    "name": "WhenSurveyInProgress",
+    "value": "2",
+    "ru": "Пока опрос активен"
+   }
+  ]
+ },
+ {
+  "id": "fd53b3e1-534f-4a84-8450-60f4a3708d52",
+  "name": "WeeklyRecurrenceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "Friday",
+    "value": "16",
+    "ru": "Пятница"
+   },
+   {
+    "name": "Monday",
+    "value": "1",
+    "ru": "Понедельник"
+   },
+   {
+    "name": "Saturday",
+    "value": "32",
+    "ru": "Суббота"
+   },
+   {
+    "name": "Sunday",
+    "value": "64",
+    "ru": "Воскресенье"
+   },
+   {
+    "name": "Thursday",
+    "value": "8",
+    "ru": "Четверг"
+   },
+   {
+    "name": "Tuesday",
+    "value": "2",
+    "ru": "Вторник"
+   },
+   {
+    "name": "Wednesday",
+    "value": "4",
+    "ru": "Среда"
+   }
+  ]
+ },
+ {
+  "id": "92afbcf2-5199-49da-ade2-431c2d3dd9a9",
+  "name": "CategoriesOfOrgChartMainRelationshipType",
+  "ru": null,
+  "items": [
+   {
+    "name": "AdministrativeRelationship",
+    "value": "2",
+    "ru": "Административное подчинение"
+   },
+   {
+    "name": "DirectRelationship",
+    "value": "1",
+    "ru": "Прямое подчинение"
+   }
+  ]
+ },
+ {
+  "id": "e99c21e0-bb7e-4d7a-bfe7-8d0be75d970f",
+  "name": "FigureOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "AllowToPinFigures",
+    "value": "8",
+    "ru": "Разрешено закрепляться фигурам"
+   },
+   {
+    "name": "CopyObjectFigure",
+    "value": "2",
+    "ru": "Копировать объект фигуры"
+   },
+   {
+    "name": "IsPinableFigure",
+    "value": "4",
+    "ru": "Закрепляемая фигура"
+   },
+   {
+    "name": "NoConnectorCreationAllowed",
+    "value": "1",
+    "ru": "Запрещено создание коннекторов"
+   },
+   {
+    "name": "SkipInLayout",
+    "value": "16",
+    "ru": "Пропустить в авторазмещении"
+   },
+   {
+    "name": "UpdateWhenConnectorIsCreated",
+    "value": "32",
+    "ru": "Обновлять при создании коннектора к фигуре"
+   }
+  ]
+ },
+ {
+  "id": "b64039de-7b99-4d75-b02b-48143a8a5eed",
+  "name": "MSVisioWindowTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "CustomProperties",
+    "value": "2",
+    "ru": "Custom Properties"
+   },
+   {
+    "name": "PanZoom",
+    "value": "1",
+    "ru": "Pan &amp; Zoom"
+   },
+   {
+    "name": "Shapes",
+    "value": "3",
+    "ru": "Shapes"
+   },
+   {
+    "name": "SizePosition",
+    "value": "4",
+    "ru": "Size &amp; Position"
+   }
+  ]
+ },
+ {
+  "id": "cff599ea-14aa-4bb5-a947-9aacd698ece6",
+  "name": "TypesOfArrowSegmentEnding",
+  "ru": null,
+  "items": [
+   {
+    "name": "Activity",
+    "value": "0",
+    "ru": "Единица деятельности"
+   },
+   {
+    "name": "ArrowSegment",
+    "value": "1",
+    "ru": "Сегмент стрелки"
+   },
+   {
+    "name": "Border",
+    "value": "3",
+    "ru": "Граница"
+   },
+   {
+    "name": "OffPageReference",
+    "value": "4",
+    "ru": "Междиаграммная ссылка"
+   },
+   {
+    "name": "Tunnel",
+    "value": "2",
+    "ru": "Туннель"
+   }
+  ]
+ },
+ {
+  "id": "5c9e52fd-5aa7-405d-8571-b385b4765c5f",
+  "name": "HeadPlacements",
+  "ru": null,
+  "items": [
+   {
+    "name": "AboveDepartment",
+    "value": "2",
+    "ru": "Выше подразделения"
+   },
+   {
+    "name": "BelowDepartment",
+    "value": "1",
+    "ru": "Ниже подразделения"
+   },
+   {
+    "name": "InAnotherBranch",
+    "value": "3",
+    "ru": "В другой ветке"
+   },
+   {
+    "name": "Undefined",
+    "value": "0",
+    "ru": "Не определено"
+   }
+  ]
+ },
+ {
+  "id": "67a1397b-d5fc-44d6-99ef-a3281f58be94",
+  "name": "FrameIndents",
+  "ru": null,
+  "items": [
+   {
+    "name": "mm1",
+    "value": "1",
+    "ru": "5 mm"
+   },
+   {
+    "name": "mm2",
+    "value": "2",
+    "ru": "7.5 mm"
+   },
+   {
+    "name": "mm3",
+    "value": "3",
+    "ru": "10 mm"
+   },
+   {
+    "name": "mm4",
+    "value": "4",
+    "ru": "12.5 mm"
+   },
+   {
+    "name": "mm5",
+    "value": "5",
+    "ru": "15 mm"
+   },
+   {
+    "name": "mm6",
+    "value": "6",
+    "ru": "17.5 mm"
+   },
+   {
+    "name": "mm7",
+    "value": "7",
+    "ru": "20 mm"
+   }
+  ]
+ },
+ {
+  "id": "e34c12eb-e2a7-40e4-b34b-a622141c33f2",
+  "name": "DocumentationSources",
+  "ru": null,
+  "items": [
+   {
+    "name": "ActivityReferenceDocumentation",
+    "value": "2",
+    "ru": "НСД единицы деятельности"
+   },
+   {
+    "name": "ControlArrow",
+    "value": "1",
+    "ru": "Стрелка управления"
+   },
+   {
+    "name": "OrgUnitReferenceDocumentation",
+    "value": "3",
+    "ru": "НСД оргединицы"
+   },
+   {
+    "name": "RoleReferenceDocumentation",
+    "value": "4",
+    "ru": "НСД роли"
+   }
+  ]
+ },
+ {
+  "id": "de83d586-d2f3-4a7f-9024-a70cd6dacf73",
+  "name": "OrgChartGenerationOptions",
+  "ru": null,
+  "items": [
+   {
+    "name": "DepartmentsAndPositions",
+    "value": "0",
+    "ru": "Подразделения и должности"
+   },
+   {
+    "name": "DepartmentsOnly",
+    "value": "1",
+    "ru": "Только подразделения"
+   },
+   {
+    "name": "PositionsOnly",
+    "value": "2",
+    "ru": "Только должности"
+   }
+  ]
+ },
+ {
+  "id": "3dca5e42-a28c-4345-8134-11faa4c60603",
+  "name": "PortalReportStates",
+  "ru": null,
+  "items": [
+   {
+    "name": "DoesNotExist",
+    "value": "128",
+    "ru": "Не существует"
+   },
+   {
+    "name": "Generated",
+    "value": "16",
+    "ru": "Сформирован"
+   },
+   {
+    "name": "Generating",
+    "value": "4",
+    "ru": "Формируется"
+   },
+   {
+    "name": "GenerationError",
+    "value": "32",
+    "ru": "Ошибка формирования"
+   },
+   {
+    "name": "InQueue",
+    "value": "1",
+    "ru": "В очереди формирования"
+   },
+   {
+    "name": "OnRequest",
+    "value": "2",
+    "ru": "По требованию"
+   },
+   {
+    "name": "ReservedForGeneration",
+    "value": "64",
+    "ru": "Зарезервирован для построения"
+   }
+  ]
+ },
+ {
+  "id": "e51b4ffb-7887-4f16-95a4-221e36021c56",
+  "name": "RiskAssessmentTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "BasedOnMaxValues",
+    "value": "2",
+    "ru": "По максимальным оценкам"
+   },
+   {
+    "name": "CauseAndEffect",
+    "value": "3",
+    "ru": "По причинам и последствиям"
+   },
+   {
+    "name": "MonteCarloMethod",
+    "value": "4",
+    "ru": "Метод Монте Карло"
+   },
+   {
+    "name": "Simple",
+    "value": "1",
+    "ru": "Простой"
+   }
+  ]
+ },
+ {
+  "id": "4bf4113f-ab8d-4129-9780-b82c755eef03",
+  "name": "PortalProcessRoles",
+  "ru": null,
+  "items": [
+   {
+    "name": "MeasuresInput",
+    "value": "1",
+    "ru": "Ввод показателей"
+   },
+   {
+    "name": "ReportsGeneration",
+    "value": "2",
+    "ru": "Формирование отчетов"
+   },
+   {
+    "name": "ReportsGenerationOnRequest",
+    "value": "4",
+    "ru": "Формирование отчетов по требованию"
+   }
+  ]
+ },
+ {
+  "id": "450c297b-0352-443c-8c89-296e000501b1",
+  "name": "MonthlyRecurrenceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "DayOfMonth",
+    "value": "1",
+    "ru": "Число месяца"
+   },
+   {
+    "name": "DayOfWeek",
+    "value": "2",
+    "ru": "День недели"
+   }
+  ]
+ },
+ {
+  "id": "9706092c-5630-47a5-9b95-5e0420a02b37",
+  "name": "DisplayedPropertiesSettingsStorage",
+  "ru": null,
+  "items": [
+   {
+    "name": "InFigure",
+    "value": "1",
+    "ru": "В фигуре"
+   },
+   {
+    "name": "InStyle",
+    "value": "0",
+    "ru": "В стиле"
+   }
+  ]
+ },
+ {
+  "id": "f4408a54-f3f4-4e7a-b147-4bd5225f044c",
+  "name": "DailyRecurrenceTypes",
+  "ru": null,
+  "items": [
+   {
+    "name": "EveryWorkingDay",
+    "value": "2",
+    "ru": "Каждый рабочий день"
+   },
+   {
+    "name": "NumberOfDays",
+    "value": "1",
+    "ru": "Количество дней"
+   },
+   {
+    "name": "PeriodicalSchedule",
+    "value": "4",
+    "ru": "Скользящий график"
+   }
+  ]
+ },
+ {
+  "id": "dac9cd5c-3d09-4296-b445-ea6103a8a127",
+  "name": "StatusesOfActionToEliminateNonconformityOrCause",
+  "ru": null,
+  "items": [
+   {
+    "name": "Implemented",
+    "value": "1",
+    "ru": "Внедрено"
+   },
+   {
+    "name": "Working",
+    "value": "0",
+    "ru": "В работе"
+   }
+  ]
+ }
+]

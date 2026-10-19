@@ -1,0 +1,11 @@
+﻿=== сигнатуры Data.bin / InstallData.bin ===
+Data.bin [3D 6C CB 54 7A CC 88 05] =l?Tz??.E?A.~?m.c?.7?F|????f?T.#M??.????c
+InstallData.bin [1F 8B 08 00 00 00 00 00] .?........??.tUE??=sZNz..!..$?.HH?? ...Dj
+=== поиск дампов/скриптов БД в установке ===
+\AppPlatform.Node\node_modules\form-data\README.md.bak | 12 КБ
+\BS_WebService\MySQL Server 8.4.4\bin\portal-update.sql | 82 КБ
+\BS_WebService\MySQL Server 8.4.4\bin\portal.sql | 34 КБ
+\BS_WebService\MySQL Server 8.4.4\share\install_rewriter.sql | 2 КБ
+\BS_WebService\MySQL Server 8.4.4\share\uninstall_rewriter.sql | 1 КБ
+=== Stored-параметры в метамодели (сколько хранится в БД) ===
+всего Param: 2081 с Stored=True

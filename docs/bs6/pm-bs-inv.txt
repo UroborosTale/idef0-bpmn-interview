@@ -1,0 +1,402 @@
+﻿=== верхний уровень: размеры ===
+    849,56 МБ  [кат]  AppPlatform.Node
+    241,34 МБ  [кат]  BS_WebService
+    142,15 МБ  [кат]  HtmlServerAssets
+     93,25 МБ         convert_settings.xml
+     70,28 МБ         EO.WebEngine.dll
+     28,85 МБ  [кат]  Roslyn
+     264,1 МБ  [кат]  Data
+     21,57 МБ         DevExpress.BonusSkins.v21.2.dll
+     17,72 МБ         DevExpress.Utils.v21.2.dll
+     16,48 МБ         DevExpress.Spreadsheet.v21.2.Core.dll
+     12,92 МБ  [кат]  Metadata
+      9,28 МБ  [кат]  PostgreSQL
+      8,37 МБ         DevExpress.Images.v21.2.dll
+      8,32 МБ         DevExpress.RichEdit.v21.2.Core.dll
+      7,49 МБ         DevExpress.XtraEditors.v21.2.dll
+      6,44 МБ         DevExpress.XtraBars.v21.2.dll
+      5,83 МБ         DocumentFormat.OpenXml.dll
+      5,21 МБ         BizArch.Server.dll
+      4,99 МБ         DevExpress.Pdf.v21.2.Core.dll
+      4,93 МБ         DevExpress.XtraCharts.v21.2.dll
+      4,37 МБ         DevExpress.Printing.v21.2.Core.dll
+      4,16 МБ         Microsoft.CodeAnalysis.CSharp.dll
+      3,98 МБ         Microsoft.SqlServer.Smo.dll
+      3,95 МБ         AppPlatform.Client.dll
+      3,68 МБ         DevExpress.Office.v21.2.Core.dll
+      3,59 МБ         BizArch.Client.dll
+      3,55 МБ         DevExpress.XtraGrid.v21.2.dll
+      3,39 МБ         EO.Base.dll
+      2,96 МБ         Server.Interop.dll
+      2,87 МБ         DevExpress.XtraRichEdit.v21.2.dll
+      2,49 МБ         AppPlatform.Server.dll
+      2,28 МБ  [кат]  ru
+      2,23 МБ         DevExpress.Xpo.v21.2.dll
+      2,19 МБ  [кат]  Resources
+      2,19 МБ         DevExpress.DataAccess.v21.2.dll
+      2,18 МБ         Client.Interop.dll
+      2,04 МБ         DevExpress.XtraLayout.v21.2.dll
+      1,95 МБ  [кат]  es
+      1,94 МБ  [кат]  de
+      1,79 МБ         DevExpress.DXCore.Parser.dll
+      1,64 МБ         Ping.Core.dll
+      1,64 МБ         InstallData.bin
+      1,58 МБ  [кат]  ja
+      1,55 МБ         Microsoft.Office.Interop.Excel.dll
+      1,41 МБ         Microsoft.SqlServer.SqlEnum.dll
+      1,39 МБ         DevExtreme.AspNet.Core.dll
+      1,22 МБ         Npgsql.dll
+      1,16 МБ         DevExpress.SpellChecker.v21.2.Core.dll
+      1,13 МБ         MySql.Data.dll
+      1,06 МБ         DevExpress.XtraPrinting.v21.2.dll
+      0,95 МБ         VSAddIn.ToolWindows.dll
+      0,95 МБ         Microsoft.OData.Edm.dll
+      0,94 МБ         Microsoft.Office.Interop.Visio.dll
+      0,91 МБ         DevExpress.Snap.v21.2.Core.dll
+      0,86 МБ         Sys.Client.dll
+      0,75 МБ         Sys.Server.dll
+      0,72 МБ         Metadata.dll
+      0,67 МБ         Newtonsoft.Json.dll
+      0,66 МБ         DevExpress.Data.Desktop.v21.2.dll
+      0,65 МБ  [кат]  img
+      0,63 МБ         DevExpress.XtraGrid.dll
+      0,58 МБ         eowp.exe
+      0,56 МБ         System.Text.Json.dll
+      0,56 МБ         Business Studio x64.exe
+      0,56 МБ         Business Studio Ultimate x64.exe
+      0,52 МБ         Microsoft.WindowsAPICodePack.Shell.dll
+      0,47 МБ         DevExpress.Pdf.v21.2.Drawing.dll
+      0,44 МБ         System.Web.Http.dll
+      0,44 МБ         office.dll
+      0,44 МБ         DevExpress.XtraEditors.dll
+      0,44 МБ         DevExpress.Docs.v21.2.dll
+      0,38 МБ         Microsoft.AspNetCore.Razor.Language.dll
+      0,37 МБ         Sys.dll
+      0,37 МБ         dte80a.olb
+      0,32 МБ         ZedGraph.dll
+      0,32 МБ         InstallActions.dll
+      0,28 МБ         BS_PortalService.exe
+      0,25 МБ         Microsoft.SqlServer.SqlWmiManagement.dll
+      0,25 МБ         Humanizer.dll
+      0,25 МБ         EnvDTE.dll
+      0,25 МБ         DevExpress.XtraSpellChecker.v21.2.dll
+      0,25 МБ         DevExpress.Utils.dll
+      0,22 МБ         EO.WebBrowser.dll
+      0,21 МБ         System.Data.SqlClient.dll
+      0,21 МБ         CommonResources.dll
+      0,19 МБ         System.Collections.Immutable.dll
+      0,18 МБ         HtmlServer.dll
+      0,17 МБ         System.Net.Http.Formatting.dll
+      0,17 МБ         Microsoft.SqlServer.ConnectionInfo.dll
+      0,16 МБ         System.Diagnostics.DiagnosticSource.dll
+      0,16 МБ         HtmlAgilityPack.dll
+      0,16 МБ         DBAdmin.exe
+      0,15 МБ         Microsoft.Spatial.dll
+      0,15 МБ         Microsoft.AspNet.Identity.Core.dll
+      0,15 МБ         MetaEdit.exe
+      0,15 МБ         bs_eula_v6_ru.pdf
+      0,14 МБ         System.Memory.dll
+      0,13 МБ         Ping.Core.Main.dll
+      0,13 МБ         DevExpress.XtraEditors.Core.dll
+      0,12 МБ         Microsoft.SqlServer.Diagnostics.STrace.dll
+      0,12 МБ         Microsoft.Owin.dll
+      0,11 МБ         System.Numerics.Vectors.dll
+      0,09 МБ         Newtonsoft.Json.Bson.dll
+      0,09 МБ         netstandard.dll
+      0,08 МБ         System.Text.Encodings.Web.dll
+      0,08 МБ         System.Net.Http.dll
+      0,08 МБ         Microsoft.Owin.Security.OAuth.dll
+      0,08 МБ         Microsoft.Owin.Hosting.dll
+      0,08 МБ         Microsoft.Owin.Host.HttpListener.dll
+      0,08 МБ         Microsoft.Office.Interop.VisOcx.dll
+      0,08 МБ         Microsoft.Extensions.DependencyInjection.dll
+      0,08 МБ         DevExpress.Sparkline.v21.2.Core.dll
+      0,08 МБ         Debug.dll
+      0,07 МБ         VSAddIn.Engine.dll
+      0,07 МБ         System.IO.Compression.dll
+      0,07 МБ         Microsoft.SqlServer.Dmf.Common.dll
+      0,07 МБ         Microsoft.Owin.StaticFiles.dll
+      0,07 МБ         Microsoft.MSXML.dll
+      0,07 МБ         Microsoft.Extensions.Http.dll
+      0,07 МБ         Microsoft.AspNetCore.Mvc.Razor.Extensions.dll
+      0,07 МБ         Microsoft.AspNetCore.Http.Abstractions.dll
+      0,07 МБ         DevExpress.DataVisualization.v21.2.Core.dll
+      0,07 МБ         CRM.Server.dll
+      0,06 МБ         System.Web.Http.Owin.dll
+      0,06 МБ         Microsoft.Vbe.Interop.dll
+      0,06 МБ         Microsoft.Owin.Security.dll
+      0,06 МБ         Microsoft.Extensions.Options.dll
+      0,06 МБ         Microsoft.Extensions.Logging.Abstractions.dll
+      0,06 МБ         Microsoft.Extensions.DependencyModel.dll
+      0,05 МБ         VisOcxHost.dll
+      0,05 МБ         System.Threading.Channels.dll
+      0,05 МБ         System.Net.Http.WebRequest.dll
+      0,05 МБ         System.IO.Packaging.dll
+      0,05 МБ         Microsoft.Extensions.Primitives.dll
+      0,05 МБ         Microsoft.Extensions.DependencyInjection.Abstractions.dll
+      0,05 МБ         EasyHook.dll
+      0,05 МБ         CRM.Client.dll
+      0,04 МБ         System.Runtime.dll
+      0,04 МБ         System.Diagnostics.Tracing.dll
+      0,04 МБ         Ping.Server.2.dll
+      0,04 МБ         Microsoft.SqlServer.WmiEnum.dll
+      0,04 МБ         Microsoft.SqlServer.ServiceBrokerEnum.dll
+      0,04 МБ         Microsoft.Owin.Security.Cookies.dll
+      0,04 МБ         Microsoft.Extensions.Logging.dll
+      0,04 МБ         Microsoft.CodeAnalysis.Razor.dll
+      0,04 МБ         Microsoft.AspNetCore.JsonPatch.dll
+      0,04 МБ         MapiSender.exe
+      0,03 МБ         System.Security.Cryptography.Primitives.dll
+      0,03 МБ         System.Security.Cryptography.Algorithms.dll
+      0,03 МБ         System.Resources.ResourceManager.dll
+      0,03 МБ         System.Reflection.Primitives.dll
+      0,03 МБ         System.IO.Compression.FileSystem.dll
+      0,03 МБ         System.Diagnostics.Tools.dll
+      0,03 МБ         System.Collections.dll
+      0,03 МБ         System.AppContext.dll
+      0,03 МБ         stdole.dll
+      0,03 МБ         ServiceUtils.dll
+      0,03 МБ         Microsoft.Win32.Registry.dll
+      0,03 МБ         Microsoft.SqlServer.SqlClrProvider.dll
+      0,03 МБ         Microsoft.Extensions.Hosting.Abstractions.dll
+      0,03 МБ         Microsoft.Extensions.Configuration.Abstractions.dll
+      0,03 МБ         Microsoft.Bcl.AsyncInterfaces.dll
+      0,03 МБ         Microsoft.AspNetCore.Http.Features.dll
+      0,03 МБ         FB.Client.dll
+      0,03 МБ         CallContextData.2.dll
+      0,02 МБ  [кат]  PingService
+      0,02 МБ         System.Xml.XPath.XDocument.dll
+      0,02 МБ         System.Xml.XPath.dll
+      0,02 МБ         System.Xml.XmlSerializer.dll
+      0,02 МБ         System.Xml.XmlDocument.dll
+      0,02 МБ         System.Xml.XDocument.dll
+      0,02 МБ         System.Xml.ReaderWriter.dll
+      0,02 МБ         System.ValueTuple.dll
+      0,02 МБ         System.Threading.Timer.dll
+      0,02 МБ         System.Threading.ThreadPool.dll
+      0,02 МБ         System.Threading.Thread.dll
+      0,02 МБ         System.Threading.Tasks.Parallel.dll
+      0,02 МБ         System.Threading.Tasks.Extensions.dll
+      0,02 МБ         System.Threading.Tasks.dll
+      0,02 МБ         System.Threading.Overlapped.dll
+      0,02 МБ         System.Threading.dll
+      0,02 МБ         System.Text.RegularExpressions.dll
+      0,02 МБ         System.Text.Encoding.Extensions.dll
+      0,02 МБ         System.Text.Encoding.dll
+      0,02 МБ         System.ServiceModel.Security.dll
+      0,02 МБ         System.ServiceModel.Primitives.dll
+      0,02 МБ         System.ServiceModel.NetTcp.dll
+      0,02 МБ         System.ServiceModel.Http.dll
+      0,02 МБ         System.ServiceModel.Duplex.dll
+      0,02 МБ         System.Security.SecureString.dll
+      0,02 МБ         System.Security.Principal.dll
+      0,02 МБ         System.Security.Cryptography.X509Certificates.dll
+      0,02 МБ         System.Security.Cryptography.Encoding.dll
+      0,02 МБ         System.Security.Cryptography.Csp.dll
+      0,02 МБ         System.Security.Claims.dll
+      0,02 МБ         System.Runtime.Serialization.Xml.dll
+      0,02 МБ         System.Runtime.Serialization.Primitives.dll
+      0,02 МБ         System.Runtime.Serialization.Json.dll
+      0,02 МБ         System.Runtime.Serialization.Formatters.dll
+      0,02 МБ         System.Runtime.Numerics.dll
+      0,02 МБ         System.Runtime.InteropServices.WindowsRuntime.dll
+      0,02 МБ         System.Runtime.InteropServices.RuntimeInformation.dll
+      0,02 МБ         System.Runtime.InteropServices.dll
+      0,02 МБ         System.Runtime.Handles.dll
+      0,02 МБ         System.Runtime.Extensions.dll
+      0,02 МБ         System.Runtime.CompilerServices.VisualC.dll
+      0,02 МБ         System.Runtime.CompilerServices.Unsafe.dll
+      0,02 МБ         System.Resources.Writer.dll
+      0,02 МБ         System.Resources.Reader.dll
+      0,02 МБ         System.Reflection.Extensions.dll
+      0,02 МБ         System.Reflection.Emit.Lightweight.dll
+      0,02 МБ         System.Reflection.Emit.ILGeneration.dll
+      0,02 МБ         System.Reflection.Emit.dll
+      0,02 МБ         System.Reflection.dll
+      0,02 МБ         System.ObjectModel.dll
+      0,02 МБ         System.Net.WebSockets.dll
+      0,02 МБ         System.Net.WebSockets.Client.dll
+      0,02 МБ         System.Net.WebHeaderCollection.dll
+      0,02 МБ         System.Net.Sockets.dll
+      0,02 МБ         System.Net.Security.dll
+      0,02 МБ         System.Net.Requests.dll
+      0,02 МБ         System.Net.Primitives.dll
+      0,02 МБ         System.Net.Ping.dll
+      0,02 МБ         System.Net.NetworkInformation.dll
+      0,02 МБ         System.Net.NameResolution.dll
+      0,02 МБ         System.Net.Http.Rtc.dll
+      0,02 МБ         System.Linq.Queryable.dll
+      0,02 МБ         System.Linq.Parallel.dll
+      0,02 МБ         System.Linq.Expressions.dll
+      0,02 МБ         System.Linq.dll
+      0,02 МБ         System.IO.UnmanagedMemoryStream.dll
+      0,02 МБ         System.IO.Pipes.dll
+      0,02 МБ         System.IO.MemoryMappedFiles.dll
+      0,02 МБ         System.IO.IsolatedStorage.dll
+      0,02 МБ         System.IO.FileSystem.Watcher.dll
+      0,02 МБ         System.IO.FileSystem.Primitives.dll
+      0,02 МБ         System.IO.FileSystem.DriveInfo.dll
+      0,02 МБ         System.IO.FileSystem.dll
+      0,02 МБ         System.IO.dll
+      0,02 МБ         System.IO.Compression.ZipFile.dll
+      0,02 МБ         System.Globalization.Extensions.dll
+      0,02 МБ         System.Globalization.dll
+      0,02 МБ         System.Globalization.Calendars.dll
+      0,02 МБ         System.Dynamic.Runtime.dll
+      0,02 МБ         System.Drawing.Primitives.dll
+      0,02 МБ         System.Diagnostics.TraceSource.dll
+      0,02 МБ         System.Diagnostics.TextWriterTraceListener.dll
+      0,02 МБ         System.Diagnostics.StackTrace.dll
+      0,02 МБ         System.Diagnostics.Process.dll
+      0,02 МБ         System.Diagnostics.FileVersionInfo.dll
+      0,02 МБ         System.Diagnostics.Debug.dll
+      0,02 МБ         System.Diagnostics.Contracts.dll
+      0,02 МБ         System.Data.Common.dll
+      0,02 МБ         System.Console.dll
+      0,02 МБ         System.ComponentModel.TypeConverter.dll
+      0,02 МБ         System.ComponentModel.Primitives.dll
+      0,02 МБ         System.ComponentModel.EventBasedAsync.dll
+      0,02 МБ         System.ComponentModel.dll
+      0,02 МБ         System.ComponentModel.Annotations.dll
+      0,02 МБ         System.Collections.Specialized.dll
+      0,02 МБ         System.Collections.NonGeneric.dll
+      0,02 МБ         System.Collections.Concurrent.dll
+      0,02 МБ         System.Buffers.dll
+      0,02 МБ         Pinger.Client.Utils.dll
+      0,02 МБ         Microsoft.Win32.Primitives.dll
+      0,02 МБ         Microsoft.Owin.FileSystems.dll
+      0,02 МБ         Microsoft.Extensions.FileProviders.Abstractions.dll
+      0,02 МБ         Microsoft.DotNet.PlatformAbstractions.dll
+      0,02 МБ         Microsoft.Bcl.HashCode.dll
+      0,02 МБ         Microsoft.AspNetCore.Hosting.Abstractions.dll
+      0,02 МБ         LC.Server.dll
+      0,02 МБ         EO.WebBrowser.WinForm.dll
+      0,02 МБ         DomainObjectGuidsForDeleteInConversion.ini
+      0,01 МБ         Microsoft.AspNetCore.Hosting.Server.Abstractions.dll
+      0,01 МБ         MetaEdit.ini
+      0,01 МБ         languagesettings.ini
+      0,01 МБ         CRM.Client.dll.config
+      0,01 МБ         Business Studio.exe.config
+      0,01 МБ         Business Studio x64.exe.config
+      0,01 МБ         Business Studio Ultimate x64.exe.config
+      0,01 МБ         BizArch.Client.dll.config
+      0,01 МБ         AppsResources.dll
+      0,01 МБ         AppPlatform.Client.dll.config
+       5,1 МБ         DevExpress.Data.v21.2.dll
+       2,4 МБ         Microsoft.OData.Core.dll
+       1,9 МБ         Microsoft.CodeAnalysis.dll
+       1,6 МБ         ByteComponents.dll
+       0,9 МБ         Microsoft.Office.Interop.Word.dll
+       0,5 МБ         Microsoft.SqlServer.Management.Sdk.Sfc.dll
+       0,5 МБ         Client.Utils.dll
+       0,3 МБ         ByteSQL.dll
+       0,2 МБ         BYTE_STENCIL.vss
+       0,1 МБ         Microsoft.WindowsAPICodePack.dll
+       0,1 МБ         Jering.Javascript.NodeJS.dll
+       0,1 МБ         DevExtreme.AspNet.Data.dll
+       0,1 МБ         bs_eula_v6_en.pdf
+       0,1 МБ         banner.bmp
+         1 МБ         DevExpress.Charts.v21.2.Core.dll
+         0 МБ         VSAddIn.ToolWindows.dll.config
+         0 МБ         VSAddIn.Engine.dll.config
+         0 МБ         Version.txt
+         0 МБ         Sys.Server.dll.config
+         0 МБ         Sys.dll.config
+         0 МБ         Sys.Client.dll.config
+         0 МБ         Owin.dll
+         0 МБ         MetaEdit.exe.config
+         0 МБ         Metadata.dll.config
+         0 МБ         MapiSender.exe.config
+         0 МБ         installactions.InstallState
+         0 МБ         HtmlServer.dll.config
+         0 МБ         Folder.ico
+         0 МБ         FB.Server.dll
+         0 МБ         FB.Core.dll
+         0 МБ         DBAdmin.exe.config
+         0 МБ         Data.bin
+         0 МБ         CRM.Server.dll.config
+         0 МБ         commonkey.snk
+         0 МБ         Client.Utils.dll.config
+         0 МБ         ByteComponents.dll.config
+         0 МБ         BizArch.Server.dll.config
+         0 МБ         AppPlatform.Server.dll.config
+=== по расширениям (счёт и объём) ===
+.dll             526 файлов     760,5 МБ
+.exe              33 файлов     385,5 МБ
+.dic              70 файлов     182,8 МБ
+.xml              33 файлов     105,7 МБ
+.js             1749 файлов      90,3 МБ
+.pak             118 файлов      81,5 МБ
+.aff              70 файлов      69,1 МБ
+                 130 файлов      56,3 МБ
+.css              67 файлов        35 МБ
+.ts              829 файлов      33,7 МБ
+.ibd              23 файлов      28,6 МБ
+.dblwr             2 файлов        24 МБ
+.dat               2 файлов      20,1 МБ
+.nexe              3 файлов      12,1 МБ
+.sys              24 файлов       9,4 МБ
+.mdm               3 файлов       8,5 МБ
+.resx            179 файлов       6,6 МБ
+.map             822 файлов       4,1 МБ
+=== ключевые файлы: метамодель, скрипты БД, документация ===
+       6 КБ  \AppPlatform.Client.dll.config
+       5 КБ  \AppPlatform.Server.dll.config
+       6 КБ  \BizArch.Client.dll.config
+       5 КБ  \BizArch.Server.dll.config
+      99 КБ  \bs_eula_v6_en.pdf
+     152 КБ  \bs_eula_v6_ru.pdf
+       6 КБ  \Business Studio Ultimate x64.exe.config
+       6 КБ  \Business Studio x64.exe.config
+       9 КБ  \Business Studio.exe.config
+       2 КБ  \ByteComponents.dll.config
+     202 КБ  \BYTE_STENCIL.vss
+       3 КБ  \Client.Utils.dll.config
+   95484 КБ  \convert_settings.xml
+       6 КБ  \CRM.Client.dll.config
+       5 КБ  \CRM.Server.dll.config
+       3 КБ  \DBAdmin.exe.config
+      18 КБ  \DomainObjectGuidsForDeleteInConversion.ini
+       4 КБ  \HtmlServer.dll.config
+      12 КБ  \languagesettings.ini
+       0 КБ  \MapiSender.exe.config
+       2 КБ  \Metadata.dll.config
+       4 КБ  \MetaEdit.exe.config
+       6 КБ  \MetaEdit.ini
+       3 КБ  \Sys.Client.dll.config
+       2 КБ  \Sys.dll.config
+       3 КБ  \Sys.Server.dll.config
+       3 КБ  \VSAddIn.Engine.dll.config
+       3 КБ  \VSAddIn.ToolWindows.dll.config
+      58 КБ  \AppPlatform.Node\package-lock.json
+       0 КБ  \AppPlatform.Node\package.json
+       0 КБ  \AppPlatform.Node\chrome-win32\vk_swiftshader_icd.json
+       0 КБ  \AppPlatform.Node\chrome-win32\MEIPreload\manifest.json
+       0 КБ  \AppPlatform.Node\chrome-win64\vk_swiftshader_icd.json
+       0 КБ  \AppPlatform.Node\chrome-win64\MEIPreload\manifest.json
+      58 КБ  \AppPlatform.Node\node_modules\.package-lock.json
+       1 КБ  \AppPlatform.Node\node_modules\@babel\code-frame\package.json
+       0 КБ  \AppPlatform.Node\node_modules\@babel\code-frame\README.md
+       1 КБ  \AppPlatform.Node\node_modules\@babel\helper-validator-identifier\package.json
+       0 КБ  \AppPlatform.Node\node_modules\@babel\helper-validator-identifier\README.md
+       1 КБ  \AppPlatform.Node\node_modules\@babel\highlight\package.json
+       0 КБ  \AppPlatform.Node\node_modules\@babel\highlight\README.md
+       3 КБ  \AppPlatform.Node\node_modules\@puppeteer\browsers\package.json
+       1 КБ  \AppPlatform.Node\node_modules\@puppeteer\browsers\README.md
+       0 КБ  \AppPlatform.Node\node_modules\@puppeteer\browsers\lib\esm\package.json
+       0 КБ  \AppPlatform.Node\node_modules\@puppeteer\browsers\src\tsconfig.cjs.json
+       0 КБ  \AppPlatform.Node\node_modules\@puppeteer\browsers\src\tsconfig.esm.json
+       1 КБ  \AppPlatform.Node\node_modules\@tootallnate\once\package.json
+       3 КБ  \AppPlatform.Node\node_modules\@tootallnate\once\README.md
+       2 КБ  \AppPlatform.Node\node_modules\@tootallnate\quickjs-emscripten\package.json
+      23 КБ  \AppPlatform.Node\node_modules\@tootallnate\quickjs-emscripten\README.md
+       7 КБ  \AppPlatform.Node\node_modules\@types\node\package.json
+       2 КБ  \AppPlatform.Node\node_modules\@types\node\README.md
+       1 КБ  \AppPlatform.Node\node_modules\@types\yauzl\package.json
+       1 КБ  \AppPlatform.Node\node_modules\@types\yauzl\README.md
+       2 КБ  \AppPlatform.Node\node_modules\abab\LICENSE.md
+       1 КБ  \AppPlatform.Node\node_modules\abab\package.json
+       2 КБ  \AppPlatform.Node\node_modules\abab\README.md
+       2 КБ  \AppPlatform.Node\node_modules\agent-base\package.json
+       5 КБ  \AppPlatform.Node\node_modules\agent-base\README.md
+       1 КБ  \AppPlatform.Node\node_modules\ansi-regex\package.json

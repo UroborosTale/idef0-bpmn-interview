@@ -1,0 +1,1358 @@
+{
+  "roles": [],
+  "systems": [
+    {
+      "name": "Система управления кандидатами (ATS)",
+      "quote": "Поступающие отклики регистрируются в системе управления кандидатами (ATS)",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Информационная система компании",
+      "quote": "создаётся кадровая запись в информационной системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "data": [
+    {
+      "name": "Заявка на открытие вакансии",
+      "kind": "document",
+      "quote": "В заявке указываются наименование должности, подразделение, причина открытия вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Штатное расписание и бюджет",
+      "kind": "data",
+      "quote": "проверяют заявку на соответствие организационной структуре, штатному расписанию и утверждённому бюджету",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Профиль должности",
+      "kind": "document",
+      "quote": "HR-менеджер совместно с руководителем подразделения уточняет профиль должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Текст вакансии",
+      "kind": "document",
+      "quote": "подготавливает описание вакансии для публикации и поиска кандидатов",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Резюме кандидата",
+      "kind": "document",
+      "quote": "Для каждого кандидата создаётся запись, содержащая контактные данные, резюме, источник отклика",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Результаты первичного интервью",
+      "kind": "document",
+      "quote": "рекрутер фиксирует результаты оценки в системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Оценка профессиональных компетенций",
+      "kind": "document",
+      "quote": "интервьюер оформляет обратную связь и передаёт HR-менеджеру рекомендацию",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Результат дополнительной проверки",
+      "kind": "document",
+      "quote": "уполномоченное лицо фиксирует решение о возможности продолжения процесса",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Предложение о работе",
+      "kind": "document",
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Документы для оформления",
+      "kind": "document",
+      "quote": "кадровая служба запрашивает у кандидата документы, необходимые для оформления трудовых отношений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Кадровая запись",
+      "kind": "data",
+      "quote": "создаётся кадровая запись в информационной системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "План адаптации",
+      "kind": "document",
+      "quote": "подготавливает план адаптации и согласовывает перечень задач на начальный период работы",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Учётные записи и доступы",
+      "kind": "data",
+      "quote": "IT-служба подготавливает необходимые учётные записи, оборудование и доступы",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Причина отказа кандидату",
+      "kind": "data",
+      "quote": "При несоответствии обязательным критериям фиксируется причина отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "controls": [
+    {
+      "name": "Внутренний регламент процесса найма",
+      "kind": "regulation",
+      "quote": "Сроки выполнения этапов и ответственные лица устанавливаются регламентом процесса",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Применимое трудовое законодательство",
+      "kind": "norm",
+      "quote": "Оформление трудоустройства выполняется в соответствии с применимым законодательством",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Правила обработки персональных данных",
+      "kind": "rule",
+      "quote": "Доступ к персональным данным кандидатов предоставляется только уполномоченным сотрудникам",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Правила проверки благонадёжности",
+      "kind": "rule",
+      "quote": "согласованные процедуры проверки благонадёжности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "subprocesses": [
+    {
+      "name": "Инициирование и согласование вакансии",
+      "quote": "Руководитель подразделения выявляет необходимость найма нового сотрудника и формирует заявку на открытие вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.55
+    },
+    {
+      "name": "Подбор кандидатов",
+      "quote": "Рекрутер размещает вакансию на выбранных площадках",
+      "source_fragment_id": "auto",
+      "confidence": 0.55
+    },
+    {
+      "name": "Отбор и принятие решения",
+      "quote": "Непосредственный руководитель оценивает профессиональные компетенции кандидата",
+      "source_fragment_id": "auto",
+      "confidence": 0.55
+    },
+    {
+      "name": "Оформление и выход на работу",
+      "quote": "После принятия предложения кадровая служба запрашивает у кандидата документы",
+      "source_fragment_id": "auto",
+      "confidence": 0.55
+    }
+  ],
+  "operations": [
+    {
+      "name": "Формирование заявки на вакансию",
+      "subprocess_name": "Инициирование и согласование вакансии",
+      "quote": "формирует заявку на открытие вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Согласование заявки на вакансию",
+      "subprocess_name": "Инициирование и согласование вакансии",
+      "quote": "Уполномоченный руководитель и при необходимости финансовая служба проверяют заявку",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Формирование профиля вакансии",
+      "subprocess_name": "Инициирование и согласование вакансии",
+      "quote": "HR-менеджер совместно с руководителем подразделения уточняет профиль должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Поиск и привлечение кандидатов",
+      "subprocess_name": "Подбор кандидатов",
+      "quote": "Рекрутер размещает вакансию на выбранных площадках",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Первичный анализ резюме",
+      "subprocess_name": "Подбор кандидатов",
+      "quote": "Рекрутер анализирует поступившие резюме на соответствие установленным требованиям вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Первичное интервью с кандидатом",
+      "subprocess_name": "Отбор и принятие решения",
+      "quote": "Рекрутер связывается с кандидатом, согласовывает дату и формат интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Профессиональное собеседование",
+      "subprocess_name": "Отбор и принятие решения",
+      "quote": "направляется на профессиональное собеседование с руководителем подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Дополнительные проверки кандидата",
+      "subprocess_name": "Отбор и принятие решения",
+      "quote": "кандидат проходит дополнительные проверки, необходимые для конкретной должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Принятие решения о выборе кандидата",
+      "subprocess_name": "Отбор и принятие решения",
+      "quote": "HR-менеджер собирает результаты всех этапов оценки и передаёт их руководителю подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Формирование и направление предложения о работе",
+      "subprocess_name": "Отбор и принятие решения",
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Подготовка документов и оформление трудоустройства",
+      "subprocess_name": "Оформление и выход на работу",
+      "quote": "кадровая служба запрашивает у кандидата документы, необходимые для оформления трудовых отношений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Подготовка рабочего места",
+      "subprocess_name": "Оформление и выход на работу",
+      "quote": "После подтверждения трудоустройства HR-менеджер уведомляет заинтересованные подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "name": "Выход сотрудника на работу и адаптация",
+      "subprocess_name": "Оформление и выход на работу",
+      "quote": "В согласованную дату сотрудник приступает к работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "nodes": [
+    {
+      "type": "event",
+      "subtype": "start",
+      "name": "Потребность в новом сотруднике возникла",
+      "operation_name": "Формирование заявки на вакансию",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 1,
+      "quote": "Возникновение потребности в новом сотруднике",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "выявить необходимость найма нового сотрудника",
+      "operation_name": "Формирование заявки на вакансию",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 2,
+      "quote": "выявляет необходимость найма нового сотрудника",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "сформировать заявку на открытие вакансии",
+      "operation_name": "Формирование заявки на вакансию",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 3,
+      "quote": "В заявке указываются наименование должности, подразделение, причина открытия вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "направить заявку на согласование",
+      "operation_name": "Формирование заявки на вакансию",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 4,
+      "quote": "заявка направляется на согласование уполномоченным лицам",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Заявка направлена на согласование",
+      "operation_name": "Формирование заявки на вакансию",
+      "order_hint": 5,
+      "quote": "заявка направляется на согласование уполномоченным лицам",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "проверить заявку на соответствие штатному расписанию и бюджету",
+      "operation_name": "Согласование заявки на вакансию",
+      "role_name": "Финансовая служба",
+      "order_hint": 6,
+      "quote": "проверяют заявку на соответствие организационной структуре, штатному расписанию и утверждённому бюджету",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Заявка соответствует требованиям?",
+      "operation_name": "Согласование заявки на вакансию",
+      "order_hint": 7,
+      "quote": "заявка получает один из статусов: «Согласована», «Отклонена» или «Требует доработки»",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Заявка согласована",
+      "operation_name": "Согласование заявки на вакансию",
+      "order_hint": 8,
+      "quote": "Если заявка согласована, процесс переходит к этапу подбора кандидатов",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Заявка отклонена",
+      "operation_name": "Согласование заявки на вакансию",
+      "order_hint": 9,
+      "quote": "Если заявка отклонена, процесс завершается с фиксацией причины отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Заявка требует доработки",
+      "operation_name": "Согласование заявки на вакансию",
+      "order_hint": 10,
+      "quote": "заявка возвращается инициатору для внесения изменений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "уточнить профиль должности",
+      "operation_name": "Формирование профиля вакансии",
+      "role_name": "HR-менеджер",
+      "order_hint": 11,
+      "quote": "уточняет профиль должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "определить обязательные и желательные компетенции",
+      "operation_name": "Формирование профиля вакансии",
+      "role_name": "HR-менеджер",
+      "order_hint": 12,
+      "quote": "Определяются обязательные и желательные компетенции",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "подготовить описание вакансии для публикации",
+      "operation_name": "Формирование профиля вакансии",
+      "role_name": "HR-менеджер",
+      "order_hint": 13,
+      "quote": "подготавливает описание вакансии для публикации и поиска кандидатов",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Профиль должности утверждён",
+      "operation_name": "Формирование профиля вакансии",
+      "order_hint": 14,
+      "quote": "Определяются обязательные и желательные компетенции",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "разместить вакансию на выбранных площадках",
+      "operation_name": "Поиск и привлечение кандидатов",
+      "role_name": "Рекрутер",
+      "order_hint": 15,
+      "quote": "размещает вакансию на выбранных площадках",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "зарегистрировать отклики в системе управления кандидатами",
+      "operation_name": "Поиск и привлечение кандидатов",
+      "role_name": "Рекрутер",
+      "order_hint": 16,
+      "quote": "отклики регистрируются в системе управления кандидатами (ATS)",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "создать запись кандидата с резюме и статусом",
+      "operation_name": "Поиск и привлечение кандидатов",
+      "role_name": "Рекрутер",
+      "order_hint": 17,
+      "quote": "Для каждого кандидата создаётся запись, содержащая контактные данные, резюме, источник отклика",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "проанализировать резюме на соответствие требованиям вакансии",
+      "operation_name": "Первичный анализ резюме",
+      "role_name": "Рекрутер",
+      "order_hint": 18,
+      "quote": "анализирует поступившие резюме на соответствие установленным требованиям вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Кандидат соответствует обязательным критериям?",
+      "operation_name": "Первичный анализ резюме",
+      "order_hint": 19,
+      "quote": "При несоответствии обязательным критериям фиксируется причина отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "направить приглашение на первичное интервью",
+      "operation_name": "Первичный анализ резюме",
+      "role_name": "Рекрутер",
+      "order_hint": 20,
+      "quote": "направляется приглашение на первичное интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "зафиксировать причину отказа",
+      "operation_name": "Первичный анализ резюме",
+      "role_name": "Рекрутер",
+      "order_hint": 21,
+      "quote": "При несоответствии обязательным критериям фиксируется причина отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "согласовать дату и формат интервью с кандидатом",
+      "operation_name": "Первичное интервью с кандидатом",
+      "role_name": "Рекрутер",
+      "order_hint": 22,
+      "quote": "согласовывает дату и формат интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "провести первичную беседу с кандидатом",
+      "operation_name": "Первичное интервью с кандидатом",
+      "role_name": "Рекрутер",
+      "order_hint": 23,
+      "quote": "проводит первичную беседу",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "зафиксировать результаты оценки в системе",
+      "operation_name": "Первичное интервью с кандидатом",
+      "role_name": "Рекрутер",
+      "order_hint": 24,
+      "quote": "фиксирует результаты оценки в системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Кандидат передаётся на следующий этап?",
+      "operation_name": "Первичное интервью с кандидатом",
+      "order_hint": 25,
+      "quote": "принимает решение о передаче кандидата на следующий этап либо о завершении его участия в процессе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Участие кандидата завершено",
+      "operation_name": "Первичное интервью с кандидатом",
+      "order_hint": 26,
+      "quote": "о завершении его участия в процессе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "провести профессиональное собеседование",
+      "operation_name": "Профессиональное собеседование",
+      "role_name": "Непосредственный руководитель",
+      "order_hint": 27,
+      "quote": "направляется на профессиональное собеседование с руководителем подразделения или профильным специалистом",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "предложить профессиональное задание или тестирование",
+      "operation_name": "Профессиональное собеседование",
+      "role_name": "Непосредственный руководитель",
+      "order_hint": 28,
+      "quote": "предлагается выполнить профессиональное задание, пройти тестирование",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "оформить обратную связь и рекомендацию",
+      "operation_name": "Профессиональное собеседование",
+      "role_name": "Непосредственный руководитель",
+      "order_hint": 29,
+      "quote": "интервьюер оформляет обратную связь и передаёт HR-менеджеру рекомендацию",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "подтвердить профессиональную квалификацию кандидата",
+      "operation_name": "Дополнительные проверки кандидата",
+      "role_name": "Служба безопасности",
+      "order_hint": 30,
+      "quote": "подтверждение профессиональной квалификации",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "проверить предоставленные документы",
+      "operation_name": "Дополнительные проверки кандидата",
+      "role_name": "Юридический отдел",
+      "order_hint": 31,
+      "quote": "проверку предоставленных документов",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "провести проверку благонадёжности",
+      "operation_name": "Дополнительные проверки кандидата",
+      "role_name": "Служба безопасности",
+      "order_hint": 32,
+      "quote": "согласованные процедуры проверки благонадёжности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "зафиксировать решение о продолжении процесса",
+      "operation_name": "Дополнительные проверки кандидата",
+      "role_name": "Юридический отдел",
+      "order_hint": 33,
+      "quote": "уполномоченное лицо фиксирует решение о возможности продолжения процесса",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "собрать результаты всех этапов оценки",
+      "operation_name": "Принятие решения о выборе кандидата",
+      "role_name": "HR-менеджер",
+      "order_hint": 34,
+      "quote": "собирает результаты всех этапов оценки и передаёт их руководителю подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "проанализировать компетенции кандидатов",
+      "operation_name": "Принятие решения о выборе кандидата",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 35,
+      "quote": "анализирует профессиональные компетенции кандидатов, результаты интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Кандидат соответствует требованиям?",
+      "operation_name": "Принятие решения о выборе кандидата",
+      "order_hint": 36,
+      "quote": "Если кандидат соответствует требованиям, принимается решение о его выборе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "принять решение о выборе кандидата",
+      "operation_name": "Принятие решения о выборе кандидата",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 37,
+      "quote": "принимается решение о его выборе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "определить необходимость продолжения поиска",
+      "operation_name": "Принятие решения о выборе кандидата",
+      "role_name": "HR-менеджер",
+      "order_hint": 38,
+      "quote": "определяет необходимость продолжения поиска или пересмотра требований к вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "сформировать предложение о работе",
+      "operation_name": "Формирование и направление предложения о работе",
+      "role_name": "HR-менеджер",
+      "order_hint": 39,
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "направить предложение кандидату",
+      "operation_name": "Формирование и направление предложения о работе",
+      "role_name": "HR-менеджер",
+      "order_hint": 40,
+      "quote": "Предложение направляется кандидату для рассмотрения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "провести переговоры по условиям трудоустройства",
+      "operation_name": "Формирование и направление предложения о работе",
+      "role_name": "HR-менеджер",
+      "order_hint": 41,
+      "quote": "проводит переговоры по условиям трудоустройства в пределах предоставленных полномочий",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Кандидат принял предложение?",
+      "operation_name": "Формирование и направление предложения о работе",
+      "order_hint": 42,
+      "quote": "Кандидат принимает предложение, отклоняет его или запрашивает изменение условий",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Предложение о работе принято",
+      "operation_name": "Формирование и направление предложения о работе",
+      "order_hint": 43,
+      "quote": "При принятии предложения процесс переходит к оформлению трудоустройства",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "вернуться к резервным кандидатам или возобновить поиск",
+      "operation_name": "Формирование и направление предложения о работе",
+      "role_name": "HR-менеджер",
+      "order_hint": 44,
+      "quote": "компания может вернуться к другим подходящим кандидатам или возобновить поиск",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "запросить документы для оформления трудовых отношений",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "role_name": "Кадровая служба",
+      "order_hint": 45,
+      "quote": "кадровая служба запрашивает у кандидата документы, необходимые для оформления трудовых отношений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "проверить комплектность и корректность документов",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "role_name": "Кадровая служба",
+      "order_hint": 46,
+      "quote": "проверяет их комплектность и корректность",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "gateway",
+      "subtype": "exclusive",
+      "name": "Документы предоставлены в полном объёме?",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "order_hint": 47,
+      "quote": "Если обнаружены отсутствующие документы или ошибки, оформление приостанавливается",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "приостановить оформление до устранения замечаний",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "role_name": "Кадровая служба",
+      "order_hint": 48,
+      "quote": "оформление приостанавливается до их устранения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "создать кадровую запись в информационной системе",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "role_name": "Кадровая служба",
+      "order_hint": 49,
+      "quote": "создаётся кадровая запись в информационной системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "оформить и подписать документы",
+      "operation_name": "Подготовка документов и оформление трудоустройства",
+      "role_name": "Юридический отдел",
+      "order_hint": 50,
+      "quote": "документы оформляются и подписываются в установленном порядке",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "уведомить подразделения о выходе сотрудника",
+      "operation_name": "Подготовка рабочего места",
+      "role_name": "HR-менеджер",
+      "order_hint": 51,
+      "quote": "HR-менеджер уведомляет заинтересованные подразделения о предстоящем выходе сотрудника",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "подготовить учётные записи, оборудование и доступы",
+      "operation_name": "Подготовка рабочего места",
+      "role_name": "IT-служба",
+      "order_hint": 52,
+      "quote": "IT-служба подготавливает необходимые учётные записи, оборудование и доступы к информационным системам",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "организовать рабочее место и пропуск",
+      "operation_name": "Подготовка рабочего места",
+      "role_name": "Административный отдел",
+      "order_hint": 53,
+      "quote": "организует рабочее место, пропуск и обеспечение необходимыми ресурсами",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "определить наставника и подготовить план адаптации",
+      "operation_name": "Подготовка рабочего места",
+      "role_name": "Руководитель подразделения",
+      "order_hint": 54,
+      "quote": "определяет непосредственного наставника, подготавливает план адаптации",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "timer",
+      "name": "Наступила согласованная дата выхода",
+      "operation_name": "Выход сотрудника на работу и адаптация",
+      "order_hint": 55,
+      "quote": "В согласованную дату сотрудник приступает к работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "провести вводные мероприятия и ознакомить с правилами",
+      "operation_name": "Выход сотрудника на работу и адаптация",
+      "role_name": "HR-менеджер",
+      "order_hint": 56,
+      "quote": "проводит необходимые вводные мероприятия, знакомит сотрудника с внутренними правилами",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "представить сотрудника команде и разъяснить обязанности",
+      "operation_name": "Выход сотрудника на работу и адаптация",
+      "role_name": "Непосредственный руководитель",
+      "order_hint": 57,
+      "quote": "представляет сотрудника команде, разъясняет его обязанности, цели, порядок взаимодействия",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "task",
+      "subtype": "user",
+      "name": "отслеживать прогресс адаптации и давать обратную связь",
+      "operation_name": "Выход сотрудника на работу и адаптация",
+      "role_name": "Непосредственный руководитель",
+      "order_hint": 58,
+      "quote": "отслеживает прогресс сотрудника, предоставляет обратную связь",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "type": "event",
+      "subtype": "end",
+      "name": "Сотрудник приступил к выполнению обязанностей",
+      "operation_name": "Выход сотрудника на работу и адаптация",
+      "order_hint": 59,
+      "quote": "сотрудник приступил к выполнению обязанностей",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "flows": [
+    {
+      "from_order_hint": 1,
+      "to_order_hint": 2,
+      "condition": null,
+      "quote": "формирует заявку на открытие вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 2,
+      "to_order_hint": 3,
+      "condition": null,
+      "quote": "формирует заявку на открытие вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 3,
+      "to_order_hint": 4,
+      "condition": null,
+      "quote": "формирует заявку на открытие вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 6,
+      "to_order_hint": 7,
+      "condition": null,
+      "quote": "Уполномоченный руководитель и при необходимости финансовая служба проверяют заявку",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 11,
+      "to_order_hint": 12,
+      "condition": null,
+      "quote": "HR-менеджер совместно с руководителем подразделения уточняет профиль должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 12,
+      "to_order_hint": 13,
+      "condition": null,
+      "quote": "HR-менеджер совместно с руководителем подразделения уточняет профиль должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 15,
+      "to_order_hint": 16,
+      "condition": null,
+      "quote": "Рекрутер размещает вакансию на выбранных площадках",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 16,
+      "to_order_hint": 17,
+      "condition": null,
+      "quote": "Рекрутер размещает вакансию на выбранных площадках",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 18,
+      "to_order_hint": 19,
+      "condition": null,
+      "quote": "Рекрутер анализирует поступившие резюме на соответствие установленным требованиям вакансии",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 22,
+      "to_order_hint": 23,
+      "condition": null,
+      "quote": "Рекрутер связывается с кандидатом, согласовывает дату и формат интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 23,
+      "to_order_hint": 24,
+      "condition": null,
+      "quote": "Рекрутер связывается с кандидатом, согласовывает дату и формат интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 24,
+      "to_order_hint": 25,
+      "condition": null,
+      "quote": "Рекрутер связывается с кандидатом, согласовывает дату и формат интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 27,
+      "to_order_hint": 28,
+      "condition": null,
+      "quote": "направляется на профессиональное собеседование с руководителем подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 28,
+      "to_order_hint": 29,
+      "condition": null,
+      "quote": "направляется на профессиональное собеседование с руководителем подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 30,
+      "to_order_hint": 31,
+      "condition": null,
+      "quote": "кандидат проходит дополнительные проверки, необходимые для конкретной должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 31,
+      "to_order_hint": 32,
+      "condition": null,
+      "quote": "кандидат проходит дополнительные проверки, необходимые для конкретной должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 32,
+      "to_order_hint": 33,
+      "condition": null,
+      "quote": "кандидат проходит дополнительные проверки, необходимые для конкретной должности",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 34,
+      "to_order_hint": 35,
+      "condition": null,
+      "quote": "HR-менеджер собирает результаты всех этапов оценки и передаёт их руководителю подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 35,
+      "to_order_hint": 36,
+      "condition": null,
+      "quote": "HR-менеджер собирает результаты всех этапов оценки и передаёт их руководителю подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 39,
+      "to_order_hint": 40,
+      "condition": null,
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 40,
+      "to_order_hint": 41,
+      "condition": null,
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 41,
+      "to_order_hint": 42,
+      "condition": null,
+      "quote": "HR-менеджер формирует предложение о работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 45,
+      "to_order_hint": 46,
+      "condition": null,
+      "quote": "кадровая служба запрашивает у кандидата документы, необходимые для оформления трудовых отношений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 46,
+      "to_order_hint": 47,
+      "condition": null,
+      "quote": "кадровая служба запрашивает у кандидата документы, необходимые для оформления трудовых отношений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 51,
+      "to_order_hint": 52,
+      "condition": null,
+      "quote": "После подтверждения трудоустройства HR-менеджер уведомляет заинтересованные подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 52,
+      "to_order_hint": 53,
+      "condition": null,
+      "quote": "После подтверждения трудоустройства HR-менеджер уведомляет заинтересованные подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 53,
+      "to_order_hint": 54,
+      "condition": null,
+      "quote": "После подтверждения трудоустройства HR-менеджер уведомляет заинтересованные подразделения",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 55,
+      "to_order_hint": 56,
+      "condition": null,
+      "quote": "В согласованную дату сотрудник приступает к работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 56,
+      "to_order_hint": 57,
+      "condition": null,
+      "quote": "В согласованную дату сотрудник приступает к работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 57,
+      "to_order_hint": 58,
+      "condition": null,
+      "quote": "В согласованную дату сотрудник приступает к работе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 5,
+      "to_order_hint": 6,
+      "condition": null,
+      "quote": "заявка направляется на согласование уполномоченным лицам",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 7,
+      "to_order_hint": 8,
+      "condition": "Согласована",
+      "quote": "заявка получает один из статусов: «Согласована», «Отклонена» или «Требует доработки»",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 7,
+      "to_order_hint": 9,
+      "condition": "Отклонена",
+      "quote": "заявка получает один из статусов: «Согласована», «Отклонена» или «Требует доработки»",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 7,
+      "to_order_hint": 10,
+      "condition": "Требует доработки",
+      "quote": "заявка получает один из статусов: «Согласована», «Отклонена» или «Требует доработки»",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 10,
+      "to_order_hint": 3,
+      "condition": null,
+      "quote": "заявка возвращается инициатору для внесения изменений",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 8,
+      "to_order_hint": 11,
+      "condition": null,
+      "quote": "Если заявка согласована, процесс переходит к этапу подбора кандидатов",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 14,
+      "to_order_hint": 15,
+      "condition": null,
+      "quote": "Определяются обязательные и желательные компетенции",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 17,
+      "to_order_hint": 18,
+      "condition": null,
+      "quote": "Для каждого кандидата создаётся запись, содержащая контактные данные, резюме, источник отклика",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 19,
+      "to_order_hint": 20,
+      "condition": "Соответствует",
+      "quote": "При несоответствии обязательным критериям фиксируется причина отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 19,
+      "to_order_hint": 21,
+      "condition": "Не соответствует",
+      "quote": "При несоответствии обязательным критериям фиксируется причина отказа",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 20,
+      "to_order_hint": 22,
+      "condition": null,
+      "quote": "направляется приглашение на первичное интервью",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 25,
+      "to_order_hint": 27,
+      "condition": "Передаётся",
+      "quote": "принимает решение о передаче кандидата на следующий этап либо о завершении его участия в процессе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 25,
+      "to_order_hint": 26,
+      "condition": "Завершить участие",
+      "quote": "принимает решение о передаче кандидата на следующий этап либо о завершении его участия в процессе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 29,
+      "to_order_hint": 30,
+      "condition": null,
+      "quote": "интервьюер оформляет обратную связь и передаёт HR-менеджеру рекомендацию",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 33,
+      "to_order_hint": 34,
+      "condition": null,
+      "quote": "уполномоченное лицо фиксирует решение о возможности продолжения процесса",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 36,
+      "to_order_hint": 37,
+      "condition": "Соответствует",
+      "quote": "Если кандидат соответствует требованиям, принимается решение о его выборе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 36,
+      "to_order_hint": 38,
+      "condition": "Ни один не подходит",
+      "quote": "Если кандидат соответствует требованиям, принимается решение о его выборе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 37,
+      "to_order_hint": 39,
+      "condition": null,
+      "quote": "принимается решение о его выборе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 42,
+      "to_order_hint": 43,
+      "condition": "Принял",
+      "quote": "Кандидат принимает предложение, отклоняет его или запрашивает изменение условий",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 42,
+      "to_order_hint": 44,
+      "condition": "Отказ",
+      "quote": "Кандидат принимает предложение, отклоняет его или запрашивает изменение условий",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 43,
+      "to_order_hint": 45,
+      "condition": null,
+      "quote": "При принятии предложения процесс переходит к оформлению трудоустройства",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 47,
+      "to_order_hint": 49,
+      "condition": "Полный комплект",
+      "quote": "Если обнаружены отсутствующие документы или ошибки, оформление приостанавливается",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 47,
+      "to_order_hint": 48,
+      "condition": "Есть замечания",
+      "quote": "Если обнаружены отсутствующие документы или ошибки, оформление приостанавливается",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 49,
+      "to_order_hint": 50,
+      "condition": null,
+      "quote": "создаётся кадровая запись в информационной системе",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 50,
+      "to_order_hint": 51,
+      "condition": null,
+      "quote": "документы оформляются и подписываются в установленном порядке",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    },
+    {
+      "from_order_hint": 54,
+      "to_order_hint": 55,
+      "condition": null,
+      "quote": "определяет непосредственного наставника, подготавливает план адаптации",
+      "source_fragment_id": "auto",
+      "confidence": 0.8
+    }
+  ],
+  "statements": [],
+  "process_hints": {
+    "goal": "Обеспечить своевременный поиск, отбор и оформление кандидата на вакантную должность",
+    "trigger": "Возникновение потребности в новом сотруднике и инициирование заявки на открытие вакансии",
+    "result": "Кандидат прошёл отбор, принял предложение о работе, оформлен и подготовлен к выходу на работу"
+  }
+}

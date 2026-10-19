@@ -1,0 +1,24 @@
+﻿таблиц: 22
+avgreportdata
+files
+forummessages
+languages
+links
+objectlinks
+objects
+objectsreports
+personallinks
+portal
+reportdata
+reportindex
+reports
+reportsusersquery
+resourcefromtables
+rightsobjects
+rightsreports
+sections
+tables
+titleindex
+users
+userslinks
+=== внешние ключи (первые 25) ===

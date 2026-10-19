@@ -1,0 +1,50 @@
+﻿full_name: <Module>
+full_name: EnvDTEFake.Project
+full_name: VSAddIn.ToolWindows.Сетка
+full_name: VSAddIn.ToolWindows.CfgFav
+full_name: VSAddIn.ToolWindows.ChooseClass
+full_name: VSAddIn.ToolWindows.ChooseEnum
+full_name: VSAddIn.ToolWindows.Classes
+full_name: VSAddIn.ToolWindows.ИконкиКласса
+full_name: VSAddIn.ToolWindows.ТипКлассаДляПоказа
+full_name: VSAddIn.ToolWindows.IDHolder
+full_name: VSAddIn.ToolWindows.MetadataHolder
+full_name: VSAddIn.ToolWindows.ClassesHelper
+full_name: VSAddIn.ToolWindows.ClassProp
+full_name: VSAddIn.ToolWindows.ClassPropHelper
+full_name: VSAddIn.ToolWindows.DBUpdater
+full_name: VSAddIn.ToolWindows.DefaultValues
+full_name: VSAddIn.ToolWindows.DefValues
+full_name: VSAddIn.ToolWindows.EnumMembersDS
+full_name: VSAddIn.ToolWindows.EnumProp
+full_name: VSAddIn.ToolWindows.FillMenuSupport
+full_name: VSAddIn.ToolWindows.GenericProp
+full_name: VSAddIn.ToolWindows.ImportDescriptions
+full_name: VSAddIn.ToolWindows.ExportBox
+full_name: VSAddIn.ToolWindows.UtilityBox
+full_name: VSAddIn.ToolWindows.KeysDS
+full_name: VSAddIn.ToolWindows.MainDS
+full_name: VSAddIn.ToolWindows.MethodProps
+full_name: VSAddIn.ToolWindows.Methods
+full_name: VSAddIn.ToolWindows.OptionsTabPage
+full_name: VSAddIn.ToolWindows.ИконкиПараметров
+full_name: VSAddIn.ToolWindows.Properties
+full_name: VSAddIn.ToolWindows.PropertiesProps
+full_name: VSAddIn.ToolWindows.SourceSafeException
+full_name: VSAddIn.ToolWindows.УдПараметр
+full_name: VSAddIn.ToolWindows.УдКласс
+full_name: VSAddIn.ToolWindows.DeletedVirtualClass
+full_name: VSAddIn.ToolWindows.PropertySupport
+full_name: VSAddIn.ToolWindows.СравнительПараметров
+full_name: VSAddIn.ToolWindows.LanguageCaptionType
+full_name: VSAddIn.ToolWindows.ResourceExportOptions
+--- типов найдено: 194
+--- секции строк:
+35: table_row_counts:
+30059: name: UpdateInterfaceStrings
+50622: ldstr: 4
+50631: 17,ldstr,string,0x70003efb
+50634: 34,ldstr,string,0x70003f23
+50637: 51,ldstr,string,0x7000250b
+50640: 68,ldstr,string,0x700024d5
+51558: ldstr: 1
