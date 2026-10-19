@@ -1,12 +1,21 @@
 import type { SessionRecord } from "../repo.js";
 import type { ProcessLogicModel } from "../types/model.js";
 import { layoutLayered, type LayoutNodeIn, type LayoutEdgeIn } from "../pipeline/layout.js";
-import { laneHeightOf } from "../shared/bpmnGeometry.js";
+import { laneHeightOf, laneTops } from "../shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows } from "../shared/bpmnRouting.js";
+import { labelSide } from "../shared/bpmnLabels.js";
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Где стоит подпись фигуры в упрощённой схеме: под фигурой, а если она не помещается в дорожку — над ней.
+ * Строка одна (как в альбоме: имя обрезается до 20 знаков), поэтому высота — одна строка.
+ */
+export function albumLabelY(b: { y: number; w: number; h: number }, text: string, band?: { top: number; bottom: number } | null): number {
+  return labelSide({ x: 0, y: b.y, w: b.w, h: b.h }, text, band) === "above" ? b.y - 6 : b.y + b.h + 11;
 }
 
 /** Упрощённая SVG-схема BPMN для печати (переиспользуется альбомом моделей и пакетом к аудиту). */
@@ -29,6 +38,9 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
   });
   const layoutEdges: LayoutEdgeIn[] = model.flows.map((f) => ({ id: f.id, from: f.from, to: f.to, fixed: fixedRoute(f.route) }));
   const laneHeights = [...model.roles.map((r) => laneHeightOf(r.lane_height)), laneHeightOf(model.process.unassigned_lane_height)];
+  // полосы дорожек: подпись фигуры у нижней границы дорожки уходит наверх (shared/bpmnLabels.ts)
+  const laneBands = laneTops(laneHeights).map((top, i) => ({ top, bottom: top + laneHeights[i] }));
+  const bandOf = (b: { y: number; h: number }) => laneBands.find((band) => b.y >= band.top - 0.5 && b.y + b.h <= band.bottom + 0.5) ?? null;
   const layout = await layoutLayered(layoutNodes, layoutEdges, laneHeights);
 
   const boxes = model.nodes
@@ -40,22 +52,20 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
         const r = b.width / 2;
         const cx = b.x + r,
           cy = b.y + r;
+        const text = n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name;
         return `<g>
           <circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="#1f2937" stroke-width="${n.subtype === "end" ? 2.4 : 1.4}" />
-          <text x="${cx}" y="${b.y + b.height + 11}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(
-          n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name
-        )}</text>
+          <text x="${cx}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
         </g>`;
       }
       if (n.type === "gateway") {
         const cx = b.x + b.width / 2,
           cy = b.y + b.height / 2,
           r = b.width / 2;
+        const text = n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name;
         return `<g>
           <polygon points="${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}" fill="${fill}" stroke="#b45309" stroke-width="1.4" />
-          <text x="${cx}" y="${b.y + b.height + 11}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(
-          n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name
-        )}</text>
+          <text x="${cx}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
         </g>`;
       }
       return `<g>

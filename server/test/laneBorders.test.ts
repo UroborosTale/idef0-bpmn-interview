@@ -6,6 +6,7 @@ import { demoModel } from "../src/reference/demo.js";
 import { bpmnHosts } from "../src/shared/codes.js";
 import { labelBox, labelSide } from "../src/shared/bpmnLabels.js";
 import { nudgeOffLaneBorders } from "../src/shared/bpmnRouting.js";
+import { albumLabelY } from "../src/export/album.js";
 
 /**
  * Замечание с осмотра (C025.02.01): поток «Уведомление об отчислении» шёл по низу полосы дорожек, а подпись
@@ -36,6 +37,14 @@ describe("линии дорожек: отрезки и подписи", () => {
       [0, 92],
       [50, 92],
     ]);
+  });
+
+  it("альбом: подпись у нижней границы дорожки ставится над фигурой", () => {
+    const band = { top: 210, bottom: 360 };
+    // событие почти у нижней границы: под ним подпись не помещается — она над фигурой
+    expect(albumLabelY({ y: 324, w: 36, h: 36 }, "Уведомление об отчислении", band)).toBe(318);
+    // выше по дорожке подпись остаётся под фигурой
+    expect(albumLabelY({ y: 150, w: 36, h: 36 }, "Начало", band)).toBe(197);
   });
 
   it("на эталонах ни один горизонтальный отрезок стрелки не лежит на линии дорожки", async () => {
