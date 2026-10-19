@@ -518,9 +518,11 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     } else if (side === "T") {
       const trunkY = Math.min(...ys) - BRANCH_GAP;
       const stubX = Math.min(...xs) - BRANCH_STUB;
-      list.forEach((a, i) => {
+      list.forEach((a) => {
         const f = freeOf(a);
-        a.points = [...(i === 0 ? ([[stubX, trunkY]] as Pt[]) : []), [f[0], trunkY], ...a.points] as Pt[];
+        // Ствол должен быть непрерывным: каждая копия идёт от вылета по общей горизонтали, иначе участок
+        // между головной стрелкой и копией не нарисован и ствол выглядит разорванным.
+        a.points = [[stubX, trunkY], [f[0], trunkY], ...a.points] as Pt[];
       });
     }
   }
