@@ -194,7 +194,17 @@ async function improvePlacement(nodes: LayoutNodeIn[], edges: LayoutEdgeIn[], el
   const columns = columnPlacement(nodes, edges);
   const elkScore = score(elkStart);
   const columnScore = score(columns);
-  const start = columnScore < elkScore - 1e-9 ? columns : elkStart;
+  // Ширина — часть замысла «как в Business Studio»: узкий вариант предпочитается, если он не хуже лучшего
+  // по качеству больше чем на NARROW_TOLERANCE баллов (примерно 4 пересечения). Иначе остаётся лучший по качеству.
+  const widthOf = (p: Placement): number => Math.max(0, ...[...placeBoxes(nodes, p.rawX, p.rank, lanes).values()].map((b) => b.x + b.width));
+  const NARROW = 1800;
+  const NARROW_TOLERANCE = 40;
+  const options = [
+    { p: elkStart, s: elkScore, w: widthOf(elkStart) },
+    { p: columns, s: columnScore, w: widthOf(columns) },
+  ].sort((a, b) => a.s - b.s);
+  const fitting = options.filter((o) => o.w <= NARROW);
+  const start = fitting.length && fitting[0].s <= options[0].s + NARROW_TOLERANCE ? fitting[0].p : options[0].p;
 
   const succ = new Map<string, string[]>();
   for (const e of edges) succ.set(e.from, [...(succ.get(e.from) ?? []), e.to]);
