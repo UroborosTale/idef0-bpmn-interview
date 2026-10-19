@@ -705,6 +705,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
       to: { key: edge.to },
       text: edge.label,
       textAt,
+      // производные связи общей схемы (DerivedFlow_N) рисуем, но при импорте не возвращаем (vsdxImport) — они не из модели
       tag: edge.flowId ? { pm_k: "flow", pm_id: edge.flowId, pm_n: edge.label ?? "" } : { pm_k: "synthflow" },
       props: visioFlowProps(!!edge.label, edge.isDefault),
     });
@@ -712,7 +713,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
 
   for (const s of d.shapes) drawBpmnShape(page, s, model);
   // что было нарисовано: по этому списку импорт отличает удалённое в Visio от появившегося в модели позже
-  page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId ? [e.flowId] : [])) });
+  page.meta.pm_manifest = JSON.stringify({ n: d.shapes.flatMap((s) => (s.nodeId ? [s.nodeId] : [])), f: d.edges.flatMap((e) => (e.flowId && !e.flowId.startsWith("DerivedFlow_") ? [e.flowId] : [])) });
   return page;
 }
 

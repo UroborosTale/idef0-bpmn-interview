@@ -194,7 +194,20 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // (родитель остаётся одним шагом). Стрелки к скрытым узлам тоже опускаем.
   const nodes = view.nodes.filter((n) => !n.idef0_parent);
   const visibleIds = new Set(nodes.map((n) => n.id));
-  const flows = view.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to));
+  // Связи уровня процесса: у эталонных моделей потоки живут внутри операций (между шагами), а между
+  // подпроцессами их нет — общая схема распадалась на изолированные блоки («3 элем. · 0 связей»).
+  // Выстраиваем подпроцессы в порядке модели; это только рисунок и XML диаграммы, модель не меняется,
+  // поэтому обратный приём правок из Visio такие потоки не создаёт.
+  const derivedFlows: ProcessLogicModel["flows"] = [];
+  if (
+    scope === null &&
+    nodes.length > 1 &&
+    nodes.every((n) => n.type === "task" || n.type === "subprocess") &&
+    view.flows.length === 0
+  ) {
+    for (let i = 1; i < nodes.length; i++) derivedFlows.push({ id: `DerivedFlow_${i}`, from: nodes[i - 1].id, to: nodes[i].id, source: [], confirmed_by: [] });
+  }
+  const flows = [...view.flows.filter((f) => visibleIds.has(f.from) && visibleIds.has(f.to)), ...derivedFlows];
   // ожидающие события, ведущие прямо в блок действия, на диаграмме — значки на блоке (shared/bpmnTriggers.ts); в XML они остаются событиями
   const tview = diagramTriggers(nodes, flows);
   const isHidden = (nodeId: string) => tview.hidden.has(nodeId.replace(/^Node_/, ""));
@@ -233,13 +246,39 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     for (const l of leaves) synthFlows.push({ id: `SynthFlow_e_${l.id}`, from: nodeIdOf(l.id), to: eid });
   }
 
-  // роли -> дорожки (+ "без исполнителя")
-  const laneRoles = [...view.roles];
+  // роли -> дорожки (+ "без исполнителя"). Дорожка подпроцесса — его исполнитель, а если он не задан (эталоны
+  // хранят роль на шагах вложенных операций) — самый частый исполнитель его поддерева: иначе все подпроцессы
+  // висели в «Без исполнителя», а дорожки ролей стояли пустыми.
+  const parentOf = new Map<string, string | null>(model.nodes.map((n) => [n.id, n.idef0_parent ?? null]));
+  const inSubtree = (id: string | null, rootId: string): boolean => {
+    let cur: string | null = id;
+    while (cur) {
+      if (cur === rootId) return true;
+      cur = parentOf.get(cur) ?? null;
+    }
+    return false;
+  };
+  const LANE_KINDS = new Set(["executor", "coexecutor"]);
+  const roleOf = (n: ProcessNode): string | null => {
+    const h = hostOf(n);
+    if (h.role_id) return h.role_id;
+    const counts = new Map<string, number>();
+    for (const s of model.nodes) if (s.id !== h.id && inSubtree(s.id, h.id) && s.role_id) counts.set(s.role_id, (counts.get(s.role_id) ?? 0) + 1);
+    if (counts.size === 0)
+      for (const a of model.assignments ?? [])
+        if (a.node_id && LANE_KINDS.has(a.kind) && inSubtree(a.node_id, h.id)) counts.set(a.role_id, (counts.get(a.role_id) ?? 0) + 1);
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [rid, c] of counts) if (c > bestCount) (best = rid), (bestCount = c);
+    return best;
+  };
+  const usedRoles = new Set(nodes.map((n) => roleOf(n)).filter((r): r is string => !!r));
+  // на общей схеме роли, которых нет ни у одного подпроцесса, дорожками не показываем: они были пустыми
+  const laneRoles = scope === null ? view.roles.filter((r) => usedRoles.has(r.id)) : [...view.roles];
   const UNASSIGNED_LANE = "Lane_unassigned";
   const laneIdOf = (roleId: string | null | undefined) => (roleId ? `Lane_${roleId}` : UNASSIGNED_LANE);
   const laneIndexOf = new Map<string, number>();
   laneRoles.forEach((r, i) => laneIndexOf.set(laneIdOf(r.id), i));
-  const roleOf = (n: ProcessNode) => hostOf(n).role_id;
   const hasUnassigned = nodes.some((n) => !roleOf(n)) || synthEvents.length > 0;
   const unassignedIndex = laneRoles.length;
   if (hasUnassigned) laneIndexOf.set(UNASSIGNED_LANE, unassignedIndex);

@@ -979,6 +979,9 @@ export function reconcileVsdxEdit(model: ProcessLogicModel, parsed: ParsedVsdx):
     }
 
     for (const e of page.edges) {
+      // производная связь общей схемы (DerivedFlow_N): нарисована для читаемости, но в модели её нет —
+      // обратный приём не должен превращать её в настоящий поток
+      if (e.pmId?.startsWith("DerivedFlow_")) continue;
       const flow = e.pmId ? flowById.get(e.pmId) : undefined;
       if (flow) {
         seenFlows.add(flow.id);
