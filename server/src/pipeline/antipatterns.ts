@@ -77,8 +77,28 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
 
   // --- Избыточное согласование: цепочка ≥3 подряд идущих шагов-согласований без изменения объекта ---
   const approvalLike = (n: ProcessNode) => {
+    // шлюзы и события («Согласование завершено») — технические точки, а не согласования
+    if (n.type !== "task" && n.type !== "subprocess") return false;
     const lower = n.name.toLowerCase();
     return APPROVE_STEMS.some((s) => lower.includes(s)) || CONSULT_STEMS.some((s) => lower.includes(s));
+  };
+  /** Следующее согласование по потоку: технические узлы (шлюзы, события) пропускаем, но в цепочку не берём. */
+  const nextApproval = (from: ProcessNode): ProcessNode | undefined => {
+    const queue = (outAdj.get(from.id) ?? []).map((f) => nodeById.get(f.to)).filter((x): x is ProcessNode => !!x);
+    const seen = new Set<string>();
+    while (queue.length > 0) {
+      const cand = queue.shift()!;
+      if (seen.has(cand.id)) continue;
+      seen.add(cand.id);
+      if (approvalLike(cand)) return cand;
+      if (cand.type === "gateway" || cand.type === "event") {
+        for (const f of outAdj.get(cand.id) ?? []) {
+          const n = nodeById.get(f.to);
+          if (n) queue.push(n);
+        }
+      }
+    }
+    return undefined;
   };
   const visitedChainStart = new Set<string>();
   for (const n of model.nodes) {
@@ -86,8 +106,7 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
     const chain: ProcessNode[] = [n];
     let cur = n;
     while (true) {
-      const succs = (outAdj.get(cur.id) ?? []).map((f) => nodeById.get(f.to)).filter((x): x is ProcessNode => !!x);
-      const next = succs.find((s) => approvalLike(s));
+      const next = nextApproval(cur);
       if (!next || chain.includes(next)) break;
       chain.push(next);
       visitedChainStart.add(next.id);
@@ -123,7 +142,7 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
 
   // --- Петля без выхода по сроку ---
   const { cycles } = findCyclesWithMarkers(model);
-  for (const cycle of cycles) {
+  for (const cycle of distinctCycles(cycles)) {
     const hasTimerOrCount = cycle.some((id) => {
       const n = nodeById.get(id);
       if (!n) return false;
@@ -134,7 +153,7 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
     if (!hasTimerOrCount) {
       const names = cycle.map((id) => nodeById.get(id)?.name ?? id);
       findings.push({
-        id: `ap_loop_${cycle[0]}`,
+        id: `ap_loop_${[...new Set(cycle)].sort().join("_")}`,
         rule: "loop_without_exit",
         label: RULE_LABEL.loop_without_exit,
         elementIds: cycle,
@@ -185,6 +204,21 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
   }
 
   return findings;
+}
+
+/** Одна и та же петля, найденная по разным обратным рёбрам, — один антипаттерн. */
+function distinctCycles(cycles: string[][]): string[][] {
+  const kept: string[][] = [];
+  for (const cycle of cycles) {
+    const set = new Set(cycle);
+    const duplicate = kept.some((k) => {
+      const kset = new Set(k);
+      const common = [...set].filter((id) => kset.has(id)).length;
+      return common / Math.max(set.size, kset.size) >= 0.8;
+    });
+    if (!duplicate) kept.push(cycle);
+  }
+  return kept;
 }
 
 function findCyclesWithMarkers(model: ProcessLogicModel): { cycles: string[][] } {
