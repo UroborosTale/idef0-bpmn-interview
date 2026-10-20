@@ -55,6 +55,14 @@ const VERB_STEMS: Array<{ stem: string; inf: string }> = [
   { stem: "заверш", inf: "завершить процесс" },
   { stem: "проверк", inf: "проверить данные" },
   { stem: "звон", inf: "позвонить клиенту" },
+  { stem: "организу", inf: "организовать" },
+  { stem: "взаимодейству", inf: "взаимодействовать" },
+  { stem: "определя", inf: "определить" },
+  { stem: "контролиру", inf: "проконтролировать" },
+  { stem: "собира", inf: "собрать" },
+  { stem: "приглаша", inf: "пригласить" },
+  { stem: "оценива", inf: "оценить" },
+  { stem: "куриру", inf: "курировать" },
   { stem: "информир", inf: "проинформировать участника" },
 ];
 
@@ -115,6 +123,41 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** Названия систем и должностей: «hr» → «HR», первая буква — заглавная. */
+function niceName(s: string): string {
+  return capitalize(s.trim().replace(/\bhr\b/giu, "HR"));
+}
+
+/** Служебные слова, которые не могут быть частью названия роли («Служба и», «Отдел при»). */
+const ROLE_STOP = new Set(["и", "а", "но", "при", "в", "на", "по", "для", "с", "от", "из", "под", "над", "не", "же", "ли", "что", "чтобы", "который", "которая", "которые", "это", "его", "ее", "её", "их", "или", "либо", "так", "как", "у", "о", "об"]);
+
+/**
+ * B1: имя шага — инфинитив глагола плюс объект из самой фразы («проверяет комплектность заявки» →
+ * «Проверить комплектность заявки»), а не шаблон «проверить данные». Объект обрезается на союзе,
+ * запятой или предлоге, чтобы в имя не попала следующая часть предложения.
+ */
+function actionName(verbHit: { stem: string; inf: string }, sentence: string, idx: number): string {
+  const verb = verbHit.inf.split(" ")[0];
+  if (idx < 0) return niceName(verbHit.inf);
+  let tail = sentence.slice(idx + verbHit.stem.length);
+  // окончание спряжения приклеено к основе: «проверя|ет», «оформ|ляет»
+  tail = tail.replace(/^[а-яё]{1,6}(?=\s|$)/u, "").trim();
+  const obj = tail.split(/[,.;:!?]|\s+(?:и|а|но|затем|потом|после|для|чтобы|при|если|когда|который|которая|которые|со|с|в|на|по|из|от|у|о|об)\s+/iu)[0].trim();
+  const words = obj.split(/\s+/).filter(Boolean).slice(0, 6);
+  if (words.length === 0) return niceName(verbHit.inf);
+  return niceName(`${verb} ${words.join(" ")}`);
+}
+
+/** Слово с основой глагола в личной форме или инфинитиве; «проверке» — существительное, не действие. */
+function verbForm(sentence: string, stem: string): { index: number; form: string } | null {
+  const re = new RegExp(`[а-яё-]*?${stem}[а-яё]*`, "giu");
+  for (const m of sentence.matchAll(re)) {
+    const word = m[0];
+    if (/(?:ет|ют|ит|ат|ят|ует|ает|яет|ть|ться|тся|л|ла|ли|ем|им|ешь|ишь)$/u.test(word)) return { index: m.index ?? -1, form: word };
+  }
+  return null;
+}
+
 export function mockExtractChunk(
   fragments: LLMFragmentInput[],
   _context: { processName: string; modelType: "AS-IS" | "TO-BE" }
@@ -135,36 +178,42 @@ export function mockExtractChunk(
   const seenSystems = new Set<string>();
   const seenData = new Set<string>();
   const seenControls = new Set<string>();
+  const seenActions = new Set<string>();
 
   for (const frag of fragments) {
     const isFact = frag.speaker === "owner" || frag.speaker === "participant";
 
-    // роли (по словарю должностей и "отдел/служба X")
+    // роли: сначала составные («финансовый директор», «HR-менеджер»), затем одиночные слова и подразделения
     const lower = frag.text.toLowerCase();
+    const addRole = (name: string, confidence: number) => {
+      const key = name.trim().toLowerCase();
+      if (!key || seenRoles.has(key)) return;
+      seenRoles.add(key);
+      result.roles.push({ name: niceName(name), kind: "internal", source_fragment_id: frag.id, quote: frag.text.slice(0, 200), confidence });
+    };
+    const compounds: string[] = [];
     for (const rw of ROLE_WORDS) {
-      if (lower.includes(rw) && !seenRoles.has(rw)) {
-        seenRoles.add(rw);
-        result.roles.push({
-          name: capitalize(rw),
-          kind: "internal",
-          source_fragment_id: frag.id,
-          quote: frag.text.slice(0, 200),
-          confidence: 0.5,
-        });
+      if (rw === "hr") continue;
+      const m = frag.text.match(new RegExp(`([А-ЯЁA-Z][А-ЯЁA-Zа-яёa-z-]*)[-\\s]+${rw}`, "u"));
+      if (m && !ROLE_STOP.has(m[1].toLowerCase())) {
+        compounds.push(m[0].toLowerCase());
+        addRole(m[0], 0.55);
       }
     }
+    const coveredByCompound = (rw: string) => compounds.some((c) => c.includes(rw));
+    for (const rw of ROLE_WORDS) {
+      if (lower.includes(rw) && !coveredByCompound(rw)) addRole(rw, 0.5);
+    }
+    // «Служба безопасности», «Юридическая служба» — подразделение как роль; «Служба и», «Отдел при» отбрасываем
     for (const dw of DEPT_WORDS) {
-      const re = new RegExp(`${dw}\\s+[а-яё]+`, "iu");
-      const m = frag.text.match(re);
-      if (m && !seenRoles.has(m[0].toLowerCase())) {
-        seenRoles.add(m[0].toLowerCase());
-        result.roles.push({
-          name: capitalize(m[0]),
-          kind: "internal",
-          source_fragment_id: frag.id,
-          quote: frag.text.slice(0, 200),
-          confidence: 0.45,
-        });
+      for (const re of [new RegExp(`\\b${dw}\\s+([а-яё][а-яё-]*)`, "iu"), new RegExp(`\\b([А-ЯЁA-Zа-яёa-z-]+)\\s+${dw}\\b`, "iu")]) {
+        const m = frag.text.match(re);
+        if (!m) continue;
+        const words = m[0].replace(/\s+/g, " ").trim().toLowerCase().split(" ");
+        if (words.some((w) => ROLE_STOP.has(w))) continue;
+        // второе слово — глагол («Служба проверяют»), а не название подразделения
+        if (words[1] && /(?:ют|ет|ит|ают|яют|ует|ешь|ишь|ться|тся|ть)$/u.test(words[1])) continue;
+        addRole(m[0], 0.45);
       }
     }
 
@@ -225,6 +274,8 @@ export function mockExtractChunk(
 
       const verbHit = VERB_STEMS.find((v) => sLower.includes(v.stem));
       if (!verbHit) continue;
+      const form = verbForm(sLower, verbHit.stem);
+      if (!form) continue;
 
       const role = findWord(sentence, ROLE_WORDS);
       const doc = findWord(sentence, DOC_WORDS);
@@ -233,11 +284,16 @@ export function mockExtractChunk(
       const uncertain = /обычно|иногда|бывает|как правило/iu.test(sentence);
       const isGateway = CONDITION_MARKERS.some((mk) => sLower.includes(mk));
 
+      const name = isGateway ? capitalize(verbHit.inf) : actionName(verbHit, sentence, form.index);
+      const actionKey = `${name.toLowerCase()}|${role ?? ""}`;
+      if (seenActions.has(actionKey)) continue;
+      seenActions.add(actionKey);
+
       orderCounter += 1;
       result.nodes.push({
         type: isGateway ? "gateway" : "task",
         subtype: isGateway ? "exclusive" : "user",
-        name: verbHit.inf,
+        name,
         role_name: role ? capitalize(role) : null,
         system_names: system ? [system.toUpperCase()] : [],
         input_names: [],
