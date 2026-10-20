@@ -53,7 +53,7 @@ export default function RegistryPage() {
         <button onClick={() => setTab("staleness")} className={tab === "staleness" ? "active" : ""}>Актуальность</button>
         {tab === "registry" && (
           <>
-            <a href={api.registryExportXlsxUrl()} target="_blank" rel="noreferrer"><button>Экспорт .xlsx</button></a>
+            <a href={api.registryExportXlsxUrl()} download><button>Экспорт .xlsx</button></a>
             <button className="primary" onClick={() => setShowNew(true)}>+ Добавить процесс</button>
           </>
         )}

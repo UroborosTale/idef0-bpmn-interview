@@ -133,7 +133,7 @@ function CompareModal({ asIsId, toBeId, title, onClose }: { asIsId: string; toBe
             </div>
             <div className="toolbar" style={{ marginTop: 12 }}>
               <a href={api.comparePreviewUrl(asIsId, toBeId)} target="_blank" rel="noreferrer"><button>Просмотр HTML</button></a>
-              <a href={api.compareExportPdfUrl(asIsId, toBeId)} target="_blank" rel="noreferrer"><button>Экспорт PDF</button></a>
+              <a href={api.compareExportPdfUrl(asIsId, toBeId)} download><button>Экспорт PDF</button></a>
             </div>
           </>
         )}

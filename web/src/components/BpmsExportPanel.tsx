@@ -20,8 +20,8 @@ export default function BpmsExportPanel({ session }: { session: SessionRecord })
       </p>
 
       <div className="toolbar" style={{ marginTop: 10 }}>
-        <a href={api.bpmsCamundaUrl(session.id)} target="_blank" rel="noreferrer"><button className="primary">Camunda: .bpmn</button></a>
-        <a href={api.bpmsElma365Url(session.id)} target="_blank" rel="noreferrer"><button>ELMA365: .json</button></a>
+        <a href={api.bpmsCamundaUrl(session.id)} download><button className="primary">Camunda: .bpmn</button></a>
+        <a href={api.bpmsElma365Url(session.id)} download><button>ELMA365: .json</button></a>
         <select value={target} onChange={(e) => setTarget(e.target.value as "camunda" | "elma365")}>
           <option value="camunda">Отчёт для Camunda</option>
           <option value="elma365">Отчёт для ELMA365</option>

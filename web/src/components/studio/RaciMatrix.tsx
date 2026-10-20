@@ -70,7 +70,7 @@ export default function RaciMatrix({
         <button onClick={fill} title="Добавить R и A по исполнителю функции там, где отметок нет">
           Заполнить по исполнителям
         </button>
-        <a href={dirty ? undefined : api.raciExportXlsxUrl(sessionId, filterSet?.id)} target="_blank" rel="noreferrer" className={dirty ? "disabled-link" : ""} title={dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
+        <a href={dirty ? undefined : api.raciExportXlsxUrl(sessionId, filterSet?.id)} download className={dirty ? "disabled-link" : ""} title={dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
           <button disabled={dirty}>Экспорт .xlsx</button>
         </a>
       </div>

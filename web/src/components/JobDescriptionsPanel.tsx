@@ -41,8 +41,8 @@ export default function JobDescriptionsPanel({ session }: { session: SessionReco
                   >
                     Предпросмотр
                   </button>{" "}
-                  <a href={api.jobDescriptionExportHtmlUrl(session.id, r.id)} target="_blank" rel="noreferrer"><button>.html</button></a>{" "}
-                  <a href={api.jobDescriptionExportDocxUrl(session.id, r.id)} target="_blank" rel="noreferrer"><button>.docx</button></a>
+                  <a href={api.jobDescriptionExportHtmlUrl(session.id, r.id)} download><button>.html</button></a>{" "}
+                  <a href={api.jobDescriptionExportDocxUrl(session.id, r.id)} download><button>.docx</button></a>
                 </td>
               </tr>
             ))}

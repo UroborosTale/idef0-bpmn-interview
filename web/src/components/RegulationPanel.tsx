@@ -26,8 +26,8 @@ export default function RegulationPanel({ session }: { session: SessionRecord })
           <input type="checkbox" checked={structureOnly} onChange={(e) => setStructureOnly(e.target.checked)} />
           Только структура (без текста)
         </label>
-        <a href={api.regulationExportDocxUrl(session.id, structureOnly)} target="_blank" rel="noreferrer"><button>Экспорт .docx</button></a>
-        <a href={api.regulationExportHtmlUrl(session.id, structureOnly)} target="_blank" rel="noreferrer"><button>Экспорт .html</button></a>
+        <a href={api.regulationExportDocxUrl(session.id, structureOnly)} download><button>Экспорт .docx</button></a>
+        <a href={api.regulationExportHtmlUrl(session.id, structureOnly)} download><button>Экспорт .html</button></a>
         <button
           className="primary"
           disabled={busy}

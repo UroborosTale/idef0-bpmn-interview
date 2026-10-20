@@ -15,8 +15,8 @@ export default function AuditPackagePanel({ session }: { session: SessionRecord 
       </p>
       <div className="toolbar" style={{ marginTop: 10 }}>
         <a href={api.auditPackagePreviewUrl(session.id)} target="_blank" rel="noreferrer"><button>Предпросмотр (HTML)</button></a>
-        <a href={api.auditPackagePdfUrl(session.id)} target="_blank" rel="noreferrer"><button className="primary">Скачать PDF</button></a>
-        <a href={api.auditPackageZipUrl(session.id)} target="_blank" rel="noreferrer"><button>Скачать .zip</button></a>
+        <a href={api.auditPackagePdfUrl(session.id)} download><button className="primary">Скачать PDF</button></a>
+        <a href={api.auditPackageZipUrl(session.id)} download><button>Скачать .zip</button></a>
       </div>
       <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
         Если PDF-рендеринг недоступен в этом окружении (нет Chromium), используйте предпросмотр и печать в PDF из браузера.

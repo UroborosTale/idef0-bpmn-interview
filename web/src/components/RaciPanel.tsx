@@ -45,7 +45,7 @@ export default function RaciPanel({ session, onChanged }: { session: SessionReco
         <button disabled={busy} onClick={() => withBusy(async () => { await api.buildRaci(session.id); onChanged(); })}>
           Построить автоматически
         </button>
-        <a href={api.raciExportXlsxUrl(session.id)} target="_blank" rel="noreferrer"><button>Экспорт .xlsx</button></a>
+        <a href={api.raciExportXlsxUrl(session.id)} download><button>Экспорт .xlsx</button></a>
       </div>
 
       <p className="muted" style={{ fontSize: 12 }}>

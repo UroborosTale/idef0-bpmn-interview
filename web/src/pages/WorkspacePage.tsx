@@ -304,7 +304,14 @@ export default function WorkspacePage({
               setSession(await api.uploadFile(sessionId, file.name, b64, { append, anonymize }));
             })
           }
-          onRun={() => withBusy(async () => setSession(await api.runPipeline(sessionId, onProgress)))}
+          onRun={() =>
+            withBusy(async () => {
+              const updated = await api.runPipeline(sessionId, onProgress);
+              setSession(updated);
+              // модель готова — сразу показываем студию, а не оставляем пользователя на тексте
+              if (updated.model) setTab("studio");
+            })
+          }
         />
       )}
 

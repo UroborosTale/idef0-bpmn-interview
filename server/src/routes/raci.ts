@@ -89,6 +89,6 @@ raciRouter.get("/sessions/:id/raci/export/xlsx", (req, res) => {
     return;
   }
   const buf = buildRaciWorkbookBuffer(session.model, setId ? { nodeIds: setNodeIds(session.model, setId) } : {});
-  res.setHeader("Content-Disposition", `attachment; filename="raci.xlsx"`);
+  res.setHeader("Content-Disposition", `attachment; filename="raci.xlsx"; filename*=UTF-8''${encodeURIComponent(`${session.meta.processName}.raci.xlsx`)}`);
   res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet").send(buf);
 });

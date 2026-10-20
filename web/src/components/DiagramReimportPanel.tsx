@@ -38,8 +38,8 @@ export default function DiagramReimportPanel({ session, onChanged }: { session: 
       </div>
       <p className="muted" style={{ fontSize: 12 }}>
         Экспортируйте текущую модель в bpmn.io/Camunda Modeler (
-        <a href={api.exportUrl(session.id, "bpmn")} target="_blank" rel="noreferrer">скачать .bpmn</a>) или draw.io (
-        <a href={api.exportUrl(session.id, "idef0.drawio")} target="_blank" rel="noreferrer">скачать .drawio</a>), внесите правки во внешнем
+        <a href={api.exportUrl(session.id, "bpmn")} download>скачать .bpmn</a>) или draw.io (
+        <a href={api.exportUrl(session.id, "idef0.drawio")} download>скачать .drawio</a>), внесите правки во внешнем
         редакторе и загрузите изменённый файл ниже — переименованные элементы обновятся, новые появятся как гипотезы, а отсутствующие в
         файле элементы модели будут только отмечены (не удалены).
       </p>

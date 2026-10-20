@@ -100,7 +100,7 @@ regulationRouter.get("/sessions/:id/regulation/export.html", (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
   const structureOnly = req.query.structureOnly === "1";
-  res.setHeader("Content-Disposition", `attachment; filename="regulation.html"`);
+  res.setHeader("Content-Disposition", `attachment; filename="regulation.html"; filename*=UTF-8''${encodeURIComponent(`${session.meta.processName}.regulation.html`)}`);
   res.type("text/html; charset=utf-8").send(buildRegulationHtml(session, { structureOnly }));
 });
 
@@ -110,6 +110,6 @@ regulationRouter.get("/sessions/:id/regulation/export.docx", async (req, res) =>
   if (!session) return;
   const structureOnly = req.query.structureOnly === "1";
   const buf = await buildRegulationDocx(session, { structureOnly });
-  res.setHeader("Content-Disposition", `attachment; filename="regulation.docx"`);
+  res.setHeader("Content-Disposition", `attachment; filename="regulation.docx"; filename*=UTF-8''${encodeURIComponent(`${session.meta.processName}.regulation.docx`)}`);
   res.type("application/vnd.openxmlformats-officedocument.wordprocessingml.document").send(buf);
 });

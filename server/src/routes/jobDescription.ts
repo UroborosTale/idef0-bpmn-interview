@@ -28,6 +28,12 @@ function requireReady(req: any, res: any) {
   return session;
 }
 
+/** Имя файла с ролью: иначе инструкции разных ролей скачиваются как job-description.html/.docx и путаются. */
+function attachmentName(roleName: string, ext: string): string {
+  const base = `${roleName.replace(/[\\/:*?"<>|]/g, " ").trim().slice(0, 100) || "роль"}.должностная-инструкция.${ext}`;
+  return `attachment; filename="job-description.${ext}"; filename*=UTF-8''${encodeURIComponent(base)}`;
+}
+
 function lookupPosition(roleName: string): RolePositionInfo | undefined {
   const row = db
     .prepare(
@@ -51,7 +57,7 @@ jobDescriptionRouter.get("/sessions/:id/job-description/:roleId/export.html", (r
   const session = requireReady(req, res);
   if (!session) return;
   const role = session.model!.roles.find((r) => r.id === req.params.roleId)!;
-  res.setHeader("Content-Disposition", `attachment; filename="job-description.html"`);
+  res.setHeader("Content-Disposition", attachmentName(role.name, "html"));
   res.type("text/html; charset=utf-8").send(buildJobDescriptionHtml(session, req.params.roleId, lookupPosition(role.name)));
 });
 
@@ -60,6 +66,6 @@ jobDescriptionRouter.get("/sessions/:id/job-description/:roleId/export.docx", as
   if (!session) return;
   const role = session.model!.roles.find((r) => r.id === req.params.roleId)!;
   const buf = await buildJobDescriptionDocx(session, req.params.roleId, lookupPosition(role.name));
-  res.setHeader("Content-Disposition", `attachment; filename="job-description.docx"`);
+  res.setHeader("Content-Disposition", attachmentName(role.name, "docx"));
   res.type("application/vnd.openxmlformats-officedocument.wordprocessingml.document").send(buf);
 });

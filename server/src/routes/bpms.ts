@@ -22,7 +22,7 @@ bpmsRouter.get("/sessions/:id/bpms/camunda.bpmn", (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
   const { xml } = buildCamundaBpmn(session.model!);
-  res.setHeader("Content-Disposition", `attachment; filename="camunda.bpmn"`);
+  res.setHeader("Content-Disposition", `attachment; filename="camunda.bpmn"; filename*=UTF-8''${encodeURIComponent(`${session.meta.processName}.camunda.bpmn`)}`);
   res.type("application/xml").send(xml);
 });
 
@@ -31,7 +31,7 @@ bpmsRouter.get("/sessions/:id/bpms/elma365.json", (req, res) => {
   const session = requireReady(req, res);
   if (!session) return;
   const { data } = buildElma365Export(session.model!);
-  res.setHeader("Content-Disposition", `attachment; filename="elma365.json"`);
+  res.setHeader("Content-Disposition", `attachment; filename="elma365.json"; filename*=UTF-8''${encodeURIComponent(`${session.meta.processName}.elma365.json`)}`);
   res.type("application/json").send(JSON.stringify(data, null, 2));
 });
 

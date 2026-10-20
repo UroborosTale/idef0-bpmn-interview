@@ -24,7 +24,7 @@ export default function ExportsPanel({ session }: { session: SessionRecord }) {
       <h4>Экспорт</h4>
       <div className="exports-row">
         {links.map((l) => (
-          <a key={l.path} href={api.exportUrl(id, l.path)} target="_blank" rel="noreferrer">
+          <a key={l.path} href={api.exportUrl(id, l.path)} {...(l.path === "album.html" ? { target: "_blank", rel: "noreferrer" } : { download: "" })}>
             <button disabled={!session.model}>{l.label}</button>
           </a>
         ))}

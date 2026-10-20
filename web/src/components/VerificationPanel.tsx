@@ -10,6 +10,9 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
   const [editText, setEditText] = useState("");
   const [proposal, setProposal] = useState<{ diff: any; proposedModel: unknown; proposedFragments: unknown; proposedRawText: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // утверждённая версия — только просмотр: пересказ можно читать, но не подтверждать и не править
+  const locked = session.model?.process.status === "approved";
 
   async function reload() {
     const p = await api.verificationPreview(session.id);
@@ -24,8 +27,11 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
 
   async function withBusy(fn: () => Promise<void>) {
     setBusy(true);
+    setError(null);
     try {
       await fn();
+    } catch (e) {
+      setError((e as Error).message || "Не удалось выполнить действие");
     } finally {
       setBusy(false);
     }
@@ -38,6 +44,8 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
         Владелец процесса читает пересказ (без терминов IDEF0/BPMN), подтверждает верные абзацы или правит неточные —
         правки превращаются в изменения модели, но применяются только после проверки аналитиком.
       </p>
+      {locked && <p className="validation-item" style={{ background: "#fff7e6" }}>Версия утверждена — пересказ открыт только для чтения. Чтобы править, откройте новый цикл правок.</p>}
+      {error && <p className="validation-item error">{error}</p>}
 
       <div style={{ marginTop: 12 }}>
         {paragraphs.map((p) => (
@@ -56,7 +64,7 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
                       })
                     }
                   >
-                    Показать изменения
+                    {busy ? "Проверяю…" : "Показать изменения"}
                   </button>
                   <button onClick={() => setEditingId(null)}>Отмена</button>
                 </div>
@@ -68,11 +76,11 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
                   {confirmed.includes(p.id) ? (
                     <span className="pill status-approved">подтверждено</span>
                   ) : (
-                    <button disabled={busy} onClick={() => withBusy(async () => { await api.confirmParagraph(session.id, p.id); await reload(); })}>
+                    <button disabled={busy || locked} onClick={() => withBusy(async () => { await api.confirmParagraph(session.id, p.id); await reload(); })}>
                       Подтвердить
                     </button>
                   )}
-                  <button onClick={() => { setEditingId(p.id); setEditText(p.text); }}>Править</button>
+                  <button disabled={locked} title={locked ? "Версия утверждена — сначала откройте новый цикл правок" : undefined} onClick={() => { setEditingId(p.id); setEditText(p.text); }}>Править</button>
                 </div>
               </div>
             )}

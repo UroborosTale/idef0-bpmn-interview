@@ -159,7 +159,7 @@ export default function ReviewPanel({ session, onChanged }: { session: SessionRe
         </div>
       )}
 
-      <h5 style={{ marginTop: 20 }}>Уведомления (ФТ-М7.4.2)</h5>
+      <h5 style={{ marginTop: 20 }}>Уведомления</h5>
       <p className="muted" style={{ fontSize: 12 }}>
         При финальном утверждении система создаёт уведомления владельцам смежных процессов и по затронутым ролям.
         Канал "в системе" работает всегда; вебхук (мессенджер/внешняя интеграция) — опционально.
