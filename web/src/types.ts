@@ -225,6 +225,8 @@ export interface Gap {
   question: string;
   status: "open" | "answered" | "dismissed";
   topic?: string;
+  /** Ответ аналитика на вопрос (у отвеченных пробелов). */
+  answer?: string;
 }
 
 export interface Statement {
