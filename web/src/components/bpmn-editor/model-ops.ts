@@ -2,7 +2,7 @@ import { MIN_DIAGRAM_W, clampDiagramWidth, clampLaneHeight } from "@shared/bpmnG
 import { routesForCopy } from "../idef0-editor/arrow-edit";
 import { allowedTriggers, eventSpec, withTrigger, type EventPosition, type EventTrigger, type TriggerType } from "@shared/events";
 import type { ExternalPool, FlowRoute, MessageFlow, ProcessFlow, ProcessLogicModel, ProcessNode } from "../../types";
-import { LANE_H, MIN_LANE_H, boxMap, boxOf, clampIntoLane, contentWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, triggerView, visibleNodes, type Pt } from "./geometry";
+import { LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, clampIntoLane, contentWidth, isBoundary, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, roleIdOfLane, sizeOf, snap, snapTop, triggerView, visibleNodes, type Pt } from "./geometry";
 
 type M = ProcessLogicModel;
 export interface OpResult {
@@ -107,6 +107,110 @@ export function addNodeAt(m: M, spec: NewNodeSpec, cx: number, cy: number): OpRe
     layout: { x, y },
   };
   return { model: { ...m, nodes: [...m.nodes, node] }, id: node.id };
+}
+
+/** Пересечение прямоугольников (касание не считается). */
+const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/**
+ * A3 (отчёт 19.10): фигура из палитры встаёт в цепочку рядом с выбранной, а не «где-то справа».
+ * - задача, подпроцесс, шлюз, промежуточное событие — вставляются в разрыв единственной исходящей стрелки
+ *   (A → новая → B), иначе добавляется ветка A → новая;
+ * - начало вставляется перед выбранной (в разрыв входящей стрелки), конец — после выбранной;
+ * - если выбрано конечное событие, новая фигура встаёт перед ним (в разрыв его входящей стрелки).
+ * Место освобождается сдвигом фигур этой дорожки вправо: фигуры и подписи не накладываются.
+ */
+export function insertNodeAfter(m: M, spec: NewNodeSpec, afterId: string): OpResult {
+  const from = m.nodes.find((n) => n.id === afterId);
+  if (!from) return { model: m, error: "Элемент не найден" };
+  const size = sizeOf(spec);
+  const sel = boxOf(from);
+  const isStart = spec.type === "event" && spec.subtype === "start";
+  const isEnd = spec.type === "event" && spec.subtype === "end";
+  const selectedIsEnd = from.type === "event" && from.subtype === "end";
+  /** Вставляем перед выбранной: новое начало или шаг перед конечным событием. */
+  const before = isStart || selectedIsEnd;
+
+  // новая фигура остаётся на линии центров выбранной: та же полоса дорожки, без прыжков по вертикали
+  let x = Math.max(MIN_X, before ? sel.x - size.w - 40 : sel.x + sel.w + 40);
+  const y = snapTop(sel.y + (sel.h - size.h) / 2, size.h);
+
+  // Освобождаем место: фигуры той же полосы, стоящие не левее помехи, едут вправо на столько, сколько нужно.
+  const row = (b: { y: number; h: number }) => b.y < y + size.h && y < b.y + b.h;
+  let nodes = [...m.nodes];
+  for (let guard = 0; guard < 20; guard++) {
+    const rect = { x, y, w: size.w, h: size.h };
+    const blocker = nodes.find((n) => {
+      if (n.id === afterId) return false;
+      const b = boxOf(n);
+      return row(b) && overlaps(b, rect);
+    });
+    if (!blocker) break;
+    const bb = boxOf(blocker);
+    const delta = before ? sel.x - (x + size.w) + 40 : x + size.w + 40 - bb.x;
+    if (delta <= 0) break;
+    nodes = nodes.map((n) => {
+      if (n.id === afterId) return n;
+      const b = boxOf(n);
+      if (!row(b) || b.x < bb.x - 0.5) return n;
+      return { ...n, layout: { x: b.x + delta, y: b.y } };
+    });
+  }
+  const lane = from.role_id != null ? laneIndexOfRole(m, from.role_id) : laneIndexAtY(m, sel.y + sel.h / 2);
+
+  const id = nextId("n", m.nodes.map((n) => n.id));
+  let usedFlowIds = m.flows.map((f) => f.id);
+  const mkFlow = (a: string, b: string, extra: Partial<ProcessFlow> = {}): ProcessFlow => {
+    const flow: ProcessFlow = { id: nextId("flow", usedFlowIds), from: a, to: b, condition: null, source: [], confirmed_by: [], ...extra };
+    usedFlowIds = [...usedFlowIds, flow.id];
+    return flow;
+  };
+
+  const ins = m.flows.filter((f) => f.to === afterId && f.from !== afterId);
+  const outs = m.flows.filter((f) => f.from === afterId && f.to !== afterId);
+  let flows = m.flows;
+  if (before && ins.length === 1) {
+    // … → выбранная превращается в … → новая → выбранная
+    const old = ins[0];
+    const rest = flows.filter((f) => f.id !== old.id);
+    const first = mkFlow(old.from, id, { condition: old.condition ?? null });
+    const second = mkFlow(id, afterId);
+    flows = [...rest, first, second];
+  } else if (!before && !isEnd && outs.length === 1) {
+    // выбранная → … превращается в выбранную → новая → …
+    const old = outs[0];
+    const rest = flows.filter((f) => f.id !== old.id);
+    const first = mkFlow(afterId, id, old.is_default ? { is_default: true } : {});
+    const second = mkFlow(id, old.to, { condition: old.condition ?? null });
+    flows = [...rest, first, second];
+  } else if (before) {
+    // входящей стрелки нет (или их несколько): новая → выбранная — так продолжение цепочки не рвётся
+    if (!(from.type === "event" && from.subtype === "start")) flows = [...flows, mkFlow(id, afterId)];
+  } else if (!selectedIsEnd) {
+    flows = [...flows, mkFlow(afterId, id)];
+  }
+
+  const node: ProcessNode = {
+    id,
+    type: spec.type,
+    subtype: spec.subtype,
+    ...(spec.trigger ? { trigger: structuredClone(spec.trigger) } : {}),
+    name: spec.name,
+    role_id: roleIdOfLane(m, lane),
+    system_ids: [],
+    inputs: [],
+    outputs: [],
+    controls: [],
+    status: "confirmed",
+    confidence: 1,
+    source: [],
+    requirement_ids: [],
+    tags: [],
+    confirmed_by: [],
+    layout: { x, y },
+  };
+  return { model: { ...m, nodes: [...nodes, node], flows }, id };
 }
 
 export const moveNode = (m: M, id: string, x: number, y: number): M => mapNode(m, id, (n) => ({ ...n, layout: { x, y } }));

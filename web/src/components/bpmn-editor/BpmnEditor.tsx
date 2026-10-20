@@ -17,7 +17,7 @@ import { positionOnSide } from "@shared/bpmnManual";
 import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, snapShape, type Guide, type GuideTarget } from "./guides";
 import { alignLeft, alignMiddle, boundsOf, copyFragment, deleteGroup, distributeHorizontally, dropGroup, hasClipboard, moveGroup, nodesInRect, pasteFragment, selectableIds, setClipboard, takeClipboard } from "./selection-ops";
-import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, setArtifactOffset, setPoolOffset, addPool, addMessage, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, addRole, addScopeLane, deleteFlow, deleteMessage, deletePool, deleteNode, updateMessage, updatePool, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec } from "./model-ops";
+import { BLOCK_TRIGGERS, EVENT_PALETTE, PALETTE, diagramMinWidth, laneMinHeight, setDiagramWidth, setLaneHeight, setArtifactOffset, setPoolOffset, addPool, addMessage, addBoundaryEvent, attachTrigger, deleteTriggerEvent, nearestSide, reconnectFlow, setFlowRoute, type FlowSide, addFlow, addNodeAt, insertNodeAfter, addRole, addScopeLane, deleteFlow, deleteMessage, deletePool, deleteNode, updateMessage, updatePool, dropNodeIntoLane, duplicateNode, moveNode, updateFlow, updateNode, type NewNodeSpec, type OpResult } from "./model-ops";
 import { ArrowDefs, ArtifactShape, FlowShape, LaneResizeHandles, LanesLayer, MessageShape, NodeShape, PoolShape, TriggerMarkers, nodeStyle, UNASSIGNED_LANE } from "./shapes";
 import type { Selection } from "../studio/selection";
 import { entryOf, updateEntry } from "../studio/dict-ops";
@@ -653,7 +653,6 @@ export default function BpmnEditor({
 
   const addFromPalette = (spec: NewNodeSpec, at?: Pt) => {
     const m = viewRef.current;
-    let cx: number, cy: number;
     const from = curSel?.kind === "node" ? m.nodes.find((n) => n.id === curSel.id) : undefined;
     // ожидающий триггер при выбранном блоке прикрепляется к блоку значком, а не рисуется отдельной фигурой со стрелкой
     if (!at && spec.type === "event" && spec.trigger && spec.subtype !== "end" && spec.trigger.direction !== "throw" && BLOCK_TRIGGERS.includes(spec.trigger.type) && from && (from.type === "task" || from.type === "subprocess")) {
@@ -662,24 +661,19 @@ export default function BpmnEditor({
       else commit(r.model, { kind: "node", id: r.id! });
       return;
     }
+    let added: OpResult;
     if (at) {
-      [cx, cy] = at;
+      added = addNodeAt(m, spec, at[0], at[1]);
     } else if (from) {
-      const b = boxMap(visibleNodes(m)).get(from.id) ?? boxOf(from);
-      cx = b.x + b.w + 100;
-      cy = b.y + b.h / 2;
+      // A3: фигура встаёт в цепочку рядом с выбранной (в разрыв стрелки), а не «справа от неё» с лишней веткой
+      added = insertNodeAfter(m, spec, from.id);
     } else {
       const r = svgRef.current!.getBoundingClientRect();
-      [cx, cy] = toWorld(r.left + r.width / 2, r.top + r.height / 2);
+      const [cx, cy] = toWorld(r.left + r.width / 2, r.top + r.height / 2);
+      added = addNodeAt(m, spec, cx, cy);
     }
-    const added = addNodeAt(m, spec, cx, cy);
-    let next = added.model;
-    // «быстрое продолжение»: новая фигура сразу соединяется с выбранной
-    if (!at && from) {
-      const linked = addFlow(next, from.id, added.id!);
-      if (!linked.error) next = linked.model;
-    }
-    commit(next, { kind: "node", id: added.id! });
+    if (added.error) return showHint(added.error);
+    commit(added.model, { kind: "node", id: added.id! });
     setEditing(added.id!);
   };
 

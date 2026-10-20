@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { session, structuredModel } from "../../test/fixtures";
 import { commit, field, renderWithModel } from "../../test/harness";
 import type { ProcessLogicModel } from "../../types";
-import { SIZE, autoLayout, boxMap, diagramExtras, isBoundary, modelExtents, visibleNodes, withLayout } from "../bpmn-editor/geometry";
+import { SIZE, autoLayout, boxMap, boxOf, diagramExtras, isBoundary, modelExtents, visibleNodes, withLayout } from "../bpmn-editor/geometry";
 import { addBoundaryEvent, addFlow, addMessage, addNodeAt, addPool, deleteMessage, deleteNode, deletePool, dropNodeIntoLane, setNodeRole, updateMessage } from "../bpmn-editor/model-ops";
 import { ArtifactShape } from "../bpmn-editor/shapes";
 import MessagesEditor, { PoolsEditor } from "./MessagesEditor";
@@ -235,6 +235,41 @@ describe("студия: новые элементы на диаграмме оп
     fireEvent.pointerDown(document.querySelector(`[data-node-id="${id}"]`)!, { button: 0, pointerId: 1 });
     fireEvent.pointerUp(document.querySelector(".studio svg.bpe-svg")!, { pointerId: 1 });
   };
+
+  it("A3: палитра вставляет фигуру в цепочку, выделение переходит на неё, следующий щелчок продолжает цепочку", async () => {
+    const { onSave } = studio(structuredModel());
+    select("b1");
+    fireEvent.click(palette("Шлюз XOR"));
+    // переименование открылось на новой фигуре — выделение перешло на неё
+    const rename = document.querySelector(".bpe-rename") as HTMLInputElement;
+    expect(rename).toBeTruthy();
+    expect(rename.value).toBe("Развилка");
+    fireEvent.keyDown(rename, { key: "Enter" });
+    // следующий щелчок продолжает цепочку: задача встаёт между шлюзом и концом
+    fireEvent.click(palette("Задача"));
+    const rename2 = document.querySelector(".bpe-rename") as HTMLInputElement;
+    expect(rename2.value).toBe("Новая задача");
+    fireEvent.keyDown(rename2, { key: "Enter" });
+    await act(async () => fireEvent.click(screen.getByTitle("Сохранить (Ctrl+S)")));
+    const m = onSave.mock.calls[0][0] as M;
+    const g = m.nodes.find((n) => n.name === "Развилка")!;
+    const t = m.nodes.find((n) => n.name === "Новая задача")!;
+    const outs = (id: string) => m.flows.filter((f) => f.from === id).map((f) => f.to);
+    // цепочка не ветвится: b1 → шлюз → задача → b2
+    expect(outs("b1")).toEqual([g.id]);
+    expect(outs(g.id)).toEqual([t.id]);
+    expect(outs(t.id)).toEqual(["b2"]);
+    // фигуры не налезают друг на друга
+    for (const id of [g.id, t.id]) {
+      const b = boxOf(m.nodes.find((n) => n.id === id)!);
+      for (const n of m.nodes) {
+        if (n.id === id || !n.layout) continue;
+        const o = boxOf(n);
+        const hit = b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h;
+        expect(hit, `${id} налезает на ${n.id}`).toBe(false);
+      }
+    }
+  });
 
   it("палитра: «Бизнес-правила» добавляет задачу с этим видом", async () => {
     const { onSave } = studio(structuredModel());

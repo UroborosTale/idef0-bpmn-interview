@@ -1,9 +1,72 @@
 import { describe, expect, it } from "vitest";
 import { purchaseModel, structuredModel } from "../../test/fixtures";
 import { LANE_H, START_Y, autoLayout, boxOf, laneIndexAtY, laneIndexOfRole, positionsFromBpmnXml, visibleNodes, withLayout, wrapText } from "./geometry";
-import { addFlow, addNodeAt, addRole, deleteNode, duplicateNode, deleteRole, dropNodeIntoLane, moveNode, nextId, replaceNodeObject, setNodeRole, setNodeType } from "./model-ops";
+import { addFlow, addNodeAt, addRole, deleteNode, duplicateNode, deleteRole, dropNodeIntoLane, insertNodeAfter, moveNode, nextId, replaceNodeObject, setNodeRole, setNodeType } from "./model-ops";
 
 const laid = () => withLayout(purchaseModel());
+
+/** Фигура не налезает ни на одну другую (A3: подписи и рамки не должны слипаться). */
+function expectNoOverlap(m: ReturnType<typeof structuredModel>, id: string) {
+  const b = boxOf(m.nodes.find((n) => n.id === id)!);
+  for (const n of visibleNodes(m)) {
+    if (n.id === id) continue;
+    const o = boxOf(n);
+    const hit = b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h;
+    expect(hit, `${id} налезает на ${n.id}`).toBe(false);
+  }
+}
+
+describe("A3: фигура из палитры встаёт в цепочку", () => {
+  // начало b0 → b1 → b2 → конец b9; фигуры стоят вплотную (зазор 10 px)
+  it("шлюз вставляется между задачей и следующей фигурой, без лишней ветки", () => {
+    const r = insertNodeAfter(structuredModel(), { type: "gateway", subtype: "exclusive", name: "Развилка" }, "b1");
+    const id = r.id!;
+    const out = r.model.flows.filter((f) => f.from === "b1");
+    expect(out).toHaveLength(1); // стрелка b1 → b2 заменена на b1 → шлюз
+    expect(out[0].to).toBe(id);
+    expect(r.model.flows.some((f) => f.from === id && f.to === "b2")).toBe(true);
+    expect(r.model.flows.some((f) => f.from === "b1" && f.to === "b2")).toBe(false);
+    expect(r.model.flows).toHaveLength(4);
+    const added = r.model.nodes.find((n) => n.id === id)!;
+    expect(added.role_id).toBe("r2"); // дорожка выбранной фигуры
+    expect(boxOf(added).x).toBeGreaterThan(boxOf(structuredModel().nodes.find((n) => n.id === "b1")!).x);
+    expectNoOverlap(r.model, id);
+  });
+
+  it("следующая фигура продолжает цепочку: задача после шлюза тоже встаёт в разрыв", () => {
+    const g = insertNodeAfter(structuredModel(), { type: "gateway", subtype: "exclusive", name: "Развилка" }, "b1");
+    const t = insertNodeAfter(g.model, { type: "task", name: "Проверить" }, g.id!);
+    const outs = t.model.flows.filter((f) => f.from === g.id!);
+    expect(outs).toHaveLength(1); // шлюз не ветвится сам по себе
+    expect(outs[0].to).toBe(t.id);
+    expect(t.model.flows.some((f) => f.from === t.id! && f.to === "b2")).toBe(true);
+    expectNoOverlap(t.model, t.id!);
+  });
+
+  it("конец после задачи не налезает на существующий конец и соединяется с задачей", () => {
+    const r = insertNodeAfter(structuredModel(), { type: "event", subtype: "end", name: "Отказ" }, "b1");
+    expect(r.model.flows.some((f) => f.from === "b1" && f.to === r.id)).toBe(true);
+    expectNoOverlap(r.model, r.id!);
+  });
+
+  it("шаг перед конечным событием вставляется в его входящую стрелку", () => {
+    const r = insertNodeAfter(structuredModel(), { type: "task", name: "Закрыть реестр" }, "b9");
+    const out = r.model.flows.filter((f) => f.to === "b9");
+    expect(out).toHaveLength(1);
+    expect(out[0].from).toBe(r.id);
+    expect(r.model.flows.some((f) => f.from === "b2" && f.to === r.id)).toBe(true);
+    expectNoOverlap(r.model, r.id!);
+  });
+
+  it("начало вставляется перед выбранной фигурой в разрыв входящей стрелки", () => {
+    const r = insertNodeAfter(structuredModel(), { type: "event", subtype: "start", name: "Новое начало" }, "b1");
+    expect(r.model.flows.some((f) => f.from === "b0" && f.to === r.id)).toBe(true);
+    expect(r.model.flows.some((f) => f.from === r.id && f.to === "b1")).toBe(true);
+    expect(r.model.flows.some((f) => f.from === "b0" && f.to === "b1")).toBe(false);
+    expectNoOverlap(r.model, r.id!);
+  });
+});
+
 
 describe("BPMN: операции над моделью", () => {
   it("nextId не повторяет занятые id", () => {
