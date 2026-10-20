@@ -15,7 +15,7 @@ export const PROP_TABS: { key: PropTab; title: string }[] = [
 const LINKS_SECTIONS = new Set(["Источник в интервью", "Диаграммы", "Замечания проверки"]);
 /** Вкладка «Жизненный цикл», как в Business Studio: статус, версия и история объекта. */
 const LIFE_SECTIONS = new Set(["Жизненный цикл", "История"]);
-const MORE_SECTIONS = new Set(["Ролевая модель", "Ролевая модель процесса", "RACI", "Стороны блока IDEF0", "Триггеры блока", "Граничные события", "Потоки сообщений", "Внешние пулы"]);
+const MORE_SECTIONS = new Set(["Ролевая модель", "Ролевая модель процесса", "RACI", "Триггеры блока", "Граничные события", "Потоки сообщений", "Внешние пулы"]);
 /** На какой вкладке показан раздел (по заголовку; остальные — на «Основных»). */
 export const tabOfSection = (title: string): PropTab => (LIFE_SECTIONS.has(title) ? "life" : LINKS_SECTIONS.has(title) ? "links" : MORE_SECTIONS.has(title) ? "more" : "main");
 

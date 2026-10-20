@@ -199,7 +199,7 @@ export default function NodeProperties({
   return (
     <div>
       <div className="prop-kind">
-        {TYPE_LABELS[node.type]}
+        {isFn && childCount > 0 ? "Подпроцесс" : TYPE_LABELS[node.type]}
         {code && <span className="nav-code"> {code}</span>}
         {isStep && host && (
           <>
@@ -321,7 +321,7 @@ export default function NodeProperties({
         </Section>
       )}
 
-      {(node.type === "task" || node.type === "subprocess") && onDiagram && (
+      {(node.type === "task" || node.type === "subprocess") && activeKind === "bpmn" && onDiagram && (
         <Section title="Триггеры блока" count={blockTriggers.length} open={blockTriggers.length > 0}>
           {blockTriggers.length === 0 && <p className="muted prop-note">Блок ничего не ждёт: его запускает стрелка. Добавьте триггер, если блок запускает сообщение, срок, условие или сигнал.</p>}
           {blockTriggers.length > 0 && (
@@ -349,7 +349,7 @@ export default function NodeProperties({
         </Section>
       )}
 
-      {(node.type === "task" || node.type === "subprocess") && onDiagram && (
+      {(node.type === "task" || node.type === "subprocess") && activeKind === "bpmn" && onDiagram && (
         <Section title="Граничные события" count={boundaries.length} open={boundaries.length > 0}>
           {boundaries.length === 0 && <p className="muted prop-note">На границе задачи событий нет.</p>}
           {boundaries.length > 0 && (
@@ -384,7 +384,7 @@ export default function NodeProperties({
         </Section>
       )}
 
-      {node.type !== "gateway" && onDiagram && (
+      {node.type !== "gateway" && activeKind === "bpmn" && onDiagram && (
         <Section title="Потоки сообщений" count={messageCount} open={messageCount > 0}>
           <MessagesEditor model={model} nodeId={node.id} onChange={onChange} />
         </Section>

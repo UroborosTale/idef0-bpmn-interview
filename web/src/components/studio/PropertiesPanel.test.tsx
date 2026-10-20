@@ -49,6 +49,18 @@ describe("панель «Свойства»: функция", () => {
     expect(sections).toEqual(["Общие", "Сроки и стоимость", "Триггеры блока", "Граничные события", "Потоки сообщений", "Ролевая модель", "Стороны блока IDEF0", "RACI", "Диаграммы", "Оформление", "Источник в интервью", "Жизненный цикл", "История"]);
   });
 
+  it("IDEF0: стороны блока — на «Основных» и раскрыты, BPMN-разделов нет; у подпроцесса заголовок «Подпроцесс»", () => {
+    panel({ kind: "node", id: "b" }, purchaseModel(), "idef0");
+    expect(document.querySelector(".prop-kind")!.textContent).toMatch(/^Подпроцесс/);
+    expect(screen.queryByText("Триггеры блока")).toBeNull();
+    expect(screen.queryByText("Граничные события")).toBeNull();
+    expect(screen.queryByText("Потоки сообщений")).toBeNull();
+    const sides = [...document.querySelectorAll(".prop-section")].find((s) => s.querySelector("summary")?.textContent?.includes("Стороны блока IDEF0")) as HTMLDetailsElement;
+    expect(sides.getAttribute("data-tab")).toBe("main");
+    expect(sides.open).toBe(true);
+    expect(screen.getByText("Входы (Input) — слева")).toBeTruthy();
+  });
+
   it("правка атрибутов и исполнителя", () => {
     const p = panel({ kind: "node", id: "a" });
     commit(field("Длительность"), "2 дня");
