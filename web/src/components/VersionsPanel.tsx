@@ -42,7 +42,7 @@ export default function VersionsPanel({ session, onChanged }: { session: Session
       <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
         Текущая версия: <strong>v{currentVersion ?? "—"}</strong>
         {currentStatus && <span className={`pill status-${currentStatus}`} style={{ marginLeft: 8 }}>{STATUS_LABEL[currentStatus] ?? currentStatus}</span>}
-        . Каждое сохранение (правка, запуск конвейера, ход интервью) создаёт минорную версию автоматически.
+        . Значимое сохранение (правка, запуск конвейера, ход интервью) создаёт минорную версию автоматически; повтор без изменений — нет.
       </div>
 
       <div className="chat-input-row">
