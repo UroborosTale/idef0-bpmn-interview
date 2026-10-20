@@ -30,6 +30,12 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
   const nodeById = new Map(model.nodes.map((n) => [n.id, n] as const));
   const outAdj = new Map<string, typeof model.flows>();
   for (const f of model.flows) outAdj.set(f.from, [...(outAdj.get(f.from) ?? []), f]);
+  // у подпроцесса/операции без собственных выходов результат описан в шагах — это не «шаг без выхода»
+  const hasChildren = new Set<string>();
+  for (const n of model.nodes) {
+    if (n.idef0_parent) hasChildren.add(n.idef0_parent);
+    if (n.bpmn_scope) hasChildren.add(n.bpmn_scope);
+  }
 
   // --- Двойной ввод: один объект данных — вход у шагов в ДВУХ РАЗНЫХ системах ---
   const dataConsumerSystems = new Map<string, Set<string>>(); // data_id -> systems
@@ -128,7 +134,7 @@ export function detectAntipatterns(model: ProcessLogicModel): AntipatternFinding
   for (const n of model.nodes) {
     if (n.type !== "task" && n.type !== "subprocess") continue;
     const hasOutgoingFlow = (outAdj.get(n.id) ?? []).length > 0;
-    if (n.outputs.length === 0 && !hasOutgoingFlow) {
+    if (n.outputs.length === 0 && !hasOutgoingFlow && !hasChildren.has(n.id)) {
       findings.push({
         id: `ap_nooutput_${n.id}`,
         rule: "step_without_output",

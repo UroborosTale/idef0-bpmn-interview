@@ -33,4 +33,14 @@ describe("антипаттерны (B12)", () => {
     expect(loops.length).toBeGreaterThan(0);
     expect(new Set(loops.map((f) => f.id)).size).toBe(loops.length);
   });
+
+  it("операция с шагами не предлагается к удалению как шаг без выхода", () => {
+    const m = emptyModel({ id: "p", name: "Процесс" });
+    m.nodes.push(
+      node("op", { type: "subprocess", name: "Обработка ответа клиента" }),
+      node("s1", { name: "Проверить ответ", bpmn_scope: "op", outputs: ["d1"] })
+    );
+    const finding = detectAntipatterns(m).find((f) => f.rule === "step_without_output" && f.elementIds.includes("op"));
+    expect(finding).toBeUndefined();
+  });
 });

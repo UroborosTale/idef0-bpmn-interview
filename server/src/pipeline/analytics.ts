@@ -35,12 +35,19 @@ function nodeMinutes(n: ProcessNode): { processing: number; waiting: number } {
 
 /** Все простые пути старт→конец (без повторных посещений узла) с ограничением на число путей/глубину — граф может быть большим/циклическим. */
 function findPaths(model: ProcessLogicModel, maxPaths = 300, maxDepth = 60): string[][] {
+  // Основной сценарий процесса — верхний уровень: шаги операций (bpmn_scope) не должны давать
+  // отдельные «пути процесса» и подменять главный маршрут.
+  const topIds = new Set(model.nodes.filter((n) => !n.bpmn_scope).map((n) => n.id));
+  const topFlows = model.flows.filter((f) => topIds.has(f.from) && topIds.has(f.to));
+  const useTop = topFlows.length > 0 && model.nodes.some((n) => topIds.has(n.id) && n.type === "event" && n.subtype === "start");
+  const nodes = useTop ? model.nodes.filter((n) => topIds.has(n.id)) : model.nodes;
+  const flows = useTop ? topFlows : model.flows;
   const outAdj = new Map<string, string[]>();
-  for (const f of model.flows) outAdj.set(f.from, [...(outAdj.get(f.from) ?? []), f.to]);
-  const starts = model.nodes.filter((n) => n.type === "event" && n.subtype === "start").map((n) => n.id);
-  const ends = new Set(model.nodes.filter((n) => n.type === "event" && n.subtype === "end").map((n) => n.id));
-  const roots = starts.length > 0 ? starts : model.nodes.filter((n) => !model.flows.some((f) => f.to === n.id)).map((n) => n.id);
-  const terminal = ends.size > 0 ? ends : new Set(model.nodes.filter((n) => (outAdj.get(n.id) ?? []).length === 0).map((n) => n.id));
+  for (const f of flows) outAdj.set(f.from, [...(outAdj.get(f.from) ?? []), f.to]);
+  const starts = nodes.filter((n) => n.type === "event" && n.subtype === "start").map((n) => n.id);
+  const ends = new Set(nodes.filter((n) => n.type === "event" && n.subtype === "end").map((n) => n.id));
+  const roots = starts.length > 0 ? starts : nodes.filter((n) => !flows.some((f) => f.to === n.id)).map((n) => n.id);
+  const terminal = ends.size > 0 ? ends : new Set(nodes.filter((n) => (outAdj.get(n.id) ?? []).length === 0).map((n) => n.id));
 
   const paths: string[][] = [];
   function dfs(nodeId: string, path: string[], visited: Set<string>) {
@@ -70,14 +77,18 @@ function pathInfo(model: ProcessLogicModel, nodeIds: string[]): PathInfo {
   const nodeById = new Map(model.nodes.map((n) => [n.id, n] as const));
   let total = 0;
   const names: string[] = [];
+  const ids: string[] = [];
   for (const id of nodeIds) {
     const n = nodeById.get(id);
     if (!n) continue;
-    names.push(n.name);
+    if (n.type !== "gateway") {
+      names.push(n.name);
+      ids.push(n.id);
+    }
     const { processing, waiting } = nodeMinutes(n);
     total += processing + waiting;
   }
-  return { nodeIds, nodeNames: names, totalMinutes: total };
+  return { nodeIds: ids, nodeNames: names, totalMinutes: total };
 }
 
 /** Циклы возврата: рёбра, ведущие к узлу, уже присутствующему в текущем стеке DFS (back edges). */
