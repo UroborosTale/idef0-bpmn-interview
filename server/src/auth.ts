@@ -128,7 +128,7 @@ authRouter.post(
     const { login, password } = (req.body ?? {}) as { login?: string; password?: string };
     const stored = login ? users().get(login) : undefined;
     if (!login || !password || !stored || !verifyPassword(password, stored)) {
-      res.status(401).json({ error: "неверный логин или пароль" });
+      res.status(401).json({ error: "Неверный логин или пароль" });
       return;
     }
     const token = crypto.randomBytes(32).toString("base64url");

@@ -166,6 +166,8 @@ a { color: var(--accent); }
 
 .muted { color: var(--muted); }
 .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; white-space: pre-wrap; }
+/* Таблицы служебных страниц — обычным шрифтом: моноширинный остаётся для кода и выгрузок. */
+table.mono { font-family: inherit; white-space: normal; }
 
 .comment-item { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; }
 .comment-item .meta { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
@@ -615,3 +617,14 @@ button.danger-fill:hover { background: #991b1b; }
 .obj-slot.s-p4 { grid-column: 1; grid-row: 4; } .obj-slot.s-p5 { grid-column: 2; grid-row: 4; } .obj-slot.s-p6 { grid-column: 3; grid-row: 4; }
 .obj-slot.s-n3 { grid-column: 1; grid-row: 5; } .obj-slot.s-n4 { grid-column: 3; grid-row: 5; }
 .obj-shape { grid-column: 2; grid-row: 3; display: flex; justify-content: center; padding: 10px; border: 2px solid #475569; border-radius: 10px; background: #86efac; }
+
+/* Компактнее на ноутбуках 1280×720 и 1024×768: холсту остаётся больше места (B4). */
+@media (max-height: 800px) {
+  .studio { height: calc(100vh - 220px); min-height: 420px; }
+  .problems { height: 130px; }
+}
+@media (max-width: 1100px) {
+  .studio-body { grid-template-columns: 250px minmax(0, 1fr); }
+  .studio .bpe-body { grid-template-columns: 120px minmax(0, 1fr); }
+}
+

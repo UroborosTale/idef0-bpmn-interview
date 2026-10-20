@@ -94,7 +94,7 @@ export default function Idef0Editor({
   /** Несколько выделенных блоков (от двух); один выделенный блок — это обычный sel. */
   const [multi, setMulti] = useState<string[]>([]);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [connectTo, setConnectTo] = useState<Pt | null>(null);

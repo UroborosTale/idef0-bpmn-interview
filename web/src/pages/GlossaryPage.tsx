@@ -88,7 +88,7 @@ function EntriesTab({
         <input placeholder="Значение (напр. канонический термин)" value={value} onChange={(e) => setValue(e.target.value)} />
         <button
           disabled={!key.trim() || !value.trim()}
-          onClick={async () => { await api.upsertGlossary(key.trim().toLowerCase(), kind, value.trim(), "confirmed"); setKey(""); setValue(""); onChanged(); }}
+          onClick={async () => { await api.upsertGlossary(key.trim(), kind, value.trim(), "confirmed"); setKey(""); setValue(""); onChanged(); }}
         >
           Добавить
         </button>

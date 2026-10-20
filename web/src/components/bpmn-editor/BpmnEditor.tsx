@@ -91,7 +91,7 @@ export default function BpmnEditor({
   /** Несколько выделенных фигур (от двух); одна выделенная — это обычный sel. */
   const [multi, setMulti] = useState<string[]>([]);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   /** Конец стрелки в руках пользователя: куда он сейчас указывает (точка, фигура под ней, ближайшая сторона). */
   const [flowGhost, setFlowGhost] = useState<{ id: string; end: "from" | "to"; pt: Pt; target: string | null; side: FlowSide | null; pos: number | null } | null>(null);
   /** Направляющие выравнивания: ровные линии, которые видны, пока отрезок, излом или конец стрелки перетаскивают и он выровнен с чем-то. */

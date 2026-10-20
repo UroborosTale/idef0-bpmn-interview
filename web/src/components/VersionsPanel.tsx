@@ -32,13 +32,16 @@ export default function VersionsPanel({ session, onChanged }: { session: Session
 
   const currentStatus = session.model?.process.status;
   const currentVersion = session.model?.process.version;
+  const STATUS_LABEL: Record<string, string> = { draft: "Черновик", review: "На согласовании", needs_rework: "На доработке", approved: "Утверждено", archived: "Архив" };
+  /** Дата версии в местном времени и коротком виде — и в списке, и в выборе для сравнения. */
+  const when = (ts: string) => new Date(ts).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
   return (
     <div>
       <h4>Версии модели</h4>
       <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
         Текущая версия: <strong>v{currentVersion ?? "—"}</strong>
-        {currentStatus && <span className={`pill status-${currentStatus}`} style={{ marginLeft: 8 }}>{currentStatus}</span>}
+        {currentStatus && <span className={`pill status-${currentStatus}`} style={{ marginLeft: 8 }}>{STATUS_LABEL[currentStatus] ?? currentStatus}</span>}
         . Каждое сохранение (правка, запуск конвейера, ход интервью) создаёт минорную версию автоматически.
       </div>
 
@@ -105,11 +108,11 @@ export default function VersionsPanel({ session, onChanged }: { session: Session
           <div className="toolbar" style={{ marginTop: 14 }}>
             <select value={a} onChange={(e) => setA(Number(e.target.value))}>
               <option value="">версия A</option>
-              {versions.map((v) => <option key={v.seq} value={v.seq}>v{v.version} ({v.ts.slice(0, 16)})</option>)}
+              {versions.map((v) => <option key={v.seq} value={v.seq}>v{v.version} ({when(v.ts)})</option>)}
             </select>
             <select value={b} onChange={(e) => setB(Number(e.target.value))}>
               <option value="">версия B</option>
-              {versions.map((v) => <option key={v.seq} value={v.seq}>v{v.version} ({v.ts.slice(0, 16)})</option>)}
+              {versions.map((v) => <option key={v.seq} value={v.seq}>v{v.version} ({when(v.ts)})</option>)}
             </select>
             <button disabled={a === "" || b === ""} onClick={async () => setDiff(await api.diffVersions(id, a, b))}>
               Сравнить
@@ -153,17 +156,17 @@ function DiffView({ diff, from, to }: { diff: any; from: { version: string }; to
           <div key={key} style={{ marginBottom: 10 }}>
             <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
             {d.added.length > 0 && (
-              <div className="mono" style={{ fontSize: 12, color: "#2C7A57" }}>
+              <div style={{ fontSize: 13, color: "#2C7A57" }}>
                 + добавлено ({d.added.length}): {d.added.map((x: any) => x.name ?? x.id).join(", ")}
               </div>
             )}
             {d.removed.length > 0 && (
-              <div className="mono" style={{ fontSize: 12, color: "#AD4130" }}>
+              <div style={{ fontSize: 13, color: "#AD4130" }}>
                 − удалено ({d.removed.length}): {d.removed.map((x: any) => x.name ?? x.id).join(", ")}
               </div>
             )}
             {d.changed.length > 0 && (
-              <div className="mono" style={{ fontSize: 12, color: "#B87317" }}>
+              <div style={{ fontSize: 13, color: "#B87317" }}>
                 ~ изменено ({d.changed.length}): {d.changed.map((c: any) => c.after?.name ?? c.id).join(", ")}
               </div>
             )}
