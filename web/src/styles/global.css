@@ -134,6 +134,7 @@ a { color: var(--accent); }
 .validation-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
 .validation-item.error { background: var(--error-bg); }
 .validation-item.warning { background: var(--warn-bg); }
+.validation-item.accepted { background: #f8fafc; opacity: .8; }
 
 .chat-panel { display: flex; flex-direction: column; height: 100%; }
 .chat-log { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px; }

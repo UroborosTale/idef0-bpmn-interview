@@ -85,6 +85,27 @@ describe("страница сессии", () => {
     expect(screen.getByRole("tab", { name: "Проверки (2)" })).toBeTruthy(); // 1 пробел + 1 ошибка
   });
 
+  it("принятое замечание не считается в «Проверках» и помечено на вкладке «Валидация»", async () => {
+    const s = session();
+    s.model!.accepted_issues = [
+      {
+        rule: "bpmn_flow_condition",
+        element_id: "a",
+        message: "Условие не задано",
+        reason: "Так и задумано",
+        at: "2026-10-19T10:00:00.000Z",
+      },
+    ];
+    s.validation = [
+      { id: "v1", notation: "BPMN", severity: "warning", rule: "bpmn_flow_condition", message: "Условие не задано", element_id: "a" },
+    ];
+    setup(s, { initialTab: "validation" });
+    await screen.findByRole("heading", { name: "Закупка" });
+    expect(screen.getByRole("tab", { name: "Проверки (1)" })).toBeTruthy(); // только 1 открытый пробел
+    expect(screen.getByRole("tab", { name: "Валидация" })).toBeTruthy(); // действующих нет — счётчика нет
+    expect(screen.getByText(/принято: Так и задумано/)).toBeTruthy();
+  });
+
   it("режим интервью: начало, ответ владельца", async () => {
     const s = { ...session(), mode: "B" as const, status: "interviewing" as const, chat: [] };
     setup(s);

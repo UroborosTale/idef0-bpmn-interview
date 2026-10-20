@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { splitAccepted } from "@shared/validate";
 import { api } from "../api/client";
 import { inDesktopShell, onShellMessage } from "../desktop";
 import type { SessionRecord } from "../types";
@@ -182,8 +183,10 @@ export default function WorkspacePage({
   }
 
   // Вкладки сгруппированы по задачам: сначала выбирается группа, затем вкладка в ней.
+  // Принятые замечания (accepted_issues) не считаются действующими — так же, как в студии.
+  const validation = splitAccepted(model?.accepted_issues, session.validation);
   const openGaps = model ? model.gaps.filter((g) => g.status === "open").length : 0;
-  const errors = session.validation.filter((v) => v.severity === "error").length;
+  const errors = validation.active.filter((v) => v.severity === "error").length;
   const groups: { key: string; label: string; tabs: { key: Tab; label: string }[] }[] = [
     {
       key: "model",
@@ -202,7 +205,7 @@ export default function WorkspacePage({
       label: `Проверки${openGaps || errors ? ` (${openGaps + errors})` : ""}`,
       tabs: [
         { key: "gaps", label: `Пробелы${openGaps ? ` (${openGaps})` : ""}` },
-        { key: "validation", label: `Валидация${session.validation.length ? ` (${session.validation.length})` : ""}` },
+        { key: "validation", label: `Валидация${validation.active.length ? ` (${validation.active.length})` : ""}` },
         { key: "checklist", label: "Чек-лист" },
         { key: "verification", label: "Верификация" },
         { key: "traceability", label: "Трассировка требований" },
@@ -386,7 +389,16 @@ export default function WorkspacePage({
               />
             )}
             {tab === "gaps" && !model && <p className="muted">Модель ещё не построена.</p>}
-            {tab === "validation" && <ValidationPanel issues={session.validation} onSelectElement={(id) => { selectElement(id); setTab("model"); }} />}
+            {tab === "validation" && (
+              <ValidationPanel
+                issues={validation.active}
+                accepted={validation.accepted}
+                onSelectElement={(id) => {
+                  selectElement(id);
+                  setTab("model");
+                }}
+              />
+            )}
             {tab === "raci" && model && <RaciPanel session={session} onChanged={reload} />}
             {tab === "raci" && !model && <p className="muted">Модель ещё не построена.</p>}
             {tab === "analytics" && model && <AnalyticsPanel session={session} onChanged={reload} />}

@@ -50,6 +50,14 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
   const nodeById = new Map(model.nodes.map((n) => [n.id, n] as const));
   const dataById = new Map(model.data.map((d) => [d.id, d] as const));
 
+  // Узел с декомпозицией (дети по IDEF0 или шаги операции): исполнитель и продолжение
+  // описаны внутри — на верхнем уровне их не спрашиваем, иначе пробелы ложные.
+  const hasChildren = new Set<string>();
+  for (const n of model.nodes) {
+    if (n.idef0_parent) hasChildren.add(n.idef0_parent);
+    if (n.bpmn_scope) hasChildren.add(n.bpmn_scope);
+  }
+
   const outgoing = new Map<string, number>();
   const incoming = new Map<string, number>();
   for (const f of model.flows) {
@@ -57,26 +65,23 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
     incoming.set(f.to, (incoming.get(f.to) ?? 0) + 1);
   }
 
-  // 4.1.a — у действия нет исполнителя
+  // 4.1.a — у действия нет исполнителя (если есть декомпозиция, исполнитель задан в шагах)
   for (const n of model.nodes) {
-    if (n.type === "task" && !n.role_id) {
+    if (n.type === "task" && !n.role_id && !hasChildren.has(n.id)) {
       add("missing_executor", "critical", n.id, `Кто выполняет действие «${n.name}»?`);
     }
   }
 
-  // 4.1.b — у ветвления нет альтернативной ветки или условия
+  // 4.1.b — у ветвления нет условия. Слияние (один выход) и проходной шлюз пробелом не считаем:
+  // отсутствие выхода ловит 4.1.c, а «альтернативная ветка» у слияния не нужна.
   for (const n of model.nodes) {
     if (n.type !== "gateway") continue;
+    // параллельный шлюз и шлюз по событию ветвятся без условий: условия задают ветки, а не сам факт ветвления
+    if (n.subtype === "parallel" || n.subtype === "event_based") continue;
     const outFlows = model.flows.filter((f) => f.from === n.id);
+    if (outFlows.length < 2) continue;
     const hasConditions = outFlows.some((f) => f.condition && f.condition.trim().length > 0);
-    if (outFlows.length < 2) {
-      add(
-        "gateway_missing_branch",
-        "important",
-        n.id,
-        `Какие варианты развития возможны в точке «${n.name}» и что происходит в каждом из них?`
-      );
-    } else if (!hasConditions) {
+    if (!hasConditions) {
       add(
         "gateway_missing_condition",
         "important",
@@ -86,8 +91,11 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
     }
   }
 
-  // 4.1.c — поток обрывается (тупик)
+  // 4.1.c — поток обрывается (тупик); у функции с декомпозицией продолжение описано внутри
   for (const n of model.nodes) {
+    if (hasChildren.has(n.id)) continue;
+    // событие-ссылка не имеет исходящего потока: продолжение — парное событие с тем же именем
+    if (n.type === "event" && n.trigger?.type === "link") continue;
     const isEndEvent = n.type === "event" && (n.subtype === "end" || /заверш|оконч/iu.test(n.subtype ?? ""));
     if (isEndEvent) continue;
     if ((outgoing.get(n.id) ?? 0) === 0) {
@@ -110,9 +118,12 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
     add("missing_end_event", "critical", null, "Чем процесс считается завершённым (какой результат)?", "process_result");
   }
 
-  // 4.1.e — у функции IDEF0 нет управления или выхода (берём верхнеуровневые task/subprocess)
+  // 4.1.e — у функции IDEF0 нет управления или выхода.
+  // Правило только для функций IDEF0: у шагов BPMN (bpmn_scope) управление и результат — потоки и данные,
+  // а не ICOM-стрелки, поэтому пустые controls/outputs у них пробелом не являются.
   for (const n of model.nodes) {
     if (n.type !== "task" && n.type !== "subprocess") continue;
+    if (n.bpmn_scope) continue;
     if (n.controls.length === 0) {
       add(
         "idef0_missing_control",
@@ -145,7 +156,8 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
   for (const d of model.data) {
     const produced = producedBy.get(d.id) ?? [];
     const consumed = consumedBy.get(d.id) ?? [];
-    if (produced.length > 0 && consumed.length === 0) {
+    // внешний потребитель/поставщик продукта — не пробел: продукт уходит из процесса или приходит извне
+    if (produced.length > 0 && consumed.length === 0 && !d.consumer) {
       add(
         "orphan_output_document",
         "desirable",
@@ -153,7 +165,7 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
         `Где и кем используется документ «${d.name}» после его создания?`
       );
     }
-    if (consumed.length > 0 && produced.length === 0) {
+    if (consumed.length > 0 && produced.length === 0 && !d.supplier) {
       add(
         "orphan_input_document",
         "desirable",
