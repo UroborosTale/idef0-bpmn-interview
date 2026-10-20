@@ -59,6 +59,15 @@ const LEGACY: Record<string, Tab> = { editor: "studio", idef0Editor: "studio", v
 const normalizeTab = (t: string | undefined): string | undefined => (t && LEGACY[t]) || t;
 const isTab = (t: string | undefined): t is Tab => !!t && (ALL_TABS as string[]).includes(t);
 
+/** Статус сессии в шапке — по-русски, а не кодом из API. */
+const SESSION_STATUS: Record<string, string> = {
+  draft: "Черновик",
+  processing: "Обработка…",
+  ready: "Готово",
+  interviewing: "Интервью идёт",
+  completed: "Завершено",
+};
+
 export default function WorkspacePage({
   sessionId,
   onBack,
@@ -248,11 +257,14 @@ export default function WorkspacePage({
 
   // в настольном приложении, как в Business Studio, вместо шапки сайта — одна строка: «Назад», название сессии и вкладки разделов
   const desk = inDesktopShell();
+  const approved = model?.process.status === "approved";
   const toolbarEl = (
       <div className="toolbar">
         <button onClick={onBack}>← Назад</button>
         <h2 style={{ margin: 0 }}>{session.title}</h2>
-        <span className={`pill status-${session.status}`}>{session.status}</span>
+        <span className={`pill status-${approved ? "approved" : session.status}`} title={`Статус сессии: ${session.status}`}>
+          {approved ? "Утверждено" : SESSION_STATUS[session.status] ?? session.status}
+        </span>
         {session.diagramsStale && !desk && (
           <button onClick={() => withBusy(async () => setSession(await api.rebuildDiagrams(sessionId)))}>
             Пересобрать диаграммы (модель изменена)

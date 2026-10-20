@@ -85,6 +85,21 @@ describe("страница сессии", () => {
     expect(screen.getByRole("tab", { name: "Проверки (2)" })).toBeTruthy(); // 1 пробел + 1 ошибка
   });
 
+  it("статус сессии в шапке — по-русски, а не кодом API", async () => {
+    setup(session());
+    await screen.findByRole("heading", { name: "Закупка" });
+    expect(screen.getByText("Готово")).toBeTruthy();
+  });
+
+  it("утверждённая модель помечена «Утверждено», а не ready", async () => {
+    const approved = session();
+    approved.model!.process.status = "approved";
+    setup(approved);
+    await screen.findByRole("heading", { name: "Закупка" });
+    expect(screen.getByText("Утверждено")).toBeTruthy();
+    expect(document.querySelector(".pill.status-approved")).toBeTruthy();
+  });
+
   it("принятое замечание не считается в «Проверках» и помечено на вкладке «Валидация»", async () => {
     const s = session();
     s.model!.accepted_issues = [
