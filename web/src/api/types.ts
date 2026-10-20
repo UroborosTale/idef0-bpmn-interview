@@ -14,6 +14,8 @@ export interface CampaignRespondentStatus {
   completed_at: string | null;
   last_reminded_at: string | null;
   overdue: boolean;
+  /** Персональная ссылка (абсолютная; учитывает PUBLIC_URL сервера). */
+  link?: string;
 }
 export interface Campaign {
   id: string;

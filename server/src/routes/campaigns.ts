@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { nanoid } from "nanoid";
 import { db, logAudit } from "../db.js";
 import { getSession, updateSession } from "../repo.js";
@@ -7,6 +7,16 @@ import { startTrackChat, turnTrackChat } from "../pipeline/trackInterview.js";
 import { safeWebhookFetch, validateWebhookUrl } from "../util/webhook.js";
 
 export const campaignsRouter = Router();
+
+/**
+ * Адрес приложения для ссылок респондентов. PUBLIC_URL задаёт внешний адрес (например, http://192.168.1.10:8787),
+ * иначе берём адрес, по которому аналитик открыл приложение: за прокси — X-Forwarded-*, иначе Host.
+ */
+function publicBase(req: Request): string {
+  const configured = process.env.PUBLIC_URL?.trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  return `${req.protocol}://${req.get("host") ?? "127.0.0.1"}`;
+}
 
 interface CampaignRow {
   id: string;
@@ -91,7 +101,7 @@ campaignsRouter.post("/sessions/:id/campaigns", (req, res) => {
 
   res.status(201).json({
     campaign: { id: campaignId, session_id: session.id, name, due_date: due_date ?? null, created_at: new Date().toISOString() },
-    respondents: campaignRespondentRows.map((r) => ({ name: r.name, roleId: r.roleId, token: r.token, link: `/campaign/${campaignId}/${r.token}` })),
+    respondents: campaignRespondentRows.map((r) => ({ name: r.name, roleId: r.roleId, token: r.token, link: `${publicBase(req)}/campaign/${campaignId}/${r.token}` })),
   });
 });
 
@@ -100,7 +110,7 @@ campaignsRouter.get("/sessions/:id/campaigns", (req, res) => {
   res.json(rows);
 });
 
-function campaignStatus(campaign: CampaignRow) {
+function campaignStatus(campaign: CampaignRow, base: string) {
   const respondents = db.prepare(`SELECT * FROM campaign_respondents WHERE campaign_id = ?`).all(campaign.id) as CampaignRespondentRow[];
   const now = Date.now();
   const overdue = campaign.due_date ? new Date(campaign.due_date).getTime() < now : false;
@@ -109,6 +119,7 @@ function campaignStatus(campaign: CampaignRow) {
     respondents: respondents.map((r) => ({
       ...r,
       overdue: overdue && r.status !== "completed",
+      link: `${base}/campaign/${campaign.id}/${r.token}`,
     })),
     coverage: {
       total: respondents.length,
@@ -126,7 +137,7 @@ campaignsRouter.get("/campaigns/:campaignId", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  res.json(campaignStatus(campaign));
+  res.json(campaignStatus(campaign, publicBase(req)));
 });
 
 campaignsRouter.delete("/campaigns/:campaignId", (req, res) => {
@@ -162,7 +173,7 @@ campaignsRouter.post("/campaigns/:campaignId/remind", async (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const { respondents } = campaignStatus(campaign);
+  const { respondents } = campaignStatus(campaign, publicBase(req));
   const overdue = respondents.filter((r) => r.overdue);
   if (overdue.length === 0) {
     res.json({ overdue: [], sent: 0 });
@@ -178,7 +189,7 @@ campaignsRouter.post("/campaigns/:campaignId/remind", async (req, res) => {
       await safeWebhookFetch(campaign.reminder_webhook_url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ campaign: campaign.name, respondent: r.name, due_date: campaign.due_date, status: r.status, link: `/campaign/${campaign.id}/${r.token}` }),
+        body: JSON.stringify({ campaign: campaign.name, respondent: r.name, due_date: campaign.due_date, status: r.status, link: `${publicBase(req)}/campaign/${campaign.id}/${r.token}` }),
         signal: AbortSignal.timeout(10_000),
       });
       db.prepare(`UPDATE campaign_respondents SET last_reminded_at = ? WHERE id = ?`).run(new Date().toISOString(), r.id);

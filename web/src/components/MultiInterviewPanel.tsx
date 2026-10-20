@@ -279,7 +279,7 @@ function NewCampaignForm({ sessionId, onCancel, onRefresh, onDone }: { sessionId
                 try {
                   const valid = respondents.filter((r) => r.name.trim());
                   const created = await api.createCampaign(sessionId, name, dueDate ? new Date(dueDate).toISOString() : null, valid.map((r) => ({ name: r.name, roleId: r.roleId || null, weight: r.weight })));
-                  setLinks(created.respondents.map((r) => ({ name: r.name, link: window.location.origin + r.link })));
+                  setLinks(created.respondents.map((r) => ({ name: r.name, link: r.link.startsWith("http") ? r.link : window.location.origin + r.link })));
                   // список кампаний обновляем сразу: иначе под ссылками висело «Кампаний пока нет» до перезагрузки страницы
                   await onRefresh();
                 } finally {
@@ -344,7 +344,7 @@ function CampaignDetail({ campaignId, onDeleted }: { campaignId: string; onDelet
               <td>{r.name}</td>
               <td>{STATUS_LABEL[r.status]}</td>
               <td>{r.overdue ? "да" : "нет"}</td>
-              <td><button onClick={() => navigator.clipboard?.writeText(window.location.origin + `/campaign/${campaignId}/${r.token}`)}>Копировать ссылку</button></td>
+              <td><button onClick={() => navigator.clipboard?.writeText(r.link ?? window.location.origin + `/campaign/${campaignId}/${r.token}`)}>Копировать ссылку</button></td>
             </tr>
           ))}
         </tbody>
