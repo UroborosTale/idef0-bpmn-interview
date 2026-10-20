@@ -9,6 +9,7 @@ import { validateModel } from "../pipeline/validate.js";
 import { generateBpmn } from "../pipeline/bpmn.js";
 import { generateIdef0 } from "../pipeline/idef0.js";
 import { logAgentStep } from "../pipeline/agents.js";
+import { launchPdfBrowser } from "../export/pdfBrowser.js";
 
 export const hypothesesRouter = Router();
 
@@ -252,15 +253,16 @@ hypothesesRouter.get("/sessions/:asIsId/compare/:toBeId/export.pdf", async (req,
   const report = buildCompareReport(asIs.model, toBe.model, loadRatesMap());
   const html = buildCompareHtml(asIs.meta.processName, toBe.meta.processName, report);
   try {
-    const { chromium } = await import("playwright");
-    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH || "/opt/pw-browsers/chromium";
-    const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] }).catch(() => chromium.launch());
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
-    const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
-    await browser.close();
-    res.setHeader("Content-Disposition", `attachment; filename="compare-as-is-to-be.pdf"`);
-    res.type("application/pdf").send(pdf);
+    const browser = await launchPdfBrowser();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: "networkidle" });
+      const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
+      res.setHeader("Content-Disposition", `attachment; filename="compare-as-is-to-be.pdf"`);
+      res.type("application/pdf").send(pdf);
+    } finally {
+      await browser.close();
+    }
   } catch (e) {
     res.status(501).json({
       error: "PDF-рендеринг недоступен в этом окружении (нет Chromium). Используйте /compare/.../preview.html и печать в PDF из браузера.",

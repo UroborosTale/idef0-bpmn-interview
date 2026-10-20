@@ -3,6 +3,7 @@ import { getSession, listSessions } from "../repo.js";
 import { db } from "../db.js";
 import { runChecklist } from "../pipeline/checklist.js";
 import { buildAuditPackageHtml, buildAuditPackageZip } from "../export/auditPackage.js";
+import { launchPdfBrowser } from "../export/pdfBrowser.js";
 
 export const auditPackageRouter = Router();
 
@@ -61,15 +62,16 @@ auditPackageRouter.get("/sessions/:id/audit-package/export.pdf", async (req, res
   if (!session) return;
   const checklist = runChecklist(session.model!, enabledChecklistRules());
   try {
-    const { chromium } = await import("playwright");
-    const executablePath = process.env.PLAYWRIGHT_CHROMIUM_PATH || "/opt/pw-browsers/chromium";
-    const browser = await chromium.launch({ executablePath, args: ["--no-sandbox"] }).catch(() => chromium.launch());
-    const page = await browser.newPage();
-    await page.setContent(await buildAuditPackageHtml(session, checklist), { waitUntil: "networkidle" });
-    const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
-    await browser.close();
-    attachment(res, `${session.meta.processName}.audit-package.pdf`);
-    res.type("application/pdf").send(pdf);
+    const browser = await launchPdfBrowser();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(await buildAuditPackageHtml(session, checklist), { waitUntil: "networkidle" });
+      const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "16mm", bottom: "16mm", left: "14mm", right: "14mm" } });
+      attachment(res, `${session.meta.processName}.audit-package.pdf`);
+      res.type("application/pdf").send(pdf);
+    } finally {
+      await browser.close();
+    }
   } catch (e) {
     res.status(501).json({
       error: "PDF-рендеринг недоступен в этом окружении (нет Chromium). Используйте /audit-package/preview.html и печать в PDF из браузера.",
