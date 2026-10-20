@@ -257,9 +257,12 @@ export function useBeforeUnload(active: boolean) {
   }, [active]);
 }
 
+/** Событие клавиатуры: подходит и React.KeyboardEvent, и нативный KeyboardEvent (общий обработчик студии). */
+type KeyLike = { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; key: string; code: string; preventDefault: () => void };
+
 /** Клавиши, общие для редакторов; false — клавиша не обработана. */
 export function handleCommonKeys(
-  e: React.KeyboardEvent,
+  e: KeyLike,
   a: { undo: () => void; redo: () => void; save: () => void }
 ): boolean {
   const mod = e.ctrlKey || e.metaKey;

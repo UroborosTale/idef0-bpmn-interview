@@ -71,6 +71,7 @@ export default function WorkspacePage({
   onTabChange?: (tab: string) => void;
 }) {
   const [session, setSession] = useState<SessionRecord | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTabState] = useState<Tab>(isTab(normalizeTab(initialTab)) ? (normalizeTab(initialTab) as Tab) : "text");
   const setTab = (t: Tab) => {
     setTabState(t);
@@ -83,8 +84,14 @@ export default function WorkspacePage({
   const onProgress = (p: { done: number; total: number; stage?: string }) => setProgress(`${p.stage ?? "обработка"}: ${p.done} из ${p.total} частей текста`);
 
   const reload = useCallback(async () => {
-    const s = await api.getSession(sessionId);
-    setSession(s);
+    try {
+      const s = await api.getSession(sessionId);
+      setSession(s);
+      setLoadError(null);
+    } catch {
+      // A9: удалённая сессия или устаревшая ссылка — раньше страница навсегда оставалась на «Загрузка сессии…»
+      setLoadError("Сессия не найдена: возможно, её удалили или ссылка устарела.");
+    }
   }, [sessionId]);
 
   // настольное приложение: после приёма правок из Visio оболочка присылает обновлённую сессию — страница не перезагружается
@@ -130,7 +137,17 @@ export default function WorkspacePage({
     else if (session?.model) setTabState("studio");
   }, [session?.id]);
 
-  if (!session) return <p className="muted">Загрузка сессии…</p>;
+  if (!session) {
+    if (loadError) {
+      return (
+        <div className="page page-empty" role="alert">
+          <p className="muted">{loadError}</p>
+          <button onClick={onBack}>← К списку сессий</button>
+        </div>
+      );
+    }
+    return <p className="muted">Загрузка сессии…</p>;
+  }
 
   const model = session.model;
   const selectedNode = model?.nodes.find((n) => n.id === selectedId) ?? null;

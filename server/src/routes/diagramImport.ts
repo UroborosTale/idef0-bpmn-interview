@@ -135,6 +135,21 @@ diagramImportRouter.post("/diagram-import/new", async (req, res) => {
     res.status(400).json({ error: "meta.processName обязателен" });
     return;
   }
+  // Файл не того формата — понятный отказ до создания сессии (иначе появлялась пустая сессия «Готово»)
+  const mismatch =
+    format === "bpmn" && !/<(\w+:)?definitions[\s>]/i.test(content)
+      ? "Файл не похож на BPMN: в нём нет элемента <definitions>. Если это draw.io, выберите формат «draw.io»."
+      : format === "drawio" && !/<mxfile[\s>]|<mxGraphModel[\s>]/i.test(content)
+        ? "Файл не похож на draw.io: в нём нет <mxfile> или <mxGraphModel>."
+        : (format === "xlsx" || format === "vsdx") && Buffer.from(content, "base64").subarray(0, 2).toString() !== "PK"
+          ? format === "xlsx"
+            ? "Файл не похож на Excel: это не книга .xlsx."
+            : "Файл не похож на Visio: это не пакет .vsdx."
+          : null;
+  if (mismatch) {
+    res.status(400).json({ error: mismatch });
+    return;
+  }
 
   let built: { model: ReturnType<typeof buildModelFromParsedBpmn>["model"]; warnings: string[] };
   try {
@@ -191,7 +206,9 @@ diagramImportRouter.post("/diagram-import/new", async (req, res) => {
   const bpmn = await generateBpmn(built.model);
   const idef0 = generateIdef0(built.model);
 
-  const session = createSession({ title: meta.processName, mode: "A", meta });
+  // Импортированная модель — не текст интервью: режим «рисование с нуля», иначе в сессии висела вкладка «Текст»
+  // и кнопка «Перезапустить обработку текста», хотя текста нет.
+  const session = createSession({ title: meta.processName, mode: "blank", meta });
   updateSession(session.id, {
     model: built.model,
     validation,

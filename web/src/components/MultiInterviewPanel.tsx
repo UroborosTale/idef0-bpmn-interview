@@ -233,7 +233,7 @@ function CampaignsSection({ session }: { session: SessionRecord }) {
       <div className="toolbar">
         <button onClick={() => setShowNew(true)}>+ Новая кампания</button>
       </div>
-      {showNew && <NewCampaignForm onCancel={() => setShowNew(false)} onCreated={async () => { setShowNew(false); await reload(); }} sessionId={session.id} />}
+      {showNew && <NewCampaignForm onCancel={() => setShowNew(false)} onRefresh={reload} onDone={() => setShowNew(false)} sessionId={session.id} />}
       <ul style={{ fontSize: 13, marginTop: 10 }}>
         {campaigns.map((c) => (
           <li key={c.id} style={{ marginBottom: 4 }}>
@@ -248,7 +248,7 @@ function CampaignsSection({ session }: { session: SessionRecord }) {
   );
 }
 
-function NewCampaignForm({ sessionId, onCancel, onCreated }: { sessionId: string; onCancel: () => void; onCreated: () => Promise<void> }) {
+function NewCampaignForm({ sessionId, onCancel, onRefresh, onDone }: { sessionId: string; onCancel: () => void; onRefresh: () => Promise<void>; onDone: () => void }) {
   const [name, setName] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [respondents, setRespondents] = useState<{ name: string; roleId: string; weight: number }[]>([{ name: "", roleId: "", weight: 1 }]);
@@ -280,6 +280,8 @@ function NewCampaignForm({ sessionId, onCancel, onCreated }: { sessionId: string
                   const valid = respondents.filter((r) => r.name.trim());
                   const created = await api.createCampaign(sessionId, name, dueDate ? new Date(dueDate).toISOString() : null, valid.map((r) => ({ name: r.name, roleId: r.roleId || null, weight: r.weight })));
                   setLinks(created.respondents.map((r) => ({ name: r.name, link: window.location.origin + r.link })));
+                  // список кампаний обновляем сразу: иначе под ссылками висело «Кампаний пока нет» до перезагрузки страницы
+                  await onRefresh();
                 } finally {
                   setBusy(false);
                 }
@@ -301,7 +303,7 @@ function NewCampaignForm({ sessionId, onCancel, onCreated }: { sessionId: string
               </li>
             ))}
           </ul>
-          <button className="primary" onClick={onCreated}>Готово</button>
+          <button className="primary" onClick={onDone}>Готово</button>
         </div>
       )}
     </div>

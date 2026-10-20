@@ -15,6 +15,7 @@ import JSZip from "jszip";
 import { buildProtocolMarkdown } from "../export/protocol.js";
 import { buildStatementsMarkdown } from "../export/statements.js";
 import { buildQuestionsText } from "../export/questions.js";
+import { ensureDiagrams } from "../pipeline/diagrams.js";
 
 export const exportRouter = Router();
 
@@ -94,10 +95,12 @@ exportRouter.get("/sessions/:id/export/bpmn.zip", async (req, res) => {
   res.type("application/zip").send(await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }));
 });
 
-exportRouter.get("/sessions/:id/export/bpmn", (req, res) => {
-  const session = requireReady(req, res);
-  if (!session || !session.bpmnXml) {
-    if (session) res.status(400).json({ error: "диаграмма BPMN ещё не сгенерирована" });
+exportRouter.get("/sessions/:id/export/bpmn", async (req, res) => {
+  const ready = requireReady(req, res);
+  if (!ready) return;
+  const session = await ensureDiagrams(ready);
+  if (!session.bpmnXml) {
+    res.status(400).json({ error: "диаграмма BPMN ещё не сгенерирована" });
     return;
   }
   attachment(res, `${session.meta.processName}.bpmn`);
@@ -111,10 +114,12 @@ exportRouter.get("/sessions/:id/export/model.json", (req, res) => {
   res.type("application/json").send(JSON.stringify(session.model, null, 2));
 });
 
-exportRouter.get("/sessions/:id/export/idef0/:diagram.svg", (req, res) => {
-  const session = requireReady(req, res);
-  if (!session || !session.idef0) {
-    if (session) res.status(400).json({ error: "диаграмма IDEF0 ещё не сгенерирована" });
+exportRouter.get("/sessions/:id/export/idef0/:diagram.svg", async (req, res) => {
+  const ready = requireReady(req, res);
+  if (!ready) return;
+  const session = await ensureDiagrams(ready);
+  if (!session.idef0) {
+    res.status(400).json({ error: "диаграмма IDEF0 ещё не сгенерирована" });
     return;
   }
   const map: Record<string, string> = {

@@ -6,6 +6,7 @@ import { runOrchestratedPipeline } from "../pipeline/agents.js";
 import { CHUNK_SIZE } from "../pipeline/extract.js";
 import { carryOverManualEdits } from "../pipeline/carryOver.js";
 import { rebuildOutputs } from "../pipeline/run.js";
+import { applyAnsweredGaps } from "../pipeline/gaps.js";
 import { logAudit } from "../db.js";
 import { db } from "../db.js";
 import { addVersion } from "../repo.js";
@@ -33,6 +34,9 @@ function runInBackground(session: SessionRecord, fragments: Fragment[], note: st
         carried = { matched: c.matched, kept: c.kept };
         output = { ...output, ...(await rebuildOutputs(c.model, output.report, session.model.gaps)) };
       }
+      // Ответы на уточнения переживают пересборку: пробелы строятся заново с другими id, отмечаем их по тексту вопроса
+      const latest = getSession(session.id);
+      if (latest) applyAnsweredGaps(output.model, latest.qa);
       updateSession(session.id, {
         model: output.model,
         validation: output.validation,
@@ -204,7 +208,10 @@ processRouter.post("/sessions/:id/answers", async (req, res) => {
   const fragments = [...session.fragments, newFragment];
   const qa = [...session.qa, { gapId, question: gap.question, answerText, ts: new Date().toISOString() }];
   if (activeJob(session.id)) return void res.status(409).json({ error: "для этой сессии уже выполняется обработка — дождитесь её завершения" });
-  const withAnswer = updateSession(req.params.id, { fragments, qa });
+  // Пробел отвечен сразу, не дожидаясь перезапуска конвейера: ответ виден в списке, карточка уходит из «открытых».
+  // После обработки статус восстановится по журналу ответов (applyAnsweredGaps) — пробелы строятся заново.
+  const answered = { ...session.model, gaps: session.model.gaps.map((g) => (g.id === gapId ? { ...g, status: "answered" as const, answer: answerText } : g)) };
+  const withAnswer = updateSession(req.params.id, { fragments, qa, model: answered });
   try {
     res.status(202).json(runInBackground(withAnswer, fragments, `Ответ на уточнение: ${gap.question.slice(0, 60)}`, "owner", "gap_answered", { gapId }));
   } catch (e) {

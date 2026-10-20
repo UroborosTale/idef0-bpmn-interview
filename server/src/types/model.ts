@@ -272,6 +272,8 @@ export const Gap = z.object({
   element_id: z.string().nullable(),
   question: z.string(),
   status: GapStatus.default("open"),
+  /** Ответ аналитика на вопрос (для отвеченных пробелов: что именно ответили). */
+  answer: z.string().optional(),
   topic: z.string().optional(), // for interview "no more than N questions per topic"
   asked_count: z.number().default(0),
 });

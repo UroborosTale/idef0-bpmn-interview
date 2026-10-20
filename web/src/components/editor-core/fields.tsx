@@ -1,29 +1,88 @@
 import { useEffect, useId, useRef, useState } from "react";
 import type { View } from "./hooks";
 
-/** Поле, которое фиксирует значение по потере фокуса/Enter — одна правка = один шаг undo. */
+/** Поле, которое фиксирует значение по паузе в наборе, потере фокуса или Enter — одна правка = один шаг undo. */
 export function CommitInput({ value, onCommit, placeholder, multiline, required, rows }: { value: string; onCommit: (v: string) => void; placeholder?: string; multiline?: boolean; required?: boolean; rows?: number }) {
   const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
-  const commit = () => {
-    if (required && !v.trim()) setV(value); // пустое значение не принимается — возвращаем прежнее
-    else if (v !== value) onCommit(v);
+  const vRef = useRef(v);
+  vRef.current = v;
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const doneRef = useRef(onCommit);
+  doneRef.current = onCommit;
+  const focused = useRef(false);
+  const timer = useRef<number | null>(null);
+
+  // значение из модели приходит после сохранения: пока поле в фокусе, не затираем набранное
+  useEffect(() => {
+    if (!focused.current) setV(value);
+  }, [value]);
+  useEffect(() => () => clearTimer(timer), []);
+
+  /** Зафиксировать набранное: без паузы и без потери фокуса правка считалась бы несохранённой. */
+  const commit = (raw?: string) => {
+    clearTimer(timer);
+    const next = raw ?? vRef.current;
+    if (required && !next.trim()) {
+      setV(valueRef.current); // пустое значение не принимается — возвращаем прежнее
+      return;
+    }
+    if (next !== valueRef.current) doneRef.current(next);
+  };
+  /** Набор: правка попадает в модель через короткую паузу, чтобы не плодить шаги undo на каждую букву. */
+  const change = (next: string) => {
+    setV(next);
+    clearTimer(timer);
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      commit(next);
+    }, 400);
+  };
+  const blur = () => {
+    focused.current = false;
+    commit();
   };
   if (multiline) {
-    return <textarea rows={rows ?? 3} value={v} placeholder={placeholder} onChange={(e) => setV(e.target.value)} onBlur={commit} />;
+    return (
+      <textarea
+        rows={rows ?? 3}
+        value={v}
+        placeholder={placeholder}
+        onChange={(e) => change(e.target.value)}
+        onFocus={() => (focused.current = true)}
+        onBlur={blur}
+        onKeyDown={(e) => {
+          // Ctrl+S сохраняет модель вместе с набранным — поле фиксируется до обработчика студии
+          if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "s" || e.code === "KeyS")) commit();
+        }}
+      />
+    );
   }
   return (
     <input
       value={v}
       placeholder={placeholder}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={commit}
+      onChange={(e) => change(e.target.value)}
+      onFocus={() => (focused.current = true)}
+      onBlur={blur}
       onKeyDown={(e) => {
+        if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === "s" || e.code === "KeyS")) commit();
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        if (e.key === "Escape") setV(value);
+        if (e.key === "Escape") {
+          clearTimer(timer);
+          setV(valueRef.current);
+        }
       }}
     />
   );
+}
+
+/** Снять отложенную фиксацию поля (общая для обоих видов ввода). */
+function clearTimer(ref: { current: number | null }) {
+  if (ref.current !== null) {
+    window.clearTimeout(ref.current);
+    ref.current = null;
+  }
 }
 
 /** Плашка о восстановленном (или устаревшем) черновике. */

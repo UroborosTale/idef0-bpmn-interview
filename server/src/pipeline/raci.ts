@@ -32,28 +32,45 @@ export function buildRaci(model: ProcessLogicModel): RaciEntry[] {
     entries.push({ node_id, role_id, type });
   };
 
+  /**
+   * Исполнитель подпроцесса, у которого роль не задана: берём её из декомпозиции (чаще всего встречающуюся роль
+   * среди шагов). Иначе подпроцесс верхнего уровня оставался без R и A — автопостроение создавало ошибки
+   * «не имеет ответственного (A)» на модели, где ошибок не было.
+   */
+  const childRole = (id: string): string | null => {
+    const counts = new Map<string, number>();
+    for (const k of model.nodes) {
+      if (k.idef0_parent !== id && k.bpmn_scope !== id) continue;
+      if (!k.role_id) continue;
+      counts.set(k.role_id, (counts.get(k.role_id) ?? 0) + 1);
+    }
+    const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : null;
+  };
+
   for (const n of model.nodes) {
     if (n.type !== "task" && n.type !== "subprocess") continue;
-    if (n.role_id) add(n.id, n.role_id, "R");
+    const owner = n.role_id ?? childRole(n.id);
+    if (owner) add(n.id, owner, "R");
 
     const text = n.source.map((s) => s.quote).join(" ").toLowerCase();
     let foundA = false;
     if (APPROVE_STEMS.some((s) => text.includes(s))) {
-      const roleId = findRoleIdInText(text, model.roles) ?? n.role_id;
+      const roleId = findRoleIdInText(text, model.roles) ?? owner;
       if (roleId) {
         add(n.id, roleId, "A");
         foundA = true;
       }
     }
     if (CONSULT_STEMS.some((s) => text.includes(s))) {
-      const roleId = findRoleIdInText(text, model.roles, n.role_id);
+      const roleId = findRoleIdInText(text, model.roles, owner);
       if (roleId) add(n.id, roleId, "C");
     }
     if (INFORM_STEMS.some((s) => text.includes(s))) {
-      const roleId = findRoleIdInText(text, model.roles, n.role_id);
+      const roleId = findRoleIdInText(text, model.roles, owner);
       if (roleId) add(n.id, roleId, "I");
     }
-    if (!foundA && n.role_id) add(n.id, n.role_id, "A");
+    if (!foundA && owner) add(n.id, owner, "A");
   }
   return entries;
 }

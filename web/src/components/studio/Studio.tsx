@@ -938,6 +938,49 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     handleCommonKeys(e, { undo: h.undo, redo: h.redo, save: () => h.dirty && !busy && void save() });
   };
 
+  /**
+   * A1: те же клавиши работают, когда фокус вне студии (строка навигатора, кнопка, тело страницы):
+   * React-обработчик выше видит только события внутри своего поддерева, а Ctrl+S в браузере открывал
+   * «Сохранить страницу как». Слушаем window и пропускаем то, что уже обработано (defaultPrevented) или холстом.
+   */
+  const keys = useRef({ undo: h.undo, redo: h.redo, save, dirty: h.dirty, busy, goHist, props: () => setPropsOpen(true) });
+  keys.current = { undo: h.undo, redo: h.redo, save, dirty: h.dirty, busy, goHist, props: () => setPropsOpen(true) };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return;
+      const target = e.target as Element | null;
+      if (target?.closest?.(".bpe")) return; // у холста своя обработка
+      const k = keys.current;
+      const mod = e.ctrlKey || e.metaKey;
+      const inField = isTextInput(e.target);
+      // Ctrl+S: фиксируем набранное в поле (CommitInput сделает это по blur) и сохраняем уже новую модель.
+      // Работает и в диалогах студии — браузерное «Сохранить страницу как» не должно открываться нигде.
+      if (mod && !e.altKey && (e.key.toLowerCase() === "s" || e.code === "KeyS")) {
+        e.preventDefault();
+        if (inField) (e.target as HTMLElement).blur();
+        window.setTimeout(() => {
+          if (keys.current.dirty && !keys.current.busy) void keys.current.save();
+        }, 0);
+        return;
+      }
+      if (target?.closest?.("dialog,[role='dialog']")) return; // остальные клавиши в диалоге — его собственные
+      // в поле ввода Ctrl+Z/Ctrl+Y — родная отмена набора, её не перехватываем
+      if (inField) return;
+      if (handleCommonKeys(e, { undo: k.undo, redo: k.redo, save: () => k.dirty && !k.busy && void k.save() })) return;
+      if (e.altKey && !mod && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        k.goHist(e.key === "ArrowLeft" ? -1 : 1);
+        return;
+      }
+      if (mod && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "e" || e.code === "KeyE")) {
+        e.preventDefault();
+        k.props();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const exportLink = (label: string, path: string) => (
     <a key={path} href={api.exportUrl(session.id, path)} target="_blank" rel="noreferrer" className={h.dirty ? "disabled-link" : ""} onClick={(e) => h.dirty && e.preventDefault()} title={h.dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
       <RibbonIcon name="export" />

@@ -141,6 +141,37 @@ describe("страница сессии", () => {
     expect(document.querySelector(".statusbar")!.textContent).toMatch(/несохранённые/);
   });
 
+  it("неизвестная сессия: «Сессия не найдена» и возврат к списку (A9)", async () => {
+    vi.spyOn(api, "getSession").mockRejectedValue(new Error("not found"));
+    vi.spyOn(api, "activeJob").mockResolvedValue(null as never);
+    const onBack = vi.fn();
+    render(<WorkspacePage sessionId="nonexistent" onBack={onBack} />);
+    await screen.findByText(/Сессия не найдена/);
+    fireEvent.click(screen.getByText("← К списку сессий"));
+    expect(onBack).toHaveBeenCalled();
+  });
+
+  it("Ctrl+S вне холста сохраняет набранное в поле, не дожидаясь потери фокуса (A1, A2)", async () => {
+    const s = session();
+    setup(s);
+    const put = vi.spyOn(api, "putModel").mockResolvedValue(s);
+    vi.spyOn(api, "rebuildDiagrams").mockResolvedValue({ ...s, updatedAt: "2026-10-02T10:00:01Z" });
+    await screen.findByRole("heading", { name: "Закупка" });
+    await waitFor(() => expect(document.querySelector(".studio")).toBeTruthy());
+    fireEvent.click(navRow("Исполнители"));
+    fireEvent.click(document.querySelector(".dict-table tbody tr")!);
+    const desc = screen.getByLabelText("Описание");
+    fireEvent.focus(desc);
+    fireEvent.change(desc, { target: { value: "набрано без blur" } });
+    // Ctrl+S прямо из поля: сначала фиксируется набранное, затем сохраняется модель
+    fireEvent.keyDown(desc, { key: "s", code: "KeyS", ctrlKey: true });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    await waitFor(() => expect(put).toHaveBeenCalledTimes(1));
+    expect(put.mock.calls[0][1]!.roles[0].description).toBe("набрано без blur");
+  });
+
   it("ошибка в одной вкладке не роняет страницу", async () => {
     setup(session(), { initialTab: "text" });
     await screen.findByRole("heading", { name: "Закупка" });

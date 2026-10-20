@@ -7,6 +7,25 @@ function normName(s: string): string {
 }
 
 /**
+ * Отметить отвеченные пробелы по журналу ответов (`session.qa`): повторная обработка строит пробелы заново,
+ * у них другие id, поэтому сверяем по тексту вопроса — он у одного и того же пробела не меняется.
+ */
+export function applyAnsweredGaps(model: ProcessLogicModel, answers: { question: string; answerText: string }[]): number {
+  if (answers.length === 0) return 0;
+  const byQuestion = new Map<string, string>();
+  for (const a of answers) byQuestion.set(a.question.trim(), a.answerText);
+  let n = 0;
+  for (const g of model.gaps) {
+    const answer = byQuestion.get(g.question.trim());
+    if (answer === undefined || g.status === "answered") continue;
+    g.status = "answered";
+    g.answer = answer;
+    n++;
+  }
+  return n;
+}
+
+/**
  * Детерминированный движок выявления пробелов и противоречий (ФТ-4).
  * Правила полноты (4.1), противоречия (4.2), неявные ветвления (4.3),
  * приоритет + сформулированный вопрос (4.4).
