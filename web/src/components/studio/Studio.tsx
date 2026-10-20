@@ -44,6 +44,9 @@ import { LC_STATUS_LABELS, lcStatus, lcVersion, nextVersion } from "./lifecycle"
 import { LOOP_KINDS, LOOP_LABELS } from "@shared/loops";
 import type { PropTab } from "./PanelParts";
 
+/** Статус процесса по-русски: в строке состояния не должен появляться код API. */
+const PROCESS_STATUS_LABEL: Record<string, string> = { draft: "Черновик", review: "На согласовании", needs_rework: "На доработке", approved: "Утверждено", archived: "Архив" };
+
 type M = ProcessLogicModel;
 
 /** Начальное состояние черновика: роли и позиции фигур достроены (в черновиках, сохранённых раньше, полей новой версии модели нет). */
@@ -982,7 +985,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   }, []);
 
   const exportLink = (label: string, path: string) => (
-    <a key={path} href={api.exportUrl(session.id, path)} target="_blank" rel="noreferrer" className={h.dirty ? "disabled-link" : ""} onClick={(e) => h.dirty && e.preventDefault()} title={h.dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
+    <a key={path} href={api.exportUrl(session.id, path)} download className={h.dirty ? "disabled-link" : ""} onClick={(e) => h.dirty && e.preventDefault()} title={h.dirty ? "Экспортируется сохранённая версия — сначала сохраните" : undefined}>
       <RibbonIcon name="export" />
       {label}
     </a>
@@ -1178,7 +1181,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                       <option value="A3">A3</option>
                       <option value="A2">A2</option>
                     </select>
-                    <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.pdf${q}`)} target="_blank" rel="noreferrer" {...guard}>
+                    <a href={api.exportUrl(session.id, `idef0/${encodeURIComponent(diagram)}.pdf${q}`)} download {...guard}>
                       <RibbonIcon name="pdf" />
                       Лист в PDF
                     </a>
@@ -1240,7 +1243,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         </div>
       </div>
 
-      <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "330px " : ""}minmax(0, 1fr)${propsOpen ? " 340px" : ""}` }}>
+      <div className="studio-body" style={{ gridTemplateColumns: `${navOpen ? "var(--studio-nav-w, 330px) " : ""}minmax(0, 1fr)${propsOpen ? " var(--studio-props-w, 340px)" : ""}` }}>
         {navOpen && (
           <Navigator model={draft} activeKey={active.key} selectedId={selection?.kind === "node" ? selection.id : null} onOpenDoc={open} onSelectFn={selectFn} onProperties={(id) => (selectFn(id), setPropsOpen(true))} onAddFunction={locked ? () => undefined : addFn} onOpenEntry={(dict, id) => { open(dictDoc(dict)); setSelection({ kind: "entry", dict, id }); }} onMoveFunction={locked ? undefined : moveFn} onFunctionAction={locked ? undefined : fnAction} onWizard={locked ? undefined : () => setWizardOpen(true)} reveal={navReveal} storageKey={session.id} onRenameFunction={locked ? undefined : renameFn} clipboard={clip} onCopy={locked ? undefined : copyFn} onCut={locked ? undefined : cutFn} onPaste={locked ? undefined : pasteFn} activeSet={activeSetId} onActiveSet={chooseSet} onSetOp={locked ? undefined : setOp} onClose={() => setNavOpen(false)} />
         )}
@@ -1404,7 +1407,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           if (!n)
             return (
               <span>
-                <b>{draft.process.name}</b> · {draft.process.type} · версия {draft.process.version} · статус: {draft.process.status}
+                <b>{draft.process.name}</b> · {draft.process.type} · версия {draft.process.version} · статус: {PROCESS_STATUS_LABEL[draft.process.status] ?? draft.process.status}
               </span>
             );
           const code = idef0Codes(draft).get(n.id);

@@ -1,6 +1,5 @@
 import type { ProcessLogicModel } from "../../types";
-import { processCodeOf } from "@shared/codes";
-import { idef0Codes } from "../idef0-editor/geometry";
+import { blockNumbers, functionCodes, isStructured, processCodeOf } from "@shared/codes";
 
 /** Документ (вкладка) окна студии. */
 export type StudioDoc =
@@ -37,11 +36,13 @@ export const reportDoc = (report: ReportKind): StudioDoc => ({ key: `report:${re
 
 /** Заголовок вкладки; для диаграммы IDEF0 — код функции (A0, A2, A21…). */
 export function docTitle(doc: StudioDoc, model: ProcessLogicModel): string {
+  // те же обозначения, что в навигаторе: без кода процесса — номера блоков A1.1, с кодом — коды Соглашения
+  const labels = isStructured(model) ? functionCodes(model) : blockNumbers(model);
   switch (doc.kind) {
     case "bpmn":
-      return doc.scope ? `BPMN ${idef0Codes(model).get(doc.scope) ?? "?"}` : "BPMN";
+      return doc.scope ? `BPMN ${labels.get(doc.scope) ?? "?"}` : "BPMN";
     case "idef0":
-      return `IDEF0 ${doc.parent ? idef0Codes(model).get(doc.parent) ?? "A?" : processCodeOf(model)}`;
+      return `IDEF0 ${doc.parent ? labels.get(doc.parent) ?? "A?" : processCodeOf(model)}`;
     case "dict":
       return DICT_TITLES[doc.dict];
     case "report":
