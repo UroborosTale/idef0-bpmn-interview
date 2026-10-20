@@ -831,7 +831,7 @@ function drawBpmnShape(page: Page, s: Shape, model: ProcessLogicModel, plain = f
   const band = lanes?.find((l) => y >= l.y - 0.5 && y + h <= l.y + l.h + 0.5);
   const above = !!band && labelSide({ x, y, w, h }, s.name, { top: band.y, bottom: band.y + band.h }) === "above";
   // plain — фигура для палитры оболочки: без меток модели (метки ставит приём правок, когда фигура становится шагом)
-  const tag: Record<string, string> = plain ? {} : s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
+  const tag: Record<string, string> = plain ? {} : s.nodeId ? { pm_k: "node", pm_id: s.nodeId, pm_n: s.name, pm_t: s.kind, pm_x: String(Math.round(x)), pm_y: String(Math.round(y)) } : { pm_k: "synth", pm_id: s.id };
   const props = visioShapeProps(s);
   // оформление вида из модели (shape_styles) ложится поверх значений выгрузки по умолчанию
   const pos = s.event?.position ?? (s.subtype === "start" ? "start" : s.subtype === "end" ? "end" : "intermediate");

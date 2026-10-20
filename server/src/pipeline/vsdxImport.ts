@@ -496,7 +496,14 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
     }
     if (page.nodes.length) pages.push(page);
   }
-  if (skippedIdef0) warnings.push(`Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`);
+  if (skippedIdef0) {
+    const own = pages.some((p) => p.own) || idef0.some((p) => p.marks.length > 0);
+    warnings.push(
+      own
+        ? `Страницы IDEF0 восстановлены по меткам модели (${skippedIdef0}).`
+        : `Страницы IDEF0 пропущены (${skippedIdef0}): импортируются диаграммы BPMN и блок-схемы.`
+    );
+  }
   if (pages.length === 0) warnings.push("Не найдено ни одной фигуры, похожей на шаг процесса, событие или шлюз.");
   return { pages, sheets, idef0, warnings };
 }
@@ -597,19 +604,23 @@ function readPage(contents: X, pageIndex: number, pageName: string, pageH: numbe
     }
     const geo = geometryOf(s.shape);
     const vb = s.bpmn;
-    // у собственной выгрузки вид задаёт метка pm_*, а подтип, триггер и признаки — свойства фигуры (их правят в «Данных фигуры» Visio)
+    // у собственной выгрузки вид задаёт метка pm_* (pm_t — точный вид), а подтип, триггер и признаки — свойства
+    // фигуры (их правят в «Данных фигуры» Visio)
+    const savedKind = pk === "node" && ["task", "subprocess", "gateway", "event"].includes(s.user.pm_t ?? "") ? (s.user.pm_t as Kind) : undefined;
     const byProps: Kind | undefined = pk ? undefined : vb.kind === "pool" ? "lane" : vb.kind === "flow" ? "ignore" : vb.kind;
-    let kind: Kind = pk
-      ? geo.diamond
-        ? "gateway"
-        : geo.ellipse
-          ? "event"
-          : "task"
-      : // на странице IDEF0 блок функции — это прямоугольник с названием, и стрелки к нему могут быть ещё не проведены
-        // (на BPMN без связей фигура считается примечанием и пропускается — там правило остаётся прежним)
-        (byProps ?? (idef0 && !geo.diamond && !geo.ellipse ? "task" : classify(s.name, geo, connected.has(s.id), s.box)));
-    // подпроцесс собственной выгрузки отличает маркер «+» во второй секции геометрии
-    if (pk && kind === "task" && arr<X>(s.shape.Section).some((x) => attr(x, "N") === "Geometry" && attr(x, "IX") === "1")) kind = "subprocess";
+    let kind: Kind =
+      savedKind ??
+      (pk
+        ? geo.diamond
+          ? "gateway"
+          : geo.ellipse
+            ? "event"
+            : "task"
+        : // на странице IDEF0 блок функции — это прямоугольник с названием, и стрелки к нему могут быть ещё не проведены
+          // (на BPMN без связей фигура считается примечанием и пропускается — там правило остаётся прежним)
+          (byProps ?? (idef0 && !geo.diamond && !geo.ellipse ? "task" : classify(s.name, geo, connected.has(s.id), s.box))));
+    // старые выгрузки без pm_t: подпроцесс отличает маркер «+» во второй секции геометрии
+    if (!savedKind && pk && kind === "task" && arr<X>(s.shape.Section).some((x) => attr(x, "N") === "Geometry" && attr(x, "IX") === "1")) kind = "subprocess";
     if (kind === "lane") {
       lanes.push({ name: textDeep(s), box: s.box });
       nodeKinds.set(s.id, "lane");
@@ -733,8 +744,160 @@ const centre = (b: VsdxBox) => [b.x + b.w / 2, b.y + b.h / 2] as const;
 const area = (b: VsdxBox) => b.w * b.h;
 const contains = (outer: VsdxBox, inner: VsdxBox) => inner.x >= outer.x - 1 && inner.y >= outer.y - 1 && inner.x + inner.w <= outer.x + outer.w + 1 && inner.y + inner.h <= outer.y + outer.h + 1;
 
+/**
+ * A7: модель из собственной выгрузки Visio. Названия и иерархия функций — из меток pm_* страниц IDEF0,
+ * шаги, дорожки, события и потоки — из страниц BPMN. Страница «BPMN» без pm_scope — общая схема, функцией не становится.
+ */
+function buildModelFromOwnVsdx(parsed: ParsedVsdx, meta: SessionMeta): { model: ProcessLogicModel; warnings: string[] } {
+  const warnings = [...parsed.warnings];
+  const nodes: ProcessNode[] = [];
+  const byId = new Map<string, ProcessNode>();
+  const roles: Role[] = [];
+  const roleById = new Map<string, Role>();
+  const ensure = (id: string, kind: ProcessNode["type"], name: string): ProcessNode => {
+    let n = byId.get(id);
+    if (!n) {
+      n = {
+        id,
+        type: kind,
+        name,
+        role_id: null,
+        system_ids: [],
+        inputs: [],
+        outputs: [],
+        controls: [],
+        duration: null,
+        frequency: null,
+        idef0_parent: null,
+        bpmn_scope: null,
+        status: "confirmed",
+        confidence: 0.8,
+        source: [{ fragment_id: "diagram_import", quote: "Visio: метки pm_*" }],
+        requirement_ids: [],
+        tags: ["from_diagram_import"],
+        confirmed_by: [],
+      };
+      byId.set(id, n);
+      nodes.push(n);
+    }
+    return n;
+  };
+  const roleFor = (id: string, name: string): Role => {
+    let role = roleById.get(id);
+    if (!role) {
+      role = { id, name: clean(name) || `Дорожка ${roleById.size + 1}`, kind: "internal", source: [] };
+      roleById.set(id, role);
+      roles.push(role);
+    }
+    return role;
+  };
+
+  // функции IDEF0: название — текст блока без кода, родитель — функция, чья это декомпозиция
+  for (const page of parsed.idef0) {
+    if (page.context) continue; // A-0 изображает сам процесс, а не функцию
+    for (const mark of page.marks) {
+      if (mark.k !== "fn" || mark.id === "__context__") continue;
+      const visible = mark.text.replace(/^\S+\s+/, "").trim();
+      const name = visible || mark.was.trim() || "(без названия)";
+      const n = ensure(mark.id, "task", name);
+      n.name = name;
+      n.idef0_parent = page.parent ?? null;
+    }
+  }
+
+
+  const leavesOf = (page: VsdxPage) =>
+    page.containers.filter((c) => !page.containers.some((o) => o !== c && area(o.box) < area(c.box) && contains(c.box, o.box)));
+  const idByKey = new Map<string, string>();
+  for (const page of parsed.pages) {
+    for (const c of leavesOf(page)) if (c.laneId && c.laneId !== "__unassigned__") roleFor(c.laneId, c.name);
+    for (const n of page.nodes) if (!n.synth && n.pmId) idByKey.set(n.key, n.pmId);
+  }
+
+  const flows: ProcessFlow[] = [];
+  const flowById = new Map<string, ProcessFlow>();
+  for (const page of parsed.pages) {
+    const leaves = leavesOf(page);
+    const incoming = new Set(page.edges.map((e) => e.to));
+    // граничное событие: ничего не входит, центр лежит на краю задачи или подпроцесса
+    const boundaryHost = new Map<string, string>();
+    for (const ev of page.nodes) {
+      if (ev.kind !== "event" || incoming.has(ev.key)) continue;
+      const [ex, ey] = centre(ev.box);
+      const reach = Math.max(ev.box.w, ev.box.h) / 2 + 4;
+      const host = page.nodes.find((t) => {
+        if (t.kind !== "task" && t.kind !== "subprocess") return false;
+        const [l, r, top, bottom] = [t.box.x, t.box.x + t.box.w, t.box.y, t.box.y + t.box.h];
+        if (ex < l - reach || ex > r + reach || ey < top - reach || ey > bottom + reach) return false;
+        return Math.min(Math.abs(ex - l), Math.abs(ex - r), Math.abs(ey - top), Math.abs(ey - bottom)) <= reach;
+      });
+      if (host) boundaryHost.set(ev.key, host.key);
+    }
+
+    for (const n of page.nodes) {
+      if (n.synth || !n.pmId) continue;
+      const node = ensure(n.pmId, n.kind, n.text || "(без названия)");
+      if (n.text) node.name = n.text;
+      node.type = n.kind;
+      if (n.subtype) node.subtype = n.subtype;
+      if (n.trigger) node.trigger = n.trigger;
+      if (n.loop) node.loop = n.loop;
+      if (page.scope) node.bpmn_scope = page.scope;
+      if (n.kind === "task" || n.kind === "subprocess") {
+        const [cx, cy] = centre(n.box);
+        const lane = leaves.find((c) => cx >= c.box.x && cx <= c.box.x + c.box.w && cy >= c.box.y && cy <= c.box.y + c.box.h);
+        if (lane) node.role_id = lane.laneId && lane.laneId !== "__unassigned__" ? roleFor(lane.laneId, lane.name).id : null;
+      }
+    }
+    for (const [eventKey, hostKey] of boundaryHost) {
+      const ev = byId.get(idByKey.get(eventKey) ?? "");
+      const host = byId.get(idByKey.get(hostKey) ?? "");
+      if (ev && host) {
+        ev.attached_to = host.id;
+        if (page.nodes.find((n) => n.key === eventKey)?.nonInterrupting) ev.interrupting = false;
+      }
+    }
+    for (const e of page.edges) {
+      const from = idByKey.get(e.from);
+      const to = idByKey.get(e.to);
+      if (!from || !to) continue;
+      const id = e.pmId ?? `flow_${nanoid(8)}`;
+      // производные связи общей схемы (DerivedFlow_N) нарисованы для читаемости и в модель не возвращаются
+      if (id.startsWith("DerivedFlow_") || flowById.has(id)) continue;
+      const flow: ProcessFlow = {
+        id,
+        from,
+        to,
+        condition: e.label || null,
+        ...(e.isDefault ? { is_default: true } : {}),
+        source: [{ fragment_id: "diagram_import", quote: `Visio: ${page.name}` }],
+        confirmed_by: [],
+      };
+      flowById.set(id, flow);
+      flows.push(flow);
+    }
+  }
+
+  // у операции, которая не нарисована на дорожке, исполнитель берётся из её шагов (как в автопостроении RACI)
+  for (const n of nodes) {
+    if (n.role_id || (n.type !== "task" && n.type !== "subprocess")) continue;
+    const counts = new Map<string, number>();
+    for (const c of nodes) if (c.role_id && c.bpmn_scope === n.id) counts.set(c.role_id, (counts.get(c.role_id) ?? 0) + 1);
+    const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (best) n.role_id = best[0];
+  }
+
+  const model = importedModel(meta, { nodes, flows, roles });
+  warnings.push(`Модель восстановлена из выгрузки Visio: функций и шагов — ${nodes.length}, потоков — ${flows.length}, дорожек — ${roles.length}.`);
+  return { model, warnings };
+}
+
+
 /** Модель процесса из разобранного .vsdx: шаги, события, шлюзы, потоки, исполнители по дорожкам. */
 export function buildModelFromParsedVsdx(parsed: ParsedVsdx, meta: SessionMeta) {
+  // A7: собственная выгрузка несёт метки pm_* — по ним модель восстанавливается целиком (имена, иерархия,
+  // шаги, дорожки и потоки), а не превращается в набор функций по названиям страниц.
+  if (parsed.pages.some((p) => p.own) || parsed.idef0.some((p) => p.marks.length > 0)) return buildModelFromOwnVsdx(parsed, meta);
   const warnings = [...parsed.warnings];
   const roles: Role[] = [];
   const roleByName = new Map<string, Role>();

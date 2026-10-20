@@ -77,7 +77,7 @@ describe("импорт Visio (.vsdx)", () => {
     expect(model.flows.filter((f) => f.from === gate.id).map((f) => f.condition).sort()).toEqual(["да", "нет"]);
     expect(flow("Договор получен", src.nodes.find((n) => n.id === "t1")!.name)).toBeTruthy();
     expect(model.flows.some((f) => f.from === gate.id && f.to === idOf(src.nodes.find((n) => n.id === "t2")!.name) && f.condition === "да")).toBe(true);
-    expect(warnings.filter((w) => !/IDEF0/.test(w))).toEqual([]); // всё распознано (страницы IDEF0 пропускаются осознанно)
+    expect(warnings.filter((w) => !/IDEF0|восстановлена/.test(w))).toEqual([]); // всё распознано
   });
 
   it("тип шлюза и вид события собственной выгрузки сохраняются", async () => {
@@ -89,10 +89,10 @@ describe("импорт Visio (.vsdx)", () => {
     expect((await importFile(await buildVsdx(m))).model.nodes.find((n) => n.type === "gateway")!.subtype).toBe("inclusive");
   });
 
-  it("страницы IDEF0 пропускаются, диаграммы BPMN читаются", async () => {
+  it("страницы IDEF0 читаются по меткам модели, диаграммы BPMN — как диаграммы", async () => {
     const parsed = await parseVsdx(await buildVsdx(purchaseModel()));
     expect(parsed.pages.length).toBeGreaterThan(0);
-    expect(parsed.warnings.join(" ")).toMatch(/IDEF0 пропущены/);
+    expect(parsed.warnings.join(" ")).toMatch(/IDEF0 восстановлены/);
     expect(parsed.pages.every((p) => !p.name.startsWith("IDEF0"))).toBe(true);
   });
 
@@ -151,17 +151,30 @@ describe("импорт Visio (.vsdx)", () => {
     expect(validateModel(model).filter((i) => i.severity === "error")).toEqual([]);
   });
 
-  it("несколько страниц — по операции на каждую: проверки потока идут по диаграммам и ошибок нет", async () => {
+  it("собственная выгрузка восстанавливает модель: имена, иерархия, шаги, потоки и дорожки (A7)", async () => {
     const src = demoModel();
     const parsed = await parseVsdx(await buildVsdx(src));
     const { model, warnings } = buildModelFromParsedVsdx(parsed, meta);
-    const ops = model.nodes.filter((n) => n.type === "task" && n.tags.includes("from_diagram_import") && model.nodes.some((s) => s.bpmn_scope === n.id));
-    expect(ops).toHaveLength(parsed.pages.length);
-    expect(ops.map((o) => o.name)).toContain("C090.01.01"); // префикс «BPMN » у названия страницы убран
+    // ни «функций-страниц», ни общих схемы как функции
+    expect(model.nodes.some((n) => n.name === "BPMN" || /^C090\.\d/.test(n.name))).toBe(false);
+    // каждая функция и каждый шаг исходной модели на месте — с тем же id, именем и иерархией
+    for (const original of src.nodes) {
+      const got = model.nodes.find((n) => n.id === original.id);
+      expect(got, original.name).toBeTruthy();
+      expect(got!.name, original.id).toBe(original.name);
+      expect(got!.type, original.id).toBe(original.type);
+      expect(got!.idef0_parent ?? null, original.id).toBe(original.idef0_parent ?? null);
+      expect(got!.bpmn_scope ?? null, original.id).toBe(original.bpmn_scope ?? null);
+    }
+    const s1 = model.nodes.find((n) => n.name === "Подготовка закупки")!;
+    expect(s1.idef0_parent ?? null).toBeNull();
+    expect(model.nodes.filter((n) => n.idef0_parent === s1.id).map((n) => n.name)).toEqual(
+      expect.arrayContaining(["Оформление заявки на закупку", "Согласование заявки на закупку"])
+    );
     expect(model.nodes.filter((n) => n.bpmn_scope).length).toBeGreaterThan(60);
+    expect(model.flows.map((f) => f.id).sort()).toEqual(src.flows.map((f) => f.id).sort());
     expect(model.nodes.some((n) => n.attached_to)).toBe(true); // граничные события демо
-    expect(validateModel(model).filter((i) => i.severity === "error")).toEqual([]);
-    expect(warnings.join(" ")).toMatch(/каждая стала диаграммой операции/);
+    expect(warnings.join(" ")).toMatch(/Модель восстановлена из выгрузки Visio/);
   });
 
   it("фигуры, нарисованные вручную без мастера (Visio называет их «Sheet.N»): прямоугольник — шаг, ромб — шлюз, овал — событие", async () => {
