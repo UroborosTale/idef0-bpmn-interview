@@ -82,13 +82,17 @@ export function analyzeImpact(
 
   const kpiChanged = d.kpi.added.length > 0 || d.kpi.removed.length > 0 || d.kpi.changed.length > 0;
 
-  // исполнители изменённых шагов (ФТ-М7.4.1)
+  // исполнители изменённых шагов (ФТ-М7.4.1); систему, заведённую ролью, в «Затронутые роли» не пишем (B13)
+  const normName = (s: string) => s.trim().toLowerCase().replace(/[«»"]/g, "");
+  const systemNames = new Set(after.systems.map((s) => normName(s.name)));
   const roleById = new Map(after.roles.map((r) => [r.id, r.name] as const));
   const affectedRoleIds = new Set<string>();
   for (const n of after.nodes) {
     if (changedIds.has(n.id) && n.role_id) affectedRoleIds.add(n.role_id);
   }
-  const affectedRoles = [...affectedRoleIds].map((roleId) => ({ roleId, name: roleById.get(roleId) ?? roleId }));
+  const affectedRoles = [...affectedRoleIds]
+    .filter((roleId) => !systemNames.has(normName(roleById.get(roleId) ?? "")))
+    .map((roleId) => ({ roleId, name: roleById.get(roleId) ?? roleId }));
 
   // значимость (ФТ-М7.3.2)
   const hasStructuralChange = d.nodes.added.length > 0 || d.nodes.removed.length > 0 || d.flows.added.length > 0 || d.flows.removed.length > 0;

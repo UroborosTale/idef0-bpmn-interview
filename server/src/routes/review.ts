@@ -44,7 +44,10 @@ function findAdjacentProcesses(sessionId: string, before: any, after: any): Adja
 
 function findBaselineVersion(session: NonNullable<ReturnType<typeof getSession>>) {
   const lastApproved = [...session.versions].reverse().find((v) => v.major);
-  return lastApproved ?? session.versions[0];
+  if (lastApproved) return lastApproved;
+  // B13: до первого утверждения сравнивать не с чем — базой служит текущий снимок,
+  // а не пустая версия 0.1 (иначе «изменены» все шаги, а регламент «устаревает» целиком)
+  return session.versions[session.versions.length - 1];
 }
 
 /** ФТ-М7.2.1: запуск маршрута согласования (по умолчанию: аналитик → владелец → нормоконтролёр). Сразу считает анализ влияния (ФТ-М7.3.1). */
