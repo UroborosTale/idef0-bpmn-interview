@@ -47,7 +47,7 @@ versionsRouter.post("/sessions/:id/versions", (req, res) => {
   const note = (req.body?.note as string) || "снимок версии";
   const author = (req.body?.author as string) || "аналитик";
   try {
-    const updated = addVersion(req.params.id, note, { author });
+    const updated = addVersion(req.params.id, note, { author, force: true });
     res.json(updated);
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });

@@ -37,7 +37,7 @@ describe("хранилище", () => {
     const s = await newSession();
     await runAndWait(s.id);
     const after = (await app.call("GET", `/sessions/${s.id}`)).body;
-    expect(after.versions.map((v: any) => v.seq)).toEqual([1, 2]);
+    expect(after.versions.map((v: any) => v.seq)).toEqual([1]); // повторный прогон без изменений не создаёт версию (B10)
     expect(after.versions[0].model).toBeUndefined();
     const list = (await app.call("GET", "/sessions")).body;
     const row = list.find((x: any) => x.id === s.id);

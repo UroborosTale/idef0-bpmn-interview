@@ -290,6 +290,24 @@ export function editBlockReason(session: SessionRecord): string | null {
   return null;
 }
 
+/** Модель без версии и статуса процесса: их меняет сам снимок, содержание они не описывают. */
+function versionless(m: ProcessLogicModel): unknown {
+  return { ...m, process: { ...m.process, version: undefined, status: undefined } };
+}
+
+/** Стабильный JSON (ключи по алфавиту): сравнение моделей не зависит от порядка полей. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${stableJson(o[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
 /**
  * Создаёт снимок версии модели (ФТ-М7.1.1): каждое сохранение — новая версия.
  * Мажорная версия присваивается при утверждении (opts.major), минорная —
@@ -299,11 +317,21 @@ export function editBlockReason(session: SessionRecord): string | null {
  * Версия и статус синхронизируются в модель сессии (process.version/status),
  * чтобы GET /sessions/:id всегда показывал актуальную версию.
  */
-export function addVersion(id: string, note: string, opts?: { major?: boolean; author?: string; modelOverride?: ProcessLogicModel }): SessionRecord {
+export function addVersion(id: string, note: string, opts?: { major?: boolean; author?: string; modelOverride?: ProcessLogicModel; force?: boolean }): SessionRecord {
   const current = getSession(id);
   const model = opts?.modelOverride ?? current?.model;
   if (!current || !model) throw new Error("No model to snapshot");
-  const last = db.prepare(`SELECT seq, version FROM session_versions WHERE session_id = ? ORDER BY seq DESC LIMIT 1`).get(id) as { seq: number; version: string } | undefined;
+  const last = db.prepare(`SELECT seq, version, model_json FROM session_versions WHERE session_id = ? ORDER BY seq DESC LIMIT 1`).get(id) as { seq: number; version: string; model_json: string } | undefined;
+  // B10: повторное сохранение без изменений не создаёт новую версию (v0.3 → v0.4 → v0.5 за секунду);
+  // ручной «Снимок» (force) и утверждение (major) — явное действие, их не схлопываем
+  if (!opts?.major && !opts?.force && last) {
+    try {
+      const previous = JSON.parse(last.model_json) as ProcessLogicModel;
+      if (stableJson(versionless(previous)) === stableJson(versionless(model))) return current;
+    } catch {
+      /* повреждённый снимок — новую версию всё равно создаём */
+    }
+  }
   let major = 0;
   let minor = 0;
   if (last) {
