@@ -153,7 +153,7 @@ function verbForm(sentence: string, stem: string): { index: number; form: string
   const re = new RegExp(`[а-яё-]*?${stem}[а-яё]*`, "giu");
   for (const m of sentence.matchAll(re)) {
     const word = m[0];
-    if (/(?:ет|ют|ит|ат|ят|ует|ает|яет|ть|ться|тся|л|ла|ли|ем|им|ешь|ишь)$/u.test(word)) return { index: m.index ?? -1, form: word };
+    if (/(?:ет|ют|ит|ат|ят|ует|ает|яет|ть|ться|тся|л|ла|ли|ем|им|ешь|ишь)$/u.test(word)) return { index: (m.index ?? 0) + word.indexOf(stem), form: word };
   }
   return null;
 }
