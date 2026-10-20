@@ -12,15 +12,37 @@ function normName(s: string): string {
  */
 export function applyAnsweredGaps(model: ProcessLogicModel, answers: { question: string; answerText: string }[]): number {
   if (answers.length === 0) return 0;
-  const byQuestion = new Map<string, string>();
-  for (const a of answers) byQuestion.set(a.question.trim(), a.answerText);
+  const normQ = (s: string) => s.trim().toLowerCase().replace(/[«»"']/g, "").replace(/\s+/g, " ").replace(/[?!.]+$/, "");
+  const entries = answers.map((a) => ({ key: normQ(a.question), answer: a.answerText }));
+  const exact = new Map(entries.map((e) => [e.key, e.answer] as const));
   let n = 0;
   for (const g of model.gaps) {
-    const answer = byQuestion.get(g.question.trim());
-    if (answer === undefined || g.status === "answered") continue;
+    const key = normQ(g.question);
+    let answer = exact.get(key);
+    // имя шага могло измениться при пересборке — сравниваем вопросы по основе, а не по точному тексту
+    if (answer === undefined) {
+      answer = entries.find((e) => {
+        if (key.length < 10 || e.key.length < 10) return false;
+        const shorter = Math.min(key.length, e.key.length);
+        const longer = Math.max(key.length, e.key.length);
+        return (key.includes(e.key) || e.key.includes(key)) && shorter / longer >= 0.6;
+      })?.answer;
+    }
+    if (answer === undefined) continue;
+    const wasOpen = g.status !== "answered";
     g.status = "answered";
     g.answer = answer;
-    n++;
+    if (wasOpen) n++;
+    // ответ «кто выполняет» сразу назначает исполнителя, а не ждёт следующего извлечения
+    if (g.rule === "missing_executor" && g.element_id) {
+      const node = model.nodes.find((x) => x.id === g.element_id);
+      if (node && !node.role_id) {
+        const lower = answer.toLowerCase();
+        const norm = (s: string) => s.trim().toLowerCase().replace(/[«»"']/g, "");
+        const role = model.roles.find((r) => lower.includes(norm(r.name))) ?? model.roles.find((r) => norm(r.name).split(" ").every((w) => lower.includes(w)));
+        if (role) node.role_id = role.id;
+      }
+    }
   }
   return n;
 }

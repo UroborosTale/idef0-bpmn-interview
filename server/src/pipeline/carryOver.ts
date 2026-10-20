@@ -5,12 +5,34 @@ type M = ProcessLogicModel;
 
 const CARD_FIELDS = ["description", "owner", "reference", "qualification", "supplier", "consumer", "value", "quality_standard"];
 
+/** Поля шага, которые аналитик правит вручную: при совпадении источника они важнее новой добычи из текста. */
+const MANUAL_NODE_FIELDS = ["duration", "time_processing", "time_waiting", "cost_estimate", "frequency", "content", "begin", "result", "deadline"] as const;
+
+/**
+ * Имя изменили руками, а не извлекли заново: в нём есть слова, которых нет в цитате
+ * («Закрыть запрос (РУЧНАЯ ПРАВКА)»). Сравниваем основы слов, чтобы «проверить» и «проверяет» считались одним словом.
+ */
+function looksRenamed(n: ProcessNode): boolean {
+  const quote = n.source[0]?.quote;
+  if (!quote) return true;
+  const qWords = normKey(quote).split(" ").filter(Boolean);
+  return normKey(n.name)
+    .split(" ")
+    .filter((w) => w.length >= 4)
+    .some((w) => !qWords.some((q) => q.startsWith(w.slice(0, 5)) || w.startsWith(q.slice(0, 5))));
+}
+
+/** Ключ вопроса без регистра, кавычек и знаков на конце: пересборка меняет пунктуацию, но не смысл. */
+function questionKey(rule: string, question: string): string {
+  return `${rule}|${question.trim().toLowerCase().replace(/[«»"']/g, "").replace(/\s+/g, " ").replace(/[?!.]+$/, "")}`;
+}
+
 /** Пробелы, на которые аналитик уже ответил или которые отклонил, не должны снова открываться после пересчёта. */
 export function keepGapStatuses(prev: M["gaps"], fresh: M["gaps"]): M["gaps"] {
-  const closed = new Map(prev.filter((g) => g.status !== "open").map((g) => [`${g.rule}|${g.question}`, g] as const));
+  const closed = new Map(prev.filter((g) => g.status !== "open").map((g) => [questionKey(g.rule, g.question), g] as const));
   const out = fresh.map((g) => {
-    const old = closed.get(`${g.rule}|${g.question}`);
-    return old ? { ...g, status: old.status, asked_count: old.asked_count } : g;
+    const old = closed.get(questionKey(g.rule, g.question));
+    return old ? { ...g, status: old.status, asked_count: old.asked_count, answer: old.answer } : g;
   });
   // открытые вопросы, заданные владельцем вручную, тоже сохраняются
   const ids = new Set(out.map((g) => g.id));
@@ -92,14 +114,6 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       if (hit) inherit(newList as { id: string; name: string }[], hit, e);
     }
   }
-  // карточки переносятся всем сопоставленным записям, даже если ни один перенесённый шаг на них не ссылается
-  for (const [oldList, newList] of [[prev.roles, model.roles], [prev.data, model.data], [prev.controls, model.controls], [prev.systems, model.systems]] as const) {
-    const byKey = new Map((newList as { id: string; name: string }[]).map((e) => [normKey(e.name), e.id] as const));
-    for (const e of oldList as { id: string; name: string }[]) {
-      const hit = byKey.get(normKey(e.name));
-      if (hit) inherit(newList as { id: string; name: string }[], hit, e);
-    }
-  }
   const role = lazy(prev.roles, model.roles, "role");
   const data = lazy(prev.data, model.data, "data");
   const control = lazy(prev.controls, model.controls, "ctl");
@@ -109,14 +123,29 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
 
   // --- шаги ---
   const nodeKey = (n: ProcessNode) => `${n.type}|${normKey(n.name)}`;
+  const sourceKey = (n: ProcessNode) => {
+    const s = n.source[0];
+    return s ? `${s.fragment_id}|${normKey(s.quote)}` : null;
+  };
   const nextByKey = new Map<string, ProcessNode>();
   for (const n of model.nodes) if (!nextByKey.has(nodeKey(n))) nextByKey.set(nodeKey(n), n);
+  const nextBySource = new Map<string, ProcessNode[]>();
+  for (const n of model.nodes) {
+    const k = sourceKey(n);
+    if (k) nextBySource.set(k, [...(nextBySource.get(k) ?? []), n]);
+  }
   const nodeMap = new Map<string, string>(); // id прежнего шага → id в новой модели
   let matched = 0;
+  const usedNew = new Set<string>();
   for (const o of prev.nodes) {
     if (o.source.length === 0) continue; // ручные шаги — ниже
-    const n = nextByKey.get(nodeKey(o));
-    if (!n || [...nodeMap.values()].includes(n.id)) continue;
+    // сначала по названию, затем по цитате источника: так переименованный вручную шаг не теряется
+    const byName = nextByKey.get(nodeKey(o));
+    const key = sourceKey(o);
+    const bySource = key ? (nextBySource.get(key) ?? []).find((x) => !usedNew.has(x.id)) : undefined;
+    const n = byName && !usedNew.has(byName.id) ? byName : bySource;
+    if (!n) continue;
+    usedNew.add(n.id);
     nodeMap.set(o.id, n.id);
     matched++;
     n.layout = o.layout ?? n.layout;
@@ -129,6 +158,8 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       n.status = "confirmed";
       n.confidence = 1;
     }
+    // имя, которого нет в цитате, аналитик изменил руками — оставляем его, а не новое извлечение
+    if (o.name !== n.name && key && key === sourceKey(n) && looksRenamed(o)) n.name = o.name;
   }
 
   // ручные шаги (и вложенные в них функции) переносятся целиком
@@ -159,13 +190,32 @@ export function carryOverManualEdits(prev: M, next: M): { model: M; matched: num
       system_ids: mapIds(o.system_ids, system),
     });
   }
+  // карточка шага и его место в структуре — ручная работа аналитика: возвращаем после сопоставления,
+  // когда уже известны новые id родителей и ролей
+  const prevById = new Map(prev.nodes.map((n) => [n.id, n] as const));
+  for (const [oldId, newId] of nodeMap) {
+    const o = prevById.get(oldId);
+    const n = model.nodes.find((x) => x.id === newId);
+    if (!o || !n) continue;
+    if (o.role_id) {
+      const rid = role(o.role_id);
+      if (rid) n.role_id = rid;
+    }
+    for (const k of MANUAL_NODE_FIELDS) {
+      const v = o[k];
+      if (v != null && v !== "" && ((n as Record<string, unknown>)[k] == null || (n as Record<string, unknown>)[k] === "")) {
+        (n as Record<string, unknown>)[k] = v;
+      }
+    }
+    if (o.bpmn_scope && nodeMap.has(o.bpmn_scope)) n.bpmn_scope = nodeMap.get(o.bpmn_scope)!;
+    if (o.idef0_parent && nodeMap.has(o.idef0_parent)) n.idef0_parent = nodeMap.get(o.idef0_parent)!;
+    if (o.attached_to && nodeMap.has(o.attached_to)) n.attached_to = nodeMap.get(o.attached_to)!;
+  }
   const kept = model.nodes.length - next.nodes.length;
   const present = new Set(model.nodes.map((n) => n.id));
 
-  // связи с участием ручных шагов
-  const manualIds = new Set(manual.map((o) => o.id));
+  // связи между сохранившимися шагами: новые потоки из текста плюс прежние ручные связи
   for (const f of prev.flows) {
-    if (!manualIds.has(f.from) && !manualIds.has(f.to)) continue;
     const from = nodeMap.get(f.from);
     const to = nodeMap.get(f.to);
     if (!from || !to || !present.has(from) || !present.has(to)) continue;
