@@ -31,6 +31,18 @@ describe("новая сессия", () => {
     expect(spy.mock.calls[0][0]).toMatchObject({ mode: "A", meta: { processName: "Закупка", owner: "Иванов", modelType: "TO-BE", confidential: false } });
   });
 
+  it("режим Б: интервью начинается сразу после создания", async () => {
+    const { onCreated } = setup();
+    vi.spyOn(api, "createSession").mockResolvedValue({ id: "sB" } as never);
+    const start = vi.spyOn(api, "interviewStart").mockResolvedValue({ id: "sB" } as never);
+    fireEvent.click(screen.getByLabelText(/Режим Б/));
+    fireEvent.change(screen.getByPlaceholderText(/например, Согласование/), { target: { value: "Найм" } });
+    fireEvent.click(create());
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith("sB"));
+    expect(start).toHaveBeenCalledWith("sB");
+    expect(start.mock.invocationCallOrder[0]).toBeLessThan(onCreated.mock.invocationCallOrder[0]);
+  });
+
   it("режим Г: пустая модель создаётся без текста интервью и LLM", async () => {
     const { onCreated } = setup();
     const blank = vi.spyOn(api, "createBlankSession").mockResolvedValue({ id: "s2" } as never);

@@ -83,6 +83,14 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
         return;
       }
       const session = await api.createSession({ mode: mode as "A" | "B", meta });
+      // кнопка режима Б обещает «создать и начать интервью» — первый вопрос задаём сразу, не заставляя нажимать ещё раз
+      if (mode === "B") {
+        try {
+          await api.interviewStart(session.id);
+        } catch {
+          /* интервью можно начать в сессии вручную — созданную сессию не теряем */
+        }
+      }
       onCreated(session.id);
     } catch (e) {
       setError((e as Error).message);
