@@ -613,6 +613,16 @@ export default function Navigator({
   );
   /** Вертикальные вкладки панели (как в Business Studio): деятельность, справочники, отчёты. */
   const [navTab, setNavTab] = useState<NavTab>("activity");
+  /** Переключение раздела сбрасывает поиск: иначе вместо справочников показываются прежние результаты. */
+  const openTab = (t: NavTab) => {
+    setNavTab(t);
+    setQuery("");
+  };
+  // после переименования и смены раздела панель не остаётся прокрученной вправо (у строк не срезаны первые буквы)
+  useEffect(() => {
+    const sc = rootRef.current?.querySelector(".nav-scroll") as HTMLElement | null;
+    if (sc) sc.scrollLeft = 0;
+  }, [navTab, query, renaming, renamingSet]);
   const sectionTab = (id: string): NavTab => (id === "dicts" ? "dicts" : id === "reports" ? "reports" : "activity");
   const section = (id: string, title: string, body: React.ReactNode, action?: React.ReactNode) =>
     sectionTab(id) !== navTab ? null : (
@@ -666,7 +676,7 @@ export default function Navigator({
         <button className="nav-tool" title="Свернуть все ветки дерева" onClick={() => setCollapsed(new Set([...model.nodes.map((n) => n.id), "~group", "~process"]))}>
           Свернуть
         </button>
-        <button className="nav-tool" title="Показать отчёты" onClick={() => setNavTab("reports")}>
+        <button className="nav-tool" title="Показать отчёты" onClick={() => openTab("reports")}>
           Отчёты
         </button>
       </div>
@@ -814,7 +824,7 @@ export default function Navigator({
       </div>
       <div className="nav-vtabs" role="tablist" aria-orientation="vertical" aria-label="Разделы навигатора">
         {NAV_TABS.map((t) => (
-          <button key={t.key} role="tab" aria-selected={navTab === t.key} className="nav-vtab" onClick={() => setNavTab(t.key)} title={t.title}>
+          <button key={t.key} role="tab" aria-selected={navTab === t.key} className="nav-vtab" onClick={() => openTab(t.key)} title={t.title}>
             <span className="nav-vtab-icon">
               <NavIcon kind={t.key === "activity" ? "tabActivity" : t.key === "dicts" ? "tabDicts" : "tabReports"} />
             </span>

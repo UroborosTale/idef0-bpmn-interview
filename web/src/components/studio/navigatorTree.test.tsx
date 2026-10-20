@@ -24,6 +24,27 @@ const rows = () =>
   }));
 const count = () => document.querySelector(".nav-section")!.querySelectorAll(".nav-row").length;
 
+describe("навигатор: поиск и разделы (B7)", () => {
+  it("переход в «Справочники» сбрасывает поиск и показывает раздел", () => {
+    nav(structuredModel());
+    const input = document.querySelector(".nav-search input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "Актуализация" } });
+    expect(document.querySelector(".nav-results")).toBeTruthy();
+    fireEvent.click(document.querySelector('[role="tab"][title="Справочники"]')!);
+    expect(input.value).toBe("");
+    expect(document.querySelector(".nav-results")).toBeNull();
+    expect(document.querySelector(".nav-section-head")?.textContent).toContain("Справочники");
+  });
+
+  it("горизонтальная прокрутка сбрасывается при поиске — первые буквы строк видны", () => {
+    nav(structuredModel());
+    const sc = document.querySelector(".nav-scroll") as HTMLElement;
+    sc.scrollLeft = 40;
+    fireEvent.change(document.querySelector(".nav-search input")!, { target: { value: "Акт" } });
+    expect(sc.scrollLeft).toBe(0);
+  });
+});
+
 describe("навигатор: иерархия по кодам процесса (модель с кодом)", () => {
   it("группа → B002.00.00 → подпроцессы B002.01.00 → операции B002.01.01 → диаграмма BPMN операции; без номеров блоков", () => {
     const m = structuredModel();
