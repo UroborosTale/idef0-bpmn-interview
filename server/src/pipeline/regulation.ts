@@ -76,7 +76,11 @@ function buildGeneral(model: ProcessLogicModel): RegulationParagraph[] {
 
 function buildTerms(model: ProcessLogicModel): RegulationParagraph[] {
   const out: RegulationParagraph[] = [heading("terms")];
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[«»"]/g, "");
+  // ИС — не должность: бывает, что система заведена и ролью (ERP, ELMA365); в терминах она описывается один раз
+  const systemNames = new Set(model.systems.map((s) => norm(s.name)));
   for (const r of model.roles) {
+    if (systemNames.has(norm(r.name))) continue;
     out.push({
       id: `terms-role-${r.id}`,
       section: "terms",

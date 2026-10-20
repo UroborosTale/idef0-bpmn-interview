@@ -3,6 +3,7 @@ import { getSession } from "../repo.js";
 import { db } from "../db.js";
 import { buildJobDescriptionHtml, buildJobDescriptionDocx } from "../export/jobDescription.js";
 import type { RolePositionInfo } from "../pipeline/jobDescription.js";
+import { isSystemRole } from "../pipeline/jobDescription.js";
 
 export const jobDescriptionRouter = Router();
 
@@ -18,6 +19,10 @@ function requireReady(req: any, res: any) {
   }
   if (!session.model.roles.some((r) => r.id === req.params.roleId)) {
     res.status(404).json({ error: "роль не найдена в модели" });
+    return null;
+  }
+  if (isSystemRole(session.model, req.params.roleId)) {
+    res.status(400).json({ error: "Это информационная система, а не роль сотрудника — должностная инструкция для неё не формируется" });
     return null;
   }
   return session;

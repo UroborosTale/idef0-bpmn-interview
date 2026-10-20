@@ -7,6 +7,10 @@ export default function JobDescriptionsPanel({ session }: { session: SessionReco
   const model = session.model!;
   const [previewRoleId, setPreviewRoleId] = useState<string | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string>("");
+  // B14: система, заведённая ещё и ролью (ERP, ELMA365), — не сотрудник, инструкции для неё нет
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[«»"]/g, "");
+  const systemNames = new Set(model.systems.map((s) => norm(s.name)));
+  const roles = model.roles.filter((r) => !systemNames.has(norm(r.name)));
 
   return (
     <div>
@@ -18,13 +22,13 @@ export default function JobDescriptionsPanel({ session }: { session: SessionReco
         Если роль связана со штатной должностью (справочники → должности), в шапке указывается название должности.
       </p>
 
-      {model.roles.length === 0 ? (
+      {roles.length === 0 ? (
         <p className="muted">В модели нет ролей.</p>
       ) : (
         <table className="mono" style={{ width: "100%", fontSize: 13, marginTop: 10, borderCollapse: "collapse" }}>
           <thead><tr style={{ textAlign: "left" }}><th>Роль</th><th></th></tr></thead>
           <tbody>
-            {model.roles.map((r) => (
+            {roles.map((r) => (
               <tr key={r.id} style={{ borderTop: "1px solid #e5e7eb" }}>
                 <td>{r.name}</td>
                 <td>

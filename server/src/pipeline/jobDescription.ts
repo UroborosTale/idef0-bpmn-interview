@@ -1,5 +1,16 @@
 import type { ProcessLogicModel } from "../types/model.js";
 
+/**
+ * B14: система, заведённая в модели ещё и ролью (ERP, ELMA365), не получает должностную инструкцию —
+ * это информационная система, а не сотрудник. Сравниваем названия без регистра и кавычек.
+ */
+export function isSystemRole(model: ProcessLogicModel, roleId: string): boolean {
+  const role = model.roles.find((r) => r.id === roleId);
+  if (!role) return false;
+  const norm = (s: string) => s.trim().toLowerCase().replace(/[«»"]/g, "");
+  return model.systems.some((s) => norm(s.name) === norm(role.name));
+}
+
 export type JobDescriptionSectionKey = "general" | "duties" | "interactions" | "documents";
 
 export interface JobDescriptionParagraph {
