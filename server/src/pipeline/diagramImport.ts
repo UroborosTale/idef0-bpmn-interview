@@ -399,6 +399,10 @@ export interface ParsedDrawioCell {
   isEdge: boolean;
   source?: string;
   target?: string;
+  /** Стиль mxCell: по нему определяется вид фигуры BPMN (событие, шлюз, задача, дорожка). */
+  style: string;
+  /** Родительская ячейка: дорожка/пул для фигуры, ребро для подписи ветки. */
+  parent?: string;
 }
 export interface ParsedDrawio {
   cells: ParsedDrawioCell[];
@@ -414,10 +418,100 @@ export function parseDrawioXml(xml: string): ParsedDrawio {
     const attrs = parseAttrs(m[1]);
     if (!attrs.id || attrs.id === "0" || attrs.id === "1") continue;
     if (!attrs.vertex && !attrs.edge) continue;
-    cells.push({ id: attrs.id, value: attrs.value ?? null, isEdge: attrs.edge === "1", source: attrs.source, target: attrs.target });
+    cells.push({
+      id: attrs.id,
+      value: attrs.value ?? null,
+      isEdge: attrs.edge === "1",
+      source: attrs.source,
+      target: attrs.target,
+      style: attrs.style ?? "",
+      parent: attrs.parent,
+    });
   }
   if (cells.length === 0) warnings.push("Не найдено ни одной фигуры draw.io (mxCell с vertex или edge) — проверьте формат файла.");
   return { cells, warnings };
+}
+
+// --- draw.io: вид фигуры по стилю ---
+
+/** Стиль mxCell как карта «ключ → значение»; одиночные токены (ellipse, rhombus, swimlane) — с пустым значением. */
+function drawioStyle(style: string | undefined): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const raw of (style ?? "").split(";")) {
+    const token = raw.trim();
+    if (!token) continue;
+    const eq = token.indexOf("=");
+    if (eq < 0) out.set(token.toLowerCase(), "");
+    else out.set(token.slice(0, eq).trim().toLowerCase(), token.slice(eq + 1).trim());
+  }
+  return out;
+}
+
+/** Вид фигуры draw.io: дорожка/пул, событие, шлюз, задача, подпроцесс или «не импортируем». */
+export type DrawioShapeKind = "lane" | "event" | "gateway" | "task" | "subprocess" | "skip";
+
+/**
+ * A5: вид фигуры по стилю draw.io. Поддержаны библиотека BPMN 2.0 (shape=mxgraph.bpmn.task2/gateway2/event),
+ * базовые фигуры (ellipse, rhombus, swimlane) и подписи рёбер (edgeLabel), которые фигурами не являются.
+ */
+export function drawioShapeKind(style: string | undefined): DrawioShapeKind {
+  const s = drawioStyle(style);
+  if (s.has("edgelabel")) return "skip";
+  if (s.has("swimlane") || s.get("shape") === "pool" || /mxgraph\.bpmn\.(?:pool|lane)/i.test(s.get("shape") ?? "")) return "lane";
+  if (s.has("text") || s.get("shape") === "text" || /^annotation$/i.test(s.get("shape") ?? "")) return "skip";
+  const shape = (s.get("shape") ?? "").toLowerCase();
+  // объекты данных, хранилища и разговоры — не узлы процесса
+  if (/mxgraph\.bpmn\.(?:data|conversation)/.test(shape) || shape === "datastore" || shape === "mxgraph.basic.datastore") return "skip";
+  if (/mxgraph\.bpmn\.event/.test(shape) || shape === "mxgraph.bpmn.shape" || shape === "doubleellipse" || s.has("ellipse")) return "event";
+  if (/mxgraph\.bpmn\.gateway/.test(shape) || s.has("rhombus")) return "gateway";
+  if (/mxgraph\.bpmn\.subprocess/.test(shape)) return "subprocess";
+  if (/mxgraph\.bpmn\.task/.test(shape)) return s.get("issubprocess") === "1" || s.get("subprocess") === "1" ? "subprocess" : "task";
+  return "task";
+}
+
+/** Вид шлюза draw.io (gwType) в подтип модели. */
+export function drawioGatewaySubtype(style: string | undefined): string {
+  const gw = (drawioStyle(style).get("gwtype") ?? "").toLowerCase();
+  if (gw === "parallel") return "parallel";
+  if (gw === "inclusive") return "inclusive";
+  if (gw === "eventbased" || gw === "event_based") return "event_based";
+  if (gw === "complex") return "complex";
+  return "exclusive";
+}
+
+const DRAWIO_TASK_SUBTYPES: Record<string, string> = {
+  user: "user",
+  service: "service",
+  send: "send",
+  receive: "receive",
+  script: "script",
+  manual: "manual",
+  businessrule: "business_rule",
+  business_rule: "business_rule",
+  rule: "business_rule",
+};
+
+/** Вид задачи draw.io (taskMarker) в подтип модели; undefined — обычная пользовательская задача. */
+export function drawioTaskSubtype(style: string | undefined): string | undefined {
+  return DRAWIO_TASK_SUBTYPES[(drawioStyle(style).get("taskmarker") ?? "").toLowerCase()];
+}
+
+/** Намёк на конечное событие из стиля: outline=end или символ «терминатор». */
+export function drawioEndEventHint(style: string | undefined): boolean {
+  const s = drawioStyle(style);
+  return s.get("outline") === "end" || /^terminate/i.test(s.get("symbol") ?? "");
+}
+
+/** Подпись ячейки: текст без HTML-разметки и лишних пробелов. */
+function drawioLabel(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const text = value
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return text || null;
 }
 
 /** ФТ-М9.4.2: применить правки названий узлов IDEF0, внесённые в draw.io (по id ячейки "IDEF0_<nodeId>", см. idef0ToDrawio). */
@@ -441,45 +535,123 @@ export function reconcileDrawioIdef0Edit(model: ProcessLogicModel, parsed: Parse
   return { model: out, changes };
 }
 
-/** ФТ-М9.5.2/9.5.3: свежая модель PLM из произвольной (не обязательно IDEF0) draw.io-диаграммы — вершины как узлы, рёбра как связи. */
+/**
+ * ФТ-М9.5.2/9.5.3, A5: свежая модель PLM из draw.io-диаграммы. Вид фигуры берём из стиля (библиотека BPMN 2.0 и
+ * базовые фигуры draw.io): круг — событие, ромб — шлюз, дорожка — роль, подпись ребра — условие ветки.
+ * Начало и конец события различаются по связям (нет входящей — начало, нет исходящей — конец).
+ */
 export function buildModelFromParsedDrawio(parsed: ParsedDrawio, meta: SessionMeta): { model: ProcessLogicModel; warnings: string[] } {
   const warnings = [...parsed.warnings];
+  const byId = new Map(parsed.cells.map((c) => [c.id, c] as const));
+
+  // дорожки и пулы: роль на каждое уникальное название
+  const roles: Role[] = [];
+  const roleByName = new Map<string, Role>();
+  const roleByCell = new Map<string, Role>();
+  for (const c of parsed.cells) {
+    if (c.isEdge || drawioShapeKind(c.style) !== "lane") continue;
+    const name = drawioLabel(c.value);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    let role = roleByName.get(key);
+    if (!role) {
+      role = { id: `role_${nanoid(8)}`, name, kind: "internal", source: [] };
+      roleByName.set(key, role);
+      roles.push(role);
+    }
+    roleByCell.set(c.id, role);
+  }
+  const roleOf = (cell: ParsedDrawioCell): string | null => {
+    let parent = cell.parent;
+    while (parent) {
+      const role = roleByCell.get(parent);
+      if (role) return role.id;
+      parent = byId.get(parent)?.parent;
+    }
+    return null;
+  };
+
   const idMap = new Map<string, string>();
-  const nodes: ProcessNode[] = parsed.cells
-    .filter((c) => !c.isEdge)
-    .map((c) => {
-      const plmId = `imp_${nanoid(8)}`;
-      idMap.set(c.id, plmId);
-      return {
-        id: plmId,
-        type: "task" as NodeType,
-        name: c.value ?? "(без названия)",
-        role_id: null,
-        system_ids: [],
-        inputs: [],
-        outputs: [],
-        controls: [],
-        duration: null,
-        frequency: null,
-        idef0_parent: null,
-        status: c.value ? ("confirmed" as const) : ("hypothesis" as const),
-        confidence: c.value ? 0.7 : 0.4,
-        source: [{ fragment_id: "diagram_import", quote: c.id }],
-        requirement_ids: [],
-        tags: ["from_diagram_import"],
-        confirmed_by: [],
-      };
+  const endHint = new Map<string, boolean>();
+  const nodes: ProcessNode[] = [];
+  let skipped = 0;
+  for (const c of parsed.cells) {
+    if (c.isEdge) continue;
+    const kind = drawioShapeKind(c.style);
+    if (kind === "lane") continue;
+    if (kind === "skip") {
+      skipped += 1;
+      continue;
+    }
+    const plmId = `imp_${nanoid(8)}`;
+    const name = drawioLabel(c.value);
+    idMap.set(c.id, plmId);
+    if (kind === "event") endHint.set(plmId, drawioEndEventHint(c.style));
+    const subtype = kind === "gateway" ? drawioGatewaySubtype(c.style) : kind === "task" ? drawioTaskSubtype(c.style) : undefined;
+    nodes.push({
+      id: plmId,
+      type: kind,
+      ...(subtype ? { subtype } : {}),
+      name: name ?? "(без названия)",
+      role_id: roleOf(c),
+      system_ids: [],
+      inputs: [],
+      outputs: [],
+      controls: [],
+      duration: null,
+      frequency: null,
+      idef0_parent: null,
+      status: name ? "confirmed" : "hypothesis",
+      confidence: name ? 0.7 : 0.4,
+      source: [{ fragment_id: "diagram_import", quote: c.id }],
+      requirement_ids: [],
+      tags: ["from_diagram_import"],
+      confirmed_by: [],
     });
+  }
+  if (skipped > 0) warnings.push(`Пропущено фигур, не относящихся к потоку (данные, примечания, подписи): ${skipped}.`);
+
+  // подписи рёбер draw.io — отдельные ячейки edgeLabel с parent = id ребра
+  const edgeLabels = new Map<string, string>();
+  for (const c of parsed.cells) {
+    if (c.isEdge || drawioShapeKind(c.style) !== "skip") continue;
+    const label = drawioLabel(c.value);
+    if (label && c.parent && byId.get(c.parent)?.isEdge) edgeLabels.set(c.parent, label);
+  }
 
   const flows: ProcessFlow[] = [];
-  for (const c of parsed.cells.filter((c) => c.isEdge)) {
+  const outgoing = new Map<string, number>();
+  const incoming = new Map<string, number>();
+  for (const c of parsed.cells.filter((x) => x.isEdge)) {
     const from = c.source ? idMap.get(c.source) : undefined;
     const to = c.target ? idMap.get(c.target) : undefined;
     if (!from || !to) {
       warnings.push(`Связь ${c.id} без распознанных концов — пропущена.`);
       continue;
     }
-    flows.push({ id: `flow_${nanoid(8)}`, from, to, condition: null, source: [{ fragment_id: "diagram_import", quote: c.id }], confirmed_by: [] });
+    const label = edgeLabels.get(c.id) ?? drawioLabel(c.value);
+    const isDefault = !!label && /^(по умолчанию|default)$/i.test(label);
+    flows.push({
+      id: `flow_${nanoid(8)}`,
+      from,
+      to,
+      condition: isDefault ? null : label,
+      ...(isDefault ? { is_default: true } : {}),
+      source: [{ fragment_id: "diagram_import", quote: c.id }],
+      confirmed_by: [],
+    });
+    outgoing.set(from, (outgoing.get(from) ?? 0) + 1);
+    incoming.set(to, (incoming.get(to) ?? 0) + 1);
+  }
+
+  // вид события — по связям: начало ничего не ждёт, конец никуда не ведёт
+  for (const n of nodes) {
+    if (n.type !== "event") continue;
+    if (endHint.get(n.id)) n.subtype = "end";
+    else if (!incoming.get(n.id) && outgoing.get(n.id)) n.subtype = "start";
+    else if (!outgoing.get(n.id) && incoming.get(n.id)) n.subtype = "end";
+    else if (!outgoing.get(n.id) && !incoming.get(n.id)) n.subtype = "start";
+    else n.subtype = "intermediate";
   }
 
   const model: ProcessLogicModel = {
@@ -497,7 +669,7 @@ export function buildModelFromParsedDrawio(parsed: ParsedDrawio, meta: SessionMe
       kpi: [],
       risks: [],
     },
-    roles: [],
+    roles,
     systems: [],
     data: [],
     controls: [],
