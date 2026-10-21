@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Browser, Page } from "playwright";
-import { USER, WEB, api, expectPanel, field, launch, openContext, seedSession, statusText } from "./env";
+import { WEB, api, expectPanel, field, launch, openContext, seedSession, statusText } from "./env";
 
 let browser: Browser;
 beforeAll(async () => {
@@ -21,23 +21,6 @@ async function center(page: Page, selector: string) {
   const b = (await page.locator(selector).first().boundingBox())!;
   return { x: b.x + b.width / 2, y: b.y + b.height / 2, box: b };
 }
-
-describe("вход", () => {
-  it("неверный пароль — сообщение об ошибке; верный — список сессий", async () => {
-    await seedSession("Сессия для входа");
-    const ctx = await browser.newContext();
-    const page = await ctx.newPage();
-    await page.goto(WEB);
-    await page.getByLabel("Логин").fill(USER.login);
-    await page.getByLabel("Пароль").fill("неверный");
-    await page.getByRole("button", { name: "Войти" }).click();
-    await page.locator(".login-card .validation-item.error").waitFor();
-    await page.getByLabel("Пароль").fill(USER.password);
-    await page.getByRole("button", { name: "Войти" }).click();
-    await page.getByText("Сессия для входа").first().waitFor();
-    await ctx.close();
-  });
-});
 
 describe("студия в браузере", () => {
   it("сессия открывается в студии: вкладки, навигатор, свойства процесса, без ошибок", async () => {

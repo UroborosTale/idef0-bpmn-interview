@@ -1,9 +1,8 @@
 import { inDesktopShell } from "./desktop";
 import { useEffect, useState } from "react";
-import { api, AUTH_REQUIRED_EVENT } from "./api/client";
+import { api } from "./api/client";
 import { routePath, useRoute, type Route } from "./router";
 import ErrorBoundary from "./components/ErrorBoundary";
-import LoginPage from "./pages/LoginPage";
 import SessionsListPage from "./pages/SessionsListPage";
 import NewSessionPage from "./pages/NewSessionPage";
 import WorkspacePage from "./pages/WorkspacePage";
@@ -30,30 +29,30 @@ export default function App() {
   const [route, navigate] = useRoute();
   const [provider, setProvider] = useState<{ name: string; live: boolean } | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  // undefined — ещё не знаем; null — нужен вход
-  const [user, setUser] = useState<{ login: string; authRequired: boolean } | null | undefined>(undefined);
+  const [serverUnavailable, setServerUnavailable] = useState(false);
   const isCampaign = route.name === "campaign";
 
   useEffect(() => {
     if (isCampaign) return;
+    let alive = true;
     api
       .authMe()
-      .then((r) => setUser(r.user ? { login: r.user.login, authRequired: r.authRequired } : null))
-      .catch(() => setUser(null));
-    const onAuth = () => setUser(null);
-    window.addEventListener(AUTH_REQUIRED_EVENT, onAuth);
-    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, onAuth);
+      .then(() => alive && setServerUnavailable(false))
+      .catch(() => alive && setServerUnavailable(true));
+    return () => {
+      alive = false;
+    };
   }, [isCampaign]);
 
   useEffect(() => {
-    if (!user) return;
+    if (isCampaign) return;
     api.providerStatus().then(setProvider).catch(() => setProvider(null));
-  }, [user]);
+  }, [isCampaign]);
 
   useEffect(() => {
-    if (!user) return;
+    if (isCampaign) return;
     api.listNotifications({ unread: true }).then((rows) => setUnreadCount(rows.length)).catch(() => {});
-  }, [route.name, user]);
+  }, [route.name, isCampaign]);
 
   useEffect(() => {
     document.title = route.name === "workspace" ? "Сессия — IDEF0 / BPMN" : "IDEF0 / BPMN — модели по интервью";
@@ -61,8 +60,23 @@ export default function App() {
 
   // ФТ-М4.2.2: персональная ссылка респондента — отдельная публичная страница без навигации и входа
   if (route.name === "campaign") return <RespondentInterviewPage campaignId={route.campaignId} token={route.token} />;
-  if (user === undefined) return null;
-  if (user === null) return <LoginPage onLoggedIn={(login) => setUser({ login, authRequired: true })} />;
+  if (serverUnavailable) {
+    return (
+      <div className="app-shell">
+        <div className="main-area">
+          <div className="card" style={{ maxWidth: 560, margin: "48px auto" }}>
+            <h3 style={{ marginTop: 0 }}>Сервер недоступен</h3>
+            <p className="muted">
+              Не удалось связаться с API. Проверьте, что сервер запущен, и повторите попытку.
+            </p>
+            <button className="primary" onClick={() => window.location.reload()}>
+              Повторить
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /** Ссылка-кнопка: обычный клик — переход внутри приложения, средний/Ctrl — новая вкладка. */
   const link = (r: Route, label: React.ReactNode, className?: string) => (
@@ -102,11 +116,6 @@ export default function App() {
             </div>
           </details>
           {link({ name: "new" }, "+ Новая сессия", "primary")}
-          {user.authRequired && (
-            <button title={`Вы вошли как ${user.login}`} onClick={() => api.logout().finally(() => setUser(null))}>
-              Выйти ({user.login})
-            </button>
-          )}
         </div>
       </div>
       <div className="main-area">
