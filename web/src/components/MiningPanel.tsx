@@ -24,7 +24,7 @@ export default function MiningPanel({ session, onChanged }: { session: SessionRe
   useEffect(() => {
     api
       .getMiningLog(session.id)
-      .then((log) => setImported({ logId: log.logId, eventCount: log.eventCount, caseCount: log.caseCount, dfg: log.dfg, suggestions: [] }))
+      .then((log) => { if (log) setImported({ logId: log.logId, eventCount: log.eventCount, caseCount: log.caseCount, dfg: log.dfg, suggestions: [] }); })
       .catch(() => {});
     reloadMappings();
     // eslint-disable-next-line react-hooks/exhaustive-deps

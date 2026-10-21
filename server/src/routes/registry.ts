@@ -160,6 +160,57 @@ registryRouter.get("/registry/staleness", (_req, res) => {
   res.json(result.filter((r) => r.reviewOverdue || !r.reviewDate));
 });
 
+/** Заполняет реестр процессами из существующих сессий: связывает по session_id, затем по коду, затем по названию. */
+registryRouter.post("/registry/import-sessions", (_req, res) => {
+  const rows = db.prepare(`SELECT id, title, meta_json, model_json FROM sessions WHERE model_json IS NOT NULL`).all() as {
+    id: string;
+    title: string;
+    meta_json: string;
+    model_json: string;
+  }[];
+  const statuses = new Set(["draft", "review", "needs_rework", "approved", "archived"]);
+  let created = 0;
+  let updated = 0;
+  const now = new Date().toISOString();
+  db.transaction(() => {
+    for (const s of rows) {
+      const meta = JSON.parse(s.meta_json) as { processName?: string; code?: string | null; owner?: string; department?: string };
+      const model = JSON.parse(s.model_json) as { process?: { name?: string; code?: string | null; owner?: string | null; department?: string | null; status?: string; version?: string } };
+      const name = (model.process?.name ?? meta.processName ?? s.title).trim();
+      const code = (model.process?.code ?? meta.code ?? null) || null;
+      let existing = db.prepare(`SELECT * FROM processes WHERE session_id = ?`).get(s.id) as ProcessRow | undefined;
+      if (!existing && code) existing = db.prepare(`SELECT * FROM processes WHERE code = ? ORDER BY updated_at DESC`).get(code) as ProcessRow | undefined;
+      if (!existing) existing = db.prepare(`SELECT * FROM processes WHERE name = ? ORDER BY updated_at DESC`).get(name) as ProcessRow | undefined;
+      const status = statuses.has(model.process?.status ?? "") ? (model.process!.status as ProcessRow["status"]) : "draft";
+      const version = model.process?.version ?? "0.1";
+      const owner = model.process?.owner ?? meta.owner ?? null;
+      const department = model.process?.department ?? meta.department ?? null;
+      if (existing) {
+        db.prepare(`UPDATE processes SET code = ?, name = ?, owner = ?, department = ?, status = ?, version = ?, session_id = ?, updated_at = ? WHERE id = ?`).run(
+          code,
+          name,
+          owner,
+          department,
+          status,
+          version,
+          s.id,
+          now,
+          existing.id
+        );
+        updated++;
+      } else {
+        db.prepare(
+          `INSERT INTO processes (id, code, name, level, parent_process_id, classification, owner, department, status, version, review_date, session_id, created_at, updated_at)
+           VALUES (?, ?, ?, 'L2', NULL, 'main', ?, ?, ?, ?, NULL, ?, ?, ?)`
+        ).run(`proc_${nanoid(10)}`, code, name, owner, department, status, version, s.id, now, now);
+        created++;
+      }
+    }
+  })();
+  logAudit(null, "analyst", "registry_imported_from_sessions", { created, updated });
+  res.json({ created, updated, total: rows.length });
+});
+
 registryRouter.get("/registry/:id", (req, res) => {
   const row = db.prepare(`SELECT * FROM processes WHERE id = ?`).get(req.params.id) as ProcessRow | undefined;
   if (!row) {

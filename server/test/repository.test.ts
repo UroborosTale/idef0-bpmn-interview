@@ -67,6 +67,18 @@ describe("общий репозиторий объектов", () => {
     expect(one.usage[0]).toMatchObject({ entryId: "r1", uses: 1 });
   });
 
+  it("запись без repo_id учитывается в использовании по совпадению названия", async () => {
+    const name = "Специалист по закупкам (B15)";
+    const role = await create({ class: "role", name });
+    const p = await makeProcess("Процесс без привязки", {});
+    const current = await get(p.id);
+    current.model.roles[0].name = name;
+    const put = await app.call("PUT", `/sessions/${p.id}/model`, current.model, { "X-Base-Updated-At": current.updatedAt });
+    expect(put.status).toBe(200);
+    const usage = (await app.call("GET", `/repository/${role.id}`)).body.usage;
+    expect(usage.some((u: any) => u.sessionId === p.id)).toBe(true);
+  });
+
   it("переименование переносится в связанные записи моделей; старое название становится синонимом", async () => {
     const sys = await create({ class: "system", name: "SAP ERP" });
     const p = await makeProcess("Закупка В", { system: sys.id });

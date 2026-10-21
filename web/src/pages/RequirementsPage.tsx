@@ -43,7 +43,7 @@ export default function RequirementsPage() {
 
       <div className="chat-input-row" style={{ marginTop: 10 }}>
         <input placeholder="Код (напр. ISO9001-4.4.1.a)" value={code} onChange={(e) => setCode(e.target.value)} />
-        <input placeholder="Краткая формулировка (своими словами)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: 1 }} />
+        <input placeholder="Краткая формулировка (своими словами)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: "1 1 320px", minWidth: 240 }} />
         <input placeholder="Источник" value={source} onChange={(e) => setSource(e.target.value)} style={{ width: 120 }} />
         <button
           disabled={!code.trim() || !title.trim()}

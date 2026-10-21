@@ -97,6 +97,15 @@ describe("реестр процессов", () => {
     await waitFor(() => expect(screen.queryByText("Название*")).toBeNull()); // форма закрылась
   });
 
+  it("заполняет реестр из сессий и показывает результат", async () => {
+    setup();
+    const importSessions = vi.spyOn(api, "importRegistrySessions").mockResolvedValue({ created: 2, updated: 1, total: 3 });
+    await screen.findByText("Закупка");
+    fireEvent.click(screen.getByText("Заполнить из сессий"));
+    await waitFor(() => expect(importSessions).toHaveBeenCalled());
+    await screen.findByText(/добавлено 2, обновлено 1/);
+  });
+
   it("вкладка «Связи и разрывы» загружает связи, предложения и разрывы", async () => {
     setup();
     const links = vi.spyOn(api, "listProcessLinks").mockResolvedValue([{ id: "l1", from_process_id: "p1", to_process_id: "p2", data_label: "счёт", confirmed: false }] as never);

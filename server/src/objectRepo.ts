@@ -147,24 +147,43 @@ interface SessionRow {
   model_json: string;
 }
 
-/** Сессии, чьи модели ссылаются на объект (предварительный отбор по тексту — без разбора всех моделей). */
-function sessionsLinkedTo(repoId: string | null): { row: SessionRow; model: ProcessLogicModel }[] {
+/** Сессии, чьи модели ссылаются на объект. `byName` добавляет модели, где запись ещё не связана, но названа так же (для показа использования). */
+function sessionsLinkedTo(repoId: string | null, byName = false): { row: SessionRow; model: ProcessLogicModel }[] {
   const like = repoId ? `%"repo_id":${JSON.stringify(repoId)}%` : `%"repo_id":"%`;
-  const rows = db.prepare(`SELECT id, title, model_json FROM sessions WHERE model_json LIKE ?`).all(like) as SessionRow[];
-  return rows.map((row) => ({ row, model: JSON.parse(row.model_json) as ProcessLogicModel }));
+  // Для показа использования смотрим и модели, где запись ещё не связана (нет repo_id), но называется так же:
+  // иначе «Специалист по закупкам» в двух процессах показывается как неиспользуемый.
+  const obj = repoId && byName ? getObject(repoId) : null;
+  const rows = (obj
+    ? db.prepare(`SELECT id, title, model_json FROM sessions WHERE model_json IS NOT NULL`).all()
+    : db.prepare(`SELECT id, title, model_json FROM sessions WHERE model_json LIKE ?`).all(like)) as SessionRow[];
+  const entriesOf = (model: ProcessLogicModel) =>
+    REPO_CLASSES.flatMap((cls) => model[MODEL_KEY[cls]] as { name: string; repo_id?: string | null }[]);
+  return rows
+    .map((row) => ({ row, model: JSON.parse(row.model_json) as ProcessLogicModel }))
+    .filter(({ model }) =>
+      obj
+        ? entriesOf(model).some((e) => e.repo_id === repoId || normName(e.name) === normName(obj.name) || obj.synonyms.some((s) => normName(s) === normName(e.name)))
+        : true
+    );
 }
 
 /** Записи моделей, связанные с объектами: id объекта → записи. Для одного объекта — только его. */
 export function linkedEntries(repoId?: string): Map<string, LinkedEntry[]> {
   const out = new Map<string, LinkedEntry[]>();
-  for (const { row, model } of sessionsLinkedTo(repoId ?? null)) {
+  const obj = repoId ? getObject(repoId) : null;
+  const matches = (e: { name: string; repo_id?: string | null }) =>
+    !!obj && (e.repo_id === repoId || normName(e.name) === normName(obj.name) || obj.synonyms.some((s) => normName(s) === normName(e.name)));
+  for (const { row, model } of sessionsLinkedTo(repoId ?? null, !!repoId)) {
     const approved = model.process.status === "approved";
     for (const cls of REPO_CLASSES) {
       for (const e of model[MODEL_KEY[cls]] as { id: string; name: string; repo_id?: string | null }[]) {
-        if (!e.repo_id || (repoId && e.repo_id !== repoId)) continue;
-        const list = out.get(e.repo_id) ?? [];
+        if (repoId) {
+          if (!matches(e)) continue;
+        } else if (!e.repo_id) continue;
+        const key = repoId ?? e.repo_id!;
+        const list = out.get(key) ?? [];
         list.push({ sessionId: row.id, sessionTitle: row.title, approved, entryId: e.id, entryName: e.name, uses: entryUses(model, cls, e.id) });
-        out.set(e.repo_id, list);
+        out.set(key, list);
       }
     }
   }

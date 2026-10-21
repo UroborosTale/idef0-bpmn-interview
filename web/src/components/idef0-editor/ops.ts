@@ -55,18 +55,26 @@ export function renameEntity(m: M, kind: EntityKind, id: string, name: string): 
   }
 }
 
-/** Ближайшее к (x, y) место, где блок не налезает на соседей по диаграмме (сдвиг вниз, затем вправо). */
+/** Ближайшее к (x, y) место, где блок не налезает на соседей по диаграмме (сначала вниз, затем вправо). */
 function freeSpot(m: M, parentId: string | null, x: number, y: number): { x: number; y: number } {
   const others = functionsOf(m, parentId).map((n) => n.idef0_layout).filter((p): p is { x: number; y: number } => !!p);
   const hits = (px: number, py: number) => others.some((o) => Math.abs(o.x - px) < BLOCK_W + 30 && Math.abs(o.y - py) < BLOCK_H + 50);
+  let best: { x: number; y: number } | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
   for (let col = 0; col < 12; col++) {
     for (let row = 0; row < 12; row++) {
       const px = x + col * (BLOCK_W + 40);
       const py = y + row * (BLOCK_H + 60);
-      if (!hits(px, py)) return { x: px, y: py };
+      if (hits(px, py)) continue;
+      // ближайшее свободное место, а не первое по строкам: блок не «уезжает» по диагонали от щелчка
+      const distance = col * col + row * row;
+      if (distance < bestDistance) {
+        best = { x: px, y: py };
+        bestDistance = distance;
+      }
     }
   }
-  return { x, y };
+  return best ?? { x, y };
 }
 
 /** Новая функция на диаграмме parentId (null — A0). Вложенная функция в BPMN не показывается. */

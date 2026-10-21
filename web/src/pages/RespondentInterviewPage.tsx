@@ -30,7 +30,7 @@ export default function RespondentInterviewPage({ campaignId, token }: { campaig
     return (
       <div style={{ maxWidth: 560, margin: "80px auto", textAlign: "center" }}>
         <h2>Ссылка недействительна</h2>
-        <p className="muted">{error}</p>
+        <p className="muted">{/недействительна/i.test(error) ? "Проверьте адрес или запросите новую ссылку у аналитика." : error}</p>
       </div>
     );
   }

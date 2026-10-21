@@ -253,6 +253,11 @@ const GREY = "#64748b";
 export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; selected?: boolean }) {
   const { x, y, w, h } = a.box;
   const d = a.edge.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
+  const lines = wrapText(a.name, 18, 2);
+  const labelW = Math.max(20, Math.max(...lines.map((l) => l.length)) * 5.6 + 6);
+  const labelH = lines.length * 12 + 2;
+  const lx = x + w + 3;
+  const ly = y + h / 2 - labelH / 2 + 10;
   const arrow = a.kind === "store" ? undefined : "url(#bpe-arrow-thin)";
   return (
     <g data-artifact={a.nodeId} data-artifact-kind={a.kind} data-artifact-entity={a.entityId} style={{ cursor: "move" }}>
@@ -271,8 +276,13 @@ export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; s
           <path d={`M${x + w - 7} ${y} V${y + 7} H${x + w}`} fill="none" />
         </g>
       )}
-      <text x={x + w + 3} y={y + h / 2 + 3.5} textAnchor="start" fontSize={10} fill={GREY} pointerEvents="none">
-        {a.name.length > 18 ? a.name.slice(0, 17) + "…" : a.name}
+      <rect x={lx - 2} y={ly - 11} width={labelW} height={labelH} rx={2} fill="#fff" opacity={0.92} pointerEvents="none" />
+      <text x={lx} y={ly} textAnchor="start" fontSize={10} fill={GREY} pointerEvents="none">
+        {lines.map((l, i) => (
+          <tspan key={i} x={lx} dy={i === 0 ? 0 : 12}>
+            {l}
+          </tspan>
+        ))}
       </text>
     </g>
   );
@@ -320,6 +330,27 @@ export function MessageShape({ id, points, label, selected }: { id?: string; poi
 }
 export const UNASSIGNED_LANE = "__unassigned__";
 
+/** Подпись дорожки: одна строка крупно, если помещается; иначе две строки мельче, с переносом по слову и многоточием. */
+function laneLabelLines(name: string, laneH: number): { text: string; size: number }[] {
+  if (name.length <= laneH / 8) return [{ text: name, size: 15 }];
+  const perLine = Math.max(4, Math.floor(laneH / 7));
+  const lines: string[] = [];
+  let rest = name.trim();
+  while (rest && lines.length < 2) {
+    if (rest.length <= perLine) {
+      lines.push(rest);
+      rest = "";
+      break;
+    }
+    const space = rest.lastIndexOf(" ", perLine);
+    const cut = space >= Math.ceil(perLine / 2) ? space : perLine;
+    lines.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest) lines[lines.length - 1] = lines[lines.length - 1].slice(0, Math.max(1, perLine - 1)).trimEnd() + "…";
+  return lines.map((text) => ({ text, size: 12 }));
+}
+
 /** Фон дорожек с подписями; lanes кликабельны только если передан data-атрибут (в редакторе). */
 export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: ProcessLogicModel; width: number; hotLane?: number | null; selectedLaneId?: string | null }) {
   const heights = laneHeights(model);
@@ -330,20 +361,24 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
         const name = model.roles[i]?.name ?? "Без исполнителя";
         const top = laneTop(model, i);
         const laneH = heights[i];
+        const lines = laneLabelLines(name, laneH);
         return (
           <g key={id}>
             <rect x={LANE_X} y={top} width={width - LANE_X} height={laneH} fill={hotLane === i ? "#eef2ff" : "#fff"} stroke="#000" strokeWidth={1} />
             <g data-lane-id={id} style={{ cursor: "pointer" }}>
               <rect x={LANE_X} y={top} width={LABEL_W} height={laneH} fill={selectedLaneId === id ? "#c7d2fe" : "#e8eef7"} stroke="#000" strokeWidth={1} />
-              <text
-                transform={`translate(${LANE_X + LABEL_W / 2 + 5} ${top + laneH / 2}) rotate(-90)`}
-                textAnchor="middle"
-                fontSize={15}
-                fill="#000000"
-                pointerEvents="none"
-              >
-                {name.length > laneH / 8 ? name.slice(0, Math.floor(laneH / 8) - 1) + "…" : name}
-              </text>
+              {lines.map((line, li) => (
+                <text
+                  key={li}
+                  transform={`translate(${LANE_X + LABEL_W / 2 + (lines.length === 1 ? 5 : li === 0 ? 4 : -6)} ${top + laneH / 2}) rotate(-90)`}
+                  textAnchor="middle"
+                  fontSize={line.size}
+                  fill={li === 0 ? "#000000" : "#334155"}
+                  pointerEvents="none"
+                >
+                  {line.text}
+                </text>
+              ))}
             </g>
           </g>
         );

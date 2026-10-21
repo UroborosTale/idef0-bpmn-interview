@@ -125,7 +125,16 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
 
         <div className="form-row">
           <label>Название процесса *</label>
-          <input value={processName} onChange={(e) => setProcessName(e.target.value)} placeholder="например, Согласование заявки на закупку" />
+          <input
+            className={error?.includes("название") ? "field-error" : ""}
+            value={processName}
+            onChange={(e) => {
+              setProcessName(e.target.value);
+              if (error?.includes("название")) setError(null);
+            }}
+            placeholder="например, Согласование заявки на закупку"
+          />
+          {error?.includes("название") && <div className="validation-item error">{error}</div>}
         </div>
 
         <div className="form-row">
@@ -226,7 +235,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
           </div>
         )}
 
-        {error && <div className="validation-item error">{error}</div>}
+        {error && !error.includes("название") && <div className="validation-item error">{error}</div>}
 
         <div>
           <button className="primary" onClick={submit} disabled={busy}>

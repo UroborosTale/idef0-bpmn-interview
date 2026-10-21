@@ -17,6 +17,8 @@ export default function RegistryPage() {
   const [suggestions, setSuggestions] = useState<{ from_process_id: string; to_process_id: string; data_label: string }[]>([]);
   const [gaps, setGaps] = useState<{ processId: string; name: string; unconsumedOutputs: string[]; unproducedInputs: string[] }[]>([]);
   const [cardId, setCardId] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
 
   async function reload() {
     setRows(await api.listRegistry(filters));
@@ -53,11 +55,32 @@ export default function RegistryPage() {
         <button onClick={() => setTab("staleness")} className={tab === "staleness" ? "active" : ""}>Актуальность</button>
         {tab === "registry" && (
           <>
+            <button
+              disabled={importing}
+              title="Добавить в реестр процессы из всех сессий моделирования и связать их с сессиями"
+              onClick={async () => {
+                setImporting(true);
+                setImportResult(null);
+                try {
+                  const r = await api.importRegistrySessions();
+                  setImportResult(`Из сессий: добавлено ${r.created}, обновлено ${r.updated} (всего ${r.total}).`);
+                  await reload();
+                  setSessions(await api.listSessions());
+                } catch (e) {
+                  setImportResult((e as Error).message || "Не удалось заполнить реестр из сессий");
+                } finally {
+                  setImporting(false);
+                }
+              }}
+            >
+              {importing ? "Заполняю…" : "Заполнить из сессий"}
+            </button>
             <a href={api.registryExportXlsxUrl()} download><button>Экспорт .xlsx</button></a>
             <button className="primary" onClick={() => setShowNew(true)}>+ Добавить процесс</button>
           </>
         )}
       </div>
+      {importResult && <p className="validation-item" style={{ background: "#eef2ff" }}>{importResult}</p>}
 
       {tab === "registry" && (
         <>
@@ -452,7 +475,7 @@ function NewProcessForm({
         <label className="field"><span>Связанная модель (сессия)</span>
           <select value={sessionId} onChange={(e) => setSessionId(e.target.value)}>
             <option value="">— не выбрано —</option>
-            {sessions.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
+            {sessions.map((s) => <option key={s.id} value={s.id}>{s.title}{s.meta?.code ? ` · ${s.meta.code}` : ""}{s.updatedAt ? ` · ${new Date(s.updatedAt).toLocaleDateString("ru-RU")}` : ""}</option>)}
           </select>
         </label>
       </div>

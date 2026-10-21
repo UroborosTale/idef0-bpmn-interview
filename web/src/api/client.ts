@@ -93,6 +93,7 @@ export const api = {
     return req<RegistryProcess[]>("GET", `/registry${qs ? `?${qs}` : ""}`);
   },
   createRegistryProcess: (input: Partial<RegistryProcess>) => req<RegistryProcess>("POST", "/registry", input),
+  importRegistrySessions: () => req<{ created: number; updated: number; total: number }>("POST", "/registry/import-sessions", {}),
   patchRegistryProcess: (id: string, patch: Partial<RegistryProcess>) => req<RegistryProcess>("PATCH", `/registry/${id}`, patch),
   deleteRegistryProcess: (id: string) => req<void>("DELETE", `/registry/${id}`),
   registryExportXlsxUrl: () => `${BASE}/registry/export/xlsx`,
@@ -340,7 +341,7 @@ export const api = {
 
   // --- М4.3 Process mining ---
   importMiningLog: (id: string, csv: string, filename?: string) => req<MiningImportResult>("POST", `/sessions/${id}/mining/import`, { csv, filename }),
-  getMiningLog: (id: string) => req<any>("GET", `/sessions/${id}/mining/log`),
+  getMiningLog: (id: string) => req<any | null>("GET", `/sessions/${id}/mining/log`),
   listMiningMappings: (id: string) => req<MiningMappingRow[]>("GET", `/sessions/${id}/mining/mappings`),
   setMiningMapping: (id: string, activity: string, nodeId: string | null, confirmed: boolean) =>
     req<MiningMappingRow>("PUT", `/sessions/${id}/mining/mappings/${encodeURIComponent(activity)}`, { nodeId, confirmed }),

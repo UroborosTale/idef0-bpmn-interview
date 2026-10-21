@@ -85,7 +85,8 @@ miningRouter.post("/sessions/:id/mining/import", (req, res) => {
 miningRouter.get("/sessions/:id/mining/log", (req, res) => {
   const loaded = loadLog(req.params.id);
   if (!loaded) {
-    res.status(404).json({ error: "журнал не импортирован" });
+    // журнала нет — это не ошибка: вкладка просто показывает форму импорта, без 404 в консоли браузера
+    res.json(null);
     return;
   }
   const dfg = buildDirectlyFollowsGraph(loaded.events);

@@ -993,6 +993,9 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
 
   const shown = visibleNodes(draft);
   const fnCount = draft.nodes.filter((n) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope).length;
+  // счётчик шагов — по всем диаграммам: шаги общей схемы плюс шаги диаграмм операций
+  const isBpmnStep = (n: (typeof draft.nodes)[number]) => n.type === "task" || n.type === "subprocess";
+  const bpmnStepCount = shown.filter(isBpmnStep).length + draft.nodes.filter((n) => !!n.bpmn_scope && isBpmnStep(n)).length;
 
   return (
     <div className={`studio ${full ? "full" : ""} ${locked ? "studio-readonly" : ""}`} onKeyDown={onKeyDown}>
@@ -1420,7 +1423,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
           );
         })()}
         <span className="muted">
-          функций {fnCount} · шагов BPMN {shown.length} · связей {draft.flows.length} · исполнителей {draft.roles.length}
+          функций {fnCount} · шагов BPMN {bpmnStepCount} · связей {draft.flows.length} · исполнителей {draft.roles.length}
         </span>
         <span className="spacer" />
         <span className={errors ? "st-err" : "muted"}>ошибок: {errors}</span>

@@ -93,7 +93,7 @@ export default function StructureWizard({ model, onApply, onClose }: { model: Pr
                 </li>
               ))}
             </ul>
-            {!effectiveCode && preview.length > 0 && <p className="muted">Код процесса не задан — функции получат номера A1, A2… Задайте код, чтобы нумерация шла по Соглашению.</p>}
+            {!codeText && preview.length > 0 && <p className="muted">Код процесса не задан — функции получат номера A1, A2… Задайте код, чтобы нумерация шла по Соглашению.</p>}
             {parsed.problems.length > 0 && (
               <div className="wizard-problems" aria-label="Замечания к списку">
                 {parsed.problems.map((p, i) => (
