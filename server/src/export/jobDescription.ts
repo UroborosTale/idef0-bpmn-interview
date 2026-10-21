@@ -1,6 +1,7 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import type { SessionRecord } from "../repo.js";
 import { buildJobDescription, type RolePositionInfo } from "../pipeline/jobDescription.js";
+import { innerQuotes } from "../shared/quote.js";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -33,8 +34,8 @@ export function buildJobDescriptionHtml(session: SessionRecord, roleId: string, 
 </style>
 </head>
 <body>
-  <h1>ДОЛЖНОСТНАЯ ИНСТРУКЦИЯ<br/>«${esc(role?.name ?? roleId)}»</h1>
-  <div class="subtitle">Процесс «${esc(session.meta.processName)}» · Версия ${esc(model.process.version)}</div>
+  <h1>ДОЛЖНОСТНАЯ ИНСТРУКЦИЯ<br/>«${esc(innerQuotes(role?.name ?? roleId))}»</h1>
+  <div class="subtitle">Процесс «${esc(innerQuotes(session.meta.processName))}» · Версия ${esc(model.process.version)}</div>
   ${body}
 </body>
 </html>`;
@@ -47,10 +48,10 @@ export async function buildJobDescriptionDocx(session: SessionRecord, roleId: st
   const paragraphs = buildJobDescription(model, roleId, position);
 
   const children: Paragraph[] = [
-    new Paragraph({ text: `ДОЛЖНОСТНАЯ ИНСТРУКЦИЯ «${role?.name ?? roleId}»`, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
+    new Paragraph({ text: `ДОЛЖНОСТНАЯ ИНСТРУКЦИЯ «${innerQuotes(role?.name ?? roleId)}»`, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: `Процесс «${session.meta.processName}» · Версия ${model.process.version}`, italics: true, size: 20 })],
+      children: [new TextRun({ text: `Процесс «${innerQuotes(session.meta.processName)}» · Версия ${model.process.version}`, italics: true, size: 20 })],
     }),
   ];
 

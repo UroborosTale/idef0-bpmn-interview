@@ -1,4 +1,5 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
+import { quoted } from "../shared/quote.js";
 
 /**
  * Регламент/положение из PLM (ФТ-М1.1). Промежуточное представление —
@@ -41,7 +42,7 @@ function buildGeneral(model: ProcessLogicModel): RegulationParagraph[] {
     section: "general",
     kind: "paragraph",
     indent: 0,
-    text: `Настоящий документ определяет порядок выполнения процесса «${p.name}»${p.department ? ` в подразделении «${p.department}»` : ""}.`,
+    text: `Настоящий документ определяет порядок выполнения процесса ${quoted(p.name)}${p.department ? ` в подразделении ${quoted(p.department)}` : ""}.`,
     sourceRefs: [],
   });
   out.push({
@@ -128,7 +129,7 @@ function buildOrder(model: ProcessLogicModel): RegulationParagraph[] {
     if (!node) return;
 
     if (pathVisited.has(nodeId)) {
-      out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Возврат к шагу «${node.name}» — цикл повторяется до выполнения условия выхода.`, sourceRefs: [nodeId] });
+      out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Возврат к шагу ${quoted(node.name)} — цикл повторяется до выполнения условия выхода.`, sourceRefs: [nodeId] });
       return;
     }
     const visits = (globalVisitCount.get(nodeId) ?? 0) + 1;
@@ -140,7 +141,7 @@ function buildOrder(model: ProcessLogicModel): RegulationParagraph[] {
 
     if (node.type === "event") {
       if (node.subtype === "end") {
-        out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Процесс завершается: «${node.name}».`, sourceRefs: [nodeId] });
+        out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Процесс завершается: ${quoted(node.name)}.`, sourceRefs: [nodeId] });
         return;
       }
       for (const f of outAdj.get(nodeId) ?? []) walk(f.to, indent, newPath);
@@ -149,7 +150,7 @@ function buildOrder(model: ProcessLogicModel): RegulationParagraph[] {
 
     if (node.type === "gateway") {
       const nexts = outAdj.get(nodeId) ?? [];
-      out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Проверяется условие: «${node.name}».`, sourceRefs: [nodeId] });
+      out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent, text: `Проверяется условие: ${quoted(node.name)}.`, sourceRefs: [nodeId] });
       for (const f of nexts) {
         const condLabel = f.condition ? f.condition : nexts.length > 1 ? "выполняется данное направление" : "условие выполнено";
         out.push({ id: `order-${++counter}`, section: "order", kind: "listItem", indent: indent + 1, text: `Если ${condLabel}, то:`, sourceRefs: [nodeId, f.id] });
@@ -179,14 +180,14 @@ function buildResponsibility(model: ProcessLogicModel): RegulationParagraph[] {
   if (model.raci.length === 0) {
     for (const n of tasks) {
       if (!n.role_id) continue;
-      out.push({ id: `resp-${n.id}`, section: "responsibility", kind: "listItem", indent: 0, text: `${roleById.get(n.role_id) ?? "—"} исполняет: «${n.name}».`, sourceRefs: [n.id, n.role_id] });
+      out.push({ id: `resp-${n.id}`, section: "responsibility", kind: "listItem", indent: 0, text: `${roleById.get(n.role_id) ?? "—"} исполняет: ${quoted(n.name)}.`, sourceRefs: [n.id, n.role_id] });
     }
   } else {
     for (const n of tasks) {
       const entries = model.raci.filter((r) => r.node_id === n.id);
       if (entries.length === 0) continue;
       const byType = entries.map((e) => `${roleById.get(e.role_id) ?? "—"} ${TYPE_LABEL[e.type]}`).join("; ");
-      out.push({ id: `resp-${n.id}`, section: "responsibility", kind: "listItem", indent: 0, text: `«${n.name}»: ${byType}.`, sourceRefs: [n.id, ...entries.map((e) => e.role_id)] });
+      out.push({ id: `resp-${n.id}`, section: "responsibility", kind: "listItem", indent: 0, text: `${quoted(n.name)}: ${byType}.`, sourceRefs: [n.id, ...entries.map((e) => e.role_id)] });
     }
   }
   if (out.length === 1) out.push({ id: "resp-empty", section: "responsibility", kind: "paragraph", indent: 0, text: "Распределение ответственности не выявлено.", sourceRefs: [] });

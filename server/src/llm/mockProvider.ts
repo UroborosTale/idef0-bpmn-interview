@@ -13,6 +13,7 @@ const VERB_STEMS: Array<{ stem: string; inf: string }> = [
   { stem: "переда", inf: "передать документ" },
   { stem: "согласовыва", inf: "согласовать заявку" },
   { stem: "согласов", inf: "согласовать заявку" },
+  { stem: "согласу", inf: "согласовать заявку" },
   { stem: "утвержда", inf: "утвердить документ" },
   { stem: "утверд", inf: "утвердить документ" },
   { stem: "проверя", inf: "проверить данные" },
@@ -50,6 +51,7 @@ const VERB_STEMS: Array<{ stem: string; inf: string }> = [
   { stem: "выполня", inf: "выполнить задачу" },
   { stem: "выполн", inf: "выполнить задачу" },
   { stem: "закрыва", inf: "закрыть заявку" },
+  { stem: "выда", inf: "выдать пропуск" },
   { stem: "начина", inf: "начать процесс" },
   { stem: "заверша", inf: "завершить процесс" },
   { stem: "заверш", inf: "завершить процесс" },
@@ -71,7 +73,7 @@ const ROLE_WORDS = [
   "специалист", "оператор", "кассир", "курьер", "исполнитель", "заказчик",
   "поставщик", "секретарь", "инженер", "аналитик", "кадровик", "hr",
   "администратор", "консультант", "инспектор", "координатор", "владелец",
-  "сотрудник", "начальник", "экономист", "снабженец", "логист",
+  "сотрудник", "начальник", "экономист", "снабженец", "логист", "охранник", "вахтёр", "вахтер", "посетитель",
 ];
 
 const DEPT_WORDS = ["отдел", "служба", "департамент", "бухгалтерия", "дирекция", "управление"];
@@ -84,7 +86,7 @@ const SYSTEM_WORDS = [
 const DOC_WORDS = [
   "заявка", "договор", "акт", "счёт", "счет", "накладная", "приказ",
   "протокол", "отчёт", "отчет", "справка", "заявление", "письмо",
-  "смета", "спецификация", "техзадание", "реестр", "ведомость",
+  "смета", "спецификация", "техзадание", "реестр", "ведомость", "пропуск",
 ];
 
 const CONTROL_WORDS = [
@@ -95,6 +97,9 @@ const CONTROL_WORDS = [
 const PROPOSAL_MARKERS = ["хотелось бы", "нужно бы", "было бы неплохо", "предлага", "лучше бы", "стоило бы", "планиру"];
 const PROBLEM_MARKERS = ["проблема", "неудобно", "долго", "теряется", "ошибк", "приходится", "вручную", "путаниц", "затягива"];
 const CONDITION_MARKERS = ["если", "в случае", "либо", "иначе", "когда"];
+const TRIGGER_MARKERS = ["запускается", "запускает", "запускают", "стартует", "начинается", "триггер", "иницииру", "основание", "поступает", "поступление", "приходит", "после получения", "когда клиент", "когда сотрудник", "когда посетитель"];
+const RESULT_MARKERS = ["завершается", "заканчивается", "результат процесса", "результатом", "в результате", "в итоге", "на выходе", "считается завершённым", "считается завершенным"];
+const GOAL_MARKERS = ["цель процесса", "целью процесса", "цель —", "цель -", "цель:"];
 
 // Длительность/срок шага (ФТ-М2.1, ФТ-М4.1.3 "сроки") — простой числовой паттерн
 // "N дней/часов/недель/минут" в той же фразе, что и глагол действия.
@@ -113,10 +118,14 @@ function splitSentences(text: string): string[] {
 
 function findWord(text: string, dict: string[]): string | null {
   const lower = text.toLowerCase();
+  let best: { word: string; index: number } | null = null;
   for (const w of dict) {
-    if (lower.includes(w)) return w;
+    const index = lower.indexOf(w);
+    if (index < 0) continue;
+    // первое упоминание в предложении важнее порядка словаря: «Охранник проверяет данные сотрудника» — охранник
+    if (!best || index < best.index) best = { word: w, index };
   }
-  return null;
+  return best?.word ?? null;
 }
 
 function capitalize(s: string): string {
@@ -158,9 +167,166 @@ function verbForm(sentence: string, stem: string): { index: number; form: string
   return null;
 }
 
+/** Этапы офлайн-модели: по ним глубина 2 собирает подпроцессы, а действия — операции внутри них. */
+const STAGE_RULES: { name: string; re: RegExp }[] = [
+  { name: "Приём и проверка", re: /^(получ|приня|провер|собир|запраш|регистр)/iu },
+  { name: "Согласование", re: /^(соглас|утверд|рассмотр|отклон)/iu },
+  { name: "Оформление документов", re: /^(оформ|заполн|созда|сформир|подпис|выстав|выда)/iu },
+  { name: "Передача и уведомление", re: /^(переда|отправ|направ|уведом|информир)/iu },
+  { name: "Завершение", re: /^(оплат|закры|заверш|выполн)/iu },
+];
+
+/** «Проверить заявку» → «Проверка заявки»: имя операции — отглагольное существительное, как у блока IDEF0. */
+const OP_VERB: Record<string, string> = {
+  получить: "Получение",
+  принять: "Принятие",
+  проверить: "Проверка",
+  собрать: "Сбор",
+  запросить: "Запрос",
+  зарегистрировать: "Регистрация",
+  согласовать: "Согласование",
+  утвердить: "Утверждение",
+  рассмотреть: "Рассмотрение",
+  отклонить: "Отклонение",
+  оформить: "Оформление",
+  заполнить: "Заполнение",
+  создать: "Создание",
+  сформировать: "Формирование",
+  подписать: "Подписание",
+  выставить: "Выставление",
+  выдать: "Выдача",
+  передать: "Передача",
+  отправить: "Отправка",
+  направить: "Направление",
+  уведомить: "Уведомление",
+  проинформировать: "Информирование",
+  оплатить: "Оплата",
+  закрыть: "Закрытие",
+  завершить: "Завершение",
+  выполнить: "Выполнение",
+};
+
+/** Объект операции в родительном падеже: «Получение заявку» → «Получение заявки». */
+const OBJECT_GENITIVE: Record<string, string> = {
+  заявку: "заявки",
+  заявка: "заявки",
+  документы: "документов",
+  документ: "документа",
+  пропуск: "пропуска",
+  счёт: "счёта",
+  счет: "счета",
+  договор: "договора",
+  запрос: "запроса",
+  письмо: "письма",
+  обращение: "обращения",
+  звонок: "звонка",
+  данные: "данных",
+  задачу: "задачи",
+  форму: "формы",
+  отчёт: "отчёта",
+  отчет: "отчета",
+};
+
+function operationName(action: string): string {
+  const [first, ...rest] = action.split(/\s+/u);
+  const noun = OP_VERB[first.toLowerCase()];
+  if (!noun) return action;
+  if (rest[0]) rest[0] = OBJECT_GENITIVE[rest[0].toLowerCase()] ?? rest[0];
+  return [noun, ...rest].join(" ");
+}
+
+/**
+ * B1: глубина декомпозиции 2+ в офлайн-режиме. Действия раскладываются по этапам; этап становится подпроцессом,
+ * а его действия — двумя и более операциями. Без этого 80+ действий висели на A0 одной лестницей.
+ */
+function structureMockActions(result: ExtractionChunkResult, depth: number): void {
+  if (depth < 2) return;
+  const actions = result.nodes.filter((n) => n.type !== "event");
+  if (actions.length < 4) return;
+  const order = new Map(actions.map((n, i) => [n, i] as const));
+  const groups = new Map<string, { name: string; nodes: typeof actions }>();
+  for (const n of actions) {
+    const stage = STAGE_RULES.find((s) => s.re.test(n.name))?.name ?? "Прочие действия";
+    const group = groups.get(stage) ?? { name: stage, nodes: [] };
+    group.nodes.push(n);
+    groups.set(stage, group);
+  }
+  let list = [...groups.values()].sort((a, b) => (order.get(a.nodes[0]) ?? 0) - (order.get(b.nodes[0]) ?? 0));
+  // этап из одного действия не создаёт отдельный подпроцесс: присоединяем его к соседнему
+  for (let i = 0; i < list.length && list.length > 1; i++) {
+    if (list[i].nodes.length > 1) continue;
+    const target = i > 0 ? list[i - 1] : list[i + 1];
+    target.nodes.push(...list[i].nodes);
+    target.nodes.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+    list.splice(i, 1);
+    i = Math.max(-1, i - 1);
+  }
+  while (list.length > 6) {
+    const last = list.pop()!;
+    list[list.length - 1].nodes.push(...last.nodes);
+    list[list.length - 1].nodes.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
+  }
+  if (list.length === 0) return;
+
+  const operations: NonNullable<ExtractionChunkResult["operations"]> = [];
+  const subprocesses: NonNullable<ExtractionChunkResult["subprocesses"]> = [];
+  const usedNames = new Set<string>();
+  for (const group of list) {
+    const parts: typeof actions[] = [];
+    if (group.nodes.length <= 4) {
+      const half = Math.ceil(group.nodes.length / 2);
+      if (half > 0) parts.push(group.nodes.slice(0, half));
+      if (group.nodes.length > half) parts.push(group.nodes.slice(half));
+    } else {
+      for (let i = 0; i < group.nodes.length; i += 4) parts.push(group.nodes.slice(i, i + 4));
+    }
+    if (parts.length === 0) continue;
+    const groupRole = mostCommon(group.nodes.map((n) => n.role_name).filter((r): r is string => !!r));
+    for (const part of parts) {
+      let name = operationName(part[0].name);
+      if (usedNames.has(name.toLowerCase())) {
+        let k = 2;
+        while (usedNames.has(`${name} (${k})`.toLowerCase())) k++;
+        name = `${name} (${k})`;
+      }
+      usedNames.add(name.toLowerCase());
+      for (const n of part) n.operation_name = name;
+      const first = part[0];
+      operations.push({
+        name,
+        subprocess_name: group.name,
+        role_name: mostCommon(part.map((n) => n.role_name).filter((r): r is string => !!r)) ?? groupRole,
+        source_fragment_id: first.source_fragment_id,
+        quote: first.quote,
+        confidence: Math.min(...part.map((n) => n.confidence)),
+      });
+    }
+    const first = group.nodes[0];
+    subprocesses.push({
+      name: group.name,
+      source_fragment_id: first.source_fragment_id,
+      quote: first.quote,
+      confidence: Math.min(...group.nodes.map((n) => n.confidence)),
+    });
+  }
+  if (subprocesses.length > 0) {
+    result.operations = operations;
+    result.subprocesses = subprocesses;
+  }
+}
+
+function mostCommon(values: string[]): string | null {
+  const counts = new Map<string, number>();
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1);
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [v, c] of counts) if (c > bestCount) (best = v), (bestCount = c);
+  return best;
+}
+
 export function mockExtractChunk(
   fragments: LLMFragmentInput[],
-  _context: { processName: string; modelType: "AS-IS" | "TO-BE" }
+  context: { processName: string; modelType: "AS-IS" | "TO-BE"; decompositionDepth?: number }
 ): ExtractionChunkResult {
   const result: ExtractionChunkResult = {
     roles: [],
@@ -178,7 +344,7 @@ export function mockExtractChunk(
   const seenSystems = new Set<string>();
   const seenData = new Set<string>();
   const seenControls = new Set<string>();
-  const seenActions = new Set<string>();
+  const seenActions = new Map<string, ExtractionChunkResult["nodes"][number]>();
 
   for (const frag of fragments) {
     const isFact = frag.speaker === "owner" || frag.speaker === "participant";
@@ -257,8 +423,10 @@ export function mockExtractChunk(
 
     if (!isFact) continue;
 
+    // роль, названная в начале фрагмента, относится и к следующим фразам без подлежащего: «Охранник проверяет… Выдаёт…»
+    let lastRole: string | null = null;
     for (const sentence of splitSentences(frag.text)) {
-      const sLower = sentence.toLowerCase();
+      const sLower = sentence.toLowerCase().replace(/ё/g, "е");
 
       const isProposal = PROPOSAL_MARKERS.some((mk) => sLower.includes(mk));
       const isProblem = PROBLEM_MARKERS.some((mk) => sLower.includes(mk));
@@ -272,12 +440,20 @@ export function mockExtractChunk(
         continue;
       }
 
+      // триггер/цель/результат нужны и событиям, и паспорту процесса; их фразы не обязаны содержать глагол действия
+      const hintText = sentence.replace(/^(обычно|как правило|в итоге|в результате)\s+/iu, "").trim().slice(0, 300);
+      if (!result.process_hints.goal && GOAL_MARKERS.some((mk) => sLower.includes(mk))) result.process_hints.goal = hintText;
+      if (!result.process_hints.trigger && TRIGGER_MARKERS.some((mk) => sLower.includes(mk))) result.process_hints.trigger = hintText;
+      if (!result.process_hints.result && RESULT_MARKERS.some((mk) => sLower.includes(mk))) result.process_hints.result = hintText;
+
       const verbHit = VERB_STEMS.find((v) => sLower.includes(v.stem));
       if (!verbHit) continue;
       const form = verbForm(sLower, verbHit.stem);
       if (!form) continue;
 
-      const role = findWord(sentence, ROLE_WORDS);
+      const mentionedRole = findWord(sentence, ROLE_WORDS);
+      if (mentionedRole) lastRole = mentionedRole;
+      const role = mentionedRole ?? lastRole;
       const doc = findWord(sentence, DOC_WORDS);
       const system = findWord(sentence, SYSTEM_WORDS);
       const duration = findDuration(sentence);
@@ -285,12 +461,19 @@ export function mockExtractChunk(
       const isGateway = CONDITION_MARKERS.some((mk) => sLower.includes(mk));
 
       const name = isGateway ? capitalize(verbHit.inf) : actionName(verbHit, sentence, form.index);
-      const actionKey = `${name.toLowerCase()}|${role ?? ""}`;
-      if (seenActions.has(actionKey)) continue;
-      seenActions.add(actionKey);
+      // то же действие, названное ещё раз, дополняет прежнее (исполнитель, объект, система), а не создаёт дубль
+      const known = seenActions.get(name.toLowerCase());
+      if (known) {
+        // уточнение из следующего ответа важнее прежнего: «Охранник проверяет…» переставляет шаг в его дорожку
+        if (role) known.role_name = capitalize(role);
+        if (!known.output_names?.length && doc) known.output_names = [capitalize(doc)];
+        if (system && !known.system_names?.includes(system.toUpperCase())) known.system_names = [...(known.system_names ?? []), system.toUpperCase()];
+        known.confidence = Math.max(known.confidence, uncertain ? 0.4 : 0.6);
+        continue;
+      }
 
       orderCounter += 1;
-      result.nodes.push({
+      const node: ExtractionChunkResult["nodes"][number] = {
         type: isGateway ? "gateway" : "task",
         subtype: isGateway ? "exclusive" : "user",
         name,
@@ -304,9 +487,12 @@ export function mockExtractChunk(
         source_fragment_id: frag.id,
         quote: sentence.slice(0, 240),
         confidence: uncertain ? 0.4 : 0.6,
-      });
+      };
+      result.nodes.push(node);
+      seenActions.set(name.toLowerCase(), node);
     }
   }
 
+  structureMockActions(result, context.decompositionDepth ?? 2);
   return result;
 }

@@ -154,7 +154,7 @@ export class MockProvider implements LLMProvider {
   readonly name = "mock";
   async extractChunk(
     fragments: LLMFragmentInput[],
-    context: { processName: string; modelType: "AS-IS" | "TO-BE" }
+    context: { processName: string; modelType: "AS-IS" | "TO-BE"; decompositionDepth?: number }
   ): Promise<ExtractionChunkResult> {
     return mockExtractChunk(fragments, context);
   }

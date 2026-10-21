@@ -5,6 +5,7 @@ import { buildRegulation } from "../pipeline/regulation.js";
 import { buildRegulationDocx } from "./regulation.js";
 import { buildRaciWorkbookBuffer } from "../pipeline/raci.js";
 import { renderBpmnSchematic } from "./album.js";
+import { innerQuotes } from "../shared/quote.js";
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
@@ -77,7 +78,7 @@ export async function buildAuditPackageHtml(session: SessionRecord, checklist: C
 </style>
 </head>
 <body>
-  <h1>Пакет к аудиту: «${esc(session.meta.processName)}»</h1>
+  <h1>Пакет к аудиту: «${esc(innerQuotes(session.meta.processName))}»</h1>
   <div class="meta">
     Версия: ${esc(m.process.version)} · Статус: ${esc(m.process.status)} · Владелец: ${esc(m.process.owner ?? "—")} · Подразделение: ${esc(session.meta.department ?? "—")}<br/>
     Дата формирования пакета: ${new Date().toISOString()} · Соответствие чек-листу: <span class="badge" style="background:${checklist.compliancePercent >= 80 ? "#dcfce7" : "#fee2e2"}">${checklist.compliancePercent}%</span>

@@ -69,6 +69,8 @@ export interface ExtractedOperation {
   name: string;
   /** Подпроцесс операции — при глубине декомпозиции 2 и больше (название из subprocesses того же ответа). */
   subprocess_name?: string | null;
+  /** Исполнитель операции; действия без своего исполнителя наследуют его. */
+  role_name?: string | null;
   source_fragment_id: string;
   quote: string;
   confidence: number;

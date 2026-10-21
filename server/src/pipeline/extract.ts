@@ -30,6 +30,24 @@ export function normKey(name: string): string {
     .join(" ");
 }
 
+/**
+ * Название события из подсказки «что запускает / чем завершается»: убираем служебную рамку и по возможности
+ * приводим первое слово к отглагольному существительному («после получения заявки» → «Получение заявки»).
+ */
+function eventNameFromHint(text: string, kind: "start" | "end"): string {
+  let core = text
+    .replace(/^.*?(?:запускается|начинается|стартует|инициируется|триггер\w*\s*[—:-]\s*|завершается|заканчивается|результат\w*\s*[—:-]\s*)/iu, "")
+    .trim()
+    .replace(/^(после|при|когда|с|со|от)\s+/iu, "")
+    .replace(/[.;].*$/u, "")
+    .trim();
+  core = core
+    .replace(/^([а-яё]{4,})(?:ия|ием)(?=\s|$)/iu, (_, w: string) => `${w}ие`)
+    .replace(/^([а-яё]{4,})ей(?=\s|$)/iu, (_, w: string) => `${w}а`);
+  if (!core) return kind === "start" ? "Начало процесса" : "Завершение процесса";
+  return core.charAt(0).toUpperCase() + core.slice(1);
+}
+
 /** Что пошло не так при извлечении — показывается аналитику в проверках модели. */
 export interface ExtractionReport {
   failedChunks: { index: number; fragmentIds: string[]; error: string }[];
@@ -105,6 +123,13 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
   const controls = makeIndex<ControlEntity>();
   const nodes: ProcessNode[] = [];
   const flows: ProcessFlow[] = [];
+  const usedFlowIds = new Set<string>();
+  const nextFlowId = () => {
+    let n = flows.length + 1;
+    while (usedFlowIds.has(`flow${n}`)) n++;
+    usedFlowIds.add(`flow${n}`);
+    return `flow${n}`;
+  };
   const statements: Statement[] = [];
   // Операции процесса (ФТ-3): блоки IDEF0, у каждого своя диаграмма BPMN из действий с operation_name.
   const opByKey = new Map<string, ProcessNode>();
@@ -223,6 +248,13 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     }
     for (const o of chunkResult.operations ?? []) {
       const op = ensureOperation(o.name, { fragment_id: o.source_fragment_id, quote: o.quote }, o.confidence);
+      if (o.role_name) {
+        const role = upsert(roles, o.role_name, "role", { kind: "internal" } as any, {
+          fragment_id: o.source_fragment_id,
+          quote: o.quote,
+        });
+        op.role_id = role.id;
+      }
       // принадлежность операции подпроцессу: разворачивается на глубине 2+ (по Соглашению глубже функций нет)
       if (depth >= 2 && o.subprocess_name && !opSubName.has(op.id)) opSubName.set(op.id, o.subprocess_name);
     }
@@ -290,7 +322,7 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
       const to = orderToNodeId.get(fl.to_order_hint);
       if (!from || !to) continue;
       flows.push({
-        id: `flow${flows.length + 1}`,
+        id: nextFlowId(),
         from,
         to,
         condition: fl.condition ?? null,
@@ -315,6 +347,69 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     throw new Error(`LLM не обработал ни одного фрагмента: ${report.failedChunks[0].error}`);
   }
 
+  // Операция без собственной роли получает самого частого исполнителя своих шагов, а шаги без роли наследуют роль
+  // операции: LLM часто называет исполнителя один раз на этап, и без этого шаги оставались «без исполнителя» (D4).
+  const nodeById = new Map(nodes.map((n) => [n.id, n] as const));
+  for (const op of opByKey.values()) {
+    if (op.role_id) continue;
+    const counts = new Map<string, number>();
+    for (const id of opSteps.get(op.id) ?? []) {
+      const rid = nodeById.get(id)?.role_id;
+      if (rid) counts.set(rid, (counts.get(rid) ?? 0) + 1);
+    }
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [rid, c] of counts) if (c > bestCount) (best = rid), (bestCount = c);
+    if (best) op.role_id = best;
+  }
+  for (const n of nodes) if (n.bpmn_scope && !n.role_id) n.role_id = opByKey.get(n.bpmn_scope)?.role_id ?? null;
+
+  // Триггер и результат, названные в тексте, дают настоящие стартовое и конечное события. Это закрывает вопросы
+  // «что запускает процесс» после ответа владельца (B3) и не оставляет офлайн-модель без событий (B1).
+  const sourceOfHint = (hint: string) => {
+    const fact = fragments.find((f) => f.text.includes(hint)) ?? fragments.find((f) => f.speaker === "owner" || f.speaker === "participant") ?? fragments[0];
+    return { fragment_id: fact?.id ?? "f1", quote: hint };
+  };
+  const eventNode = (kind: "start" | "end", hint: string): ProcessNode => {
+    const source = sourceOfHint(hint);
+    return {
+      id: `${kind === "start" ? "ev_start" : "ev_end"}_${hint.length}`,
+      type: "event",
+      subtype: kind,
+      name: eventNameFromHint(hint, kind),
+      role_id: null,
+      system_ids: [],
+      inputs: [],
+      outputs: [],
+      controls: [],
+      duration: null,
+      frequency: null,
+      idef0_parent: null,
+      bpmn_scope: null,
+      status: "confirmed",
+      confidence: 0.6,
+      source: [source],
+      requirement_ids: [],
+      tags: [],
+      confirmed_by: [],
+    };
+  };
+  if (trigger && !nodes.some((n) => n.type === "event" && n.subtype === "start")) nodes.unshift(eventNode("start", trigger));
+  if (result && !nodes.some((n) => n.type === "event" && n.subtype === "end")) nodes.push(eventNode("end", result));
+
+  // Связи из конечного события и в начальное — заведомо ложные; LLM иногда соединяет два результата подряд (D5).
+  const nodeByIdNow = new Map(nodes.map((n) => [n.id, n] as const));
+  const saneFlows = flows.filter((f) => {
+    const from = nodeByIdNow.get(f.from);
+    const to = nodeByIdNow.get(f.to);
+    if (!from || !to || from.id === to.id) return false;
+    if (from.type === "event" && from.subtype === "end") return false;
+    if (to.type === "event" && to.subtype === "start") return false;
+    return true;
+  });
+  flows.length = 0;
+  flows.push(...saneFlows);
+
   // Резервная линейная связка узлов там, где явные flow отсутствуют, чтобы поток не обрывался даже
   // при неполном извлечении связей. Такие связи без источника (source: []) — их видно как выведенные.
   // Из конечного события и в начальное связь не ведётся: это заведомо ложный поток.
@@ -324,7 +419,9 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     if (a.type === "event" && a.subtype === "end") continue;
     if (b.type === "event" && b.subtype === "start") continue;
     if (!flows.some((f) => f.from === a.id)) {
-      flows.push({ id: `flow${flows.length + 1}`, from: a.id, to: b.id, condition: null, source: [], confirmed_by: [] });
+      // связь с событием — не выведенная: у неё есть источник, иначе сборка структуры отбросит её как «плоскую»
+      const source = a.type === "event" ? a.source : b.type === "event" ? b.source : [];
+      flows.push({ id: nextFlowId(), from: a.id, to: b.id, condition: null, source, confirmed_by: [] });
     }
   }
 
@@ -383,7 +480,7 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     const ordered = [...usedOps].sort((a, b) => (opOrder.get(a.id) ?? 0) - (opOrder.get(b.id) ?? 0));
     for (let i = 0; i < ordered.length - 1; i++) {
       if (wired.has(ordered[i].id)) continue;
-      flows.push({ id: `flow${flows.length + 1}`, from: ordered[i].id, to: ordered[i + 1].id, condition: null, source: [], confirmed_by: [] });
+      flows.push({ id: nextFlowId(), from: ordered[i].id, to: ordered[i + 1].id, condition: null, source: [], confirmed_by: [] });
     }
     for (const sub of subByKey.values()) if (usedSubIds.has(sub.id)) nodes.push(sub);
     for (const op of usedOps) nodes.push(op);

@@ -1,6 +1,7 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import type { SessionRecord } from "../repo.js";
 import { buildRegulation } from "../pipeline/regulation.js";
+import { innerQuotes } from "../shared/quote.js";
 
 function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -38,7 +39,7 @@ export function buildRegulationHtml(session: SessionRecord, opts?: { structureOn
 </style>
 </head>
 <body>
-  <h1>ПОЛОЖЕНИЕ О ПРОЦЕССЕ<br/>«${esc(session.meta.processName)}»</h1>
+  <h1>ПОЛОЖЕНИЕ О ПРОЦЕССЕ<br/>«${esc(innerQuotes(session.meta.processName))}»</h1>
   <div class="subtitle">
     Версия ${esc(model.process.version)} · Статус: ${esc(model.process.status)} · Владелец: ${esc(session.meta.owner ?? "—")}
     ${staleIds.size > 0 ? `<div class="legend">Абзацев, устаревших после последней генерации: ${staleIds.size} (выделены жёлтым)</div>` : ""}
@@ -55,7 +56,7 @@ export async function buildRegulationDocx(session: SessionRecord, opts?: { struc
 
   const children: Paragraph[] = [
     new Paragraph({
-      text: `ПОЛОЖЕНИЕ О ПРОЦЕССЕ «${session.meta.processName}»`,
+      text: `ПОЛОЖЕНИЕ О ПРОЦЕССЕ «${innerQuotes(session.meta.processName)}»`,
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.CENTER,
     }),

@@ -21,7 +21,7 @@ const System = z.object({ name: str, ...sourced });
 const Data = z.object({ name: str, kind: z.enum(["document", "data"]).catch("document"), ...sourced });
 const Control = z.object({ name: str, kind: z.enum(["regulation", "rule", "norm"]).catch("rule"), ...sourced });
 /** Операция процесса: этап, к которому относятся действия (node.operation_name). */
-const Operation = z.object({ name: str, subprocess_name: optStr, ...sourced });
+const Operation = z.object({ name: str, subprocess_name: optStr, role_name: optStr, ...sourced });
 /** Подпроцесс — группа операций (уровень 0); спрашивается при глубине декомпозиции 2+. */
 const Subprocess = z.object({ name: str, ...sourced });
 const Node = z.object({

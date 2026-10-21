@@ -1,4 +1,5 @@
 import type { ProcessLogicModel } from "../types/model.js";
+import { quoted } from "../shared/quote.js";
 
 /**
  * ФТ-М4.4.1: пересказ процесса обычным языком, без терминов нотаций
@@ -27,7 +28,7 @@ export function buildParaphrase(model: ProcessLogicModel): VerificationParagraph
   if (model.process.goal || model.process.trigger) {
     out.push({
       id: "vp-intro",
-      text: `Процесс «${model.process.name}» запускается, когда ${decapPhrase(model.process.trigger ?? "наступает соответствующее событие")}. Его цель — ${decapPhrase(model.process.goal ?? "не описана")}.`,
+      text: `Процесс ${quoted(model.process.name)} запускается, когда ${decapPhrase(model.process.trigger ?? "наступает соответствующее событие")}. Его цель — ${decapPhrase(model.process.goal ?? "не описана")}.`,
       sourceRefs: [],
     });
   }
@@ -54,7 +55,7 @@ export function buildParaphrase(model: ProcessLogicModel): VerificationParagraph
     if (pathVisited.has(nodeId)) {
       // шлюз — техническая точка ветвления, шагом его не называем
       if (node.type !== "gateway") {
-        out.push({ id: `vp-${++counter}`, text: `Если нужно, шаг «${node.name}» повторяется заново, пока не будет выполнено условие для продолжения.`, sourceRefs: [nodeId] });
+        out.push({ id: `vp-${++counter}`, text: `Если нужно, шаг ${quoted(node.name)} повторяется заново, пока не будет выполнено условие для продолжения.`, sourceRefs: [nodeId] });
       }
       return;
     }
@@ -118,7 +119,7 @@ export function buildParaphrase(model: ProcessLogicModel): VerificationParagraph
     const phrase = verbPhraseThirdPerson(decapPhrase(node.name));
     const text = phrase
       ? `${lead} ${roleText} ${phrase}.`
-      : `${lead} ${roleText} выполнит шаг «${node.name}».`;
+      : `${lead} ${roleText} выполнит шаг ${quoted(node.name)}.`;
     out.push({ id: `vp-${++counter}`, text, sourceRefs: [nodeId] });
     for (const f of outAdj.get(nodeId) ?? []) walk(f.to, newPath, stepIndex + 1);
   }

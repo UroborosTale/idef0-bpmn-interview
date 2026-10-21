@@ -232,7 +232,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const roots = nodes.filter((n) => (incomingCount.get(n.id) ?? 0) === 0 && !isBoundary(n) && !linkCatch.has(n.id));
   const leaves = nodes.filter((n) => (outgoingCount.get(n.id) ?? 0) === 0 && !(n.type === "event" && n.subtype === "end") && !linkThrow.has(n.id));
 
-  type SynthEvent = { id: string; name: string; kind: "start" | "end" };
+  type SynthEvent = { id: string; name: string; kind: "start" | "end"; roleId?: string | null };
   const synthEvents: SynthEvent[] = [];
   const synthFlows: { id: string; from: string; to: string }[] = [];
   if (!hasExplicitStart) {
@@ -249,7 +249,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // роли -> дорожки (+ "без исполнителя"). Дорожка подпроцесса — его исполнитель, а если он не задан (эталоны
   // хранят роль на шагах вложенных операций) — самый частый исполнитель его поддерева: иначе все подпроцессы
   // висели в «Без исполнителя», а дорожки ролей стояли пустыми.
-  const parentOf = new Map<string, string | null>(model.nodes.map((n) => [n.id, n.idef0_parent ?? null]));
+  const parentOf = new Map<string, string | null>(model.nodes.map((n) => [n.id, n.idef0_parent ?? n.bpmn_scope ?? null]));
   const inSubtree = (id: string | null, rootId: string): boolean => {
     let cur: string | null = id;
     while (cur) {
@@ -263,7 +263,11 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     const h = hostOf(n);
     if (h.role_id) return h.role_id;
     const counts = new Map<string, number>();
-    for (const s of model.nodes) if (s.id !== h.id && inSubtree(s.id, h.id) && s.role_id) counts.set(s.role_id, (counts.get(s.role_id) ?? 0) + 1);
+    // Сначала роли непосредственных детей: у подпроцесса это операции, у операции — её шаги.
+    // Только если у детей ролей нет, берём всё поддерево (эталоны хранят роль глубже).
+    for (const s of model.nodes) if (s.id !== h.id && parentOf.get(s.id) === h.id && s.role_id) counts.set(s.role_id, (counts.get(s.role_id) ?? 0) + 1);
+    if (counts.size === 0)
+      for (const s of model.nodes) if (s.id !== h.id && inSubtree(s.id, h.id) && s.role_id) counts.set(s.role_id, (counts.get(s.role_id) ?? 0) + 1);
     if (counts.size === 0)
       for (const a of model.assignments ?? [])
         if (a.node_id && LANE_KINDS.has(a.kind) && inSubtree(a.node_id, h.id)) counts.set(a.role_id, (counts.get(a.role_id) ?? 0) + 1);
@@ -272,6 +276,13 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     for (const [rid, c] of counts) if (c > bestCount) (best = rid), (bestCount = c);
     return best;
   };
+  // На диаграмме операции синтетические начало и конец — в дорожке первого/последнего шага, а не в «Без исполнителя» (D7).
+  if (scope !== null) {
+    for (const se of synthEvents) {
+      const anchor = se.kind === "start" ? roots[0] : leaves[0];
+      se.roleId = anchor ? roleOf(anchor) : null;
+    }
+  }
   const usedRoles = new Set(nodes.map((n) => roleOf(n)).filter((r): r is string => !!r));
   // на общей схеме роли, которых нет ни у одного подпроцесса, дорожками не показываем: они были пустыми
   const laneRoles = scope === null ? view.roles.filter((r) => usedRoles.has(r.id)) : [...view.roles];
@@ -279,7 +290,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const laneIdOf = (roleId: string | null | undefined) => (roleId ? `Lane_${roleId}` : UNASSIGNED_LANE);
   const laneIndexOf = new Map<string, number>();
   laneRoles.forEach((r, i) => laneIndexOf.set(laneIdOf(r.id), i));
-  const hasUnassigned = nodes.some((n) => !roleOf(n)) || synthEvents.length > 0;
+  const hasUnassigned = nodes.some((n) => !roleOf(n)) || synthEvents.some((se) => scope === null || !se.roleId);
   const unassignedIndex = laneRoles.length;
   if (hasUnassigned) laneIndexOf.set(UNASSIGNED_LANE, unassignedIndex);
   const laneCount = laneRoles.length + (hasUnassigned ? 1 : 0);
@@ -304,7 +315,14 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
       };
     });
   for (const se of synthEvents) {
-    layoutNodes.push({ id: se.id, width: NODE_SIZE.event.w, height: NODE_SIZE.event.h, laneIndex: unassignedIndex, type: "event", label: se.name });
+    layoutNodes.push({
+      id: se.id,
+      width: NODE_SIZE.event.w,
+      height: NODE_SIZE.event.h,
+      laneIndex: laneIndexOf.get(laneIdOf(se.roleId)) ?? unassignedIndex,
+      type: "event",
+      label: se.name,
+    });
   }
   const layoutSource = (id: string) => {
     const n = nodes.find((x) => x.id === id);
@@ -479,13 +497,16 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // lanes
   const lanesXml: string[] = [];
   for (const role of laneRoles) {
-    const refs = nodes.filter((n) => roleOf(n) === role.id).map((n) => `<bpmn:flowNodeRef>${nodeIdOf(n.id)}</bpmn:flowNodeRef>`);
+    const refs = [
+      ...nodes.filter((n) => roleOf(n) === role.id).map((n) => `<bpmn:flowNodeRef>${nodeIdOf(n.id)}</bpmn:flowNodeRef>`),
+      ...synthEvents.filter((se) => se.roleId === role.id).map((se) => `<bpmn:flowNodeRef>${se.id}</bpmn:flowNodeRef>`),
+    ];
     lanesXml.push(`<bpmn:lane id="${laneIdOf(role.id)}" name="${esc(role.name)}">${refs.join("")}</bpmn:lane>`);
   }
   if (hasUnassigned) {
     const refs = [
       ...nodes.filter((n) => !roleOf(n)).map((n) => `<bpmn:flowNodeRef>${nodeIdOf(n.id)}</bpmn:flowNodeRef>`),
-      ...synthEvents.map((se) => `<bpmn:flowNodeRef>${se.id}</bpmn:flowNodeRef>`),
+      ...synthEvents.filter((se) => !se.roleId).map((se) => `<bpmn:flowNodeRef>${se.id}</bpmn:flowNodeRef>`),
     ];
     lanesXml.push(`<bpmn:lane id="${UNASSIGNED_LANE}" name="Без исполнителя">${refs.join("")}</bpmn:lane>`);
   }

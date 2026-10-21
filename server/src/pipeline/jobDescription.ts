@@ -1,4 +1,5 @@
 import type { ProcessLogicModel } from "../types/model.js";
+import { quoted } from "../shared/quote.js";
 
 /**
  * B14: система, заведённая в модели ещё и ролью (ERP, ELMA365), не получает должностную инструкцию —
@@ -52,7 +53,7 @@ export function buildJobDescription(model: ProcessLogicModel, roleId: string, po
     id: "general-role",
     section: "general",
     kind: "paragraph",
-    text: `Настоящая должностная инструкция определяет обязанности роли «${role.name}» в процессе «${model.process.name}».`,
+    text: `Настоящая должностная инструкция определяет обязанности роли ${quoted(role.name)} в процессе ${quoted(model.process.name)}.`,
     sourceRefs: [role.id],
   });
   if (position?.title) {
@@ -73,12 +74,12 @@ export function buildJobDescription(model: ProcessLogicModel, roleId: string, po
     if (isDutyHolder) {
       const raciTypes = entries.filter((e) => e.type === "R" || e.type === "A").map((e) => RACI_LABEL[e.type]);
       const label = raciTypes.length > 0 ? raciTypes.join(", ") : "исполняет";
-      duties.push({ id: `duty-${n.id}`, section: "duties", kind: "listItem", text: `${label}: «${n.name}».`, sourceRefs: [n.id] });
+      duties.push({ id: `duty-${n.id}`, section: "duties", kind: "listItem", text: `${label}: ${quoted(n.name)}.`, sourceRefs: [n.id] });
       for (const id of n.inputs) usedDataIds.add(id);
       for (const id of n.outputs) usedDataIds.add(id);
     } else if (isInteractor) {
       const raciTypes = entries.filter((e) => e.type === "C" || e.type === "I").map((e) => RACI_LABEL[e.type]);
-      interactions.push({ id: `inter-${n.id}`, section: "interactions", kind: "listItem", text: `«${n.name}»: ${raciTypes.join(", ")}.`, sourceRefs: [n.id] });
+      interactions.push({ id: `inter-${n.id}`, section: "interactions", kind: "listItem", text: `${quoted(n.name)}: ${raciTypes.join(", ")}.`, sourceRefs: [n.id] });
     }
   }
   if (duties.length === 1) duties.push({ id: "duties-empty", section: "duties", kind: "paragraph", text: "Обязанности в рамках данного процесса не выявлены.", sourceRefs: [] });

@@ -3,6 +3,7 @@ import type { AgentQuestion } from "../agentQuestions.js";
 import type { AgentReport } from "../agentReports.js";
 import type { SessionRecord } from "../repo.js";
 import { functionCodes, stepCodes } from "../shared/codes.js";
+import { innerQuotes } from "../shared/quote.js";
 
 /** Word-документы из хранилища агентов: лист вопросов к интервью (с полем для записи ответа) и отчёт аналитика. */
 
@@ -60,7 +61,7 @@ export async function buildQuestionsDocx(session: SessionRecord, questions: Agen
 
   const children: (Paragraph | Table)[] = [
     new Paragraph({ text: "ЛИСТ ВОПРОСОВ К ИНТЕРВЬЮ", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
-    meta(`Процесс «${session.meta.processName}»${session.meta.owner ? ` · владелец: ${session.meta.owner}` : ""} · ${today()}`),
+    meta(`Процесс «${innerQuotes(session.meta.processName)}»${session.meta.owner ? ` · владелец: ${session.meta.owner}` : ""} · ${today()}`),
   ];
   if (live.length === 0) children.push(new Paragraph({ spacing: { before: 300 }, children: [new TextRun("Ждущих вопросов нет.")] }));
   let n = 0;
@@ -79,7 +80,7 @@ export async function buildReportDocx(session: SessionRecord, report: AgentRepor
   const label = labeler(session);
   const children: (Paragraph | Table)[] = [
     new Paragraph({ text: report.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
-    meta(`Процесс «${session.meta.processName}» · ${KIND[report.kind] ?? report.kind} · агент: ${report.agent} · ${report.createdAt.slice(0, 10)}${report.scopeNodeId ? ` · ${label(report.scopeNodeId).label}` : ""}`),
+    meta(`Процесс «${innerQuotes(session.meta.processName)}» · ${KIND[report.kind] ?? report.kind} · агент: ${report.agent} · ${report.createdAt.slice(0, 10)}${report.scopeNodeId ? ` · ${label(report.scopeNodeId).label}` : ""}`),
   ];
   if (report.summary) children.push(new Paragraph({ spacing: { before: 240 }, children: [new TextRun({ text: report.summary, bold: true })] }));
   if (report.findings.length > 0) {
