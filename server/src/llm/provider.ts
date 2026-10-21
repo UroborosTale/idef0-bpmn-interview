@@ -205,9 +205,9 @@ export function resolveProvider(confidential?: boolean): LLMProvider {
   return getLLMProvider();
 }
 
-export function providerStatus(): { name: string; live: boolean; localConfigured: boolean } {
+export function providerStatus(): { name: string; live: boolean; localConfigured: boolean; supportsImages: boolean } {
   const p = getLLMProvider();
-  return { name: p.name, live: p.name !== "mock", localConfigured: !!getLocalProviderIfConfigured() };
+  return { name: p.name, live: p.name !== "mock", localConfigured: !!getLocalProviderIfConfigured(), supportsImages: !!p.recognizeDiagramImage };
 }
 
 /** ФТ-М9.1.4/9.3.3: получить провайдер по имени для регрессионной оценки/сравнения (без учёта конфиденциальности). */

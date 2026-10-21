@@ -10,7 +10,7 @@ export const api = {
   authMe: () => req<{ authRequired: boolean; user: { login: string } | null }>("GET", "/auth/me"),
   login: (login: string, password: string) => req<{ user: { login: string } }>("POST", "/auth/login", { login, password }),
   logout: () => req<{ ok: boolean }>("POST", "/auth/logout", {}),
-  providerStatus: () => req<{ name: string; live: boolean }>("GET", "/provider-status"),
+  providerStatus: () => req<{ name: string; live: boolean; supportsImages?: boolean }>("GET", "/provider-status"),
   templates: () => req<{ id: string; name: string; hints: string[] }[]>("GET", "/templates"),
 
   listSessions: () => req<SessionListItem[]>("GET", "/sessions"),

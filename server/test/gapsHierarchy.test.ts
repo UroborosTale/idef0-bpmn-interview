@@ -85,6 +85,18 @@ describe("пробелы на иерархической модели", () => {
     expect(found(m, "orphan_output_document")[0].question).toMatch(/Выход без потребителя/);
   });
 
+  it("F4: последний шаг операции с продолжением операции не считается тупиком", () => {
+    const m = emptyModel({ id: "p", name: "Процесс" });
+    m.nodes.push(
+      node("op", { bpmn_scope: null }),
+      node("step", { bpmn_scope: "op" }),
+      node("end", { type: "event", subtype: "end", bpmn_scope: "op" }),
+      node("next", { bpmn_scope: null })
+    );
+    m.flows.push(flow("op", "next"));
+    expect(found(m, "dangling_flow", "step")).toEqual([]);
+  });
+
   it("демо C090 остаётся без пробелов", () => {
     expect(detectGaps(demoModel())).toEqual([]);
   });

@@ -182,9 +182,9 @@ table.mono { font-family: inherit; white-space: normal; }
 .bpe-palette { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
 .bpe-palette button { text-align: left; cursor: grab; }
 .bpe-palette button.active { background: #e0e7ff; border-color: #4338ca; color: #312e81; }
-.bpe-canvas { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
-.bpe-svg { width: 100%; height: 100%; display: block; user-select: none; touch-action: none; }
-.bpe-rename { position: absolute; transform: translate(-50%, -50%); width: 150px; z-index: 5; border: 2px solid var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.15); text-align: center; }
+.bpe-canvas { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: #fff; display: flex; flex-direction: column; }
+.bpe-svg { flex: 1 1 auto; min-height: 0; width: 100%; height: auto; display: block; user-select: none; touch-action: none; }
+.bpe-rename { position: absolute; transform: translate(-50%, -50%); width: 150px; z-index: 5; border: 2px solid var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,.15); text-align: center; box-sizing: border-box; }
 .bpe-corner { position: absolute; right: 8px; bottom: 6px; font-size: 11px; pointer-events: none; }
 .bpe-inspector { overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
 .bpe-inspector h4 { margin: 0 0 10px; }
@@ -526,7 +526,7 @@ button.danger-fill:hover { background: #991b1b; }
 .wizard-problems p { margin: 2px 0; }
 /* Выделение группой и миникарта диаграммы */
 .bpe-canvas { position: relative; }
-.bpe-selbar { position: absolute; bottom: 28px; left: 10px; display: flex; flex-wrap: wrap; max-width: calc(100% - 230px); gap: 6px; align-items: center; background: #fff; border: 1px solid #c4d1e6; border-radius: 6px; padding: 4px 8px; box-shadow: 0 2px 8px rgba(30, 41, 59, 0.15); font-size: 12px; z-index: 5; }
+.bpe-selbar { position: static; flex: 0 0 auto; margin: 6px 10px 28px; display: flex; flex-wrap: wrap; max-width: calc(100% - 230px); gap: 6px; align-items: center; background: #fff; border: 1px solid #c4d1e6; border-radius: 6px; padding: 4px 8px; box-shadow: 0 2px 8px rgba(30, 41, 59, 0.15); font-size: 12px; z-index: 5; }
 .bpe-selbar button, .bpe-selbar span { padding: 2px 8px; white-space: nowrap; }
 .bpe-minimap { position: absolute; right: 10px; bottom: 28px; background: rgba(255, 255, 255, 0.92); border: 1px solid #c4d1e6; border-radius: 4px; box-shadow: 0 2px 8px rgba(30, 41, 59, 0.15); z-index: 4; line-height: 0; }
 .bpe-minimap svg { cursor: pointer; touch-action: none; }

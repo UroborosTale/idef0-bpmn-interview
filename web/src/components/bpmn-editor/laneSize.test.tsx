@@ -224,6 +224,14 @@ describe("редактор: ширина дорожек", () => {
     return Number(r.getAttribute("x")) + Number(r.getAttribute("width"));
   };
 
+  it("правая граница дорожек нарисована отдельной линией (D9)", () => {
+    studio(structuredModel());
+    const line = document.querySelector(".studio svg.bpe-svg [data-lane-right]") as SVGLineElement;
+    expect(line).toBeTruthy();
+    expect(Number(line.getAttribute("x1"))).toBeCloseTo(drawnRight() - 0.5, 5);
+    expect(Number(line.getAttribute("y2")) - Number(line.getAttribute("y1"))).toBeGreaterThan(0);
+  });
+
   it("правый край дорожек тянется: ширина растёт на сдвиг (кратно 10), подсветка видна пока тянут, один шаг истории", () => {
     studio(structuredModel());
     const before = drawnRight();

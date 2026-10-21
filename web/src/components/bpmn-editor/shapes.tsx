@@ -383,6 +383,17 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
           </g>
         );
       })}
+      {/* правый край дорожек: отдельная линия, чтобы граница не пропадала, когда край совпадает с краем холста (D9) */}
+      <line
+        data-lane-right
+        x1={width - 0.5}
+        x2={width - 0.5}
+        y1={laneTop(model, 0)}
+        y2={laneTop(model, heights.length - 1) + heights[heights.length - 1]}
+        stroke="#000"
+        strokeWidth={1}
+        pointerEvents="none"
+      />
     </>
   );
 }

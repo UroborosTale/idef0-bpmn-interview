@@ -11,7 +11,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, configuredWidth, diagramLayout, diagramWidth, isBoundary, laneBandAt, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
+import { LANE_H, LANE_X, MAX_LANE_H, MIN_LANE_H, MIN_X, boxMap, boxOf, configuredWidth, diagramLayout, diagramWidth, isBoundary, laneBandAt, laneCount, laneHeight, laneIndexAtY, laneIndexOfRole, laneTop, modelExtents, positionsFromBpmnXml, snap, snapTop, triggerView, visibleNodes, withLayout } from "./geometry";
 import MiniMap from "./MiniMap";
 import { positionOnSide } from "@shared/bpmnManual";
 import { MIN_HANDLE_LEN, addBend, dragCorner, dragSegment, removeBend, type FlowGeometry } from "./flow-edit";
@@ -124,9 +124,11 @@ export default function BpmnEditor({
   /** Всё, что показывает «Вписать»: содержимое и включённый лист со штампом. */
   const fitWorld = () => {
     const ext = modelExtents(viewRef.current);
-    if (!bpmnFrameShown(frameRef.current)) return ext;
+    // правый край дорожек — часть диаграммы: «Вписать» показывает и его, иначе граница остаётся за холстом (D9)
+    const w = Math.max(ext.w, diagramWidth(viewRef.current));
+    if (!bpmnFrameShown(frameRef.current)) return { w, h: ext.h };
     const s = frameGeometry(sheetWorld(viewRef.current), frameRef.current, { node: "", title: "", no: "" }).sheet;
-    return { w: Math.max(ext.w, s.x + s.w), h: Math.max(ext.h, s.y + s.h) };
+    return { w: Math.max(w, s.x + s.w), h: Math.max(ext.h, s.y + s.h) };
   };
   const { view, setView, fit, toWorld, zoomBy, centerOn } = useViewport(svgRef, wrapRef, fitWorld);
   const setSheet = (patch: FramePatch) => h.commit(setSheetFrame(h.draftRef.current, "bpmn_frames", frameKeyBpmn, patch));
@@ -674,7 +676,9 @@ export default function BpmnEditor({
     }
     if (added.error) return showHint(added.error);
     commit(added.model, { kind: "node", id: added.id! });
-    setEditing(added.id!);
+    // D9: при броске из палитры фигура сразу встаёт на место, но поле подписи не открываем —
+    // иначе оно перекрывает дорожку; подпись правится двойным щелчком. При клике по палитре поле открывается.
+    if (!at) setEditing(added.id!);
   };
 
   /** Новый внешний пул (другой процесс или участник): общий для всех диаграмм, показывается там, где создан; поток сообщений к нему — перетаскиванием ● шага. */
@@ -1065,6 +1069,8 @@ export default function BpmnEditor({
               name={editingNode.name}
               box={boxes.get(editingNode.id) ?? boxOf(editingNode)}
               view={view}
+              left={LANE_X}
+              right={W}
               onCommit={(v) => commit(updateNode(viewRef.current, editingNode.id, { name: v }))}
               onDone={() => setEditing(null)}
             />

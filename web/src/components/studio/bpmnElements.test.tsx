@@ -4,7 +4,7 @@ import { session, structuredModel } from "../../test/fixtures";
 import { commit, field, renderWithModel } from "../../test/harness";
 import type { ProcessLogicModel } from "../../types";
 import { SIZE, autoLayout, boxMap, boxOf, diagramExtras, isBoundary, modelExtents, visibleNodes, withLayout } from "../bpmn-editor/geometry";
-import { addBoundaryEvent, addFlow, addMessage, addNodeAt, addPool, deleteMessage, deleteNode, deletePool, dropNodeIntoLane, setNodeRole, updateMessage } from "../bpmn-editor/model-ops";
+import { PALETTE, addBoundaryEvent, addFlow, addMessage, addNodeAt, addPool, deleteMessage, deleteNode, deletePool, dropNodeIntoLane, setNodeRole, updateMessage } from "../bpmn-editor/model-ops";
 import { ArtifactShape } from "../bpmn-editor/shapes";
 import MessagesEditor, { PoolsEditor } from "./MessagesEditor";
 import PropertiesPanel from "./PropertiesPanel";
@@ -269,6 +269,22 @@ describe("студия: новые элементы на диаграмме оп
         expect(hit, `${id} налезает на ${n.id}`).toBe(false);
       }
     }
+  });
+
+  it("D9: после броска из палитры фигура добавляется, но поле подписи не открывается", () => {
+    studio(structuredModel());
+    const before = shapes().length;
+    const spec = PALETTE.find((p) => p.label === "Задача")!.spec;
+    const svg = document.querySelector(".studio svg.bpe-svg")!;
+    const event = new Event("drop", { bubbles: true }) as Event & { dataTransfer: unknown; clientX: number; clientY: number };
+    Object.defineProperties(event, {
+      dataTransfer: { value: { getData: () => JSON.stringify(spec) } },
+      clientX: { value: 300 },
+      clientY: { value: 240 },
+    });
+    act(() => svg.dispatchEvent(event));
+    expect(shapes().length).toBe(before + 1);
+    expect(document.querySelector(".bpe-rename")).toBeNull();
   });
 
   it("палитра: «Бизнес-правила» добавляет задачу с этим видом", async () => {

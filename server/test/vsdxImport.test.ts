@@ -157,6 +157,7 @@ describe("импорт Visio (.vsdx)", () => {
     const { model, warnings } = buildModelFromParsedVsdx(parsed, meta);
     // ни «функций-страниц», ни общих схемы как функции
     expect(model.nodes.some((n) => n.name === "BPMN" || /^C090\.\d/.test(n.name))).toBe(false);
+    expect(model.process.code).toBe(src.process.code); // F3: код процесса не теряется
     // каждая функция и каждый шаг исходной модели на месте — с тем же id, именем и иерархией
     for (const original of src.nodes) {
       const got = model.nodes.find((n) => n.id === original.id);

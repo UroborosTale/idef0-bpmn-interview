@@ -37,12 +37,19 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
   const [confidential, setConfidential] = useState(false);
   const [templates, setTemplates] = useState<{ id: string; name: string; hints: string[] }[]>([]);
   const [templateId, setTemplateId] = useState("");
+  const [imageSupported, setImageSupported] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.templates().then(setTemplates).catch(() => {});
+    // F5: формат «изображение» показываем только если подключённый провайдер умеет распознавать картинки.
+    api.providerStatus().then((p) => setImageSupported(!!p.supportsImages)).catch(() => setImageSupported(false));
   }, []);
+
+  useEffect(() => {
+    if (!imageSupported && diagramFormat === "image") setDiagramFormat("bpmn");
+  }, [imageSupported, diagramFormat]);
 
   async function submit() {
     if (!processName.trim()) {
@@ -196,7 +203,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
               <option value="drawio">draw.io (.drawio/.xml)</option>
               <option value="vsdx">Microsoft Visio (.vsdx)</option>
               <option value="xlsx">Таблица Excel со списком шагов (.xlsx)</option>
-              <option value="image">Фото/скан схемы (изображение)</option>
+              {imageSupported && <option value="image">Фото/скан схемы (изображение)</option>}
             </select>
             <input
               type="file"
@@ -205,8 +212,7 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
               onChange={(e) => setDiagramFile(e.target.files?.[0] ?? null)}
             />
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Структурированные форматы (.bpmn, .drawio, .vsdx, .xlsx) разбираются напрямую, без LLM. Из Visio читаются шаги, события, шлюзы, соединители и дорожки (дорожка становится исполнителем); страницы IDEF0 пропускаются. Изображение распознаётся мультимодальной LLM — требует
-              настроенного внешнего провайдера (недоступно в офлайн-режиме).
+              Структурированные форматы (.bpmn, .drawio, .vsdx, .xlsx) разбираются напрямую, без LLM. Из Visio читаются шаги, события, шлюзы, соединители и дорожки (дорожка становится исполнителем); страницы IDEF0 пропускаются. Изображение распознаётся мультимодальной LLM — формат показан только при поддержке изображений подключённым провайдером.
             </div>
             {diagramFormat === "xlsx" && (
               <div className="validation-item" style={{ marginTop: 6, fontSize: 12 }}>
@@ -214,7 +220,6 @@ export default function NewSessionPage({ onCreated }: { onCreated: (id: string) 
                 <a href={api.diagramTemplateUrl()}>Скачать образец</a>
               </div>
             )}
-            {diagramFormat === "image" && <div className="validation-item" style={{ marginTop: 6, fontSize: 12 }}>В офлайн-режиме (без ANTHROPIC_API_KEY) распознавание изображений вернёт ошибку.</div>}
           </div>
         )}
 

@@ -120,6 +120,14 @@ export function detectGaps(model: ProcessLogicModel): Gap[] {
     if (n.type === "event" && n.trigger?.type === "link") continue;
     const isEndEvent = n.type === "event" && (n.subtype === "end" || /заверш|оконч/iu.test(n.subtype ?? ""));
     if (isEndEvent) continue;
+    // F4: последний шаг операции продолжается потоком самой операции (или её конечным событием) — не спрашиваем
+    // «что происходит после» у каждого такого шага, иначе один и тот же вопрос повторяется по шагам операции.
+    if (n.type === "task" && n.bpmn_scope) {
+      const siblings = model.nodes.filter((x) => x.bpmn_scope === n.bpmn_scope);
+      const lastStep = siblings.filter((x) => x.type === "task").at(-1)?.id === n.id;
+      const opHasContinuation = model.flows.some((f) => f.from === n.bpmn_scope) || siblings.some((x) => x.type === "event" && x.subtype === "end");
+      if (lastStep && opHasContinuation) continue;
+    }
     if ((outgoing.get(n.id) ?? 0) === 0) {
       add(
         "dangling_flow",

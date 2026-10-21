@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+﻿import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import NewSessionPage from "./NewSessionPage";
 
-function setup() {
+function setup(supportsImages = false) {
   vi.spyOn(api, "templates").mockResolvedValue([]);
+  vi.spyOn(api, "providerStatus").mockResolvedValue({ name: "mock", live: false, supportsImages });
   const onCreated = vi.fn();
   render(<NewSessionPage onCreated={onCreated} />);
   return { onCreated };
@@ -82,4 +83,16 @@ describe("новая сессия", () => {
     await screen.findByText("база недоступна");
     expect((screen.getByRole("button", { name: /Создать пустую/ }) as HTMLButtonElement).disabled).toBe(false);
   });
+
+  it("формат «Фото/скан» показывается только при поддержке изображений провайдером (F5)", async () => {
+    setup(false);
+    fireEvent.click(screen.getByLabelText(/Режим В/));
+    await waitFor(() => expect(screen.queryByRole("option", { name: /Фото\/скан/ })).toBeNull());
+
+    cleanup();
+    setup(true);
+    fireEvent.click(screen.getByLabelText(/Режим В/));
+    await waitFor(() => expect(screen.getByRole("option", { name: /Фото\/скан/ })).toBeTruthy());
+  });
+
 });

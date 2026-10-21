@@ -157,6 +157,8 @@ export function RenameOverlay({
   onDone,
   allowEmpty,
   placeholder,
+  left,
+  right,
 }: {
   name: string;
   box: { x: number; y: number; w: number; h: number };
@@ -166,7 +168,16 @@ export function RenameOverlay({
   /** Пустое значение тоже сохраняется (условие ветки можно стереть); по умолчанию пустой ввод отменяет правку. */
   allowEmpty?: boolean;
   placeholder?: string;
+  /** Границы дорожки в координатах модели: поле не выходит за них (D9). */
+  left?: number;
+  right?: number;
 }) {
+  const desired = Math.max(150, box.w * view.k);
+  const lo = left === undefined ? -Infinity : view.tx + left * view.k + 4;
+  const hi = right === undefined ? Infinity : view.tx + right * view.k - 4;
+  const width = Number.isFinite(lo) || Number.isFinite(hi) ? Math.max(80, Math.min(desired, hi - lo)) : desired;
+  const centre = view.tx + (box.x + box.w / 2) * view.k;
+  const clamped = Math.min(Math.max(centre, lo + width / 2), hi - width / 2);
   return (
     <input
       className="bpe-rename"
@@ -175,9 +186,9 @@ export function RenameOverlay({
       placeholder={placeholder}
       onFocus={(e) => e.currentTarget.select()}
       style={{
-        left: view.tx + (box.x + box.w / 2) * view.k,
+        left: clamped,
         top: view.ty + (box.y + box.h / 2) * view.k,
-        width: Math.max(150, box.w * view.k),
+        width,
       }}
       onBlur={(e) => {
         const v = e.currentTarget.value.trim();

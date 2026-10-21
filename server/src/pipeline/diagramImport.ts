@@ -51,7 +51,8 @@ export interface ParsedBpmnElement {
 }
 export interface ParsedBpmn {
   elements: ParsedBpmnElement[];
-  lanes: { id: string; name: string }[];
+  /** Дорожки: id, название и элементы `<flowNodeRef>` — по ним шаг получает исполнителя (F2). */
+  lanes: { id: string; name: string; refs: string[] }[];
   warnings: string[];
 }
 
@@ -62,13 +63,24 @@ const EVENT_TAGS = ["startEvent", "endEvent", "intermediateCatchEvent", "interme
 export function parseBpmnXml(xml: string): ParsedBpmn {
   const warnings: string[] = [];
   const elements: ParsedBpmnElement[] = [];
-  const lanes: { id: string; name: string }[] = [];
+  const lanes: { id: string; name: string; refs: string[] }[] = [];
 
   const laneRe = /<(?:\w+:)?lane\s+([^>]*?)(?:\/>|>)/g;
   let m: RegExpExecArray | null;
   while ((m = laneRe.exec(xml))) {
     const attrs = parseAttrs(m[1]);
-    if (attrs.id) lanes.push({ id: attrs.id, name: attrs.name ?? attrs.id });
+    if (!attrs.id) continue;
+    // содержимое дорожки: ссылки flowNodeRef стоят до её закрывающего тега (префикс пространства имён не важен)
+    let body = "";
+    if (!m[0].trim().endsWith("/>")) {
+      let close = xml.indexOf("</", m.index + m[0].length);
+      while (close >= 0 && !/^<\/(?:\w+:)?lane\s*>/i.test(xml.slice(close, close + 30))) close = xml.indexOf("</", close + 2);
+      body = close >= 0 ? xml.slice(m.index + m[0].length, close) : "";
+    }
+    const refs = [...body.matchAll(/<(?:[A-Za-z_][\w.-]*:)?flowNodeRef[^>]*>([\s\S]*?)<\/[^>]*flowNodeRef>/g)]
+      .map((r) => unescapeXml(r[1].trim()))
+      .filter(Boolean);
+    lanes.push({ id: attrs.id, name: attrs.name ?? attrs.id, refs });
   }
 
   const nodeTagPattern = [...TASK_TAGS, ...GATEWAY_TAGS, ...EVENT_TAGS].join("|");
@@ -185,8 +197,13 @@ function bpmnTagToNode(tag: string): { type: NodeType; subtype?: string } {
 /** ФТ-М9.5.2/9.5.3: свежая модель PLM из разобранного BPMN — новая сессия, стартовая точка интервью (9.5.4). */
 export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta): { model: ProcessLogicModel; warnings: string[] } {
   const warnings = [...parsed.warnings];
-  const roles: Role[] = parsed.lanes.map((l) => ({ id: `role_${nanoid(8)}`, name: l.name, kind: "internal", source: [] }));
-  const roleByLaneId = new Map(parsed.lanes.map((l, i) => [l.id, roles[i]] as const));
+  // Служебная дорожка «Без исполнителя» — не роль: она означает отсутствие исполнителя, а не должность (F2).
+  const laneEls = parsed.lanes.filter((l) => l.name.trim().toLowerCase() !== "без исполнителя" && l.id !== "Lane_unassigned");
+  const roles: Role[] = laneEls.map((l) => ({ id: `role_${nanoid(8)}`, name: l.name, kind: "internal", source: [] }));
+  const roleByLaneId = new Map(laneEls.map((l, i) => [l.id, roles[i].id] as const));
+  const roleByElement = new Map<string, string>();
+  for (const l of laneEls) for (const ref of l.refs) roleByElement.set(ref, roleByLaneId.get(l.id)!);
+  if (laneEls.length < parsed.lanes.length) warnings.push("Дорожка «Без исполнителя» не стала ролью: её шаги остаются без исполнителя.");
 
   const nodeEls = parsed.elements.filter((e) => e.tag !== "sequenceFlow");
   const flowEls = parsed.elements.filter((e) => e.tag === "sequenceFlow");
@@ -203,7 +220,7 @@ export function buildModelFromParsedBpmn(parsed: ParsedBpmn, meta: SessionMeta):
       ...eventFields(e),
       ...(e.loop ? { loop: e.loop } : {}),
       name: e.name ?? "(без названия)",
-      role_id: null,
+      role_id: roleByElement.get(e.id) ?? null,
       system_ids: [],
       inputs: [],
       outputs: [],

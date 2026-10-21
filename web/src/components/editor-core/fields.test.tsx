@@ -55,6 +55,18 @@ describe("поле с фиксацией правки", () => {
 });
 
 describe("переименование на холсте", () => {
+  it("поле правки не выходит за правую границу дорожки (D9)", () => {
+    const onCommit = vi.fn();
+    const onDone = vi.fn();
+    const view = { k: 1, tx: 0, ty: 0 };
+    render(<RenameOverlay name="Начало" box={{ x: 380, y: 20, w: 36, h: 36 }} view={view} left={80} right={400} onCommit={onCommit} onDone={onDone} />);
+    const input = screen.getByDisplayValue("Начало") as HTMLInputElement;
+    const left = Number.parseFloat(input.style.left);
+    const width = Number.parseFloat(input.style.width);
+    expect(left - width / 2).toBeGreaterThanOrEqual(80 - 0.01);
+    expect(left + width / 2).toBeLessThanOrEqual(400 + 0.01);
+  });
+
   it("Enter фиксирует обрезанное значение, Escape — отменяет", () => {
     const onCommit = vi.fn();
     const onDone = vi.fn();

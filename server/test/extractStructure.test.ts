@@ -102,6 +102,35 @@ describe("структура модели из интервью", () => {
     expect(shallow.nodes.filter((n) => !n.bpmn_scope && n.type === "task").map((n) => n.idef0_parent)).toEqual([null, null]);
   });
 
+  it("F1: операция без связей от LLM получает внутренний поток между шагами", async () => {
+    const noFlows: ExtractionChunkResult = { ...chunk, flows: [] };
+    const m = await extractModel(fragments, stub(noFlows), { processId: "s6", processName: "Продажа", modelType: "AS-IS" });
+    const op = m.nodes.find((n) => n.name === "Обработка заявки")!;
+    const steps = m.nodes.filter((n) => n.bpmn_scope === op.id);
+    expect(steps).toHaveLength(2);
+    expect(m.flows.some((f) => f.from === steps[0].id && f.to === steps[1].id)).toBe(true);
+  });
+
+  it("F1: шлюз и конечное событие, связанные с шагами одной операции, остаются на её диаграмме", async () => {
+    const branch: ExtractionChunkResult = {
+      ...chunk,
+      roles: [{ name: "Менеджер", kind: "internal", source_fragment_id: "f1", quote: "Менеджер получает заявку от клиента", confidence: 0.9 }],
+      nodes: [
+        ...chunk.nodes.map((n) => ({ ...n, role_name: "Менеджер" })),
+        { type: "gateway", name: "Есть замечания?", order_hint: 5, source_fragment_id: "f1", quote: "Есть замечания?", confidence: 0.9 },
+        { type: "event", subtype: "end", name: "Заявка обработана", order_hint: 6, source_fragment_id: "f1", quote: "Заявка обработана", confidence: 0.9 },
+      ],
+      flows: [...chunk.flows, { from_order_hint: 2, to_order_hint: 5, source_fragment_id: "f1", quote: "Есть замечания?" }, { from_order_hint: 5, to_order_hint: 6, source_fragment_id: "f1", quote: "Заявка обработана" }],
+    };
+    const m = await extractModel(fragments, stub(branch), { processId: "s7", processName: "Продажа", modelType: "AS-IS" });
+    const op = m.nodes.find((n) => n.name === "Обработка заявки")!;
+    const gateway = m.nodes.find((n) => n.name === "Есть замечания?")!;
+    const end = m.nodes.find((n) => n.name === "Заявка обработана")!;
+    expect(gateway.bpmn_scope).toBe(op.id);
+    expect(end.bpmn_scope).toBe(op.id);
+    expect(m.nodes.filter((n) => n.bpmn_scope === op.id).every((n) => !!n.role_id)).toBe(true);
+  });
+
   it("без операций модель остаётся плоской, как раньше", async () => {
     const flat: ExtractionChunkResult = { ...chunk, operations: [], nodes: chunk.nodes.map((n) => ({ ...n, operation_name: null })) };
     const m = await extractModel(fragments, stub(flat), { processId: "s2", processName: "Продажа", modelType: "AS-IS" });

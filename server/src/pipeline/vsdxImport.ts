@@ -142,6 +142,8 @@ export interface ParsedVsdx {
   idef0: VsdxIdef0Page[];
   /** Листы со всех страниц, в том числе IDEF0 (их фигуры пока не читаются, а размер листа — да). */
   sheets: VsdxSheet[];
+  /** Код процесса из метки pm_process_code (собственная выгрузка; F3). */
+  processCode?: string;
   warnings: string[];
 }
 
@@ -444,6 +446,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
   const sheets: VsdxSheet[] = [];
   const idef0: VsdxIdef0Page[] = [];
   let skippedIdef0 = 0;
+  let processCode: string | undefined;
   const pageList = arr<X>(parser.parse(pagesXml).Pages?.Page);
   if (pageList.length > MAX_PAGES) warnings.push(`В файле ${pageList.length} страниц — прочитаны первые ${MAX_PAGES}.`);
   for (let pi = 0; pi < Math.min(pageList.length, MAX_PAGES); pi++) {
@@ -452,6 +455,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
     const sheet = cells(p.PageSheet);
     const pageH = numOf(sheet, "PageHeight", 8.5);
     const pageUser = p.PageSheet ? userCells(p.PageSheet) : {};
+    if (pageUser.pm_process_code) processCode ??= pageUser.pm_process_code;
     const isIdef0 = (pageUser.pm_page ?? "").startsWith("idef0");
     if (isIdef0) skippedIdef0++;
     const target = targets.get(attr(p.Rel, "id") ?? "") ?? `page${pi + 1}.xml`;
@@ -505,7 +509,7 @@ export async function parseVsdx(buffer: Buffer): Promise<ParsedVsdx> {
     );
   }
   if (pages.length === 0) warnings.push("Не найдено ни одной фигуры, похожей на шаг процесса, событие или шлюз.");
-  return { pages, sheets, idef0, warnings };
+  return { pages, sheets, idef0, ...(processCode ? { processCode } : {}), warnings };
 }
 
 function readPage(contents: X, pageIndex: number, pageName: string, pageH: number, masters: Map<string, string>, masterInfo: { props: Map<string, VisioProps>; size: Map<string, Map<string, string>> }, warnings: string[], idef0 = false): VsdxPage {
@@ -887,7 +891,7 @@ function buildModelFromOwnVsdx(parsed: ParsedVsdx, meta: SessionMeta): { model: 
     if (best) n.role_id = best[0];
   }
 
-  const model = importedModel(meta, { nodes, flows, roles });
+  const model = importedModel(meta.code ? meta : { ...meta, ...(parsed.processCode ? { code: parsed.processCode } : {}) }, { nodes, flows, roles });
   warnings.push(`Модель восстановлена из выгрузки Visio: функций и шагов — ${nodes.length}, потоков — ${flows.length}, дорожек — ${roles.length}.`);
   return { model, warnings };
 }

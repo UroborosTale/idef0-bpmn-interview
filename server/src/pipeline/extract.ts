@@ -363,6 +363,21 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
     if (best) op.role_id = best;
   }
   for (const n of nodes) if (n.bpmn_scope && !n.role_id) n.role_id = opByKey.get(n.bpmn_scope)?.role_id ?? null;
+  // F4: если исполнитель назван у соседнего шага той же операции, но не у этого, не оставляем его без роли.
+  // Берём соседа только при единственной роли вокруг — иначе разные исполнители означают настоящее ветвление.
+  const neighbors = new Map<string, Set<string>>();
+  for (const f of flows) {
+    const a = nodeById.get(f.from);
+    const b = nodeById.get(f.to);
+    if (!a || !b || a.bpmn_scope !== b.bpmn_scope || !a.bpmn_scope) continue;
+    if (a.role_id) (neighbors.get(b.id) ?? neighbors.set(b.id, new Set()).get(b.id)!).add(a.role_id);
+    if (b.role_id) (neighbors.get(a.id) ?? neighbors.set(a.id, new Set()).get(a.id)!).add(b.role_id);
+  }
+  for (const n of nodes) {
+    if (!n.bpmn_scope || n.role_id) continue;
+    const around = neighbors.get(n.id);
+    if (around?.size === 1) n.role_id = [...around][0];
+  }
 
   // Триггер и результат, названные в тексте, дают настоящие стартовое и конечное события. Это закрывает вопросы
   // «что запускает процесс» после ответа владельца (B3) и не оставляет офлайн-модель без событий (B1).
@@ -422,6 +437,49 @@ async function extractModelImpl(fragments: Fragment[], provider: LLMProvider, op
       // связь с событием — не выведенная: у неё есть источник, иначе сборка структуры отбросит её как «плоскую»
       const source = a.type === "event" ? a.source : b.type === "event" ? b.source : [];
       flows.push({ id: nextFlowId(), from: a.id, to: b.id, condition: null, source, confirmed_by: [] });
+    }
+  }
+
+  // F1: внутри операции не должно быть разорванных шагов. Если LLM не вернул ни одной внутренней связи,
+  // выстраиваем шаги операции в порядке извлечения — иначе диаграмма операции открывается без потока.
+  for (const ids of opSteps.values()) {
+    if (ids.length < 2) continue;
+    if (flows.some((f) => ids.includes(f.from) && ids.includes(f.to))) continue;
+    for (let i = 0; i < ids.length - 1; i++) {
+      const from = nodes.find((n) => n.id === ids[i]);
+      const to = nodes.find((n) => n.id === ids[i + 1]);
+      flows.push({ id: nextFlowId(), from: ids[i], to: ids[i + 1], condition: null, source: from?.source ?? to?.source ?? [], confirmed_by: [] });
+    }
+  }
+
+  // F1: шлюз или событие, связанные только с шагами одной операции, принадлежат её диаграмме, а не общей схеме.
+  // Два прохода — чтобы конечное событие за шлюзом тоже получило область после назначения шлюза.
+  const stepOwner = new Map<string, string>();
+  for (const [opId, ids] of opSteps) for (const id of ids) stepOwner.set(id, opId);
+  for (let pass = 0; pass < 2; pass++) {
+    for (const n of nodes) {
+      if (n.bpmn_scope || n.idef0_parent || n.type === "task" || n.type === "subprocess") continue;
+      if (n.type === "event" && n.subtype === "start") continue;
+      // выведенная линейная связка (source: []) не говорит, к какой операции относится шлюз:
+      // она просто соединяет соседей по порядку и часто тянется из другой операции
+      const touching = flows.filter((f) => f.source.length > 0 && (f.from === n.id || f.to === n.id));
+      const around = touching.map((f) => nodeById.get(f.from === n.id ? f.to : f.from)).filter((x): x is ProcessNode => !!x);
+      // не забираем в операцию шлюз на стыке с блоком общей схемы или со стартом процесса: тогда поток
+      // операции начинался бы из несуществующего на её диаграмме узла
+      if (around.some((x) => ((x.type === "task" || x.type === "subprocess") && !x.bpmn_scope) || (x.type === "event" && x.subtype === "start"))) continue;
+      const owners = new Set(
+        touching
+          .map((f) => stepOwner.get(f.from === n.id ? f.to : f.from))
+          .filter((x): x is string => !!x)
+      );
+      if (owners.size !== 1) continue;
+      const opId = [...owners][0];
+      n.bpmn_scope = opId;
+      const ownerRole = opByKey.get(opId)?.role_id;
+      const stepRole = opSteps.get(opId)?.map((id) => nodeById.get(id)?.role_id).find((r): r is string => !!r);
+      n.role_id = ownerRole ?? stepRole ?? null;
+      opSteps.get(opId)?.push(n.id);
+      stepOwner.set(n.id, opId);
     }
   }
 
