@@ -162,7 +162,7 @@ export default function RegistryPage() {
             ))}
           </ul>
 
-          <h4 style={{ marginTop: 20 }}>Предлагаемые стыки (ФТ-М3.2.1)</h4>
+          <h4 style={{ marginTop: 20 }}>Предлагаемые стыки</h4>
           <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
             Автоматически найдено по совпадению выхода одного процесса и входа другого — требует подтверждения аналитика.
           </div>
@@ -176,7 +176,7 @@ export default function RegistryPage() {
             ))}
           </ul>
 
-          <h4 style={{ marginTop: 20 }}>Разрывы (ФТ-М3.2.3)</h4>
+          <h4 style={{ marginTop: 20 }}>Разрывы</h4>
           <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>Вход без производителя или выход без потребителя.</div>
           {gaps.length === 0 && <p className="muted">Разрывов не найдено.</p>}
           {gaps.map((g) => (
@@ -395,7 +395,7 @@ function CardModal({ processId, onClose }: { processId: string; onClose: () => v
               </ul>
             )}
 
-            <h4 style={{ marginTop: 16 }}>Синхронизация с внешним реестром (ФТ-М1.5.2)</h4>
+            <h4 style={{ marginTop: 16 }}>Синхронизация с внешним реестром</h4>
             <p className="muted" style={{ fontSize: 12 }}>
               Универсальный вебхук-коннектор: карточка отправляется POST-запросом на указанный URL.
               Маппинг переименовывает поля карточки перед отправкой (JSON: {"{"}"исходное_поле": "новое_имя"{"}"}).

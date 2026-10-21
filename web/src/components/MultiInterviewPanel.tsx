@@ -205,7 +205,7 @@ function AddRespondentForm({
             <option value="chat">Интерактивный чат</option>
           </select>
         </label>
-        <label className="field"><span>Вес (ФТ-М4.1.5)</span><input type="number" min={0} step={0.5} value={weight} onChange={(e) => setWeight(Number(e.target.value) || 1)} /></label>
+        <label className="field"><span>Вес</span><input type="number" min={0} step={0.5} value={weight} onChange={(e) => setWeight(Number(e.target.value) || 1)} /></label>
       </div>
       <div className="toolbar" style={{ marginTop: 10 }}>
         <button className="primary" disabled={!name.trim()} onClick={() => onCreate({ name, mode, roleId: roleId || null, weight })}>Добавить</button>
@@ -350,7 +350,7 @@ function CampaignDetail({ campaignId, onDeleted }: { campaignId: string; onDelet
         </tbody>
       </table>
 
-      <h5 style={{ marginTop: 14 }}>Напоминания (ФТ-М4.2.4)</h5>
+      <h5 style={{ marginTop: 14 }}>Напоминания</h5>
       <div className="chat-input-row">
         <input placeholder="Webhook для отправки напоминаний (необязательно)" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)} />
         <button

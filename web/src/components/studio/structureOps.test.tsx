@@ -298,8 +298,10 @@ describe("мастер структуры", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("«Вставить пример» заполняет список", () => {
+  it("«Вставить пример» заполняет список; на пустой модели нет подсказки о готовом списке", () => {
     render(<StructureWizard model={empty()} onApply={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByText(/Модель пока пуста — введите структуру/)).toBeTruthy();
+    expect(screen.queryByText(/Список подставлен из модели/)).toBeNull();
     fireEvent.click(screen.getByText("Вставить пример"));
     expect(document.querySelectorAll(".wizard-preview li").length).toBeGreaterThan(5);
   });

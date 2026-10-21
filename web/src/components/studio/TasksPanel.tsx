@@ -80,7 +80,7 @@ export default function TasksPanel({
           </button>
         </div>
       </div>
-      {tasks.length === 0 && <div className="muted problems-empty">Заданий нет. Агент (Cline) увидит поручение, когда обратится к MCP-серверу (инструмент get_tasks).</div>}
+      {tasks.length === 0 && <div className="muted problems-empty">Заданий нет. Агент увидит поручение, когда обратится к MCP-серверу (инструмент get_tasks).</div>}
       {tasks.map((t) => (
         <div key={t.id} className={`task task-${t.status}`} data-task-id={t.id}>
           <div className="proposal-head">

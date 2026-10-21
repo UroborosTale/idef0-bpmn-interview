@@ -29,7 +29,7 @@ export default function Idef0Viewer({ idef0 }: { idef0: Idef0Result | null }) {
           </button>
         ))}
       </div>
-      <div className="idef0-view" style={{ border: "1px solid var(--border)", borderRadius: 8, background: "#fff", overflow: "auto", padding: 8 }}
+      <div className="idef0-view" style={{ border: "1px solid var(--border)", borderRadius: 8, background: "#fff", overflow: "auto", padding: 20 }}
            dangerouslySetInnerHTML={{ __html: svg }} />
     </div>
   );

@@ -154,7 +154,7 @@ export default function ProblemsPanel({
         {agentAccess?.confidential && (tab === "proposals" || tab === "tasks" || tab === "questions" || tab === "reports" || tab === "agents") && (
           <div className={`agent-access ${agentAccess.allowed ? "allowed" : "denied"}`} data-agent-access>
             <span>
-              Сессия конфиденциальна. Агенты (внешние модели Cline) {agentAccess.allowed ? "имеют доступ к тексту интервью и модели" : "доступа не имеют: не видят её и ничего в неё не добавляют"}.
+              Сессия конфиденциальна. Агенты (внешние модели) {agentAccess.allowed ? "имеют доступ к тексту интервью и модели" : "доступа не имеют: не видят её и ничего в неё не добавляют"}.
             </span>
             <button onClick={() => void onSetAgentAccess?.(!agentAccess.allowed)} title="Решение за аналитиком: тексты уйдут во внешнюю модель, если разрешить">
               {agentAccess.allowed ? "Закрыть доступ" : "Разрешить доступ агентам"}

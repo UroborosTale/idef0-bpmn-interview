@@ -360,7 +360,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   };
   /** Конфиденциальная сессия: разрешить или закрыть доступ агентов — решение аналитика, сохраняется в мете сессии. */
   const setAgentAccess = async (allowed: boolean) => {
-    if (allowed && !window.confirm("Тексты интервью и модель этой конфиденциальной сессии станут доступны агентам — то есть внешней модели Cline. Разрешить?")) return;
+    if (allowed && !window.confirm("Тексты интервью и модель этой конфиденциальной сессии станут доступны внешнему агенту. Разрешить?")) return;
     try {
       await api.patchSession(session.id, { meta: { ...session.meta, agentAccess: allowed } });
       setAgentAllowed(allowed);
@@ -1147,7 +1147,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
                 setProblemsOpen(true);
                 setProblemsTab({ tab: "proposals", nonce: ++nonce.current });
               }}
-              title="Правки, которые предложил агент (Cline): вы решаете, применить их или отклонить"
+              title="Правки, которые предложил агент: вы решаете, применить их или отклонить"
             >
               <RibbonIcon name="suggest" />
               Предложения{proposals.length > 0 ? ` (${proposals.length})` : ""}

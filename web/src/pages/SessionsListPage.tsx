@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import ConfirmDialog from "../components/ConfirmDialog";
 import type { SessionListItem } from "../types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -12,15 +13,17 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function SessionsListPage({ onOpen, onCreateNew }: { onOpen: (id: string) => void; onCreateNew: () => void }) {
   const [items, setItems] = useState<SessionListItem[] | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<SessionListItem | null>(null);
 
   function reload() {
     api.listSessions().then(setItems);
   }
   useEffect(reload, []);
 
-  async function handleDelete(e: React.MouseEvent, id: string) {
-    e.stopPropagation();
-    if (!confirm("Удалить сессию безвозвратно?")) return;
+  async function deletePending() {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setPendingDelete(null);
     await api.deleteSession(id);
     reload();
   }
@@ -57,11 +60,21 @@ export default function SessionsListPage({ onOpen, onCreateNew }: { onOpen: (id:
               {s.gapsOpen > 0 && <span className="pill">{s.gapsOpen} пробел(ов)</span>}
               {s.hasErrors && <span className="pill errors">ошибки валидации</span>}
               {s.diagramsStale && <span className="pill">требует пересборки</span>}
-              <button onClick={(e) => handleDelete(e, s.id)}>Удалить</button>
+              <button onClick={(e) => { e.stopPropagation(); setPendingDelete(s); }}>Удалить</button>
             </div>
           </div>
         ))}
       </div>
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Удалить сессию"
+          text={<>Удалить «{pendingDelete.title}» безвозвратно? Модель, версии и комментарии этой сессии будут потеряны.</>}
+          confirmLabel="Удалить"
+          danger
+          onConfirm={deletePending}
+          onClose={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }

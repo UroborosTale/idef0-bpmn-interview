@@ -72,7 +72,7 @@ export default function ReviewPanel({ session, onChanged }: { session: SessionRe
       {!route && processStatus !== "approved" && (
         <div style={{ marginTop: 10 }}>
           <p className="muted" style={{ fontSize: 12 }}>
-            Маршрут по умолчанию: Аналитик → Владелец процесса → Нормоконтролёр. Перед отправкой — анализ влияния изменений (ФТ-М7.3).
+            Маршрут по умолчанию: Аналитик → Владелец процесса → Нормоконтролёр. Перед отправкой — анализ влияния изменений.
           </p>
           {preStartImpact && <ImpactView report={preStartImpact} />}
           <button

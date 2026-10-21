@@ -566,8 +566,7 @@ export default function Idef0Editor({
   /** В12: свободный текстовый блок — справа от диаграммы, с правкой текста сразу после создания. */
   const addFreeNote = () => {
     const right = Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w));
-    const bottom = Math.max(120, ...layout.functions.map((f) => f.box.y + f.box.h));
-    const r = addNote(draftRef.current, cur, right + 40, Math.max(40, bottom - 60));
+    const r = addNote(draftRef.current, cur, right + 40, 40);
     commit(r.model, { kind: "note", id: r.id });
     setEditing(`note:${r.id}`);
   };
@@ -774,10 +773,10 @@ export default function Idef0Editor({
             <button onClick={() => commit(withIdef0Layout(draft, true, cur))} title="Расставить блоки этой диаграммы по диагонали (можно отменить)">
               По диагонали
             </button>
-            <button onClick={addFreeNote} title="Добавить свободный текстовый блок на диаграмму (В12)">
+            <button onClick={addFreeNote} title="Добавить свободный текстовый блок на диаграмму">
               Примечание
             </button>
-            <button onClick={addFreeImage} title="Вставить рисунок PNG или JPEG на диаграмму (В12)">
+            <button onClick={addFreeImage} title="Вставить рисунок PNG или JPEG на диаграмму">
               Рисунок
             </button>
             <input ref={fileRef} type="file" accept="image/png,image/jpeg" onChange={onPickImage} style={{ display: "none" }} data-image-input />

@@ -91,7 +91,7 @@ export default function VerificationPanel({ session, onChanged }: { session: Ses
 
       {proposal && (
         <div className="card" style={{ marginTop: 16, background: "#fffbeb" }}>
-          <h5 style={{ marginTop: 0 }}>Предлагаемые изменения модели (ФТ-М4.4.3)</h5>
+          <h5 style={{ marginTop: 0 }}>Предлагаемые изменения модели</h5>
           <DiffSummary diff={proposal.diff} />
           <div className="toolbar" style={{ marginTop: 10 }}>
             <button

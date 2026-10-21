@@ -144,7 +144,7 @@ a { color: var(--accent); }
 .chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
 .chat-input-row textarea { flex: 1; resize: vertical; min-height: 44px; }
 
-.split { display: grid; grid-template-columns: 1fr 340px; gap: 16px; height: calc(100vh - 160px); }
+.split { display: grid; grid-template-columns: 1fr clamp(240px, 24vw, 300px); gap: 16px; height: calc(100vh - 160px); }
 .split .left { overflow: auto; }
 .split .right { overflow: auto; }
 
@@ -490,6 +490,7 @@ button.danger-fill:hover { background: #991b1b; }
 /* Дерево процессов (как в Business Studio 6) */
 .nav-icon { flex: 0 0 15px; }
 .nav-num { color: #6b7a99; font-size: 11px; font-weight: 600; min-width: 20px; }
+.nav-num-bpmn { color: #4338ca; font-size: 10px; letter-spacing: 0.2px; min-width: 30px; }
 .nav-group .nav-name { font-weight: 600; }
 .nav-bpmn-row:not(.on) .nav-name { color: #94a3b8; font-style: italic; }
 /* глубокое дерево: длинные названия не обрезаются, а прокручиваются по горизонтали */

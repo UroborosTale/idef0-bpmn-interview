@@ -368,7 +368,7 @@ export default function Navigator({
           >
             {twisty(`~steps:${n.id}`, steps.length > 0)}
             <NavIcon kind="bpmn" />
-            {structured && <span className="nav-num">{bpmnNum}</span>}
+            {structured && <span className="nav-num nav-num-bpmn">BPMN</span>}
             <span className="nav-code">{bpmnCode}</span>
             <span className="nav-name">{n.name}</span>
           </div>
@@ -385,7 +385,7 @@ export default function Navigator({
             >
               <span className="nav-twisty" />
               <NavIcon kind="step" />
-              <span className="nav-num">{`${bpmnNum}.${i + 1}`}</span>
+              <span className="nav-num">{i + 1}</span>
               <span className="nav-name">{s.name}</span>
             </div>
           ))}

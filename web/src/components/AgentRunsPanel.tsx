@@ -24,12 +24,12 @@ export default function AgentRunsPanel({ sessionId }: { sessionId: string }) {
         <h4 style={{ margin: 0 }}>Журнал агентов</h4>
       </div>
       <p className="muted" style={{ fontSize: 12 }}>
-        Шаги мультиагентного конвейера (Извлекатель → Интервьюер → Критик; повторный проход при ошибках критика — по настройке AGENT_MAX_ITERATIONS, для платных LLM по умолчанию один проход; Сборщик/Аналитик/Документалист — по вызову соответствующих операций).
+        Шаги мультиагентного конвейера: Извлекатель → Интервьюер → Критик. Число повторных проходов задаётся настройкой сервера: для платных LLM по умолчанию один проход. Сборщик, Аналитик и Документалист запускаются соответствующими действиями.
       </p>
       {usage && usage.calls > 0 && (
         <div className="card" style={{ marginTop: 10 }}>
           <b>Расход LLM по сессии:</b> {fmt(usage.calls)} вызовов, {fmt(usage.inputTokens)} входных и {fmt(usage.outputTokens)} выходных токенов
-          {usage.costUsd !== null ? ` · ≈ $${usage.costUsd}` : " · стоимость не считается (задайте LLM_PRICE_INPUT_PER_M и LLM_PRICE_OUTPUT_PER_M)"}
+          {usage.costUsd !== null ? ` · ≈ $${usage.costUsd}` : " · стоимость не считается (тарифы токенов не заданы)"}
           <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
             {usage.byModel.map((m) => `${m.provider}${m.model ? ` / ${m.model}` : ""}: ${fmt(m.calls)} выз., ${fmt(m.inputTokens + m.outputTokens)} ток.`).join(" · ")}
           </div>

@@ -22,7 +22,7 @@ export default function ProposalsList({
 }) {
   const before = useMemo(() => validateModel(model), [model]);
   if (proposals.length === 0) {
-    return <div className="muted problems-empty">Предложений от агентов нет. Агент (Cline) присылает правки через MCP-сервер процессной модели — они появятся здесь.</div>;
+    return <div className="muted problems-empty">Предложений от агентов нет. Агент присылает правки через MCP-сервер процессной модели — они появятся здесь.</div>;
   }
   return (
     <>
