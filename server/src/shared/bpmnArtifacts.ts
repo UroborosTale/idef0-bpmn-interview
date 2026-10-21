@@ -53,6 +53,13 @@ export function boundaryByHost<N extends ArtNode>(nodes: N[]): Map<string, N[]> 
   return out;
 }
 
+/**
+ * Запас высоты дорожки для подписи граничного события. Под событием на нижней границе задачи должно остаться
+ * 3 px просвета и до трёх строк по 13 px, а фигура стоит по центру дорожки; 40 px даёт этот запас даже для
+ * двухстрочной подписи и не даёт ей лечь на линию дорожки (B8).
+ */
+export const BOUNDARY_LABEL_EXTRA = 40;
+
 /** Рамки граничных событий: на нижней границе задачи, слева направо. */
 export function boundaryBoxes(nodes: ArtNode[], hostBoxes: Map<string, Box>): Map<string, Box> {
   const out = new Map<string, Box>();

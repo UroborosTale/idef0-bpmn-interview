@@ -56,7 +56,7 @@ const ICONS: Record<RibbonIconName, ReactNode> = {
   ),
   labels: <text x="3" y="17" fontSize="12.5" fontWeight="700" fill={INK} stroke="none" fontFamily="Segoe UI, Arial, sans-serif">Аб</text>,
   numbers: <text x="3.5" y="17" fontSize="13" fontWeight="700" fill={INK} stroke="none" fontFamily="Segoe UI, Arial, sans-serif">№</text>,
-  icom: <text x="1.5" y="17" fontSize="9.5" fontWeight="700" fill={INK} stroke="none" fontFamily="Segoe UI, Arial, sans-serif">ICOM</text>,
+  icom: <text x="2" y="17" fontSize="9.5" fontWeight="700" fill={INK} stroke="none" fontFamily="Segoe UI, Arial, sans-serif" textLength="20" lengthAdjust="spacingAndGlyphs">ICOM</text>,
   bpmn: (
     <>
       <circle cx="4.8" cy="12" r="2.3" fill="#d7f0dc" />

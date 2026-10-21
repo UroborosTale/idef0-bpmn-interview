@@ -190,14 +190,25 @@ describe("окно студии", () => {
     expect(s.title()).toBe("Свойства элемента");
   });
 
-  it("«На весь экран» переключает режим окна", () => {
+  it("«На весь экран» переключает режим окна и Escape выводит из него", () => {
     studio();
     const el = document.querySelector(".studio")!;
     expect(el.className).not.toMatch(/full/);
     fireEvent.click(screen.getByText("На весь экран"));
     expect(el.className).toMatch(/full/);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(el.className).not.toMatch(/full/);
+    fireEvent.click(screen.getByText("На весь экран"));
     fireEvent.click(screen.getByText("Свернуть окно"));
     expect(el.className).not.toMatch(/full/);
+  });
+
+  it("контекстное меню фигуры открывается в браузере по правой кнопке", () => {
+    studio();
+    fireEvent.contextMenu(document.querySelector('[data-node-id="b"]')!, { clientX: 120, clientY: 80 });
+    expect(screen.getByText(/Тип задачи/)).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText(/Тип задачи/)).toBeNull();
   });
 
   it("экспорт «эта диаграмма»: на вкладке справочника — понятное сообщение", () => {

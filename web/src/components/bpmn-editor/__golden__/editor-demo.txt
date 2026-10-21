@@ -1,74 +1,74 @@
 # редактор BPMN общая схема
-shape s1 task 130,1590 150×90 «Подготовка закупки»
-shape s2 task 320,1590 150×90 «Выбор поставщика»
-shape s3 task 510,1590 150×90 «Поставка и приёмка»
-artifact s1:input:d_need 80,1566 18×20 edge[89,1586 140,1590] «Потребность в оборудовании»
-artifact s1:output:d_approvedReq 196,1566 18×20 edge[205,1590 205,1586] «Согласованная заявка на закупку»
-artifact s1:output:d_rejectedReq 312,1566 18×20 edge[270,1590 321,1586] «Отклонённая заявка на закупку»
-artifact s1:store:s_erp 196,1684 18×20 edge[205,1684 205,1680] «ERP «Закупки»»
-artifact s2:input:d_approvedReq 412,1566 18×20 edge[421,1586 421,1590] «Согласованная заявка на закупку»
-artifact s2:output:d_contract 528,1566 18×20 edge[537,1590 537,1586] «Договор поставки»
-artifact s2:store:s_erp 470,1684 18×20 edge[479,1684 479,1680] «ERP «Закупки»»
-artifact s3:input:d_contract 618,1566 18×20 edge[627,1586 673,1590] «Договор поставки»
-artifact s3:output:d_act 724,1566 18×20 edge[733,1590 733,1586] «Акт приёмки оборудования»
-artifact s3:output:d_inUse 840,1566 18×20 edge[803,1590 849,1586] «Оборудование в эксплуатации»
-artifact s3:store:s_erp 729,1684 18×20 edge[738,1684 738,1680] «ERP «Закупки»»
+shape s1 task 130,1750 150×90 «Подготовка закупки»
+shape s2 task 320,1750 150×90 «Выбор поставщика»
+shape s3 task 510,1750 150×90 «Поставка и приёмка»
+artifact s1:input:d_need 80,1726 18×20 edge[89,1746 140,1750] «Потребность в оборудовании»
+artifact s1:output:d_approvedReq 196,1726 18×20 edge[205,1750 205,1746] «Согласованная заявка на закупку»
+artifact s1:output:d_rejectedReq 312,1726 18×20 edge[270,1750 321,1746] «Отклонённая заявка на закупку»
+artifact s1:store:s_erp 196,1844 18×20 edge[205,1844 205,1840] «ERP «Закупки»»
+artifact s2:input:d_approvedReq 412,1726 18×20 edge[421,1746 421,1750] «Согласованная заявка на закупку»
+artifact s2:output:d_contract 528,1726 18×20 edge[537,1750 537,1746] «Договор поставки»
+artifact s2:store:s_erp 470,1844 18×20 edge[479,1844 479,1840] «ERP «Закупки»»
+artifact s3:input:d_contract 618,1726 18×20 edge[627,1746 673,1750] «Договор поставки»
+artifact s3:output:d_act 724,1726 18×20 edge[733,1750 733,1746] «Акт приёмки оборудования»
+artifact s3:output:d_inUse 840,1726 18×20 edge[803,1750 849,1746] «Оборудование в эксплуатации»
+artifact s3:store:s_erp 729,1844 18×20 edge[738,1844 738,1840] «ERP «Закупки»»
 # редактор BPMN C090.01.01
-shape o11_start1 event/start 180,267 36×36 «Потребность в оборудовании выявлена»
+shape o11_start1 event/start 180,287 36×36 «Потребность в оборудовании выявлена»
 shape o11_start2 event/start 180,117 36×36 «Остаток на складе опустился ниже минимального»
-shape o11_start3 event/start 180,417 36×36 «Плановый цикл закупок запущен»
-shape o11_m1 gateway/exclusive 370,260 50×50 «Слияние потоков»
-shape o11_fill task/user 510,240 150×90 «Заполнить заявку на закупку»
-shape o11_late event/intermediate 514,312 36×36 «Срок заполнения истёк»
+shape o11_start3 event/start 180,457 36×36 «Плановый цикл закупок запущен»
+shape o11_m1 gateway/exclusive 370,280 50×50 «Слияние потоков»
+shape o11_fill task/user 510,260 150×90 «Заполнить заявку на закупку»
+shape o11_late event/intermediate 514,332 36×36 «Срок заполнения истёк»
 shape o11_remind task/service 700,90 150×90 «Напомнить инициатору о заявке»
 shape o11_endRemind event/end 940,117 36×36 «Напоминание отправлено»
 shape o11_check task/business_rule 1080,90 150×90 «Проверить комплектность заявки»
 shape o11_ok gateway/exclusive 1320,110 50×50 «Заявка заполнена верно?»
-shape o11_send task/send 1460,240 150×90 «Отправить заявку на согласование»
-shape o11_done event/end 1700,267 36×36 «Заявка направлена на согласование»
-flow o11_f1 o11_start1→o11_m1 [216,285 370,285]
-flow o11_f2 o11_start2→o11_m1 [216,135 388.5,135 388.5,266.5]
-flow o11_f3 o11_start3→o11_m1 [216,435 395,435 395,310]
-flow o11_f4 o11_m1→o11_fill [420,285 510,285]
-flow o11_f5 o11_fill→o11_check [660,285 992,285 992,135 1080,135]
+shape o11_send task/send 1460,260 150×90 «Отправить заявку на согласование»
+shape o11_done event/end 1700,287 36×36 «Заявка направлена на согласование»
+flow o11_f1 o11_start1→o11_m1 [216,305 370,305]
+flow o11_f2 o11_start2→o11_m1 [216,135 388.5,135 388.5,286.5]
+flow o11_f3 o11_start3→o11_m1 [216,475 395,475 395,330]
+flow o11_f4 o11_m1→o11_fill [420,305 510,305]
+flow o11_f5 o11_fill→o11_check [660,305 992,305 992,135 1080,135]
 flow o11_f6 o11_check→o11_ok [1230,135 1320,135]
-flow o11_f7 o11_ok→o11_m1 [1345,110 1345,66 401.5,66 401.5,266.5] «Нет»
-flow o11_f8 o11_ok→o11_send [1345,160 1345,285 1460,285] «Да»
-flow o11_f9 o11_send→o11_done [1610,285 1700,285]
-flow o11_f10 o11_late→o11_remind [532,348 532,372 775,372 775,180]
+flow o11_f7 o11_ok→o11_m1 [1345,110 1345,66 401.5,66 401.5,286.5] «Нет»
+flow o11_f8 o11_ok→o11_send [1345,160 1345,305 1460,305] «Да»
+flow o11_f9 o11_send→o11_done [1610,305 1700,305]
+flow o11_f10 o11_late→o11_remind [532,368 532,392 775,392 775,180]
 flow o11_f11 o11_remind→o11_endRemind [850,135 940,135]
-artifact o11_fill:input:d_need 518,216 18×20 edge[527,236 527,240] «Потребность в оборудовании»
-artifact o11_fill:output:d_request 634,216 18×20 edge[643,240 643,236] «Заявка на закупку»
-artifact o11_fill:store:s_erp 576,334 18×20 edge[585,334 585,330] «ERP «Закупки»»
+artifact o11_fill:input:d_need 518,236 18×20 edge[527,256 527,260] «Потребность в оборудовании»
+artifact o11_fill:output:d_request 634,236 18×20 edge[643,260 643,256] «Заявка на закупку»
+artifact o11_fill:store:s_erp 576,354 18×20 edge[585,354 585,350] «ERP «Закупки»»
 # редактор BPMN C090.01.02
 shape o12_start event/start 180,117 36×36 «Заявка на закупку получена»
 shape o12_route task/service 320,90 150×90 «Направить заявку на согласование»
 shape o12_split gateway/parallel 560,110 50×50 «Параллельное согласование»
-shape o12_byNeed task/user 700,240 150×90 «Согласовать заявку по потребности»
-shape o12_overdue event/intermediate 704,312 36×36 «Срок согласования истёк»
-shape o12_esc event/intermediate 940,267 36×36 «Просрочка согласования эскалирована»
-shape o12_stop event/end 1130,267 36×36 «Согласование прекращено»
-shape o12_budget task/business_rule 700,390 150×90 «Проверить наличие бюджета»
-shape o12_enough gateway/exclusive 940,410 50×50 «Бюджет достаточен?»
+shape o12_byNeed task/user 700,260 150×90 «Согласовать заявку по потребности»
+shape o12_overdue event/intermediate 704,332 36×36 «Срок согласования истёк»
+shape o12_esc event/intermediate 940,287 36×36 «Просрочка согласования эскалирована»
+shape o12_stop event/end 1130,287 36×36 «Согласование прекращено»
+shape o12_budget task/business_rule 700,430 150×90 «Проверить наличие бюджета»
+shape o12_enough gateway/exclusive 940,450 50×50 «Бюджет достаточен?»
 shape o12_reject task/service 1080,90 150×90 «Зафиксировать отказ в заявке»
-shape o12_noBudget event/end 1320,417 36×36 «Заявка отклонена из-за нехватки бюджета»
+shape o12_noBudget event/end 1320,457 36×36 «Заявка отклонена из-за нехватки бюджета»
 shape o12_join gateway/parallel 1320,110 50×50 «Согласование завершено»
 shape o12_record task/service 1460,90 150×90 «Зафиксировать решение о согласовании»
 shape o12_approved event/end 1700,117 36×36 «Заявка согласована»
 flow o12_f1 o12_start→o12_route [216,135 320,135]
 flow o12_f2 o12_route→o12_split [470,135 560,135]
-flow o12_f3 o12_split→o12_byNeed [610,135 904,135 904,285 850,285]
-flow o12_f4 o12_split→o12_budget [585,160 585,435 700,435]
-flow o12_f5 o12_budget→o12_enough [850,435 940,435]
-flow o12_f6 o12_enough→o12_reject [990,435 1047,435 1047,135 1080,135] «Нет»
-flow o12_f7 o12_reject→o12_noBudget [1230,135 1287,135 1287,435 1320,435]
-flow o12_f8 o12_enough→o12_join [965,410 965,354 1351.5,354 1351.5,153.5] «Да»
-flow o12_f9 o12_byNeed→o12_join [775,330 775,364 1338.5,364 1338.5,153.5]
+flow o12_f3 o12_split→o12_byNeed [610,135 667,135 667,305 700,305]
+flow o12_f4 o12_split→o12_budget [585,160 585,475 700,475]
+flow o12_f5 o12_budget→o12_enough [850,475 940,475]
+flow o12_f6 o12_enough→o12_reject [990,475 1047,475 1047,135 1080,135] «Нет»
+flow o12_f7 o12_reject→o12_noBudget [1230,135 1287,135 1287,475 1320,475]
+flow o12_f8 o12_enough→o12_join [965,450 965,374 1351.5,374 1351.5,153.5] «Да»
+flow o12_f9 o12_byNeed→o12_join [775,350 775,384 1338.5,384 1338.5,153.5]
 flow o12_f10 o12_join→o12_record [1370,135 1460,135]
 flow o12_f11 o12_record→o12_approved [1610,135 1700,135]
-flow o12_f12 o12_overdue→o12_esc [722,348 722,372 958,372 958,303]
-flow o12_f13 o12_esc→o12_stop [976,285 1130,285]
-artifact o12_byNeed:input:d_request 766,216 18×20 edge[775,236 775,240] «Заявка на закупку»
+flow o12_f12 o12_overdue→o12_esc [722,368 722,392 958,392 958,323]
+flow o12_f13 o12_esc→o12_stop [976,305 1130,305]
+artifact o12_byNeed:input:d_request 766,236 18×20 edge[775,256 775,260] «Заявка на закупку»
 artifact o12_reject:output:d_rejectedReq 1146,66 18×20 edge[1155,90 1155,86] «Отклонённая заявка на закупку»
 artifact o12_record:output:d_approvedReq 1526,66 18×20 edge[1535,90 1535,86] «Согласованная заявка на закупку»
 artifact o12_record:store:s_erp 1526,184 18×20 edge[1535,184 1535,180] «ERP «Закупки»»
@@ -110,9 +110,9 @@ shape o22_m0 gateway/exclusive 370,410 50×50 «Слияние потоков»
 shape o22_draft task/user 510,390 150×90 «Подготовить проект договора поставки»
 shape o22_calc task/script 700,90 150×90 «Рассчитать сумму договора»
 shape o22_split gateway/inclusive 940,110 50×50 «Какие проверки нужны?»
-shape o22_legal subprocess 1070,540 160×90 «Проведение юридической экспертизы договора»
+shape o22_legal subprocess 1070,560 160×90 «Проведение юридической экспертизы договора»
 shape o22_finance subprocess 1070,240 160×90 «Проведение финансовой проверки договора»
-shape o22_violation event/intermediate 1074,612 36×36 «Нарушение выявлено»
+shape o22_violation event/intermediate 1074,632 36×36 «Нарушение выявлено»
 shape o22_rework task/user 1270,390 150×90 «Вернуть проект договора на доработку»
 shape o22_join gateway/inclusive 1510,410 50×50 «Проверки завершены»
 shape o22_sign task/user 1650,390 150×90 «Подписать договор поставки»
@@ -122,20 +122,20 @@ flow o22_f1 o22_start→o22_m0 [216,435 370,435]
 flow o22_f2 o22_m0→o22_draft [420,435 510,435]
 flow o22_f3 o22_draft→o22_calc [660,435 775,435 775,180]
 flow o22_f4 o22_calc→o22_split [850,135 940,135]
-flow o22_f5 o22_split→o22_legal [965,160 965,585 1070,585] «Есть нестандартные условия»
+flow o22_f5 o22_split→o22_legal [965,160 965,605 1070,605] «Есть нестандартные условия»
 flow o22_f6 o22_split→o22_finance [990,135 1042,135 1042,285 1070,285] «Сумма договора свыше 1 млн руб.»
-flow o22_f7 o22_legal→o22_join [1230,585 1535,585 1535,460]
+flow o22_f7 o22_legal→o22_join [1230,605 1535,605 1535,460]
 flow o22_f8 o22_finance→o22_join [1230,285 1535,285 1535,410]
 flow o22_f9 o22_join→o22_sign [1560,435 1650,435]
 flow o22_f10 o22_sign→o22_signedBack [1800,435 1840,435]
 flow o22_f11 o22_signedBack→o22_end [1990,435 2080,435]
-flow o22_f12 o22_violation→o22_rework [1092,648 1092,672 1345,672 1345,480]
+flow o22_f12 o22_violation→o22_rework [1092,668 1092,692 1345,692 1345,480]
 flow o22_f13 o22_rework→o22_m0 [1345,390 1345,342 395,342 395,410]
 artifact o22_draft:input:d_chosen 576,366 18×20 edge[585,386 585,390] «Выбранное коммерческое предложение»
 artifact o22_draft:store:s_edo 576,484 18×20 edge[585,484 585,480] «Система электронного документооборота»
 artifact o22_sign:output:d_contract 1716,366 18×20 edge[1725,390 1725,386] «Договор поставки»
-pool p_suppl 1830,840 170×40 «Поставщики»
-message o22_m1 p_suppl→o22_signedBack [1915,840 1915,480]
+pool p_suppl 1830,880 170×40 «Поставщики»
+message o22_m1 p_suppl→o22_signedBack [1915,880 1915,480]
 # редактор BPMN C090.03.01
 shape o31_start1 event/start 180,117 36×36 «Наступил срок еженедельной проверки»
 shape o31_start2 event/start 180,267 36×36 «Обращение по поставке получено»
@@ -167,34 +167,34 @@ pool p_suppl 500,690 170×40 «Поставщики»
 message o31_m1 o31_ask→p_suppl [585,330 585,522 563.8,522 563.8,690]
 message o31_m2 p_suppl→o31_status [606.3,690 606.3,502 768,502 768,303]
 # редактор BPMN C090.03.02
-shape o32_start event/start 180,417 36×36 «Поставка прибыла и приёмка подготовлена»
-shape o32_count task/manual 320,390 150×90 «Проверить комплектность поставки»
-shape o32_pay task/service 510,90 150×90 «Оплатить поставку»
-shape o32_undo event/intermediate 514,162 36×36 «Оплата подлежит отмене»
-shape o32_refund task/service 700,90 150×90 «Вернуть оплату»
-shape o32_refunded event/end 940,117 36×36 «Оплата возвращена»
-shape o32_quality task/user 700,240 150×90 «Проверить качество оборудования»
-shape o32_okq gateway/exclusive 940,260 50×50 «Оборудование принято?»
-shape o32_cancel event/intermediate 1130,267 36×36 «Покупка отменена»
-shape o32_failed event/end 1320,267 36×36 «Приёмка не пройдена»
-shape o32_act task/user 1080,390 150×90 «Подписать акт приёмки»
-shape o32_register task/service 1270,90 150×90 «Поставить оборудование на учёт»
-shape o32_end event/end 1510,117 36×36 «Оборудование введено в эксплуатацию»
-flow o32_f1 o32_start→o32_count [198,453 198,504 395,504 395,480]
-flow o32_f2 o32_count→o32_pay [320,435 296,435 296,146.7 510,146.7]
-flow o32_f3 o32_pay→o32_quality [510,123.3 486,123.3 486,285 700,285]
-flow o32_f4 o32_quality→o32_okq [850,285 940,285]
-flow o32_f5 o32_okq→o32_act [965,310 965,435 1080,435] «Да»
-flow o32_f6 o32_okq→o32_cancel [990,285 1130,285] «Нет»
-flow o32_f7 o32_cancel→o32_failed [1166,285 1320,285]
-flow o32_f8 o32_act→o32_register [1230,435 1474,435 1474,146.7 1420,146.7]
-flow o32_f9 o32_register→o32_end [1420,123.3 1477,123.3 1477,135 1510,135]
-flow o32_f10 o32_undo→o32_refund [532,198 532,222 775,222 775,180]
-flow o32_f11 o32_refund→o32_refunded [850,135 940,135]
-artifact o32_count:input:d_arrived 386,366 18×20 edge[395,386 395,390] «Поставленное оборудование»
-artifact o32_pay:store:s_erp 576,184 18×20 edge[585,184 585,180] «ERP «Закупки»»
-artifact o32_act:output:d_act 1146,366 18×20 edge[1155,390 1155,386] «Акт приёмки оборудования»
-artifact o32_register:output:d_inUse 1336,66 18×20 edge[1345,90 1345,86] «Оборудование в эксплуатации»
-artifact o32_register:store:s_erp 1336,184 18×20 edge[1345,184 1345,180] «ERP «Закупки»»
-pool p_acc 1443,690 170×40 «Учёт основных средств»
-message o32_m1 o32_end→p_acc [1528,153 1528,690]
+shape o32_start event/start 180,457 36×36 «Поставка прибыла и приёмка подготовлена»
+shape o32_count task/manual 320,430 150×90 «Проверить комплектность поставки»
+shape o32_pay task/service 510,110 150×90 «Оплатить поставку»
+shape o32_undo event/intermediate 514,182 36×36 «Оплата подлежит отмене»
+shape o32_refund task/service 700,110 150×90 «Вернуть оплату»
+shape o32_refunded event/end 940,137 36×36 «Оплата возвращена»
+shape o32_quality task/user 700,280 150×90 «Проверить качество оборудования»
+shape o32_okq gateway/exclusive 940,300 50×50 «Оборудование принято?»
+shape o32_cancel event/intermediate 1130,307 36×36 «Покупка отменена»
+shape o32_failed event/end 1320,307 36×36 «Приёмка не пройдена»
+shape o32_act task/user 1080,430 150×90 «Подписать акт приёмки»
+shape o32_register task/service 1270,110 150×90 «Поставить оборудование на учёт»
+shape o32_end event/end 1510,137 36×36 «Оборудование введено в эксплуатацию»
+flow o32_f1 o32_start→o32_count [198,493 198,544 395,544 395,520]
+flow o32_f2 o32_count→o32_pay [320,475 296,475 296,166.7 510,166.7]
+flow o32_f3 o32_pay→o32_quality [510,143.3 486,143.3 486,325 700,325]
+flow o32_f4 o32_quality→o32_okq [850,325 940,325]
+flow o32_f5 o32_okq→o32_act [965,350 965,475 1080,475] «Да»
+flow o32_f6 o32_okq→o32_cancel [990,325 1130,325] «Нет»
+flow o32_f7 o32_cancel→o32_failed [1166,325 1320,325]
+flow o32_f8 o32_act→o32_register [1230,475 1474,475 1474,166.7 1420,166.7]
+flow o32_f9 o32_register→o32_end [1420,143.3 1477,143.3 1477,155 1510,155]
+flow o32_f10 o32_undo→o32_refund [532,218 532,242 775,242 775,200]
+flow o32_f11 o32_refund→o32_refunded [850,155 940,155]
+artifact o32_count:input:d_arrived 386,406 18×20 edge[395,426 395,430] «Поставленное оборудование»
+artifact o32_pay:store:s_erp 576,204 18×20 edge[585,204 585,200] «ERP «Закупки»»
+artifact o32_act:output:d_act 1146,406 18×20 edge[1155,430 1155,426] «Акт приёмки оборудования»
+artifact o32_register:output:d_inUse 1336,86 18×20 edge[1345,110 1345,106] «Оборудование в эксплуатации»
+artifact o32_register:store:s_erp 1336,204 18×20 edge[1345,204 1345,200] «ERP «Закупки»»
+pool p_acc 1443,730 170×40 «Учёт основных средств»
+message o32_m1 o32_end→p_acc [1528,173 1528,730]

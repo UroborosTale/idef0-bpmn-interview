@@ -22,6 +22,7 @@ export default function RequirementsPage() {
   }, [sourceFilter, q]);
 
   const sources = Array.from(new Set(rows.map((r) => r.source)));
+  const canAdd = !!code.trim() && !!title.trim() && !!source.trim();
 
   return (
     <div className="card" style={{ margin: 16 }}>
@@ -42,11 +43,12 @@ export default function RequirementsPage() {
       </div>
 
       <div className="chat-input-row" style={{ marginTop: 10 }}>
-        <input placeholder="Код (напр. ISO9001-4.4.1.a)" value={code} onChange={(e) => setCode(e.target.value)} />
-        <input placeholder="Краткая формулировка (своими словами)" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: "1 1 320px", minWidth: 240 }} />
-        <input placeholder="Источник (напр. ISO 9001)" value={source} onChange={(e) => setSource(e.target.value)} style={{ width: 160 }} />
+        <input required aria-required="true" placeholder="Код (напр. ISO9001-4.4.1.a) — обязательно" value={code} onChange={(e) => setCode(e.target.value)} />
+        <input required aria-required="true" placeholder="Краткая формулировка (своими словами) — обязательно" value={title} onChange={(e) => setTitle(e.target.value)} style={{ flex: "1 1 320px", minWidth: 240 }} />
+        <input required aria-required="true" placeholder="Источник (напр. ISO 9001) — обязательно" value={source} onChange={(e) => setSource(e.target.value)} style={{ width: 190 }} />
         <button
-          disabled={!code.trim() || !title.trim() || !source.trim()}
+          disabled={!canAdd}
+          title={canAdd ? undefined : "Заполните код, формулировку и источник — все три поля обязательны"}
           onClick={async () => {
             await api.createRequirement({ code: code.trim(), title: title.trim(), source: source.trim() });
             setCode("");
@@ -57,6 +59,7 @@ export default function RequirementsPage() {
           Добавить
         </button>
       </div>
+      {!canAdd && <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>Для добавления заполните код, формулировку и источник — все три поля обязательны.</p>}
 
       <table className="mono" style={{ width: "100%", fontSize: 13, marginTop: 12, borderCollapse: "collapse" }}>
         <thead><tr style={{ textAlign: "left" }}><th>Код</th><th>Формулировка</th><th>Источник</th><th></th><th></th></tr></thead>

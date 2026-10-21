@@ -21,6 +21,9 @@ describe("справочники: где используется", () => {
     expect(unlinkedCount(m, "roles")).toBe(2); // b1, b2
     expect(unlinkedCount(m, "systems")).toBe(4);
     expect(unlinkedCount(m, "kpi")).toBe(0);
+    // шаг диаграммы операции не входит в «функций N» строки состояния и не должен попадать в подсказку
+    const withStep = { ...m, nodes: [...m.nodes, { ...m.nodes[0], id: "step", name: "Шаг операции", bpmn_scope: "a", role_id: null }] };
+    expect(unlinkedCount(withStep, "roles")).toBe(2);
   });
 });
 

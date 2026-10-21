@@ -733,7 +733,13 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     void showShellMenu("cursor", items, { mini: !!node }).then((picked) => {
       if (!picked) return;
       const [what, arg = ""] = picked.split(/:(.*)/s);
-      if (what === "cmd") return postToShell({ t: "cmd", name: arg });
+      if (what === "cmd") {
+        // В окне Visio команду выполняет оболочка; в браузере — сам редактор, как по горячей клавише.
+        if (inDesktopShell()) return postToShell({ t: "cmd", name: arg });
+        const key = ({ cut: "x", copy: "c", paste: "v", delete: "Delete" } as Record<string, string>)[arg];
+        if (key) document.querySelector<HTMLElement>(".doc-area .bpe")?.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: arg !== "delete", bubbles: true, cancelable: true }));
+        return;
+      }
       if (what === "grid") return postToShell({ t: "grid" });
       if (what === "props") return setPropsOpen(true);
       if (!node) return;
@@ -922,6 +928,33 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft, h.dirty, locked, busy]);
 
+  /** Контекстное меню фигуры в браузере: оболочка Visio присылает shape-menu, а здесь событие приходит от холста. */
+  const onContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as Element | null;
+    const shape = target?.closest?.("[data-node-id], [data-fn-id]") ?? null;
+    if (!shape) return;
+    if (target?.closest?.("input,textarea,select,[contenteditable='true']")) return;
+    const id = shape.getAttribute("data-node-id") ?? shape.getAttribute("data-fn-id");
+    if (!id || !draft.nodes.some((n) => n.id === id)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setSelection({ kind: "node", id });
+    shapeMenuRef.current(shape.hasAttribute("data-fn-id") ? "fn" : "node", id);
+  };
+
+  // Escape выводит из режима «На весь экран» (E2): кнопка «Свернуть окно» остаётся, но клавиша тоже должна работать.
+  useEffect(() => {
+    if (!full) return;
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if ((e.target as Element | null)?.closest?.("dialog,[role='dialog']")) return;
+      e.preventDefault();
+      setFull(false);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [full]);
+
   // История и сохранение вне редакторов диаграмм
   const onKeyDown = (e: React.KeyboardEvent) => {
     // Alt+← и Alt+→ — назад и вперёд по открытым диаграммам (как в браузере)
@@ -998,7 +1031,7 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   const bpmnStepCount = shown.filter(isBpmnStep).length + draft.nodes.filter((n) => !!n.bpmn_scope && isBpmnStep(n)).length;
 
   return (
-    <div className={`studio ${full ? "full" : ""} ${locked ? "studio-readonly" : ""}`} onKeyDown={onKeyDown}>
+    <div className={`studio ${full ? "full" : ""} ${locked ? "studio-readonly" : ""}`} onKeyDown={onKeyDown} onContextMenu={onContextMenu}>
       {locked && (
         <div className="studio-lock" role="status">
           <b>Версия утверждена и заблокирована от изменений.</b> Диаграммы, справочники и отчёты открыты только для просмотра.

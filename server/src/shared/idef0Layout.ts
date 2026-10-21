@@ -640,17 +640,17 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     const b = blockOf.get(a.nodeId)!.box;
     const e = endAtBlock(a);
     if (Math.abs(e[0] - b.x) < 0.5) {
-      a.codeAt = [e[0] - 4, e[1] - 4];
+      a.codeAt = [e[0] - 4, e[1] - 36];
       a.codeAnchor = "end";
     } else if (Math.abs(e[0] - (b.x + b.w)) < 0.5) {
-      a.codeAt = [e[0] + 4, e[1] - 4];
+      a.codeAt = [e[0] + 4, e[1] - 36];
       a.codeAnchor = "start";
     } else if (Math.abs(e[1] - b.y) < 0.5) {
-      a.codeAt = [e[0] + 4, e[1] - 4];
-      a.codeAnchor = "start";
+      a.codeAt = [e[0] - 4, e[1] - 32];
+      a.codeAnchor = "end";
     } else {
-      a.codeAt = [e[0] + 4, e[1] + 12];
-      a.codeAnchor = "start";
+      a.codeAt = [e[0] - 4, e[1] + 40];
+      a.codeAnchor = "end";
     }
   }
   return { functions, arrows };

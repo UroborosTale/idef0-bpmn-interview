@@ -4,7 +4,8 @@ import { rankColumns } from "@shared/bpmnRank";
 import { ROW_PITCH, branchRows, collinearOverlaps } from "@shared/bpmnRows";
 import { diagramTriggers, type TriggerView } from "@shared/bpmnTriggers";
 import type { Pt } from "../editor-core/hooks";
-import { LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
+import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
+import { BOUNDARY_LABEL_EXTRA } from "@shared/bpmnArtifacts";
 import { mergeScope, scopeView } from "@shared/scope";
 import { POOL_H, artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
 
@@ -116,7 +117,17 @@ export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
 /** Дорожек на одну больше числа ролей: последняя — «Без исполнителя». */
 export const laneCount = (m: ProcessLogicModel) => m.roles.length + 1;
 /** Высоты дорожек сверху вниз: у роли — lane_height, у «Без исполнителя» — настройка процесса; без настройки — стандартная. */
-export const laneHeights = (m: ProcessLogicModel): number[] => [...m.roles.map((r) => laneHeightOf(r.lane_height)), laneHeightOf(m.process.unassigned_lane_height)];
+export const laneHeights = (m: ProcessLogicModel): number[] => {
+  const base = [...m.roles.map((r) => laneHeightOf(r.lane_height)), laneHeightOf(m.process.unassigned_lane_height)];
+  // Подпись граничного события должна остаться в дорожке (B8): оставляем запас под ней.
+  const boundaryLanes = new Set<number>();
+  for (const n of m.nodes) {
+    if (n.type !== "event" || !n.attached_to || !n.name.trim()) continue;
+    const host = m.nodes.find((x) => x.id === n.attached_to);
+    if (host && (host.type === "task" || host.type === "subprocess")) boundaryLanes.add(laneIndexOfRole(m, host.role_id));
+  }
+  return base.map((h, i) => (boundaryLanes.has(i) ? Math.min(MAX_LANE_H, h + BOUNDARY_LABEL_EXTRA) : h));
+};
 export const laneTop = (m: ProcessLogicModel, i: number): number => laneTops(laneHeights(m))[i] ?? START_Y;
 export const laneHeight = (m: ProcessLogicModel, i: number): number => laneHeights(m)[i] ?? LANE_H;
 /** Нижняя граница последней дорожки. */

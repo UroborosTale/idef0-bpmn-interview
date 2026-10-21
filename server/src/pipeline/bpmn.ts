@@ -1,14 +1,14 @@
 import { canHaveDefaultFlow, loopXml, type LoopKind } from "../shared/loops.js";
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { layoutLayered, orthogonalWaypoints, type LayoutExtras, type LayoutNodeIn, type LayoutEdgeIn } from "./layout.js";
-import { LANE_H, LANE_X, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
+import { LANE_H, LANE_X, MAX_LANE_H, SIZE, START_Y, laneHeightOf } from "../shared/bpmnGeometry.js";
 import { fixedRoute, nudgeOffLaneBorders, routeFlows, type RouteNode } from "../shared/bpmnRouting.js";
 import { diagramTriggers } from "../shared/bpmnTriggers.js";
 import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
 import { eventSpec, type EventPosition, type EventSpec, type TriggerType } from "../shared/events.js";
-import { artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes } from "../shared/bpmnArtifacts.js";
+import { artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, BOUNDARY_LABEL_EXTRA } from "../shared/bpmnArtifacts.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
 export interface BpmnDiagramData {
@@ -294,8 +294,16 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const unassignedIndex = laneRoles.length;
   if (hasUnassigned) laneIndexOf.set(UNASSIGNED_LANE, unassignedIndex);
   const laneCount = laneRoles.length + (hasUnassigned ? 1 : 0);
-  // высоты дорожек настраиваются: у роли — lane_height, у дорожки «Без исполнителя» — настройка процесса
-  const laneHeights = [...laneRoles.map((r) => laneHeightOf(r.lane_height)), ...(hasUnassigned ? [laneHeightOf(view.process.unassigned_lane_height)] : [])];
+  // высоты дорожек настраиваются: у роли — lane_height, у дорожки «Без исполнителя» — настройка процесса.
+  // В дорожке с граничным событием оставляем место под его подпись: иначе она уходит на линию дорожки (B8).
+  const boundaryLanes = new Set<number>();
+  for (const n of nodes) {
+    if (!isBoundary(n) || !n.name.trim()) continue;
+    boundaryLanes.add(laneIndexOf.get(laneIdOf(roleOf(hostOf(n)))) ?? unassignedIndex);
+  }
+  const laneHeights = [...laneRoles.map((r) => laneHeightOf(r.lane_height)), ...(hasUnassigned ? [laneHeightOf(view.process.unassigned_lane_height)] : [])].map((h, i) =>
+    boundaryLanes.has(i) ? Math.min(MAX_LANE_H, h + BOUNDARY_LABEL_EXTRA) : h
+  );
   if (laneHeights.length === 0) laneHeights.push(LANE_H);
 
   // --- layout ---

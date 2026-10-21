@@ -54,6 +54,16 @@ export default function App() {
     api.listNotifications({ unread: true }).then((rows) => setUnreadCount(rows.length)).catch(() => {});
   }, [route.name, isCampaign]);
 
+  // Escape закрывает меню «Ещё» в шапке: у нативного <details> своего обработчика нет.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      document.querySelectorAll("details.nav-more[open]").forEach((d) => d.removeAttribute("open"));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   useEffect(() => {
     document.title = route.name === "workspace" ? "Сессия — IDEF0 / BPMN" : "IDEF0 / BPMN — модели по интервью";
   }, [route.name]);

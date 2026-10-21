@@ -78,7 +78,10 @@ export default function HypothesesPanel({ session }: { session: SessionRecord })
                 </>
               )}
               {h.status === "applied" && h.appliedSessionId && (
-                <button onClick={() => setCompareTarget({ toBeId: h.appliedSessionId!, title: h.title })}>Сравнить AS-IS/TO-BE</button>
+                <>
+                  <a href={`/s/${h.appliedSessionId}`}><button>Открыть TO-BE</button></a>
+                  <button onClick={() => setCompareTarget({ toBeId: h.appliedSessionId!, title: h.title })}>Сравнить AS-IS/TO-BE</button>
+                </>
               )}
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, marginTop: 4 }}>{h.title}</div>

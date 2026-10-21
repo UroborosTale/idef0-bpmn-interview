@@ -198,9 +198,11 @@ function removeEntryLinks(m: M, kind: DictKind, id: string): M {
   }
 }
 
-/** Количество функций, у которых не заполнена связь со справочником, — для подсказки в заголовке окна. */
+/** Количество функций верхнего уровня, у которых не заполнена связь со справочником, — для подсказки в заголовке окна. */
 export function unlinkedCount(m: M, kind: DictKind): number {
-  const fns = m.nodes.filter(isFn);
+  // Как и в строке состояния («функций N»), считаем функции, а не шаги диаграмм операций:
+  // иначе подсказка «У 21 функц.» спорит с «функций 11» на той же странице.
+  const fns = m.nodes.filter((n) => isFn(n) && !n.bpmn_scope);
   switch (kind) {
     case "roles":
       return fns.filter((n) => !n.role_id).length;

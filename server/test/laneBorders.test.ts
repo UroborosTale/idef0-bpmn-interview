@@ -66,6 +66,17 @@ describe("линии дорожек: отрезки и подписи", () => {
     }
   });
 
+  it("подпись граничного события не налезает на задачу-хозяина (B8)", async () => {
+    const r = await generateBpmn(demoModel(), "o11");
+    const event = r.diagram.shapes.find((s) => s.nodeId === "o11_late")!;
+    const host = r.diagram.shapes.find((s) => s.nodeId === "o11_fill")!;
+    const band = r.diagram.lanes.find((l) => event.y >= l.y && event.y + event.h <= l.y + l.h)!;
+    const box = { x: event.x, y: event.y, w: event.w, h: event.h };
+    const label = labelBox(box, event.name, labelSide(box, event.name, { top: band.y, bottom: band.y + band.h }))!;
+    expect(label.y).toBeGreaterThanOrEqual(host.y + host.h);
+    expect(label.y + label.h).toBeLessThanOrEqual(band.y + band.h);
+  });
+
   it("подпись события или шлюза остаётся в своей дорожке", async () => {
     for (const build of [b002Model, c025Model, demoModel]) {
       const m = build();

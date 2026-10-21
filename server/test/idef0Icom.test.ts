@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { b002Model } from "../src/reference/b002.js";
-import { layoutIdef0 } from "../src/shared/idef0Layout.js";
+import { labelSpec, layoutIdef0 } from "../src/shared/idef0Layout.js";
 
 /**
  * В9 (план BS6): ICOM-коды на концах стрелок — I (вход), C (управление), O (выход), M (механизм).
@@ -34,6 +34,19 @@ describe("ICOM-коды стрелок IDEF0", () => {
     for (const c of ["I", "C", "O", "M"]) {
       const nums = [...new Set(lay.arrows.filter((a) => cls(a.kind) === c).map((a) => Number(a.code!.slice(1))))].sort((x, y) => x - y);
       if (nums.length) expect(nums, c).toEqual(nums.map((_, i) => i + 1));
+    }
+  });
+
+  it("код не налезает на длинную подпись: у подписи на линии он вынесен выше", () => {
+    const lay = layoutIdef0(b002Model(), null);
+    for (const a of lay.arrows) {
+      const sp = labelSpec(a as never);
+      if (!sp || !a.codeAt || (a.side !== "left" && a.side !== "right" && a.side !== "mid")) continue;
+      const lines = sp.text.split("\n").length;
+      const labelTop = sp.y - 10;
+      // подпись стоит на линии/над ней; код поднят выше её верхней строки
+      expect(a.codeAt[1] + 2, a.key).toBeLessThanOrEqual(labelTop);
+      expect(lines, a.key).toBeGreaterThan(0);
     }
   });
 });
