@@ -119,6 +119,8 @@ export function artifactsOf(
 ): Artifact[] {
   const out: Artifact[] = [];
   const boundary = boundaryByHost(nodes);
+  const labelRect = (box: Box, name: string): Box => ({ x: box.x + box.w + 3, y: box.y, w: artifactLabelWidth(name), h: ARTIFACT_H });
+  const labelsHit = (a: Box, b: Box) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   for (const n of nodes) {
     if (n.type !== "task" && n.type !== "subprocess") continue;
     const host = boxes.get(n.id);
@@ -139,10 +141,8 @@ export function artifactsOf(
       if (items.length === 0) return;
       // расстояние между соседними значками — по ширине подписи левого значка (подпись идёт справа от него)
       const wanted = items.slice(1).map((_it, i) => Math.max(ARTIFACT_W + 6, ARTIFACT_W + artifactLabelWidth(items[i].name) + 4));
-      // ряд не шире задачи с запасом по 20 пикселей: если подписи не помещаются, значки сближаются (но не ближе 10 пикселей)
-      const room = host.w + 40 - ARTIFACT_W;
-      const sum = wanted.reduce((t, g) => t + g, 0);
-      const gaps = sum > room ? wanted.map((g) => Math.max(10, (g * room) / sum)) : wanted;
+      // ряд может быть шире задачи: подписи важнее, чем уложиться в её ширину — иначе длинные названия налезают
+      const gaps = wanted;
       const offsets = [0];
       for (const g of gaps) offsets.push(offsets[offsets.length - 1] + g);
       const total = ARTIFACT_W + offsets[offsets.length - 1];
@@ -177,6 +177,33 @@ export function artifactsOf(
     };
     row(docs, false);
     row(stores, true);
+  }
+  // подписи значков соседних задач не должны налезать: сдвигаем весь ряд задачи, сохраняя промежутки внутри него
+  const groups = new Map<string, Artifact[]>();
+  for (const a of out) groups.set(a.nodeId, [...(groups.get(a.nodeId) ?? []), a]);
+  const orderedGroups = [...groups.values()].sort(
+    (a, b) => Math.min(...a.map((x) => labelRect(x.box, x.name).x)) - Math.min(...b.map((x) => labelRect(x.box, x.name).x))
+  );
+  const occupied: Box[] = [];
+  for (const group of orderedGroups) {
+    let delta = 0;
+    for (let guard = 0; guard < 24; guard++) {
+      const labels = group.map((a) => {
+        const r = labelRect(a.box, a.name);
+        return { ...r, x: r.x + delta };
+      });
+      const clash = labels.find((r) => occupied.some((o) => labelsHit(r, o)));
+      if (!clash) break;
+      const right = Math.max(...occupied.filter((o) => labelsHit(clash, o)).map((o) => o.x + o.w));
+      delta += right + 6 - clash.x;
+    }
+    if (delta !== 0) {
+      for (const a of group) {
+        a.box = { ...a.box, x: a.box.x + delta };
+        a.edge = a.edge.map(([x, y]) => [x + delta, y] as Pt);
+      }
+    }
+    occupied.push(...group.map((a) => labelRect(a.box, a.name)));
   }
   return out;
 }

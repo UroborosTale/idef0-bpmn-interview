@@ -194,8 +194,14 @@ describe("добавочные элементы: общая геометрия",
         expect(a.box.y + a.box.h).toBeLessThanOrEqual(100); // верх задачи
         expect(a.box.y).toBeGreaterThanOrEqual(100 - 30);
       }
-      expect(a.box.x).toBeGreaterThanOrEqual(200 - 20 - 22);
-      expect(a.box.x + a.box.w).toBeLessThanOrEqual(300 + 20 + 22);
+    }
+    // ряд может выйти за ширину задачи, но подписи внутри ряда не должны налезать друг на друга
+    for (const below of [false, true]) {
+      const row = arts
+        .filter((a) => (a.kind === "store") === below)
+        .sort((a, b) => a.box.x - b.box.x)
+        .map((a) => ({ x0: a.box.x + a.box.w + 3, x1: a.box.x + a.box.w + 3 + artifactLabelWidth(a.name) }));
+      for (let i = 1; i < row.length; i++) expect(row[i].x0).toBeGreaterThanOrEqual(row[i - 1].x1);
     }
   });
 
@@ -203,6 +209,17 @@ describe("добавочные элементы: общая геометрия",
     const names = { data: new Map([["a", "Потребность"], ["b", "Заявка на закупку"]]), systems: new Map() };
     const arts = artifactsOf([node("t", { inputs: ["a", "b"] })] as never[], boxes, names);
     expect(arts[1].box.x - arts[0].box.x).toBeGreaterThanOrEqual(ARTIFACT_W + artifactLabelWidth("Потребность") + 4);
+  });
+
+  it("подписи значков соседних задач не налезают друг на друга", () => {
+    const names = { data: new Map([["a", "Актуальный реестр процессов"]]), systems: new Map<string, string>() };
+    const two = new Map([
+      ["t1", { x: 200, y: 100, w: 150, h: 80 }],
+      ["t2", { x: 390, y: 100, w: 150, h: 80 }],
+    ]);
+    const arts = artifactsOf([node("t1", { inputs: ["a"] }), node("t2", { inputs: ["a"] })] as never[], two, names);
+    const label = (a: (typeof arts)[number]) => ({ x0: a.box.x + a.box.w + 3, x1: a.box.x + a.box.w + 3 + artifactLabelWidth(a.name), y0: a.box.y, y1: a.box.y + a.box.h });
+    expect(label(arts[1]).x0).toBeGreaterThanOrEqual(label(arts[0]).x1 + 6);
   });
 
   it("хранилища данных идут правее граничных событий и обходят вертикаль потока сообщений, а документы от них не зависят", () => {

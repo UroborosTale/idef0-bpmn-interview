@@ -2,17 +2,17 @@
 shape s1 task 130,1590 150×90 «Подготовка закупки»
 shape s2 task 320,1590 150×90 «Выбор поставщика»
 shape s3 task 510,1590 150×90 «Поставка и приёмка»
-artifact s1:input:d_need 110,1566 18×20 edge[119,1586 140,1590] «Потребность в оборудовании»
+artifact s1:input:d_need 80,1566 18×20 edge[89,1586 140,1590] «Потребность в оборудовании»
 artifact s1:output:d_approvedReq 196,1566 18×20 edge[205,1590 205,1586] «Согласованная заявка на закупку»
-artifact s1:output:d_rejectedReq 282,1566 18×20 edge[270,1590 291,1586] «Отклонённая заявка на закупку»
+artifact s1:output:d_rejectedReq 312,1566 18×20 edge[270,1590 321,1586] «Отклонённая заявка на закупку»
 artifact s1:store:s_erp 196,1684 18×20 edge[205,1684 205,1680] «ERP «Закупки»»
-artifact s2:input:d_approvedReq 328,1566 18×20 edge[337,1586 337,1590] «Согласованная заявка на закупку»
-artifact s2:output:d_contract 444,1566 18×20 edge[453,1590 453,1586] «Договор поставки»
-artifact s2:store:s_erp 386,1684 18×20 edge[395,1684 395,1680] «ERP «Закупки»»
-artifact s3:input:d_contract 490,1566 18×20 edge[499,1586 520,1590] «Договор поставки»
-artifact s3:output:d_act 572.1,1566 18×20 edge[581.1,1590 581.1,1586] «Акт приёмки оборудования»
-artifact s3:output:d_inUse 662,1566 18×20 edge[650,1590 671,1586] «Оборудование в эксплуатации»
-artifact s3:store:s_erp 576,1684 18×20 edge[585,1684 585,1680] «ERP «Закупки»»
+artifact s2:input:d_approvedReq 412,1566 18×20 edge[421,1586 421,1590] «Согласованная заявка на закупку»
+artifact s2:output:d_contract 528,1566 18×20 edge[537,1590 537,1586] «Договор поставки»
+artifact s2:store:s_erp 470,1684 18×20 edge[479,1684 479,1680] «ERP «Закупки»»
+artifact s3:input:d_contract 618,1566 18×20 edge[627,1586 673,1590] «Договор поставки»
+artifact s3:output:d_act 724,1566 18×20 edge[733,1590 733,1586] «Акт приёмки оборудования»
+artifact s3:output:d_inUse 840,1566 18×20 edge[803,1590 849,1586] «Оборудование в эксплуатации»
+artifact s3:store:s_erp 729,1684 18×20 edge[738,1684 738,1680] «ERP «Закупки»»
 # редактор BPMN C090.01.01
 shape o11_start1 event/start 180,267 36×36 «Потребность в оборудовании выявлена»
 shape o11_start2 event/start 180,117 36×36 «Остаток на складе опустился ниже минимального»

@@ -2,81 +2,81 @@
 fn s1 220,220 170×90
 fn s2 560,370 170×90
 fn s3 900,520 170×90
-arrow control:s1:c_policy [240,174 240,220] label@236,158/start «Положение о закупках»
-arrow control:s1:c_budget [266,174 266,220] label@262,170/start «Бюджет закупок на год»
+arrow control:s1:c_policy [240,174 240,220] label@243,158/start «Положение о закупках»
+arrow control:s1:c_budget [266,174 266,220] label@269,170/start «Бюджет закупок на год»
 arrow input:s1:d_need [50,234 220,234] label@135,238/middle «Потребность в оборудовании»
 arrow output:s1:d_rejectedReq [390,274 560,274] label@475,278/middle «Отклонённая заявка на закупку»
 arrow role:s1:r_chief [305,670 305,310]
-arrow role:s1:r_init [240,350 240,310] label@236,376/start «Инициатор закупки»
-arrow role:s1:r_head [272.5,350 272.5,310] label@268.5,364/start «Руководитель подразделения-заказчика»
+arrow role:s1:r_init [240,350 240,310] label@243,376/start «Инициатор закупки»
+arrow role:s1:r_head [272.5,350 272.5,310] label@275.5,364/start «Руководитель подразделения-заказчика»
 arrow role:s1:r_fin [337.5,652 337.5,310]
 arrow system:s1:s_erp [370,634 370,310]
-arrow control:s2:c_tender [580,324 580,370] label@576,308/start «Регламент закупочных процедур»
-arrow control:s2:c_template [606,324 606,370] label@602,320/start «Типовая форма договора поставки»
+arrow control:s2:c_tender [580,324 580,370] label@583,308/start «Регламент закупочных процедур»
+arrow control:s2:c_template [606,324 606,370] label@609,320/start «Типовая форма договора поставки»
 arrow link:s2:d_approvedReq [390,234 406,234 406,384 560,384] label@483,379/middle «Согласованная заявка на закупку»
 arrow role:s2:r_chief [305,670 645,670 645,460] label@313,666/start «Начальник отдела закупок»
-arrow role:s2:r_buyer [677.5,500 677.5,460] label@673.5,550/start «Специалист по закупкам»
-arrow role:s2:r_lawyer [710,500 710,460] label@706,514/start «Юрист»
+arrow role:s2:r_buyer [677.5,500 677.5,460] label@680.5,550/start «Специалист по закупкам»
+arrow role:s2:r_lawyer [710,500 710,460] label@713,514/start «Юрист»
 arrow role:s2:r_fin [337.5,652 612.5,652 612.5,460] label@345.5,648/start «Финансовый директор»
 arrow system:s2:s_erp [370,634 580,634 580,460] label@378,630/start «ERP «Закупки»»
-arrow control:s3:c_delivSched [920,474 920,520] label@916,458/start «График поставки по договору»
-arrow control:s3:c_accept [946,474 946,520] label@942,470/start «Инструкция по приёмке оборудования»
+arrow control:s3:c_delivSched [920,474 920,520] label@923,458/start «График поставки по договору»
+arrow control:s3:c_accept [946,474 946,520] label@949,470/start «Инструкция по приёмке оборудования»
 arrow link:s3:d_contract [730,384 746,384 746,534 900,534] label@823,529/middle «Договор поставки»
 arrow output:s3:d_act [1070,534 1240,534] label@1155,538/middle «Акт приёмки оборудования»
 arrow output:s3:d_inUse [1070,574 1240,574] label@1155,578/middle «Оборудование в эксплуатации»
-arrow role:s3:r_lchief [960,650 960,610] label@956,688/start «Руководитель службы логистики»
-arrow role:s3:r_logist [1000,650 1000,610] label@996,676/start «Логист»
-arrow role:s3:r_store [1040,650 1040,610] label@1036,664/start «Кладовщик»
+arrow role:s3:r_lchief [960,650 960,610] label@963,688/start «Руководитель службы логистики»
+arrow role:s3:r_logist [1000,650 1000,610] label@1003,676/start «Логист»
+arrow role:s3:r_store [1040,650 1040,610] label@1043,664/start «Кладовщик»
 arrow system:s3:s_erp [370,634 920,634 920,610]
 # IDEF0 C090.01.00
 fn o11 220,220 170×90
 fn o12 560,370 170×90
-arrow control:o11:c_policy [176,140 240,140 240,174 240,220] label@172,136/start «Положение о закупках»
+arrow control:o11:c_policy [176,140 240,140 240,174 240,220] label@179,136/start «Положение о закупках»
 arrow input:o11:d_need [50,234 220,234] label@135,238/middle «Потребность в оборудовании»
-arrow role:o11:r_init [240,350 240,310] label@236,364/start «Инициатор закупки»
+arrow role:o11:r_init [240,350 240,310] label@243,364/start «Инициатор закупки»
 arrow role:o11:r_erp [280,502 280,310]
 arrow system:o11:s_erp [320,484 320,310]
 arrow control:o12:c_policy [176,140 580,140 580,324 580,370]
-arrow control:o12:c_budget [606,324 606,370] label@602,320/start «Бюджет закупок на год»
+arrow control:o12:c_budget [606,324 606,370] label@609,320/start «Бюджет закупок на год»
 arrow link:o12:d_request [390,234 406,234 406,384 560,384] label@483,379/middle «Заявка на закупку»
 arrow output:o12:d_approvedReq [730,384 900,384] label@815,382/middle «Согласованная заявка на
 закупку»
 arrow output:o12:d_rejectedReq [730,424 900,424] label@815,428/middle «Отклонённая заявка на закупку»
-arrow role:o12:r_head [660,500 660,460] label@656,526/start «Руководитель подразделения-заказчика»
-arrow role:o12:r_fin [700,500 700,460] label@696,514/start «Финансовый директор»
+arrow role:o12:r_head [660,500 660,460] label@663,526/start «Руководитель подразделения-заказчика»
+arrow role:o12:r_fin [700,500 700,460] label@703,514/start «Финансовый директор»
 arrow role:o12:r_erp [280,502 620,502 620,460] label@288,498/start «ERP «Закупки»»
 arrow system:o12:s_erp [320,484 580,484 580,460] label@328,480/start «ERP «Закупки»»
 # IDEF0 C090.02.00
 fn o21 220,220 170×90
 fn o22 560,370 170×90
-arrow control:o21:c_tender [240,174 240,220] label@236,170/start «Регламент закупочных процедур»
+arrow control:o21:c_tender [240,174 240,220] label@243,170/start «Регламент закупочных процедур»
 arrow input:o21:d_approvedReq [50,234 220,234] label@135,232/middle «Согласованная заявка на
 закупку»
 arrow role:o21:r_buyer [240,520 240,310]
 arrow role:o21:r_erp [280,502 280,310]
 arrow system:o21:s_erp [320,484 320,310]
-arrow control:o22:c_template [580,324 580,370] label@576,320/start «Типовая форма договора поставки»
+arrow control:o22:c_template [580,324 580,370] label@583,320/start «Типовая форма договора поставки»
 arrow link:o22:d_chosen [390,234 406,234 406,384 560,384] label@483,379/middle «Выбранное коммерческое предложение»
 arrow output:o22:d_contract [730,384 900,384] label@815,388/middle «Договор поставки»
 arrow role:o22:r_buyer [240,520 645,520 645,460] label@248,516/start «Специалист по закупкам»
-arrow role:o22:r_lawyer [677.5,500 677.5,460] label@673.5,526/start «Юрист»
-arrow role:o22:r_fin [710,500 710,460] label@706,514/start «Финансовый директор»
+arrow role:o22:r_lawyer [677.5,500 677.5,460] label@680.5,526/start «Юрист»
+arrow role:o22:r_fin [710,500 710,460] label@713,514/start «Финансовый директор»
 arrow role:o22:r_erp [280,502 612.5,502 612.5,460] label@288,498/start «ERP «Закупки»»
 arrow system:o22:s_erp [320,484 580,484 580,460] label@328,480/start «ERP «Закупки»»
 # IDEF0 C090.03.00
 fn o31 220,220 170×90
 fn o32 560,370 170×90
-arrow control:o31:c_delivSched [240,174 240,220] label@236,170/start «График поставки по договору»
+arrow control:o31:c_delivSched [240,174 240,220] label@243,170/start «График поставки по договору»
 arrow input:o31:d_contract [50,234 220,234] label@135,238/middle «Договор поставки»
-arrow role:o31:r_logist [240,350 240,310] label@236,364/start «Логист»
+arrow role:o31:r_logist [240,350 240,310] label@243,364/start «Логист»
 arrow role:o31:r_store [280,520 280,310]
 arrow role:o31:r_erp [320,502 320,310]
 arrow system:o31:s_erp [360,484 360,310]
-arrow control:o32:c_accept [580,324 580,370] label@576,320/start «Инструкция по приёмке оборудования»
+arrow control:o32:c_accept [580,324 580,370] label@583,320/start «Инструкция по приёмке оборудования»
 arrow link:o32:d_arrived [390,234 406,234 406,384 560,384] label@483,379/middle «Поставленное оборудование»
 arrow output:o32:d_act [730,384 900,384] label@815,388/middle «Акт приёмки оборудования»
 arrow output:o32:d_inUse [730,424 900,424] label@815,428/middle «Оборудование в эксплуатации»
 arrow role:o32:r_store [280,520 660,520 660,460] label@288,516/start «Кладовщик»
-arrow role:o32:r_init [700,500 700,460] label@696,514/start «Инициатор закупки»
+arrow role:o32:r_init [700,500 700,460] label@703,514/start «Инициатор закупки»
 arrow role:o32:r_erp [320,502 620,502 620,460] label@328,498/start «ERP «Закупки»»
 arrow system:o32:s_erp [360,484 580,484 580,460] label@368,480/start «ERP «Закупки»»

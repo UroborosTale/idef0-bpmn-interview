@@ -277,6 +277,8 @@ const spread = (len: number, n: number, max: number, pad: number) => (n > 1 ? Ma
 /** Ряд подписи i-й из n стрелок на одной стороне: подписи шире шага между стрелками, поэтому чередуем до трёх рядов. */
 const rowOf = (i: number, n: number) => (n > 1 ? i % Math.min(3, n) : 0);
 const LABEL_ROW_H = 12;
+/** Подпись управления/механизма начинается чуть правее своей вертикали, чтобы линия стрелки не перечёркивала текст. */
+const LABEL_START_DX = 3;
 
 /** Подпись стрелки переносится по словам: до 34 знаков в строке и до 3 строк (как у Business Studio), строки разделены «\n». */
 export const wrapLabel = (text: string, wide: boolean | "side" = false): string => (wide === "side" ? wrapText(text, 30, 3) : wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
@@ -317,7 +319,7 @@ export function assignLabelRows(items: { x: number; label: string }[], opts: { o
       if (opts.y) {
         // высоты строк заданы: подписи сравниваются настоящими прямоугольниками (начала стрелок могут стоять на разной глубине)
         const y = opts.y(i, row, h);
-        const mine = { x0: items[i].x - 4, x1: items[i].x - 4 + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
+        const mine = { x0: items[i].x + LABEL_START_DX, x1: items[i].x + LABEL_START_DX + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H };
         return placed.some((o) => rectsHit(mine, o)) || (opts.obstacles ?? []).some((o) => rectsHit(mine, o));
       }
       for (let k = row; k < row + h; k++) if ((rows[k] ?? []).some((q) => items[i].x < q.x + q.w + LABEL_GAP && q.x < items[i].x + w + LABEL_GAP)) return true;
@@ -327,7 +329,7 @@ export function assignLabelRows(items: { x: number; label: string }[], opts: { o
     for (let k = r; k < r + h; k++) (rows[k] ??= []).push({ x: items[i].x, w });
     if (opts.y) {
       const y = opts.y(i, r, h);
-      placed.push({ x0: items[i].x - 4, x1: items[i].x - 4 + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H });
+      placed.push({ x0: items[i].x + LABEL_START_DX, x1: items[i].x + LABEL_START_DX + w, y0: y - 10, y1: y + 2 + (h - 1) * LABEL_ROW_H });
     }
     out[i] = r;
   }
@@ -686,9 +688,9 @@ function baseLabelSpec(a: { points: Pt[]; side: LabelSide; label?: string; label
     case "right":
       return { x: (first[0] + last[0]) / 2, y: first[1] + 4 - extra / 2, anchor: "middle", text };
     case "top":
-      return { x: first[0] - 4, y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text }; // как в Business Studio: подпись начинается у самой стрелки
+      return { x: first[0] + LABEL_START_DX, y: first[1] - 4 - extra - (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text }; // подпись правее вертикали, чтобы линия не шла через текст
     case "bottom":
-      return { x: first[0] - 4, y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text };
+      return { x: first[0] + LABEL_START_DX, y: first[1] + 14 + (a.labelRow ?? 0) * LABEL_ROW_H, anchor: "start", text };
     default: {
       let idx = -1;
       let best = -1;
