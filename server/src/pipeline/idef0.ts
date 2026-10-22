@@ -1,6 +1,6 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
 import { blockNumbers, isStructured, processCodeOf } from "../shared/codes.js";
-import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, noteBox, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
+import { FREE_END, functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, noteBox, offpageMarks, openArrowMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 import { wrapText } from "../shared/bpmnLabels.js";
 import { FRAME_FONT, frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
 
@@ -54,6 +54,11 @@ export interface Idef0Arrow {
   /** «Граница» на конце стрелки: штрих вместо скобок туннеля. */
   boundaryUp?: boolean;
   boundaryDown?: boolean;
+  /** I7: полый наконечник у «неопределённого конца»: треугольники контуром. */
+  openAt?: Pt[][];
+  /** I7: полый наконечник стоит у свободного конца / у блока (для выбора маркера). */
+  openUp?: boolean;
+  openDown?: boolean;
 }
 
 export interface Idef0Block {
@@ -159,6 +164,7 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     ...(a.tunnelDown ? { tunnelDown: true } : {}),
     ...(a.boundaryUp ? { boundaryUp: true } : {}),
     ...(a.boundaryDown ? { boundaryDown: true } : {}),
+    ...(a.openUp || a.openDown ? { openAt: openArrowMarks(a), openUp: a.openUp, openDown: a.openDown } : {}),
   }));
 
   // стрелки на границе диаграммы — это её внешние входы, управление, выходы и механизмы (для A-0)
@@ -344,7 +350,11 @@ function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefine
   }
   for (const a of d.arrows) {
     const path = a.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
-    parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.1" marker-end="url(#arrow)" />`);
+    const kind = a.ref?.kind;
+    // I7: если полый наконечник стоит на последней точке, сплошной маркер там не рисуется
+    const marker = kind && ((a.openDown && FREE_END[kind] !== "end") || (a.openUp && FREE_END[kind] === "end")) ? "" : ' marker-end="url(#arrow)"';
+    parts.push(`<path d="${path}" fill="none" stroke="#4677bf" stroke-width="1.1"${marker} />`);
+    for (const tri of a.openAt ?? []) parts.push(`<polygon points="${tri.map((p) => `${p[0]},${p[1]}`).join(" ")}" fill="#ffffff" stroke="#4677bf" stroke-width="1.1" />`);
     if (a.ref) for (const arc of tunnelArcs({ kind: a.ref.kind, points: a.points, tunnelUp: a.tunnelUp, tunnelDown: a.tunnelDown, boundaryUp: a.boundaryUp, boundaryDown: a.boundaryDown })) parts.push(`<path d="M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}" fill="none" stroke="#1f2937" stroke-width="1.4" />`);
     const lab = arrowLabelPlacement(a);
     // В11: значок «ссылка на диаграмму» у помеченного конца

@@ -52,7 +52,7 @@ describe("эталон B002 в студии", () => {
 
     // самая насыщенная: B002.01.03
     await page.locator('[data-nav-bpmn="o13"]').click();
-    await page.locator('.studio g[data-node-id="o13_kb"]').waitFor();
+    await page.locator('.studio g[data-node-id="o13_sub"]').waitFor();
     if (shot) await page.locator(".bpe-canvas").first().screenshot({ path: `${shot}/ref-o13.png` });
 
     // IDEF0 уровня 1 подпроцесса B002.03.00

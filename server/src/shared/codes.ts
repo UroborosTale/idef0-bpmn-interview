@@ -13,6 +13,8 @@ export interface CodeNode {
   type: string;
   idef0_parent?: string | null;
   bpmn_scope?: string | null;
+  /** Номер блока IDEF0, как в Business Studio, если он отличается от порядка на диаграмме. */
+  idef0_number?: string | null;
 }
 
 export interface CodeModel<N extends CodeNode = CodeNode> {
@@ -81,7 +83,7 @@ export function blockNumbers<N extends CodeNode>(m: CodeModel<N>): Map<string, s
   const walk = (parentId: string | null, prefix: string) => {
     siblings(m, parentId).forEach((n, i) => {
       if (out.has(n.id)) return; // защита от циклов в idef0_parent
-      const num = prefix ? `${prefix}.${i + 1}` : `A${i + 1}`;
+      const num = n.idef0_number ?? (prefix ? `${prefix}.${i + 1}` : `A${i + 1}`);
       out.set(n.id, num);
       walk(n.id, num);
     });

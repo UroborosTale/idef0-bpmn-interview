@@ -185,13 +185,15 @@ export const ProcessNode = z.object({
       z.object({
         up: z.boolean().optional(),
         down: z.boolean().optional(),
-        upKind: z.enum(["tunnel", "boundary", "offpage"]).optional(),
-        downKind: z.enum(["tunnel", "boundary", "offpage"]).optional(),
+        upKind: z.enum(["tunnel", "boundary", "offpage", "open"]).optional(),
+        downKind: z.enum(["tunnel", "boundary", "offpage", "open"]).optional(),
       })
     )
     .optional(),
   // Позиция блока на диаграмме IDEF0 A0 (редактор IDEF0); без неё блоки идут по диагонали.
   idef0_layout: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
+  /** Номер блока IDEF0, как в Business Studio (A4, A3), если он отличается от порядка на диаграмме. */
+  idef0_number: z.string().optional(),
   // Ручные маршруты стрелок IDEF0, привязанных к этой функции: ключ «вид:сущность» (input:d1, link:d2, control:c1, system:s1…).
   arrow_routes: z.record(z.string(), ArrowRoute).optional(),
   // Ручное смещение значков документов и хранилищ BPMN от автоматического места у задачи: ключ «вид:сущность» (input:d1, output:d2, store:s1).

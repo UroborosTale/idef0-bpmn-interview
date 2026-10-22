@@ -41,6 +41,11 @@ describe("эталон B002: структура по документам", () =
     expect(hosts).toHaveLength(9);
     for (const h of hosts) {
       const steps = m.nodes.filter((n) => n.bpmn_scope === h.id);
+      // D3: B002.01.03 в BS — один свёрнутый подпроцесс, без начального и конечного события
+      if (h.id === "o13") {
+        expect(steps.map((n) => n.type), h.name).toEqual(["subprocess"]);
+        continue;
+      }
       expect(steps.some((n) => n.type === "event" && n.subtype === "start"), h.name).toBe(true);
       expect(steps.some((n) => n.type === "event" && n.subtype === "end"), h.name).toBe(true);
       expect(steps.every((n) => n.role_id === "r_spec"), h.name).toBe(true); // одна дорожка — сотрудник отдела корпоративных технологий
@@ -58,11 +63,12 @@ describe("эталон B002: структура по документам", () =
     const need = m.nodes.find((n) => n.name === "Необходимо предоставить актуальный реестр процессов?")!;
     expect(m.flows.filter((f) => f.from === need.id).map((f) => f.condition).sort()).toEqual(["Да", "Нет"]);
     // интервью — задача «Бизнес-правила»; таймеры «Наступление интервью», «Начало смены», «Конец смены», «День выезда»
-    expect(m.nodes.filter((n) => n.subtype === "business_rule").map((n) => n.bpmn_scope).sort()).toEqual(["o12", "o13", "o31"]);
-    expect(m.nodes.filter((n) => n.subtype === "timer").map((n) => n.name).sort()).toEqual(["Конец смены", "Начало смены", "Наступление интервью", "Наступление интервью", "Наступление интервью", "День выезда"].sort());
+    // (в B002.01.03 по D3 остался один свёрнутый подпроцесс, поэтому таймеров «Наступление интервью» стало два)
+    expect(m.nodes.filter((n) => n.subtype === "business_rule").map((n) => n.bpmn_scope).sort()).toEqual(["o12", "o31"]);
+    expect(m.nodes.filter((n) => n.subtype === "timer").map((n) => n.name).sort()).toEqual(["Конец смены", "Начало смены", "Наступление интервью", "Наступление интервью", "День выезда"].sort());
     // фото рабочего дня: три ручных шага в начале, уведомления — сервисные задачи
     expect(m.nodes.filter((n) => n.bpmn_scope === "o32" && n.subtype === "manual")).toHaveLength(3);
-    expect(m.nodes.filter((n) => n.subtype === "service")).toHaveLength(5); // три уведомления, свод знаний, задача на ответственного секретаря
+    expect(m.nodes.filter((n) => n.subtype === "service")).toHaveLength(2); // уведомление в o12 и уведомление в o31 (остальные были в o13, D3)
     // картирование: два согласования плана с владельцем и два цикла возврата
     expect(m.nodes.filter((n) => n.bpmn_scope === "o33" && n.name === "План согласован?")).toHaveLength(2);
     // системы: реестр ведут в Excel, карточки и комментарии — в ELMA365

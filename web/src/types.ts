@@ -139,9 +139,11 @@ export interface ProcessNode {
   loop?: LoopKind;
   layout?: { x: number; y: number } | null;
   idef0_layout?: { x: number; y: number } | null;
+  /** Номер блока IDEF0, как в Business Studio (A4, A3). */
+  idef0_number?: string;
   /** Туннели внешних стрелок IDEF0 этой функции (скобки у конца): ключ «вид:сущность»; up — нет на диаграмме выше, down — нет в декомпозиции;
    *  upKind/downKind: «tunnel» — скобки, «boundary» — штрих, «offpage» — ссылка на диаграмму (значок страницы, В11). */
-  tunnels?: Record<string, { up?: boolean; down?: boolean; upKind?: "tunnel" | "boundary" | "offpage"; downKind?: "tunnel" | "boundary" | "offpage" }>;
+  tunnels?: Record<string, { up?: boolean; down?: boolean; upKind?: "tunnel" | "boundary" | "offpage" | "open"; downKind?: "tunnel" | "boundary" | "offpage" | "open" }>;
   /** Ручные маршруты стрелок IDEF0 этой функции: ключ «вид:сущность». */
   arrow_routes?: Record<string, ArrowRoute>;
   /** Ручное смещение значков документов и хранилищ BPMN от автоматического места: ключ «вид:сущность». */

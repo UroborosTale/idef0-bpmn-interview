@@ -572,6 +572,8 @@ function idef0Page(d: Idef0DiagramData, name: string, model: ProcessLogicModel, 
       color: "#4677bf",
       arrowSize: 0,
     });
+    // I7: полый наконечник у «неопределённого конца» — треугольник контуром
+    for (const tri of a.openAt ?? []) page.polyline([...tri, tri[0]], { weightPt: 0.75, line: "#4677bf" });
     // В9: ICOM-код у конца у блока — часть диаграммы, как в Business Studio
     if (a.code && a.codeAt) page.label(a.code, { x: a.codeAt[0], y: a.codeAt[1] - 9, anchor: a.codeAnchor ?? "start", w: 30 }, { fontPx: 9, color: "#475569" });
     // В11: значок «ссылка на диаграмму» у помеченного конца

@@ -82,74 +82,7 @@ artifact store:s_outlook 1143,184 24×26 edge[1155,184 1155,180] «Outlook»
 artifact data:d_checklist 1464.5,60 24×26 edge[1476.5,86 1476.5,90] «Чек-лист интервью»
 artifact data:d_chain 2341.5,60 24×26 edge[2353.5,90 2353.5,86] «Продуктовая цепочка»
 # редактор BPMN B002.01.03
-shape o13_start event/start 180,117 36×36 «Проведено первичное интервью»
-shape o13_idef0_0 task/user 320,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
-shape o13_idef0_1 task/user 510,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
-shape o13_idef0_attach task/user 700,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
-shape o13_idef0_comment task/user 890,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
-shape o13_approve1 subprocess 1070,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_assign task/user 1270,90 150×90 «Назначить повторное интервью с владельцем процесса»
-shape o13_timer event/timer 1510,117 36×36 «Наступление интервью»
-shape o13_interview task/business_rule 1650,90 150×90 «Интервьюировать по вопросам процесса»
-shape o13_comment_i task/user 1840,90 150×90 «Заполнить текстовый комментарий по проведению повторного интервью»
-shape o13_finish_i task/user 2030,90 150×90 «Завершить задачу по проведению повторного интервью»
-shape o13_notify task/service 2220,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape o13_bpmn task/user 2410,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
-shape o13_bpmn_attach task/user 2600,90 150×90 «Прикрепить файл к задаче по описанию BPMN»
-shape o13_bpmn_comment task/user 2790,90 150×90 «Заполнить текстовый комментарий по описанию BPMN»
-shape o13_atlas task/user 2980,90 150×90 «Создать атлас процессов»
-shape o13_wi task/user 3170,90 150×90 «Создать рабочую инструкцию»
-shape o13_wi_attach task/user 3360,90 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
-shape o13_wi_comment task/user 3550,90 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
-shape o13_approve2 subprocess 3730,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_reg task/user 3930,90 150×90 «Написать регламент по смоделированному процессу ООО «РУ КМЗ»»
-shape o13_reg_attach task/user 4120,90 150×90 «Прикрепить файл к задаче по описанию регламента процесса»
-shape o13_reg_comment task/user 4310,90 150×90 «Заполнить текстовый комментарий по описанию регламента процесса»
-shape o13_approve3 subprocess 4490,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape o13_kb task/service 4690,90 150×90 «Сформировать свод знаний процесса»
-shape o13_task_kk task/service 4880,90 150×90 «Создать задачу «Утвердить процесс на КК» на ответственного секретаря»
-shape o13_end event/end 5120,117 36×36 «Завершено моделирование текущего процесса»
-flow o13_f1 o13_start→o13_idef0_0 [216,135 320,135]
-flow o13_f2 o13_idef0_0→o13_idef0_1 [470,135 510,135]
-flow o13_f3 o13_idef0_1→o13_idef0_attach [660,135 700,135]
-flow o13_f4 o13_idef0_attach→o13_idef0_comment [850,135 890,135]
-flow o13_f5 o13_idef0_comment→o13_approve1 [1040,135 1070,135]
-flow o13_f6 o13_approve1→o13_assign [1230,135 1270,135]
-flow o13_f7 o13_assign→o13_timer [1420,135 1510,135]
-flow o13_f8 o13_timer→o13_interview [1546,135 1650,135]
-flow o13_f9 o13_interview→o13_comment_i [1800,135 1840,135]
-flow o13_f10 o13_comment_i→o13_finish_i [1990,135 2030,135]
-flow o13_f11 o13_finish_i→o13_notify [2180,135 2220,135]
-flow o13_f12 o13_notify→o13_bpmn [2370,135 2410,135]
-flow o13_f13 o13_bpmn→o13_bpmn_attach [2560,135 2600,135]
-flow o13_f14 o13_bpmn_attach→o13_bpmn_comment [2750,135 2790,135]
-flow o13_f15 o13_bpmn_comment→o13_atlas [2940,135 2980,135]
-flow o13_f16 o13_atlas→o13_wi [3130,135 3170,135]
-flow o13_f17 o13_wi→o13_wi_attach [3320,135 3360,135]
-flow o13_f18 o13_wi_attach→o13_wi_comment [3510,135 3550,135]
-flow o13_f19 o13_wi_comment→o13_approve2 [3700,135 3730,135]
-flow o13_f20 o13_approve2→o13_reg [3890,135 3930,135]
-flow o13_f21 o13_reg→o13_reg_attach [4080,135 4120,135]
-flow o13_f22 o13_reg_attach→o13_reg_comment [4270,135 4310,135]
-flow o13_f23 o13_reg_comment→o13_approve3 [4460,135 4490,135]
-flow o13_f24 o13_approve3→o13_kb [4650,135 4690,135]
-flow o13_f25 o13_kb→o13_task_kk [4840,135 4880,135]
-flow o13_f26 o13_task_kk→o13_end [5030,135 5120,135]
-artifact data:d_idef0_0 383,60 24×26 edge[395,90 395,86] «Диаграмма процесса IDEF0 (0 уровень)»
-artifact store:s_visio 329.5,184 24×26 edge[341.5,184 341.5,180] «Microsoft Visio»
-artifact store:s_bs 436.5,184 24×26 edge[448.5,184 448.5,180] «Business studio»
-artifact data:d_idef0_1 573,60 24×26 edge[585,90 585,86] «Диаграмма процесса IDEF0 (1 уровень)»
-artifact store:s_elma 763,184 24×26 edge[775,184 775,180] «ELMA365»
-artifact data:d_checklist 1274.5,60 24×26 edge[1286.5,86 1286.5,90] «Чек-лист интервью»
-artifact data:d_protocol 1391.5,60 24×26 edge[1403.5,90 1403.5,86] «Протокол интервью»
-artifact data:d_bpmn 2473,60 24×26 edge[2485,90 2485,86] «Диаграмма процесса BPMN 2.0»
-artifact data:d_atlas 3043,60 24×26 edge[3055,90 3055,86] «Атлас процессов»
-artifact data:d_wiTpl 3172,60 24×26 edge[3184,86 3184,90] «Шаблон рабочей инструкции»
-artifact data:d_wi 3294,60 24×26 edge[3306,90 3306,86] «Рабочая инструкция»
-artifact data:d_regTpl 3932,60 24×26 edge[3944,86 3944,90] «Шаблон регламента процесса»
-artifact data:d_reg 4054,60 24×26 edge[4066,90 4066,86] «Регламент процесса»
-artifact store:s_word 3993,184 24×26 edge[4005,184 4005,180] «Microsoft Word»
-artifact data:d_kbProject 4875,60 24×26 edge[4830,90 4887,86] «Проект свода знаний процесса»
+shape o13_sub subprocess 120,90 160×90 «Разработка модели процесса»
 # редактор BPMN B002.02.01
 shape o21_start event/start 180,117 36×36 «Направлена информация об итогах реализации процессов»
 shape o21_get task/receive 320,90 150×90 «Получить информацию по процессу ООО «РУ КМЗ»»

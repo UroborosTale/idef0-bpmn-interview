@@ -22,7 +22,8 @@
     "seed:process": "tsx src/scripts/seed-process.ts",
     "seed:b002": "tsx src/scripts/seed-process.ts b002",
     "seed:c025": "tsx src/scripts/seed-process.ts c025",
-    "seed:demo": "tsx src/scripts/seed-process.ts demo"
+    "seed:demo": "tsx src/scripts/seed-process.ts demo",
+    "reset:process": "tsx src/scripts/seed-process.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

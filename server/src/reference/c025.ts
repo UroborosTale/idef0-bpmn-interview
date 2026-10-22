@@ -85,15 +85,19 @@ interface Fn {
   /** Исполнитель операции (дорожка по умолчанию) и роли-механизмы. */
   role?: string;
   roles: [role: string, kind: Kind][];
+  /** Номер блока IDEF0, как в Business Studio (A4, A3 — порядок создания в BS отличается от порядка на диаграмме). */
+  idef0_number?: string;
+  /** Помеченные концы ICOM-стрелок: «open» — полый наконечник (выход без потребителя, I7). */
+  tunnels?: Record<string, { up?: boolean; down?: boolean; upKind?: "tunnel" | "boundary" | "offpage" | "open"; downKind?: "tunnel" | "boundary" | "offpage" | "open" }>;
 }
 
 // Порядок как в документе: A0 → A4 (C025.01.00 и её операции) → операции C025.02.00
 const FUNCTIONS: Fn[] = [
-  { id: "s1", name: "Оформление заявки на обучение сотрудника", in: ["need", "mandate"], controls: ["order266", "tk196", "list"], out: ["unapproved", "confirmed"], roles: [["initiator", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]] },
+  { id: "s1", name: "Оформление заявки на обучение сотрудника", in: ["need", "mandate"], controls: ["order266", "tk196", "list"], out: ["confirmed"], roles: [["initiator", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]], idef0_number: "A4" },
   { id: "o11", parent: "s1", name: "Формирование заявки на обучение", in: ["need", "mandate", "returned"], controls: ["order266", "list"], out: ["formed"], role: "initiator", roles: [["initiator", "executor"], ["elma", "coexecutor"]] },
-  { id: "o12", parent: "s1", name: "Согласование заявки на обучение", in: ["formed"], controls: ["tk196"], out: ["returned", "unapproved", "approved"], role: "mgr", roles: [["mgr", "executor"], ["dird", "coexecutor"], ["dirhr", "coexecutor"], ["elma", "coexecutor"]] },
-  { id: "o13", parent: "s1", name: "Подтверждение программы обучения", in: ["approved"], controls: [], out: ["impossible", "confirmed"], role: "spec", roles: [["spec", "executor"], ["elma", "coexecutor"]] },
-  { id: "s2", name: "Проведение обучения", in: ["confirmed", "dismissal"], controls: ["law273", "tk187", "order266"], out: ["trained", "eduSection", "dismissed"], roles: [["emp", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]] },
+  { id: "o12", parent: "s1", name: "Согласование заявки на обучение", in: ["formed"], controls: ["tk196"], out: ["returned", "unapproved", "approved"], role: "mgr", roles: [["mgr", "executor"], ["dird", "coexecutor"], ["dirhr", "coexecutor"], ["elma", "coexecutor"]], tunnels: { "output:unapproved": { upKind: "open" } } },
+  { id: "o13", parent: "s1", name: "Подтверждение программы обучения", in: ["approved"], controls: [], out: ["impossible", "confirmed"], role: "spec", roles: [["spec", "executor"], ["elma", "coexecutor"]], tunnels: { "output:impossible": { upKind: "open" } } },
+  { id: "s2", name: "Проведение обучения", in: ["confirmed", "dismissal"], controls: ["law273", "tk187", "order266"], out: ["trained", "eduSection", "dismissed"], roles: [["emp", "coexecutor"], ["spec", "coexecutor"], ["mgr", "controller"], ["dird", "controller"], ["dirhr", "controller"]], idef0_number: "A3" },
   { id: "o21", parent: "s2", name: "Сопровождение обучения сотрудника", in: ["confirmed", "dismissal"], controls: ["law273", "tk187", "order266"], out: ["trained", "dismissed"], role: "spec", roles: [["spec", "executor"], ["elma", "coexecutor"]] },
   { id: "o22", parent: "s2", name: "Учет результата обучения", in: ["trained"], controls: ["tk187"], out: ["eduSection"], role: "spec", roles: [["spec", "executor"], ["emp", "coexecutor"], ["elma", "coexecutor"]] },
 ];
@@ -323,6 +327,8 @@ export function c025Model(): ProcessLogicModel {
       system_ids: [id.system("elma")], // ELMA365 — механизм на всех диаграммах IDEF0
       status: "confirmed",
       confidence: 1,
+      ...(f.idef0_number ? { idef0_number: f.idef0_number } : {}),
+      ...(f.tunnels ? { tunnels: f.tunnels } : {}),
     });
   }
   for (const d of DIAGRAMS) {

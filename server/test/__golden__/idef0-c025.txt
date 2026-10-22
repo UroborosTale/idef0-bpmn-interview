@@ -6,7 +6,6 @@ arrow control:s1:c_tk196 [266,174 266,220] label@269,172/start «Трудово�
 arrow control:s1:c_list [292,174 292,220] label@295,198/start «Список направлений обучения»
 arrow input:s1:d_need [0,234 220,234] label@110,238/middle «Сотрудник нуждающийся в обучении»
 arrow input:s1:d_mandate [0,274 220,274] label@110,278/middle «Поручение руководства»
-arrow output:s1:d_unapproved [390,234 1080,234] label@735,238/middle «Несогласованная заявка на обучение»
 arrow role:s1:r_initiator [240,350 240,310] label@243,364/start «Инициатор заявки на обучение»
 arrow role:s1:r_spec [266,556 266,310]
 arrow role:s1:r_mgr [292,538 292,310]
@@ -17,7 +16,7 @@ arrow control:s2:c_law273 [580,324 580,370] label@583,296/start «Федерал
 Российской Федерации»»
 arrow control:s2:c_tk187 [606,324 606,370] label@609,334/start «Трудовой кодекс РФ ст.187»
 arrow control:s2:c_order266 [632,324 632,370]
-arrow link:s2:d_confirmed [390,252 406,252 406,384 560,384] label@483,379/middle «Подтверждённая заявка на обучение»
+arrow link:s2:d_confirmed [390,234 406,234 406,384 560,384] label@483,379/middle «Подтверждённая заявка на обучение»
 arrow input:s2:d_dismissal [0,424 560,424] label@280,422/middle «Уведомление об отчислении сотрудника от образовательной
 организации»
 arrow output:s2:d_trained [730,384 1080,384] label@905,388/middle «Обученный сотрудник»

@@ -40,8 +40,8 @@ export interface ArrowTunnel {
   /** Вид помеченного конца: «tunnel» — скобки (стрелка продолжается на другой диаграмме), «boundary» — штрих:
    *  стрелка кончается на рамке диаграммы и дальше не идёт (как «Граница» в Business Studio), «offpage» — ссылка
    *  на диаграмму: значок страницы у конца (В11). */
-  upKind?: "tunnel" | "boundary" | "offpage";
-  downKind?: "tunnel" | "boundary" | "offpage";
+  upKind?: "tunnel" | "boundary" | "offpage" | "open";
+  downKind?: "tunnel" | "boundary" | "offpage" | "open";
 }
 export const TUNNEL_KINDS: ReadonlySet<ArrowKind> = new Set<ArrowKind>(["input", "output", "control", "controlData"]);
 
@@ -106,6 +106,30 @@ export function offpageMarks(a: { kind: ArrowKind; points: Pt[]; offpageUp?: boo
   };
   if (a.offpageUp) put(free);
   if (a.offpageDown) put(block);
+  return out;
+}
+
+/**
+ * I7: полый наконечник у «неопределённого конца» (в BS — выход без потребителя). Треугольник строится
+ * у свободного конца (openUp) или у блока (openDown) и рисуется контуром без заливки.
+ */
+export function openArrowMarks(a: { kind: ArrowKind; points: Pt[]; openUp?: boolean; openDown?: boolean }): Pt[][] {
+  const pts = a.points;
+  if (pts.length < 2 || (!a.openUp && !a.openDown)) return [];
+  const last = pts.length - 1;
+  const freeAtEnd = FREE_END[a.kind] === "end";
+  const free = freeAtEnd ? { at: pts[last], from: pts[last - 1] } : { at: pts[0], from: pts[1] };
+  const block = freeAtEnd ? { at: pts[0], from: pts[1] } : { at: pts[last], from: pts[last - 1] };
+  const triangle = (end: { at: Pt; from: Pt }): Pt[] => {
+    const len = Math.hypot(end.at[0] - end.from[0], end.at[1] - end.from[1]) || 1;
+    const t: Pt = [(end.at[0] - end.from[0]) / len, (end.at[1] - end.from[1]) / len];
+    const n: Pt = [-t[1], t[0]];
+    const base: Pt = [end.at[0] - t[0] * 10, end.at[1] - t[1] * 10];
+    return [end.at, [base[0] + n[0] * 4.5, base[1] + n[1] * 4.5], [base[0] - n[0] * 4.5, base[1] - n[1] * 4.5]];
+  };
+  const out: Pt[][] = [];
+  if (a.openUp) out.push(triangle(free));
+  if (a.openDown) out.push(triangle(block));
   return out;
 }
 
@@ -222,6 +246,9 @@ export interface Arrow {
   /** В11: конец стрелки — ссылка на диаграмму («OffPageReference»): у конца рисуется значок страницы. */
   offpageUp?: boolean;
   offpageDown?: boolean;
+  /** I7: полый наконечник («неопределённый конец»): openUp — свободный конец, openDown — конец у блока. */
+  openUp?: boolean;
+  openDown?: boolean;
   /** Маршрут правился вручную: положение конца, точки излома, свободный конец или подпись заданы пользователем. */
   manual?: boolean;
   /** Подпись не рисуется: механизм общий для нескольких блоков, подпись стоит на «шине» у одной из его стрелок. */
@@ -663,6 +690,15 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     }
     if (t?.downKind === "offpage") {
       a.offpageDown = true;
+      a.tunnelDown = false;
+    }
+    // I7: полый наконечник — «неопределённый конец» (выход без потребителя)
+    if (t?.upKind === "open") {
+      a.openUp = true;
+      a.tunnelUp = false;
+    }
+    if (t?.downKind === "open") {
+      a.openDown = true;
       a.tunnelDown = false;
     }
   }

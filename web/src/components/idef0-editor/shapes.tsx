@@ -1,5 +1,5 @@
 import { type ResolvedStyle } from "@shared/shapeStyles";
-import { FREE_END, noteBox, offpageMarks, tunnelArcs } from "@shared/idef0Layout";
+import { FREE_END, noteBox, offpageMarks, openArrowMarks, tunnelArcs } from "@shared/idef0Layout";
 import { wrapText } from "../bpmn-editor/geometry";
 import { labelSpec, type Arrow, type FunctionBlock } from "./geometry";
 import { noteLines } from "./notes";
@@ -311,10 +311,15 @@ export function ArrowShape({ arrow, selected, showLabel = true, showCode = false
   const d = arrow.points.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
   const color = selected ? ACCENT : ARROW;
   const lab = labelSpec(arrow);
+  // I7: полый наконечник на последней точке заменяет сплошной маркер
+  const hollowAtEnd = (arrow.openDown && FREE_END[arrow.kind] !== "end") || (arrow.openUp && FREE_END[arrow.kind] === "end");
   return (
     <g data-arrow-key={arrow.key} style={{ cursor: "pointer" }}>
       <path d={d} fill="none" stroke="transparent" strokeWidth={14} />
-      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.2 : 1.1} markerEnd={selected ? "url(#i0-arrow-sel)" : "url(#i0-arrow)"} />
+      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.2 : 1.1} markerEnd={hollowAtEnd ? undefined : selected ? "url(#i0-arrow-sel)" : "url(#i0-arrow)"} />
+      {openArrowMarks(arrow).map((tri, i) => (
+        <polygon key={`h${i}`} data-open-arrow points={tri.map((p) => `${p[0]},${p[1]}`).join(" ")} fill="#ffffff" stroke={color} strokeWidth={1.1} pointerEvents="none" />
+      ))}
       {tunnelArcs(arrow).map((arc, i) => (
         <path key={`t${i}`} data-tunnel d={`M${arc.from[0]},${arc.from[1]} Q${arc.ctl[0]},${arc.ctl[1]} ${arc.to[0]},${arc.to[1]}`} fill="none" stroke={color} strokeWidth={1.4} pointerEvents="none" />
       ))}

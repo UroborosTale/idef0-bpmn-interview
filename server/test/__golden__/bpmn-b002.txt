@@ -95,76 +95,13 @@ extra store 1031.5,184 24×26 «Microsoft Word» link[1043.5,184 1040,180]
 extra store 1211.5,184 24×26 «Outlook» link[1223.5,184 1223.5,180]
 extra data 1474.5,60 24×26 «Чек-лист интервью» link[1486.5,86 1486.5,90]
 extra data 831.5,200 24×26 «Продуктовая цепочка» link[843.5,230 843.5,226]
-# BPMN B002.01.03 2960×490
-lane r_spec 80,60 2780×290
-shape Node_o13_start event/start 140,117 36×36 «Проведено первичное интервью»
-shape Node_o13_idef0_0 task/user 330,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (0 уровень)»
-shape Node_o13_idef0_1 task/user 520,90 150×90 «Составить диаграмму процесса в нотации IDEF0 (1 уровень)»
-shape Node_o13_idef0_attach task/user 710,90 150×90 «Прикрепить файл к задаче по описанию IDEF0»
-shape Node_o13_idef0_comment task/user 900,90 150×90 «Заполнить текстовый комментарий по описанию IDEF0»
-shape Node_o13_approve1 subprocess 1090,90 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape Node_o13_assign task/user 1280,90 150×90 «Назначить повторное интервью с владельцем процесса»
-shape Node_o13_timer event/timer 1470,117 36×36 «Наступление интервью»
-shape Node_o13_interview task/business_rule 1660,90 150×90 «Интервьюировать по вопросам процесса»
-shape Node_o13_comment_i task/user 1850,90 150×90 «Заполнить текстовый комментарий по проведению повторного интервью»
-shape Node_o13_finish_i task/user 2040,90 150×90 «Завершить задачу по проведению повторного интервью»
-shape Node_o13_notify task/service 2230,90 150×90 «Отправить уведомление руководителю отдела корпоративных технологий о выполненной задаче»
-shape Node_o13_bpmn task/user 2420,90 150×90 «Составить диаграмму процесса в нотации BPMN 2.0»
-shape Node_o13_bpmn_attach task/user 2610,90 150×90 «Прикрепить файл к задаче по описанию BPMN»
-shape Node_o13_bpmn_comment task/user 140,230 150×90 «Заполнить текстовый комментарий по описанию BPMN»
-shape Node_o13_atlas task/user 330,230 150×90 «Создать атлас процессов»
-shape Node_o13_wi task/user 520,230 150×90 «Создать рабочую инструкцию»
-shape Node_o13_wi_attach task/user 710,230 150×90 «Прикрепить файл к задаче «Написать рабочие инструкции»»
-shape Node_o13_wi_comment task/user 900,230 150×90 «Заполнить текстовый комментарий по описанию рабочей инструкции»
-shape Node_o13_approve2 subprocess 1090,230 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape Node_o13_reg task/user 1280,230 150×90 «Написать регламент по смоделированному процессу ООО «РУ КМЗ»»
-shape Node_o13_reg_attach task/user 1470,230 150×90 «Прикрепить файл к задаче по описанию регламента процесса»
-shape Node_o13_reg_comment task/user 1660,230 150×90 «Заполнить текстовый комментарий по описанию регламента процесса»
-shape Node_o13_approve3 subprocess 1850,230 160×90 «Согласовать с руководителем отдела корпоративных технологий»
-shape Node_o13_kb task/service 2040,230 150×90 «Сформировать свод знаний процесса»
-shape Node_o13_task_kk task/service 2230,230 150×90 «Создать задачу «Утвердить процесс на КК» на ответственного секретаря»
-shape Node_o13_end event/end 2420,257 36×36 «Завершено моделирование текущего процесса»
-edge Flow_o13_f1 Node_o13_start→Node_o13_idef0_0 [176,135 330,135]
-edge Flow_o13_f2 Node_o13_idef0_0→Node_o13_idef0_1 [480,135 520,135]
-edge Flow_o13_f3 Node_o13_idef0_1→Node_o13_idef0_attach [670,135 710,135]
-edge Flow_o13_f4 Node_o13_idef0_attach→Node_o13_idef0_comment [860,135 900,135]
-edge Flow_o13_f5 Node_o13_idef0_comment→Node_o13_approve1 [1050,135 1090,135]
-edge Flow_o13_f6 Node_o13_approve1→Node_o13_assign [1250,135 1280,135]
-edge Flow_o13_f7 Node_o13_assign→Node_o13_timer [1430,135 1470,135]
-edge Flow_o13_f8 Node_o13_timer→Node_o13_interview [1506,135 1660,135]
-edge Flow_o13_f9 Node_o13_interview→Node_o13_comment_i [1810,135 1850,135]
-edge Flow_o13_f10 Node_o13_comment_i→Node_o13_finish_i [2000,135 2040,135]
-edge Flow_o13_f11 Node_o13_finish_i→Node_o13_notify [2190,135 2230,135]
-edge Flow_o13_f12 Node_o13_notify→Node_o13_bpmn [2380,135 2420,135]
-edge Flow_o13_f13 Node_o13_bpmn→Node_o13_bpmn_attach [2570,135 2610,135]
-edge Flow_o13_f14 Node_o13_bpmn_attach→Node_o13_bpmn_comment [2685,180 2685,374 215,374 215,320]
-edge Flow_o13_f15 Node_o13_bpmn_comment→Node_o13_atlas [290,275 330,275]
-edge Flow_o13_f16 Node_o13_atlas→Node_o13_wi [480,275 520,275]
-edge Flow_o13_f17 Node_o13_wi→Node_o13_wi_attach [670,275 710,275]
-edge Flow_o13_f18 Node_o13_wi_attach→Node_o13_wi_comment [860,275 900,275]
-edge Flow_o13_f19 Node_o13_wi_comment→Node_o13_approve2 [1050,275 1090,275]
-edge Flow_o13_f20 Node_o13_approve2→Node_o13_reg [1250,275 1280,275]
-edge Flow_o13_f21 Node_o13_reg→Node_o13_reg_attach [1430,275 1470,275]
-edge Flow_o13_f22 Node_o13_reg_attach→Node_o13_reg_comment [1620,275 1660,275]
-edge Flow_o13_f23 Node_o13_reg_comment→Node_o13_approve3 [1810,275 1850,275]
-edge Flow_o13_f24 Node_o13_approve3→Node_o13_kb [2010,275 2040,275]
-edge Flow_o13_f25 Node_o13_kb→Node_o13_task_kk [2190,275 2230,275]
-edge Flow_o13_f26 Node_o13_task_kk→Node_o13_end [2380,275 2420,275]
-extra data 393,60 24×26 «Диаграмма процесса IDEF0 (0 уровень)» link[405,90 405,86]
-extra store 339.5,184 24×26 «Microsoft Visio» link[351.5,184 351.5,180]
-extra store 446.5,184 24×26 «Business studio» link[458.5,184 458.5,180]
-extra data 892,60 24×26 «Диаграмма процесса IDEF0 (1 уровень)» link[660,90 904,86]
-extra store 1053,184 24×26 «ELMA365» link[1065,184 850,180]
-extra data 1284.5,60 24×26 «Чек-лист интервью» link[1296.5,86 1296.5,90]
-extra data 1401.5,60 24×26 «Протокол интервью» link[1413.5,90 1413.5,86]
-extra data 2483,60 24×26 «Диаграмма процесса BPMN 2.0» link[2495,90 2495,86]
-extra data 531.5,200 24×26 «Атлас процессов» link[470,230 543.5,226]
-extra data 616.5,200 24×26 «Шаблон рабочей инструкции» link[628.5,226 628.5,230]
-extra data 738.5,200 24×26 «Рабочая инструкция» link[660,230 750.5,226]
-extra data 1282,200 24×26 «Шаблон регламента процесса» link[1294,226 1294,230]
-extra data 1404,200 24×26 «Регламент процесса» link[1416,230 1416,226]
-extra store 1343,324 24×26 «Microsoft Word» link[1355,324 1355,320]
-extra data 2225,200 24×26 «Проект свода знаний процесса» link[2180,230 2237,226]
+# BPMN B002.01.03 764×350
+lane r_spec 80,60 584×150
+shape Node_o13_sub subprocess 278,90 160×90 «Разработка модели процесса»
+shape SynthStart event/start 152,117 36×36 «Начало процесса»
+shape SynthEnd event/end 528,117 36×36 «Завершение процесса»
+edge Flow_SynthFlow_s_o13_sub SynthStart→Node_o13_sub [188,135 278,135]
+edge Flow_SynthFlow_e_o13_sub Node_o13_sub→SynthEnd [438,135 528,135]
 # BPMN B002.02.01 2580×490
 lane r_spec 80,60 2400×290
 shape Node_o21_start event/start 140,117 36×36 «Направлена информация об итогах реализации процессов»
@@ -331,67 +268,67 @@ extra data 773,200 24×26 «Справочник «Подвид работ»» l
 extra data 963,200 24×26 «Справочник «Программное обеспечение»» link[975,226 975,230]
 extra data 1578,200 24×26 «Результаты ФРД ООО «РУ КМЗ»» link[1590,230 1590,226]
 extra store 1578,324 24×26 «PowerPoint» link[1590,324 1590,320]
-# BPMN B002.03.03 4895×460
-lane r_spec 80,60 4715×260
-shape Node_o33_start1 event/start 175,117 36×36 «ФРД проведено»
-shape Node_o33_start2 event/start 365,117 36×36 «Завершено моделирование текущего процесса»
-shape Node_o33_join gateway/parallel 555,105 60×60 «Слияние потоков»
-shape Node_o33_goal task/user 745,90 150×90 «Определить цель картирования»
-shape Node_o33_docs task/user 935,90 150×90 «Собрать исходные документы по процессу»
-shape Node_o33_plan task/user 1125,90 150×90 «Составить план проведения картирования»
-shape Node_o33_m1 gateway/exclusive 1315,105 60×60 «Слияние потоков»
-shape Node_o33_agree1 task/user 1505,90 150×90 «Согласовать план с владельцем процесса»
-shape Node_o33_ok1 gateway/exclusive 1695,105 60×60 «План согласован?»
-shape Node_o33_fix1 task/user 1785,226 150×90 «Скорректировать план проведения картирования»
-shape Node_o33_day event/timer 1965,117 36×36 «День выезда»
-shape Node_o33_watch task/user 2075,90 150×90 «Наблюдать за ходом процесса»
-shape Node_o33_state task/user 2265,90 150×90 «Фиксировать текущее состояние потока»
-shape Node_o33_measure task/user 2455,90 150×90 «Выполнить замер ключевых временных параметров»
-shape Node_o33_map_cur task/user 2645,90 150×90 «Моделировать текущую карту потока создания ценности»
-shape Node_o33_map_an task/user 2835,90 150×90 «Анализировать карту потока создания ценности»
-shape Node_o33_loss_an task/user 3025,90 150×90 «Анализировать потери»
-shape Node_o33_improve task/user 3215,90 150×90 «Сформировать точки улучшения»
-shape Node_o33_map_ideal task/user 3405,90 150×90 «Моделировать идеальное состояние карты потока создания ценности»
-shape Node_o33_feasible task/user 3595,90 150×90 «Анализировать возможности реализации»
-shape Node_o33_map_target task/user 3785,90 150×90 «Моделировать целевое состояние карты потока создания ценности»
-shape Node_o33_m2 gateway/exclusive 3975,105 60×60 «Слияние потоков»
-shape Node_o33_agree2 task/user 4165,90 150×90 «Согласовать план с владельцем процесса»
-shape Node_o33_ok2 gateway/exclusive 4355,105 60×60 «План согласован?»
-shape Node_o33_fix2 task/user 4545,90 150×90 «Скорректировать план проведения картирования»
-shape Node_o33_end event/end 4445,253 36×36 «Картирование проведено»
-edge Flow_o33_f1 Node_o33_start1→Node_o33_join [193,117 193,81 585,81 585,105]
-edge Flow_o33_f2 Node_o33_start2→Node_o33_join [401,135 555,135]
-edge Flow_o33_f3 Node_o33_join→Node_o33_goal [615,135 745,135]
-edge Flow_o33_f4 Node_o33_goal→Node_o33_docs [895,135 935,135]
-edge Flow_o33_f5 Node_o33_docs→Node_o33_plan [1085,135 1125,135]
-edge Flow_o33_f6 Node_o33_plan→Node_o33_m1 [1275,135 1315,135]
-edge Flow_o33_f7 Node_o33_m1→Node_o33_agree1 [1375,135 1505,135]
-edge Flow_o33_f8 Node_o33_agree1→Node_o33_ok1 [1655,135 1695,135]
-edge Flow_o33_f9 Node_o33_ok1→Node_o33_fix1 [1725,165 1725,271 1785,271] «Нет»
-edge Flow_o33_f10 Node_o33_fix1→Node_o33_m1 [1860,226 1860,81 1345,81 1345,105]
-edge Flow_o33_f11 Node_o33_ok1→Node_o33_day [1725,105 1725,71 1983,71 1983,117] «Да»
-edge Flow_o33_f12 Node_o33_day→Node_o33_watch [2001,135 2075,135]
-edge Flow_o33_f13 Node_o33_watch→Node_o33_state [2225,135 2265,135]
-edge Flow_o33_f14 Node_o33_state→Node_o33_measure [2415,135 2455,135]
-edge Flow_o33_f15 Node_o33_measure→Node_o33_map_cur [2605,135 2645,135]
-edge Flow_o33_f16 Node_o33_map_cur→Node_o33_map_an [2795,135 2835,135]
-edge Flow_o33_f17 Node_o33_map_an→Node_o33_loss_an [2985,135 3025,135]
-edge Flow_o33_f18 Node_o33_loss_an→Node_o33_improve [3175,135 3215,135]
-edge Flow_o33_f19 Node_o33_improve→Node_o33_map_ideal [3365,135 3405,135]
-edge Flow_o33_f20 Node_o33_map_ideal→Node_o33_feasible [3555,135 3595,135]
-edge Flow_o33_f21 Node_o33_feasible→Node_o33_map_target [3745,135 3785,135]
-edge Flow_o33_f22 Node_o33_map_target→Node_o33_m2 [3935,135 3975,135]
-edge Flow_o33_f23 Node_o33_m2→Node_o33_agree2 [4035,135 4165,135]
-edge Flow_o33_f24 Node_o33_agree2→Node_o33_ok2 [4315,135 4355,135]
-edge Flow_o33_f25 Node_o33_ok2→Node_o33_fix2 [4415,135 4545,135] «Нет»
-edge Flow_o33_f26 Node_o33_fix2→Node_o33_m2 [4620,90 4620,66 4005,66 4005,105]
-edge Flow_o33_f27 Node_o33_ok2→Node_o33_end [4385,165 4385,271 4445,271] «Да»
-extra store 1188,184 24×26 «Microsoft Word» link[1200,184 1200,180]
-extra data 2328,60 24×26 «Карточка потерь» link[2340,90 2340,86]
-extra data 2708,60 24×26 «Текущая карта потока создания ценности» link[2720,90 2720,86]
-extra store 2708,184 24×26 «Microsoft Visio» link[2720,184 2720,180]
-extra data 3468,60 24×26 «Идеальная карта потока создания ценности» link[3480,90 3480,86]
-extra data 3848,60 24×26 «Целевая карта потока создания ценности» link[3860,90 3860,86]
+# BPMN B002.03.03 3340×490
+lane r_spec 80,60 3160×290
+shape Node_o33_start1 event/start 140,117 36×36 «ФРД проведено»
+shape Node_o33_start2 event/start 330,117 36×36 «Завершено моделирование текущего процесса»
+shape Node_o33_join gateway/parallel 520,105 60×60 «Слияние потоков»
+shape Node_o33_goal task/user 710,90 150×90 «Определить цель картирования»
+shape Node_o33_docs task/user 900,90 150×90 «Собрать исходные документы по процессу»
+shape Node_o33_plan task/user 1090,90 150×90 «Составить план проведения картирования»
+shape Node_o33_m1 gateway/exclusive 1280,105 60×60 «Слияние потоков»
+shape Node_o33_agree1 task/user 1470,90 150×90 «Согласовать план с владельцем процесса»
+shape Node_o33_ok1 gateway/exclusive 1660,105 60×60 «План согласован?»
+shape Node_o33_fix1 task/user 1850,90 150×90 «Скорректировать план проведения картирования»
+shape Node_o33_day event/timer 2040,117 36×36 «День выезда»
+shape Node_o33_watch task/user 2230,90 150×90 «Наблюдать за ходом процесса»
+shape Node_o33_state task/user 2420,90 150×90 «Фиксировать текущее состояние потока»
+shape Node_o33_measure task/user 2610,90 150×90 «Выполнить замер ключевых временных параметров»
+shape Node_o33_map_cur task/user 2800,90 150×90 «Моделировать текущую карту потока создания ценности»
+shape Node_o33_map_an task/user 2990,90 150×90 «Анализировать карту потока создания ценности»
+shape Node_o33_loss_an task/user 140,230 150×90 «Анализировать потери»
+shape Node_o33_improve task/user 330,230 150×90 «Сформировать точки улучшения»
+shape Node_o33_map_ideal task/user 520,230 150×90 «Моделировать идеальное состояние карты потока создания ценности»
+shape Node_o33_feasible task/user 710,230 150×90 «Анализировать возможности реализации»
+shape Node_o33_map_target task/user 900,230 150×90 «Моделировать целевое состояние карты потока создания ценности»
+shape Node_o33_m2 gateway/exclusive 1090,245 60×60 «Слияние потоков»
+shape Node_o33_agree2 task/user 1280,230 150×90 «Согласовать план с владельцем процесса»
+shape Node_o33_ok2 gateway/exclusive 1470,245 60×60 «План согласован?»
+shape Node_o33_fix2 task/user 1660,230 150×90 «Скорректировать план проведения картирования»
+shape Node_o33_end event/end 1850,257 36×36 «Картирование проведено»
+edge Flow_o33_f1 Node_o33_start1→Node_o33_join [158,117 158,81 550,81 550,105]
+edge Flow_o33_f2 Node_o33_start2→Node_o33_join [366,135 520,135]
+edge Flow_o33_f3 Node_o33_join→Node_o33_goal [580,135 710,135]
+edge Flow_o33_f4 Node_o33_goal→Node_o33_docs [860,135 900,135]
+edge Flow_o33_f5 Node_o33_docs→Node_o33_plan [1050,135 1090,135]
+edge Flow_o33_f6 Node_o33_plan→Node_o33_m1 [1240,135 1280,135]
+edge Flow_o33_f7 Node_o33_m1→Node_o33_agree1 [1340,135 1470,135]
+edge Flow_o33_f8 Node_o33_agree1→Node_o33_ok1 [1620,135 1660,135]
+edge Flow_o33_f9 Node_o33_ok1→Node_o33_fix1 [1720,135 1850,135] «Нет»
+edge Flow_o33_f10 Node_o33_fix1→Node_o33_m1 [1925,90 1925,66 1310,66 1310,105]
+edge Flow_o33_f11 Node_o33_ok1→Node_o33_day [1690,165 1690,189 2058,189 2058,153] «Да»
+edge Flow_o33_f12 Node_o33_day→Node_o33_watch [2076,135 2230,135]
+edge Flow_o33_f13 Node_o33_watch→Node_o33_state [2380,135 2420,135]
+edge Flow_o33_f14 Node_o33_state→Node_o33_measure [2570,135 2610,135]
+edge Flow_o33_f15 Node_o33_measure→Node_o33_map_cur [2760,135 2800,135]
+edge Flow_o33_f16 Node_o33_map_cur→Node_o33_map_an [2950,135 2990,135]
+edge Flow_o33_f17 Node_o33_map_an→Node_o33_loss_an [3065,180 3065,344 215,344 215,320]
+edge Flow_o33_f18 Node_o33_loss_an→Node_o33_improve [290,275 330,275]
+edge Flow_o33_f19 Node_o33_improve→Node_o33_map_ideal [480,275 520,275]
+edge Flow_o33_f20 Node_o33_map_ideal→Node_o33_feasible [670,275 710,275]
+edge Flow_o33_f21 Node_o33_feasible→Node_o33_map_target [860,275 900,275]
+edge Flow_o33_f22 Node_o33_map_target→Node_o33_m2 [1050,275 1090,275]
+edge Flow_o33_f23 Node_o33_m2→Node_o33_agree2 [1150,275 1280,275]
+edge Flow_o33_f24 Node_o33_agree2→Node_o33_ok2 [1430,275 1470,275]
+edge Flow_o33_f25 Node_o33_ok2→Node_o33_fix2 [1530,275 1660,275] «Нет»
+edge Flow_o33_f26 Node_o33_fix2→Node_o33_m2 [1735,320 1735,354 1120,354 1120,305]
+edge Flow_o33_f27 Node_o33_ok2→Node_o33_end [1500,245 1500,221 1868,221 1868,257] «Да»
+extra store 1153,184 24×26 «Microsoft Word» link[1165,184 1165,180]
+extra data 2483,60 24×26 «Карточка потерь» link[2495,90 2495,86]
+extra data 2863,60 24×26 «Текущая карта потока создания ценности» link[2875,90 2875,86]
+extra store 2863,184 24×26 «Microsoft Visio» link[2875,184 2875,180]
+extra data 583,200 24×26 «Идеальная карта потока создания ценности» link[595,230 595,226]
+extra data 963,200 24×26 «Целевая карта потока создания ценности» link[975,230 975,226]
 # BPMN B002.03.04 1820×490
 lane r_spec 80,60 1640×290
 shape Node_o34_start event/start 140,117 36×36 «Картирование проведено»
