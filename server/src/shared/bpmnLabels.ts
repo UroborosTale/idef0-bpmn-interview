@@ -37,6 +37,8 @@ const LABEL_CHAR_W = 5.8; // средняя ширина знака при ке�
 const LABEL_LINE_H = 13;
 const LABEL_GAP = 3; // просвет между фигурой и подписью
 const LANE_LABEL_MARGIN = 2; // подпись не должна касаться линии дорожки
+/** B8: подпись фигуры не заходит в колонку заголовков дорожек (LANE_X + LABEL_W = 117, плюс запас). */
+export const LABEL_MIN_X = 121;
 
 /** Сторона подписи фигуры: под фигурой, а если до линии дорожки места нет — над ней. */
 export type LabelSide = "below" | "above";
@@ -54,12 +56,12 @@ export function labelSide(b: Box, text: string, band?: { top: number; bottom: nu
   return b.y - LABEL_GAP - h >= band.top + LANE_LABEL_MARGIN ? "above" : "below";
 }
 
-/** Рамка подписи фигуры: по ней стрелки обходят текст. Подпись по умолчанию стоит по центру оси фигуры. */
-export function labelBox(b: Box, text: string, side: LabelSide = "below"): Box | null {
+/** Рамка подписи фигуры: по ней стрелки обходят текст. Подпись по умолчанию стоит по центру оси фигуры, но не заходит в колонку заголовков дорожек (B8). */
+export function labelBox(b: Box, text: string, side: LabelSide = "below", minX: number = LABEL_MIN_X): Box | null {
   const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
   if (lines.length === 0) return null;
   const w = Math.max(...lines.map((l) => l.length)) * LABEL_CHAR_W + 4;
   const h = lines.length * LABEL_LINE_H;
-  return { x: b.x + b.w / 2 - w / 2, y: side === "above" ? b.y - LABEL_GAP - h : b.y + b.h + LABEL_GAP, w, h };
+  return { x: Math.max(minX, b.x + b.w / 2 - w / 2), y: side === "above" ? b.y - LABEL_GAP - h : b.y + b.h + LABEL_GAP, w, h };
 }
 

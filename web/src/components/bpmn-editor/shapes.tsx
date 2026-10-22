@@ -8,7 +8,7 @@ import { TASK_ICON_PAD, taskIcon } from "@shared/taskIcons";
 /** Подсказка к значку типа задачи. */
 const TASK_TYPE_TITLES: Record<string, string> = { user: "Пользовательская задача", service: "Сервисная задача", manual: "Ручная задача", send: "Отправка сообщения", receive: "Получение сообщения", script: "Сценарий", business_rule: "Бизнес-правило" };
 import { MARKER_R, markerCenters, type TriggerMarker } from "@shared/bpmnTriggers";
-import { labelSide } from "@shared/bpmnLabels";
+import { labelBox, labelSide } from "@shared/bpmnLabels";
 import { LANE_X, LABEL_W, LABEL_CHARS, LABEL_LINES, flowLabelPoint, laneCount, laneHeights, laneTop, waypoints, wrapText, type Box, type EndKinds, type Pt } from "./geometry";
 
 const INK = "#1e293b";
@@ -74,17 +74,14 @@ export function nodeStyle(m: StyledModel | undefined, node: ProcessNode, boundar
 /** Подпись фигуры: под ней, а если до линии дорожки места нет — над ней (above). left — подпись левее оси (по правому краю): у фигуры вниз уходит или снизу входит стрелка, и она не должна идти через текст. */
 function Label({ box, text, above = false, left = false, color = INK, size = 11 }: { box: Box; text: string; above?: boolean; left?: boolean; color?: string; size?: number }) {
   const lines = wrapText(text, LABEL_CHARS, LABEL_LINES);
-  const cx = box.x + box.w / 2;
   const lh = Math.round((size * 13) / 11);
-  const x = left ? cx - 8 : cx;
+  // B8: горизонталь берём из общей рамки подписи — она не заходит в колонку заголовков дорожек
+  const rect = labelBox(box, text, above ? "above" : "below");
+  const x = left ? rect!.x + rect!.w - 2 : rect!.x + rect!.w / 2;
   const y = above ? box.y - 6 - (lines.length - 1) * lh : box.y + box.h + 14;
-  const labelW = Math.max(1, ...lines.map((l) => l.length)) * 5.8 + 4;
-  const labelH = lines.length * lh + 2;
-  const boxX = left ? x - labelW : x - labelW / 2;
-  const boxY = y - 10;
   return (
     <g pointerEvents="none">
-      <rect x={boxX} y={boxY} width={labelW} height={labelH} fill="#fff" opacity={0.92} pointerEvents="none" />
+      <rect x={rect!.x} y={rect!.y} width={rect!.w} height={rect!.h} fill="#fff" opacity={0.92} pointerEvents="none" />
       <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={size} fill={color} pointerEvents="none">
         {lines.map((l, i) => (
           <tspan key={i} x={x} dy={i === 0 ? 0 : lh}>

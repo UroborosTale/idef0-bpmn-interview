@@ -437,10 +437,18 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
         const sy = route?.from_pos !== undefined ? pb.y + route.from_pos * pb.h : slot.sy;
         const k = slot.k;
         const sx = pb.x + pb.w;
-        const trunk = sx + 16 + 8 * k;
+        // B11/I5: у всех стрелок одного источника общий ствол — тогда их собственные отрезки не пересекаются
+        const trunk = sx + 16;
         let points: Pt[];
         if (b.x >= trunk + 32) {
           points = [[sx, sy], [trunk, sy], [trunk, y], [b.x, y]];
+          // I5: если горизонталь задевает вертикаль управления или механизма промежуточного блока, обходим блоки сверху
+          const blockers = arrows.filter((a) => (a.kind === "role" || a.kind === "control" || a.kind === "controlData" || a.kind === "controlLink") && a.nodeId !== n.id && a.points[1][0] > trunk && a.points[1][0] < b.x && Math.min(a.points[0][1], a.points[1][1]) < y);
+          if (blockers.length > 0) {
+            const corridorY = Math.min(...blockers.map((a) => Math.min(a.points[0][1], a.points[1][1]) - 20));
+            const entry = b.x - 16 - 6 * di;
+            points = [[sx, sy], [trunk, sy], [trunk, corridorY], [entry, corridorY], [entry, y], [b.x, y]];
+          }
         } else {
           // потребитель не правее источника: обратная связь обходит оба блока сверху
           const top = Math.min(pb.y, b.y) - 30 - 8 * k;
@@ -550,6 +558,9 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
   const BRANCH_STUB = 64; // вылет ствола наружу — место подписи и наконечника
   for (const list of branches.values()) {
     if (list.length < 2) continue;
+    // управления разных блоков не сводим в общий ствол: длинная горизонталь пересекала бы вертикали
+    // других управлений (I5); ствол объединяет только стрелки одной сущности на одном блоке.
+    if ((list[0].kind === "control" || list[0].kind === "controlData") && !list.every((a) => a.nodeId === list[0].nodeId)) continue;
     const side = PORT_SIDE[list[0].kind];
     const atStart = FREE_END[list[0].kind] === "start";
     if (!atStart && FREE_END[list[0].kind] !== "end") continue; // механизмы: у них шина ниже

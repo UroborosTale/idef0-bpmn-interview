@@ -3,7 +3,7 @@ import type { ProcessLogicModel } from "../types/model.js";
 import { layoutLayered, type LayoutNodeIn, type LayoutEdgeIn } from "../pipeline/layout.js";
 import { laneHeightOf, laneTops } from "../shared/bpmnGeometry.js";
 import { fixedRoute, routeFlows } from "../shared/bpmnRouting.js";
-import { labelSide } from "../shared/bpmnLabels.js";
+import { labelBox, labelSide } from "../shared/bpmnLabels.js";
 
 function esc(s: string | null | undefined): string {
   if (!s) return "";
@@ -16,6 +16,13 @@ function esc(s: string | null | undefined): string {
  */
 export function albumLabelY(b: { y: number; w: number; h: number }, text: string, band?: { top: number; bottom: number } | null): number {
   return labelSide({ x: 0, y: b.y, w: b.w, h: b.h }, text, band) === "above" ? b.y - 6 : b.y + b.h + 11;
+}
+
+/** Центр подписи по горизонтали: рамка не заходит в колонку заголовков дорожек (B8). */
+export function albumLabelX(b: { x: number; y: number; w: number; h: number }, text: string, band?: { top: number; bottom: number } | null): number {
+  const side = labelSide({ x: b.x, y: b.y, w: b.w, h: b.h }, text, band);
+  const box = labelBox({ x: b.x, y: b.y, w: b.w, h: b.h }, text, side);
+  return box ? box.x + box.w / 2 : b.x + b.w / 2;
 }
 
 /** Упрощённая SVG-схема BPMN для печати (переиспользуется альбомом моделей и пакетом к аудиту). */
@@ -55,7 +62,7 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
         const text = n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name;
         return `<g>
           <circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="#1f2937" stroke-width="${n.subtype === "end" ? 2.4 : 1.4}" />
-          <text x="${cx}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
+          <text x="${albumLabelX({ x: b.x, y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
         </g>`;
       }
       if (n.type === "gateway") {
@@ -65,7 +72,7 @@ export async function renderBpmnSchematic(model: ProcessLogicModel): Promise<str
         const text = n.name.length > 20 ? n.name.slice(0, 18) + "…" : n.name;
         return `<g>
           <polygon points="${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}" fill="${fill}" stroke="#b45309" stroke-width="1.4" />
-          <text x="${cx}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
+          <text x="${albumLabelX({ x: b.x, y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" y="${albumLabelY({ y: b.y, w: b.width, h: b.height }, text, bandOf({ y: b.y, h: b.height }))}" text-anchor="middle" font-size="9" font-family="Arial, sans-serif">${esc(text)}</text>
         </g>`;
       }
       return `<g>

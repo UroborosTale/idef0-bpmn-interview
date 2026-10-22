@@ -4,7 +4,7 @@ import { b002Model } from "../src/reference/b002.js";
 import { c025Model } from "../src/reference/c025.js";
 import { demoModel } from "../src/reference/demo.js";
 import { bpmnHosts } from "../src/shared/codes.js";
-import { labelBox, labelSide } from "../src/shared/bpmnLabels.js";
+import { labelBox, labelSide, LABEL_MIN_X } from "../src/shared/bpmnLabels.js";
 import { nudgeOffLaneBorders } from "../src/shared/bpmnRouting.js";
 import { albumLabelY } from "../src/export/album.js";
 
@@ -75,6 +75,12 @@ describe("линии дорожек: отрезки и подписи", () => {
     const label = labelBox(box, event.name, labelSide(box, event.name, { top: band.y, bottom: band.y + band.h }))!;
     expect(label.y).toBeGreaterThanOrEqual(host.y + host.h);
     expect(label.y + label.h).toBeLessThanOrEqual(band.y + band.h);
+  });
+
+  it("подпись события не заходит в колонку заголовков дорожек (B8)", () => {
+    const box = { x: 140, y: 100, w: 36, h: 36 };
+    const rect = labelBox(box, "Информация о вновь выявленном процессе получена")!;
+    expect(rect.x).toBeGreaterThanOrEqual(LABEL_MIN_X);
   });
 
   it("подпись события или шлюза остаётся в своей дорожке", async () => {

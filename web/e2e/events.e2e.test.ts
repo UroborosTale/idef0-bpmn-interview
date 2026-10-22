@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+﻿import { mkdirSync } from "node:fs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Browser, Page } from "playwright";
 import { WEB, api, launch, openContext } from "./env";
@@ -75,7 +75,7 @@ describe("события и триггеры в браузере", () => {
     }
 
     // правка в свойствах: «Сигнал отправлен» → ждёт сообщение «Заявка принята»
-    await page.locator('.studio g[data-node-id="f"]').click();
+    await page.locator('.studio g[data-node-id="f"] circle').first().click();
     await section(page).getByLabel("Направление").selectOption("catch");
     await section(page).getByLabel("Триггер", { exact: true }).selectOption("message");
     await section(page).getByLabel("Название сообщения").fill("Заявка принята");
@@ -84,7 +84,7 @@ describe("события и триггеры в браузере", () => {
     expect(await trig("f").getAttribute("data-throwing")).toBeNull();
 
     // недопустимый триггер виден как замечание проверки, а допустимый выбирается из списка
-    await page.locator('.studio g[data-node-id="a"]').click();
+    await page.locator('.studio g[data-node-id="a"] circle').first().click();
     await section(page).getByLabel("Вид события").selectOption("end"); // сообщение у конечного допустимо
     expect(await section(page).getByLabel("Триггер", { exact: true }).inputValue()).toBe("message");
     await section(page).getByLabel("Триггер", { exact: true }).selectOption("terminate");

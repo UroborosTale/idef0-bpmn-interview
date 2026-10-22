@@ -60,7 +60,7 @@ export interface EndKinds {
   fromBoundary?: boolean;
 }
 
-export { wrapText, labelBox, LABEL_CHARS, LABEL_LINES } from "./bpmnLabels.js";
+export { wrapText, labelBox, LABEL_CHARS, LABEL_LINES, LABEL_MIN_X } from "./bpmnLabels.js";
 
 // Прокладка стрелок — bpmnRouting.ts (по всей диаграмме сразу; waypoints — маршрут одной стрелки).
 export { waypoints, routeFlows } from "./bpmnRouting.js";

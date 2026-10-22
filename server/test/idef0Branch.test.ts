@@ -40,11 +40,12 @@ const model = (nodes: ReturnType<typeof fn>[]) =>
   }) as never;
 
 /**
- * Ствол управлений: копии одной сущности сходятся в общей горизонтали над блоками. Если вылет ствола рисует только
- * головная стрелка, участок между ней и копией остаётся пустым и ствол выглядит разорванным (замечание с осмотра).
+ * Управления на разных блоках не сводятся в общий ствол: длинная горизонталь пересекала бы вертикали
+ * других управлений и стрелок (I5). На одном блоке общий ствол по-прежнему нужен — его проверяет
+ * разбитая стрелка ниже.
  */
-describe("ствол управлений IDEF0 непрерывный", () => {
-  it("каждая копия проходит через вылет ствола", () => {
+describe("ствол управлений IDEF0", () => {
+  it("управления разных блоков идут отдельными короткими стрелками", () => {
     const withCtl = (id: string, name: string, x: number) => ({ ...fn(id, name, x, []), controls: ["c1"] });
     const layout = layoutIdef0(
       {
@@ -63,11 +64,11 @@ describe("ствол управлений IDEF0 непрерывный", () => {
     );
     const ctrls = layout.arrows.filter((a) => a.kind === "control" && a.entityId === "c1");
     expect(ctrls).toHaveLength(2);
-    const xs = ctrls.flatMap((a) => a.points.map((p) => p[0]));
-    const ys = ctrls.flatMap((a) => a.points.map((p) => p[1]));
-    const stub: [number, number] = [Math.min(...xs), Math.min(...ys)];
-    // общий вылет ствола есть в каждой стрелке — ствол непрерывный
-    for (const a of ctrls) expect(a.points.some((p) => p[0] === stub[0] && p[1] === stub[1])).toBe(true);
+    for (const a of ctrls) {
+      expect(a.points).toHaveLength(2);
+      expect(a.points[0][1]).toBeLessThan(a.points[1][1]); // стрелка идёт сверху вниз в блок
+    }
+    expect(ctrls[0].points[0][0]).not.toBe(ctrls[1].points[0][0]);
   });
 });
 

@@ -31,12 +31,12 @@ arrow system:s3:s_erp [370,634 920,634 920,610]
 # IDEF0 C090.01.00
 fn o11 220,220 170×90
 fn o12 560,370 170×90
-arrow control:o11:c_policy [176,140 240,140 240,174 240,220] label@179,136/start «Положение о закупках»
+arrow control:o11:c_policy [240,174 240,220] label@243,170/start «Положение о закупках»
 arrow input:o11:d_need [0,234 220,234] label@110,238/middle «Потребность в оборудовании»
 arrow role:o11:r_init [240,350 240,310] label@243,364/start «Инициатор закупки»
 arrow role:o11:r_erp [280,502 280,310]
 arrow system:o11:s_erp [320,484 320,310]
-arrow control:o12:c_policy [176,140 580,140 580,324 580,370]
+arrow control:o12:c_policy [580,324 580,370]
 arrow control:o12:c_budget [606,324 606,370] label@609,320/start «Бюджет закупок на год»
 arrow link:o12:d_request [390,234 406,234 406,384 560,384] label@483,379/middle «Заявка на закупку»
 arrow output:o12:d_approvedReq [730,384 960,384] label@845,388/middle «Согласованная заявка на закупку»

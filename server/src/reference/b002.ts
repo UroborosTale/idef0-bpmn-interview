@@ -127,9 +127,9 @@ const FUNCTIONS: Fn[] = [
   { id: "o21", parent: "s2", name: "Анализ соответствия фактической реализации процесса утвержденной процессной модели", in: ["results"], controls: ["stp", "std"], out: ["eff", "devList"], controllers: [] },
   { id: "o22", parent: "s2", name: "Анализ причин неэффективности реализации процесса", in: ["devList"], controls: ["std"], out: ["ineff"], controllers: ["head", "dir"] },
   { id: "o31", parent: "s3", name: "Проведение интервью с владельцем процесса", in: ["ineff"], controls: ["stp"], ctrlData: ["checklist"], out: ["protocol", "chain"], controllers: ["head"] },
-  { id: "o32", parent: "s3", name: "Проведение фото рабочего дня", in: ["ineff", "protocol", "chain"], controls: ["stp"], out: ["frd"], controllers: ["head"] },
-  { id: "o33", parent: "s3", name: "Проведение картирования", in: ["ineff", "protocol", "chain"], controls: ["stp", "map", "std"], out: ["mapTarget"], controllers: ["head"] },
-  { id: "o34", parent: "s3", name: "Разработка модели оптимизированного процесса", in: ["frd", "mapTarget"], controls: ["agree", "stp", "std", "map"], out: ["optProject", "optKb"], controllers: ["head", "dir"] },
+  { id: "o32", parent: "s3", name: "Проведение фото рабочего дня", in: ["protocol", "chain"], controls: ["stp"], out: ["frd"], controllers: [] },
+  { id: "o33", parent: "s3", name: "Проведение картирования", in: ["protocol", "chain", "frd"], controls: ["stp", "map", "std"], out: ["mapTarget"], controllers: [] },
+  { id: "o34", parent: "s3", name: "Разработка модели оптимизированного процесса", in: ["frd", "mapTarget"], controls: ["agree", "stp", "std", "map"], out: ["optProject", "optKb"], controllers: [] },
 ];
 
 // --- BPMN операций ---
