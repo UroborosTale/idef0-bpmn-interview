@@ -10,7 +10,8 @@ server/src/shared/ — геометрия диаграмм, общая для с
 server/test/       — тесты (vitest)
 web/               — веб-клиент (React + TypeScript + Vite), редакторы и просмотр моделей
 desktop/           — настольная оболочка ProcessStudio (.NET 8 + WebView2 + встроенный Visio), см. docs/desktop-setup.md
-docs/              — план по Business Studio 6, снятые типы BPMN, ручная приёмка, доступ агентов
+docs/              — план по Business Studio 6, снятые типы BPMN, ручная приёмка, доступ агентов,
+                     стек и процесс разработки (docs/development-workflow.md)
 docker-compose.yml — запуск обоих сервисов в контейнерах (НФТ-6)
 ```
 
