@@ -150,6 +150,10 @@ npm run mcp -w server                  # MCP-сервер process-modeling
 - Долгие прогоны vitest удобно запускать в фоне с перенаправлением вывода в файл и читать хвост; так не блокируется
   терминал и видно итоговые счётчики.
 - Вход по умолчанию отключён (нет `AUTH_USERS`), сервер слушает `127.0.0.1`.
+- Пуш в GitHub через прокси: `git -c http.proxy=$env:HTTPS_PROXY -c http.proxyAuthMethod=basic
+  -c http.sslBackend=schannel -c http.schannelCheckRevoke=false push origin main`. Без `proxyAuthMethod=basic`
+  прокси отвечает «Proxy CONNECT aborted», без отключения проверки отзыва — «Connection was reset»
+  (проверка `ls-remote` и `fetch` — с теми же ключами).
 
 ## 8. Что остаётся после работы
 
