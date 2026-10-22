@@ -362,6 +362,8 @@ export interface ProcessLogicModel {
   messages: MessageFlow[];
   /** Ширина дорожек диаграмм BPMN, px: ключ — id операции, "" — общая схема процесса; нижняя граница, шире содержимого. */
   diagram_widths?: Record<string, number>;
+  /** ICOM-коды на концах стрелок IDEF0 в выгрузках и на печати. */
+  show_icom?: boolean;
   /** Рамка листа и сетка диаграмм IDEF0: ключ — id функции, "" — верхняя диаграмма. */
   idef0_frames?: Record<string, IdefFrame>;
   /** В12: свободные текстовые блоки на диаграммах IDEF0: ключ — id функции, "" — верхняя диаграмма. */

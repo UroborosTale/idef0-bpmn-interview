@@ -49,7 +49,8 @@ npm run seed:demo -w server                   # демо-процесс в ба�
 - Метки фигур для Visio: `pm_k`, `pm_id`, `pm_n`, `pm_c`, `pm_a`, `pm_trg`, `pm_manifest`, `pm_page`, `pm_scope`,
   `pm_parent`, `pm_sr/pm_fd/pm_fk`.
 - `docs/` — `plan-bs6-visio.md` (план по BS6 и статусы), `bs6-bpmn-types.md` (типы снятые с BS6 и трафарета),
-  `manual-checks.md` (**что нужно проверить глазами**), `desktop-setup.md` (окружение настольного приложения),
+  `manual-checks.md` (**что нужно проверить глазами**), `bs6/compare/` (**скриншоты BS6 ↔ приложение** — эталон
+  вида IDEF0/BPMN, C025 и B002; только локально, в `.gitignore`), `desktop-setup.md` (окружение настольного приложения),
   `agents/` (доступ агентов), `claude-code-history/` (выгрузка и разбор прошлых сессий).
 
 ## Как проверять работу

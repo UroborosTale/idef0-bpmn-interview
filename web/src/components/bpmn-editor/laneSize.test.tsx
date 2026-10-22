@@ -5,7 +5,7 @@ import { session, structuredModel } from "../../test/fixtures";
 import { purchaseModel } from "../../test/fixtures";
 import type { ProcessLogicModel } from "../../types";
 import Studio from "../studio/Studio";
-import { boxOf, configuredWidth, contentWidth, diagramWidth, laneHeight, laneHeights, laneIndexAtY, laneTop, lanesBottom, modelExtents, withLayout } from "./geometry";
+import { boxOf, configuredWidth, contentWidth, diagramWidth, laneCount, laneHeight, laneHeights, laneIndexAtY, laneTop, lanesBottom, modelExtents, withLayout } from "./geometry";
 import { addRole, deleteRole, diagramMinWidth, laneMinHeight, moveNode, setDiagramWidth, setLaneHeight } from "./model-ops";
 
 type M = ProcessLogicModel;
@@ -22,6 +22,15 @@ describe("высота дорожек: геометрия", () => {
     expect(laneTop(m, 0)).toBe(START_Y);
     expect(laneTop(m, 2)).toBe(START_Y + 2 * LANE_H);
     expect(lanesBottom(m)).toBe(START_Y + 3 * LANE_H);
+  });
+
+  it("пустая дорожка «Без исполнителя» не рисуется, если все фигуры распределены (B2)", () => {
+    const base = laid();
+    const m: M = { ...base, nodes: base.nodes.map((n) => ({ ...n, role_id: base.roles[0].id })) };
+    expect(laneCount(m)).toBe(base.roles.length);
+    expect(laneHeights(m)).toHaveLength(base.roles.length);
+    const withFree: M = { ...base, nodes: base.nodes.map((n, i) => ({ ...n, role_id: i === 0 ? null : base.roles[0].id })) };
+    expect(laneCount(withFree)).toBe(base.roles.length + 1);
   });
 
   it("настроенные высоты учитываются: верхи, нижняя граница, дорожка под точкой, высота мира диаграммы", () => {
@@ -122,7 +131,7 @@ describe("редактор: размер дорожек", () => {
   it("у каждой дорожки есть ручка границы; перетаскивание меняет высоту дорожки, отпускание — один шаг истории", () => {
     studio(structuredModel());
     const handles = document.querySelectorAll("[data-lane-resize]");
-    expect(handles.length).toBeGreaterThanOrEqual(2);
+    expect(handles.length).toBe(document.querySelectorAll("[data-lane-id]").length);
     const before = drawnHeights();
     const handle = document.querySelector('[data-lane-resize="0"]') as SVGRectElement;
     const [hx, hy, , hh] = ["x", "y", "width", "height"].map((a) => Number(handle.getAttribute(a)));

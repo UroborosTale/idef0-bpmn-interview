@@ -19,6 +19,14 @@ describe("ICOM-коды стрелок IDEF0", () => {
     }
   });
 
+  it("в SVG ICOM-коды выводятся только при включённой настройке модели (I6)", async () => {
+    const { generateIdef0 } = await import("../src/pipeline/idef0.js");
+    const plain = generateIdef0(b002Model()).decompositionSvg;
+    expect(plain).not.toMatch(/>[ICOM]\d+</);
+    const coded = generateIdef0({ ...b002Model(), show_icom: true }).decompositionSvg;
+    expect(coded).toMatch(/>[ICOM]\d+</);
+  });
+
   it("номер — на сущность в классе: у разбитой стрелки код один на всех отрезках", () => {
     const lay = layoutIdef0(b002Model(), null);
     const codes = new Map<string, Set<string>>();

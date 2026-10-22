@@ -381,3 +381,6 @@ web/coverage/
 
 # история чатов Claude Code: рабочие логи с содержимым интервью, в репозиторий не попадает
 docs/claude-code-history/
+
+# Скриншоты Business Studio ↔ приложение: рабочие модели КМЗ, только локально
+docs/bs6/compare/

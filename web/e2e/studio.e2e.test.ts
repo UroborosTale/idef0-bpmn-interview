@@ -81,6 +81,13 @@ describe("студия в браузере", () => {
     await page.locator(".doc-tab", { hasText: "IDEF0 A0" }).click();
     const blocks = page.locator(".studio g[data-fn-id]");
     await blocks.first().waitFor();
+    // на A0 может быть один подпроцесс: открываем его декомпозицию, чтобы соединить две функции
+    if ((await blocks.count()) < 2) {
+      await blocks.first().click();
+      const opener = page.locator(".studio [data-open]").first();
+      if (await opener.count()) await opener.click();
+      await expect.poll(() => blocks.count()).toBeGreaterThan(1);
+    }
     const arrowsBefore = await page.locator(".studio [data-arrow-key]").count();
     const lastId = (await blocks.last().getAttribute("data-fn-id"))!;
     await blocks.first().click();
@@ -245,8 +252,10 @@ describe("студия в браузере", () => {
     await page.locator("[data-nav-hit^=roles]").first().click();
     await expectPanel(page, "Карточка записи");
     await page.locator(".doc-tab", { hasText: "BPMN" }).click();
-    await page.getByLabel("Поиск в навигаторе").fill("проверить");
-    await page.locator("[data-nav-hit]:not([data-nav-hit*=\":\"])").first().click();
+    const model = (await api<{ model: any }>("GET", `/sessions/${id}`)).body.model;
+    const fn = model.nodes.find((n: any) => (n.type === "task" || n.type === "subprocess") && !n.bpmn_scope);
+    await page.getByLabel("Поиск в навигаторе").fill(fn.name);
+    await page.locator(`[data-nav-hit="${fn.id}"]`).first().click();
     await expectPanel(page, "Свойства элемента");
     await page.getByRole("button", { name: "100%", exact: true }).click();
     expect(await page.locator(".bpe-toolbar .muted").first().innerText()).toBe("100%");

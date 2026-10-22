@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { frameGeometry, frameTexts, withFrameHeight, FRAME_H } from "../src/shared/idef0Frame.js";
-import { generateIdef0 } from "../src/pipeline/idef0.js";
+import { generateIdef0, frameInfo } from "../src/pipeline/idef0.js";
+import { b002Model } from "../src/reference/b002.js";
 import { purchaseModel } from "./fixtures.js";
 import type { ProcessLogicModel } from "../src/types/model.js";
 
@@ -10,6 +11,15 @@ describe("рамка листа IDEF0", () => {
   it("штамп: подписи NODE / TITLE / NO. и автоматические значения; ручные надписи перекрывают, пустые — нет", () => {
     expect(frameTexts(undefined, defaults)).toEqual({ nodeLabel: "NODE:", node: "A0", titleLabel: "TITLE:", title: "Закупка", noLabel: "NO.:", no: "1.0" });
     expect(frameTexts({ texts: { title: "Моё название", nodeLabel: "УЗЕЛ:", no: "  " } }, defaults)).toMatchObject({ title: "Моё название", nodeLabel: "УЗЕЛ:", no: "1.0" });
+  });
+
+  it("штамп вложенной диаграммы: NODE — номер узла A3/A4, TITLE — название без кода (I2)", () => {
+    const m = b002Model();
+    const parent = m.nodes.find((n) => m.nodes.some((c) => c.idef0_parent === n.id))!;
+    const info = frameInfo({ code: "B002.01.00", title: `B002.01.00 — ${parent.name}` }, m, "child", parent.id);
+    expect(info.defaults.node).toMatch(/^A\d+$/);
+    expect(info.defaults.node).not.toContain(".");
+    expect(info.defaults.title).toBe(parent.name);
   });
 
   it("лист округляется до клетки, штамп добавляется снизу, ячейки идут слева направо", () => {

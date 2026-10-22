@@ -28,14 +28,17 @@ export function Idef0Defs() {
 
 export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: FunctionBlock; selected: boolean; hot: boolean; style?: ResolvedStyle; showCode?: boolean }) {
   const { x, y, w, h } = fn.box;
-  const lines = wrapText(fn.node.name || "", 22, 3);
+  const big = w >= 200;
+  const caption = showCode && fn.code ? `${fn.code} ${fn.node.name}` : fn.node.name || "";
+  const size = style?.font_size ?? (big ? 14 : 12);
+  const maxChars = Math.max(10, Math.floor((w - 18) / (size * 0.52)));
+  const lines = wrapText(caption, maxChars, 3);
   const stroke = selected ? ACCENT : hot ? "#16a34a" : style?.line ?? INK;
-  const size = style?.font_size ?? 12;
   const lh = Math.round((size * 7) / 6);
   const top = y + h / 2 - 6 - ((lines.length - 1) * lh) / 2;
   return (
     <g data-fn-id={fn.node.id} style={{ cursor: "move" }}>
-      <rect x={x} y={y} width={w} height={h} fill={style?.fill ?? "#e8eef7"} stroke={stroke} strokeWidth={selected || hot ? 2.6 : 1.6} strokeDasharray={fn.node.status === "hypothesis" ? "6 4" : undefined} />
+      <rect x={x} y={y} width={w} height={h} fill={style?.fill ?? "#e8eef7"} stroke={stroke} strokeWidth={selected || hot ? 2.2 : 1} strokeDasharray={fn.node.status === "hypothesis" ? "6 4" : undefined} />
       <text textAnchor="middle" fontSize={size} fontFamily="Arial, sans-serif" fill={style?.text ?? INK} pointerEvents="none">
         {lines.map((l, i) => (
           <tspan key={i} x={x + w / 2} y={top + i * lh + 4}>
@@ -43,19 +46,14 @@ export function BlockShape({ fn, selected, hot, style, showCode = true }: { fn: 
           </tspan>
         ))}
       </text>
-      {showCode && (
-        <text x={x + 6} y={y + h - 6} fontSize={10} fontFamily="Arial, sans-serif" fill="#4b5563" pointerEvents="none">
-          {fn.code}
-        </text>
-      )}
       {/* В12: метка фигуры — короткая серая подпись над блоком (то же место, что в SVG и Visio) */}
       {fn.node.shapeLabel && (
         <text x={x} y={y - 4} fontSize={9} fontFamily="Arial, sans-serif" fill="#6b7280" pointerEvents="none" data-shape-label>
           {fn.node.shapeLabel}
         </text>
       )}
-      {fn.hasChildren && (
-        // отметка «есть декомпозиция»: клик открывает диаграмму вложенных функций
+      {fn.hasChildren && (selected || hot) && (
+        // отметка «есть декомпозиция»: при наведении и выделении; на печать и в выгрузку не идёт
         <g data-open={fn.node.id} style={{ cursor: "pointer" }}>
           <rect x={x + w - 22} y={y + h - 22} width={16} height={16} fill="#fff" stroke={INK} />
           <path d={`M${x + w - 18},${y + h - 14} H${x + w - 10} M${x + w - 14},${y + h - 18} V${y + h - 10}`} stroke={INK} strokeWidth={1.4} pointerEvents="none" />
@@ -328,7 +326,7 @@ export function ArrowShape({ arrow, selected, showLabel = true, showCode = false
         </g>
       ))}
       {showLabel && (
-        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none" {...(arrow.side === "left" || arrow.side === "right" ? { stroke: "#fff", strokeWidth: 4, paintOrder: "stroke" } : {})}>
+        <text x={lab.x} y={lab.y} textAnchor={lab.anchor} fontSize={10.5} fontFamily="Arial, sans-serif" fill={selected ? ACCENT : "#000"} fontWeight={selected ? 600 : 400} pointerEvents="none" stroke="#fff" strokeWidth={4} paintOrder="stroke">
           {lab.text.split("\n").map((line, i) => (
             <tspan key={i} x={lab.x} dy={i === 0 ? 0 : 12}>
               {line}

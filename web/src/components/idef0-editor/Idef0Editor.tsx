@@ -5,7 +5,7 @@ import type { ProcessLogicModel } from "../../types";
 import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, useHint, useModelHistory, useViewport, type Pt } from "../editor-core/hooks";
 import { DraftBanner, RenameOverlay } from "../editor-core/fields";
 import EditorToolbar from "../editor-core/EditorToolbar";
-import { processCodeOf } from "@shared/codes";
+import { blockNumbers, processCodeOf } from "@shared/codes";
 import { deleteNode, duplicateNode, updateNode } from "../bpmn-editor/model-ops";
 import MiniMap from "../bpmn-editor/MiniMap";
 import { GUIDE_SNAP_PX, guideFor, guideTargets, snapAxis, type Guide, type GuideTarget } from "../bpmn-editor/guides";
@@ -723,10 +723,10 @@ export default function Idef0Editor({
   const { w: worldW, h: worldH } = idef0Extents(layout);
   const parentNode = cur ? draft.nodes.find((n) => n.id === cur) : undefined;
   const frameOn = frameShown(frame);
-  // надписи штампа по умолчанию: узел, название и номер листа
+  // надписи штампа по умолчанию: номер узла IDEF0 (A0/A3), название без кода и номер листа — как в Business Studio
   const frameGeo = frameGeometry({ w: worldW, h: worldH }, frame, {
-    node: cur ? codes.get(cur) ?? "A?" : "A0",
-    title: cur ? `${codes.get(cur) ?? ""} ${parentNode?.name ?? ""}`.trim() : `${processCodeOf(draft)} ${draft.process.name}`.trim(),
+    node: cur ? blockNumbers(draft).get(cur) ?? "" : "A0",
+    title: cur ? parentNode?.name ?? "" : draft.process.name,
     no: "1.0",
   });
   // функции, не помещающиеся на лист: лист заданный вручную не подгоняется под диаграмму
@@ -759,6 +759,12 @@ export default function Idef0Editor({
         onZoomIn={() => zoomBy(1.2)}
         onFit={fit}
         onActual={() => setView((v) => ({ ...v, k: 1, tx: 10, ty: 10 }))}
+        onZoomTo={(k) => setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.2, k)) }))}
+        onFitWidth={() => {
+          const el = wrapRef.current;
+          const total = Math.max(worldW, frameGeo.sheet.x + frameGeo.sheet.w);
+          if (el) setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.2, (el.clientWidth - 20) / Math.max(1, total))), tx: 10, ty: 10 }));
+        }}
         dirty={h.dirty}
         busy={busy}
         hint={hint}

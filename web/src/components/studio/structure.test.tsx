@@ -67,7 +67,7 @@ describe("диаграммы BPMN операций в студии", () => {
     fireEvent.click(document.querySelector('[data-nav-bpmn="o1"]')!);
     expect(s.active()).toBe("BPMN B002.01.01");
     expect(s.shapes()).toEqual(["b0", "b1", "b2", "b9"]);
-    expect(document.querySelectorAll("[data-lane-id]").length).toBe(2); // дорожка исполнителя и «Без исполнителя»
+    expect(document.querySelectorAll("[data-lane-id]").length).toBe(1); // пустая дорожка «Без исполнителя» не рисуется (B2)
   });
 
   it("щелчок по шагу: свойства подоперации с кодом и ссылкой на операцию, без блоков IDEF0", () => {

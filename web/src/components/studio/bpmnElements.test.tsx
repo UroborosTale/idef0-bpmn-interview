@@ -4,7 +4,7 @@ import { session, structuredModel } from "../../test/fixtures";
 import { commit, field, renderWithModel } from "../../test/harness";
 import type { ProcessLogicModel } from "../../types";
 import { SIZE, autoLayout, boxMap, boxOf, diagramExtras, isBoundary, modelExtents, visibleNodes, withLayout } from "../bpmn-editor/geometry";
-import { PALETTE, addBoundaryEvent, addFlow, addMessage, addNodeAt, addPool, deleteMessage, deleteNode, deletePool, dropNodeIntoLane, setNodeRole, updateMessage } from "../bpmn-editor/model-ops";
+import { PALETTE, addBoundaryEvent, addFlow, addMessage, addNodeAt, addPool, deleteMessage, deleteNode, deletePool, dropNodeIntoLane, setNodeRole, setPoolOffset, updateMessage } from "../bpmn-editor/model-ops";
 import { ArtifactShape } from "../bpmn-editor/shapes";
 import MessagesEditor, { PoolsEditor } from "./MessagesEditor";
 import PropertiesPanel from "./PropertiesPanel";
@@ -440,7 +440,8 @@ describe("студия: новые элементы на диаграмме оп
   describe("внешний пул и поток сообщений правятся на диаграмме", () => {
     const withPool = () => {
       const pool = addPool(structuredModel(), "Поставщики");
-      return addMessage(pool.model, "b2", pool.id!, "Запрос предложений").model;
+      const m = addMessage(pool.model, "b2", pool.id!, "Запрос предложений").model;
+      return setPoolOffset(m, pool.id!, 0, 120);
     };
     const svgEl = () => document.querySelector(".studio svg.bpe-svg")!;
 

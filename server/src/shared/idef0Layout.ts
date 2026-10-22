@@ -145,7 +145,6 @@ export const BLOCK_H = 90;
 export const STEP_X = 340;
 export const STEP_Y = 150;
 export const MARGIN = 220;
-const STUB_SIDE = 170; // внешние входы/выходы: длинные, подпись лежит на самой линии, как в Business Studio
 const STUB_CTRL = 46; // управление сверху
 const STUB_MECH = 40; // механизмы снизу
 
@@ -281,7 +280,7 @@ const LABEL_ROW_H = 12;
 const LABEL_START_DX = 3;
 
 /** Подпись стрелки переносится по словам: до 34 знаков в строке и до 3 строк (как у Business Studio), строки разделены «\n». */
-export const wrapLabel = (text: string, wide: boolean | "side" = false): string => (wide === "side" ? wrapText(text, 30, 3) : wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
+export const wrapLabel = (text: string, wide: boolean | "side" = false): string => (wide === "side" ? wrapText(text, 55, 2) : wide ? wrapText(text, 60, 2) : wrapText(text, 40, 2)).join("\n");
 /** Ширина подписи стрелки в пикселях (кегль 10,5): по самой длинной строке после переноса. */
 export const labelWidth = (wrapped: string): number => Math.max(1, ...wrapped.split("\n").map((l) => l.length)) * 6 + 4;
 /** Зазор между подписями в одной строке. */
@@ -352,6 +351,10 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     hasChildren: hasChildren(m, node.id),
   }));
   const blockOf = new Map(functions.map((f) => [f.node.id, f] as const));
+  // I1: правый край листа — по самому правому блоку; внешние выходы доходят до него, а не обрываются в поле.
+  // Запас справа — под самую длинную подпись выхода, чтобы она не вышла за лист.
+  const outLabelW = Math.max(0, ...fnNodes.flatMap((n) => n.outputs.filter((id) => dataById.has(id)).map((id) => labelWidth(wrapLabel(dataById.get(id)!.name, "side")))));
+  const frameRight = Math.max(640, Math.ceil((Math.max(...functions.map((f) => f.box.x + f.box.w), 0) + Math.max(170, outLabelW + 30)) / 20) * 20);
 
   // данные → функция, которая их выпускает (первая на этой диаграмме)
   const producedBy = new Map<string, string>();
@@ -437,7 +440,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
         }
         arrows.push(finish({ key: `link:${n.id}:${id}`, kind, entityId: id, label, nodeId: n.id, fromId: producer, points, side: "mid" }, route));
       } else {
-        arrows.push(finish({ key: `input:${n.id}:${id}`, kind, entityId: id, label, nodeId: n.id, points: [[b.x - STUB_SIDE, y], [b.x, y]], side: "left" }, route));
+        arrows.push(finish({ key: `input:${n.id}:${id}`, kind, entityId: id, label, nodeId: n.id, points: [[0, y], [b.x, y]], side: "left" }, route));
       }
     });
 
@@ -449,7 +452,7 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       if (consumed) return;
       const route = routeOf(n, "output", id);
       const y = route?.pos !== undefined ? b.y + route.pos * b.h : b.y + 14 + i * oStep;
-      arrows.push(finish({ key: `output:${n.id}:${id}`, kind: "output", entityId: id, label: dataById.get(id)!.name, nodeId: n.id, points: [[b.x + b.w, y], [b.x + b.w + STUB_SIDE, y]], side: "right" }, route));
+      arrows.push(finish({ key: `output:${n.id}:${id}`, kind: "output", entityId: id, label: dataById.get(id)!.name, nodeId: n.id, points: [[b.x + b.w, y], [frameRight, y]], side: "right" }, route));
     });
 
     // механизмы (снизу): должности (исполнитель и назначенные роли) и системы
@@ -590,6 +593,35 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
       list.forEach((a, i) => (a.labelRow = rows[i]));
     }
   }
+  // I4: подпись не должна лежать на чужом блоке или на другой подписи. Сдвигаем её вдоль стрелки (по вертикали),
+  // сохраняя ручной сдвиг пользователя; линия под текстом всё равно прерывается белой подложкой при отрисовке.
+  const occupied: LabelRect[] = [];
+  const rectOf = (sp: { x: number; y: number; anchor: "start" | "middle" | "end"; text: string }): LabelRect => {
+    const w = labelWidth(sp.text);
+    const x0 = sp.anchor === "middle" ? sp.x - w / 2 : sp.anchor === "end" ? sp.x - w : sp.x;
+    return { x0, x1: x0 + w, y0: sp.y - 10, y1: sp.y + 2 + (sp.text.split("\n").length - 1) * LABEL_ROW_H };
+  };
+  const hits = (a: LabelRect, b: LabelRect) => a.x0 < b.x1 + 1 && b.x0 < a.x1 + 1 && a.y0 < b.y1 + 1 && b.y0 < a.y1 + 1;
+  for (const a of arrows) {
+    if (!a.label || a.labelHidden) continue;
+    const base = a.labelOffset ?? [0, 0];
+    let chosen: LabelRect | null = null;
+    let chosenOffset = base;
+    for (const dy of [0, -14, 14, -28, 28, -42, 42, -56, 56]) {
+      a.labelOffset = [base[0], base[1] + dy];
+      const sp = labelSpec(a);
+      if (!sp) continue;
+      const rect = rectOf(sp);
+      const blocked = functions.some((f) => f.node.id !== a.nodeId && hits(rect, { x0: f.box.x - 2, x1: f.box.x + f.box.w + 2, y0: f.box.y - 2, y1: f.box.y + f.box.h + 2 })) || occupied.some((o) => hits(rect, o));
+      if (!blocked) {
+        chosen = rect;
+        chosenOffset = [base[0], base[1] + dy];
+        break;
+      }
+    }
+    a.labelOffset = chosenOffset;
+    if (chosen) occupied.push(chosen);
+  }
   for (const a of arrows) {
     if (!TUNNEL_KINDS.has(a.kind)) continue;
     const t = fnNodes.find((n) => n.id === a.nodeId)?.tunnels?.[arrowRouteKey(a.kind, a.entityId)];
@@ -658,11 +690,13 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
 
 /** Размер «мира» диаграммы. */
 export function idef0Extents(layout: Idef0Layout<NodeLike>): { w: number; h: number } {
-  // стрелки, уведённые вручную за пределы блоков, тоже должны поместиться (справа от конца — место для подписи)
+  // стрелки, уведённые вручную за пределы блоков, тоже должны поместиться (справа от конца — место для подписи);
+  // у автоматических внешних выходов конец уже стоит на правом краю листа, поэтому запас им не нужен
   const pts = layout.arrows.flatMap((a) => a.points);
+  const manualPts = layout.arrows.filter((a) => a.manual).flatMap((a) => a.points);
   return {
-    w: Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w + 260), ...pts.map((p) => p[0] + 200)),
-    h: Math.max(420, ...layout.functions.map((f) => f.box.y + f.box.h + 220), ...pts.map((p) => p[1] + 60)),
+    w: Math.max(640, ...layout.functions.map((f) => f.box.x + f.box.w + 20), ...pts.map((p) => p[0]), ...manualPts.map((p) => p[0] + 200)),
+    h: Math.max(420, ...layout.functions.map((f) => f.box.y + f.box.h + 20), ...pts.map((p) => p[1] + 40)),
   };
 }
 

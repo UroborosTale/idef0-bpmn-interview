@@ -114,6 +114,7 @@ describe("выделение группой, копирование и мини�
     }
 
     // миникарта: видна, щелчок по ней сдвигает видимую часть
+    await page.getByRole("button", { name: "Миникарта" }).click();
     const map = page.locator("[data-minimap]");
     await map.waitFor();
     const viewBefore = await page.locator("[data-minimap-view]").getAttribute("x");
@@ -215,6 +216,7 @@ describe("выделение группой, копирование и мини�
     }
 
     // миникарта: видна, щелчок по ней сдвигает видимую часть, кнопка выключает
+    await page.getByRole("button", { name: "Миникарта" }).click();
     const map = page.locator("[data-minimap]");
     await map.waitFor();
     const viewBefore = await page.locator("[data-minimap-view]").getAttribute("x");

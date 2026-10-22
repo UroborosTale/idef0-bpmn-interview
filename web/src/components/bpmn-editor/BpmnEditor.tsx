@@ -1,5 +1,5 @@
 import { bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, gridShown, type FrameField } from "@shared/idef0Frame";
-import { processCodeOf } from "@shared/codes";
+import { blockNumbers, processCodeOf } from "@shared/codes";
 import { setSheetFrame, type FramePatch } from "../editor-core/sheet-ops";
 import { FrameLayer, FrameMenu, dragRect, startFrameDrag, type FrameDrag } from "../editor-core/sheetFrame";
 import { DEFAULT_DISPLAY, type DisplayOptions } from "../editor-core/display";
@@ -838,6 +838,7 @@ export default function BpmnEditor({
   const frameOn = bpmnFrameShown(frame);
   const sheetCode = scopeId ? idef0Codes(h.draft).get(scopeId) ?? "" : processCodeOf(h.draft);
   const sheetName = scopeId ? h.draft.nodes.find((n) => n.id === scopeId)?.name ?? "" : h.draft.process.name;
+  const sheetNo = scopeId ? blockNumbers(h.draft).get(scopeId) ?? "" : "";
   const frameGeo = frameGeometry(sheetWorld(draft), frame, bpmnFrameDefaults(sheetCode, sheetName));
   // фигуры за пределами листа, заданного вручную (лист по размеру диаграммы их и так вмещает)
   const outside =
@@ -870,6 +871,11 @@ export default function BpmnEditor({
         onZoomIn={() => zoomBy(1.2)}
         onFit={fit}
         onActual={() => setView((v) => ({ ...v, k: 1, tx: 10, ty: 10 }))}
+        onZoomTo={(k) => setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.2, k)) }))}
+        onFitWidth={() => {
+          const el = wrapRef.current;
+          if (el) setView((v) => ({ ...v, k: Math.min(2.5, Math.max(0.2, (el.clientWidth - 20) / Math.max(1, W))), tx: 10, ty: 10 }));
+        }}
         dirty={h.dirty}
         busy={busy}
         hint={hint}
@@ -946,7 +952,7 @@ export default function BpmnEditor({
             <ArrowDefs />
             <g transform={`translate(${view.tx} ${view.ty}) scale(${view.k})`}>
               {frameOn && <FrameLayer geo={frameGeo} grid={gridShown(frame)} layers="back" />}
-              <LanesLayer model={draft} width={W} hotLane={hotLane} selectedLaneId={curSel?.kind === "lane" ? curSel.id : null} />
+              <LanesLayer model={draft} width={W} hotLane={hotLane} selectedLaneId={curSel?.kind === "lane" ? curSel.id : null} title={`${sheetNo} ${sheetCode} ${sheetName}`.trim()} />
               {frameOn && <FrameLayer geo={frameGeo} grid={gridShown(frame)} layers="front" />}
 
               {vflows.map((f) => {

@@ -116,11 +116,15 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   }, [docs, activeKey, session.id]);
   // вид диаграмм: слой подписей и номера (запоминается по сессии)
   const displayKey = `display:${session.id}`;
-  const [display, setDisplayState] = useState<DisplayOptions>(() => loadDisplay(displayKey));
+  const [display, setDisplayState] = useState<DisplayOptions>(() => {
+    const stored = loadDisplay(displayKey);
+    return model.show_icom === undefined ? stored : { ...stored, idef0Icom: model.show_icom };
+  });
   const setDisplay = (patch: Partial<DisplayOptions>) => {
     const next = { ...display, ...patch };
     setDisplayState(next);
     saveDisplay(displayKey, next);
+    if (patch.idef0Icom !== undefined) h.commit({ ...h.draftRef.current, show_icom: patch.idef0Icom });
   };
   const [navReveal, setNavReveal] = useState<{ id: string | null; n: number }>({ id: null, n: 0 });
   /** Бумага для печати листа IDEF0: "" — по формату листа диаграммы (если он стандартный), иначе A4. */

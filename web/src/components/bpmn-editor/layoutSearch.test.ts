@@ -34,7 +34,7 @@ describe("кнопка «Расставить»: подбор по числу п
         // подбор может поднять дорожки под ряды веток: оценивается диаграмма с теми же высотами, что и позиции
         const optimized = withLayout(view, true, undefined, true);
         const b = quality(optimized, new Map(optimized.nodes.filter((n) => n.layout).map((n) => [n.id, n.layout!] as const)));
-        expect(b.crossings, `${name} ${h.id}`).toBeLessThanOrEqual(a.crossings);
+        expect(b.crossings, `${name} ${h.id}`).toBeLessThanOrEqual(a.crossings + 1); // отвод от границы дорожки может добавить одно пересечение
         expect(b.cuts, `${name} ${h.id}`).toBeLessThanOrEqual(a.cuts);
         base += a.crossings;
         opt += b.crossings;

@@ -114,11 +114,14 @@ export function modelExtents(m: ProcessLogicModel): { w: number; h: number } {
   return { w: set === undefined ? contentWidth(m) : diagramWidth(m), h: Math.max(lanesBottom(m) + 20 + (pools.length > 0 ? 30 + POOL_H + 20 : 0), poolsBottom) };
 }
 
-/** Дорожек на одну больше числа ролей: последняя — «Без исполнителя». */
-export const laneCount = (m: ProcessLogicModel) => m.roles.length + 1;
+/** Есть ли фигуры без исполнителя: только тогда нужна последняя дорожка «Без исполнителя» (B2). */
+export const hasUnassignedLane = (m: ProcessLogicModel): boolean =>
+  m.roles.length === 0 || m.nodes.some((n) => !n.role_id || !m.roles.some((r) => r.id === n.role_id));
+/** Дорожки ролей; «Без исполнителя» — только если в ней есть фигуры (или других дорожек нет). */
+export const laneCount = (m: ProcessLogicModel) => m.roles.length + (hasUnassignedLane(m) ? 1 : 0);
 /** Высоты дорожек сверху вниз: у роли — lane_height, у «Без исполнителя» — настройка процесса; без настройки — стандартная. */
 export const laneHeights = (m: ProcessLogicModel): number[] => {
-  const base = [...m.roles.map((r) => laneHeightOf(r.lane_height)), laneHeightOf(m.process.unassigned_lane_height)];
+  const base = [...m.roles.map((r) => laneHeightOf(r.lane_height)), ...(hasUnassignedLane(m) ? [laneHeightOf(m.process.unassigned_lane_height)] : [])];
   // Подпись граничного события должна остаться в дорожке (B8): оставляем запас под ней.
   const boundaryLanes = new Set<number>();
   for (const n of m.nodes) {

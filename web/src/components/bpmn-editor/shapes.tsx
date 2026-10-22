@@ -31,7 +31,7 @@ function EventGlyph({ cx, cy, trigger, throwing, k = 1 }: { cx: number; cy: numb
   );
 }
 function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: string }) {
-  const p = { stroke: INK, strokeWidth: 3, fill: "none", strokeLinecap: "round" as const };
+  const p = { stroke: INK, strokeWidth: 3.2, fill: "none", strokeLinecap: "round" as const };
   switch (subtype) {
     case "parallel":
       return <path d={`M${cx - 9} ${cy} H${cx + 9} M${cx} ${cy - 9} V${cy + 9}`} {...p} />;
@@ -61,7 +61,7 @@ function GatewayGlyph({ cx, cy, subtype }: { cx: number; cy: number; subtype?: s
         </g>
       );
     default:
-      return <path d={`M${cx - 7} ${cy - 7} L${cx + 7} ${cy + 7} M${cx + 7} ${cy - 7} L${cx - 7} ${cy + 7}`} {...p} />;
+      return <path d={`M${cx - 8} ${cy - 8} L${cx + 8} ${cy + 8} M${cx + 8} ${cy - 8} L${cx - 8} ${cy + 8}`} {...p} />;
   }
 }
 
@@ -78,14 +78,21 @@ function Label({ box, text, above = false, left = false, color = INK, size = 11 
   const lh = Math.round((size * 13) / 11);
   const x = left ? cx - 8 : cx;
   const y = above ? box.y - 6 - (lines.length - 1) * lh : box.y + box.h + 14;
+  const labelW = Math.max(1, ...lines.map((l) => l.length)) * 5.8 + 4;
+  const labelH = lines.length * lh + 2;
+  const boxX = left ? x - labelW : x - labelW / 2;
+  const boxY = y - 10;
   return (
-    <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={size} fill={color} pointerEvents="none">
-      {lines.map((l, i) => (
-        <tspan key={i} x={x} dy={i === 0 ? 0 : lh}>
-          {l}
-        </tspan>
-      ))}
-    </text>
+    <g pointerEvents="none">
+      <rect x={boxX} y={boxY} width={labelW} height={labelH} fill="#fff" opacity={0.92} pointerEvents="none" />
+      <text x={x} y={y} textAnchor={left ? "end" : "middle"} fontSize={size} fill={color} pointerEvents="none">
+        {lines.map((l, i) => (
+          <tspan key={i} x={x} dy={i === 0 ? 0 : lh}>
+            {l}
+          </tspan>
+        ))}
+      </text>
+    </g>
   );
 }
 
@@ -125,9 +132,18 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
       </g>
     );
   } else {
-    // ширина строки — по ширине блока (шрифт 12 px ≈ 6,3 px на знак), как в Business Studio до 4 строк
-    const lines = wrapText(node.name || "", Math.max(12, Math.floor((w - 22) / 6.3)), 4);
-    const lh = Math.round(((size ?? 12) * 7) / 6);
+    // B4: название целиком — переносим без многоточия и уменьшаем шрифт, пока текст не поместится в фигуру
+    let textSize = size ?? 12;
+    let lines: string[] = [];
+    let lh = 0;
+    for (; textSize >= 8; textSize--) {
+      const maxChars = Math.max(10, Math.floor((w - 22) / (textSize * 0.52)));
+      lines = wrapText(node.name || "", maxChars, 99);
+      lh = Math.round((textSize * 7) / 6);
+      if (lines.length * lh <= h - 12) break;
+    }
+    if (textSize < 8) textSize = 8;
+    if (lines.length === 0) lines = [""];
     const top = cy - ((lines.length - 1) * lh) / 2 + 4;
     body = (
       <g>
@@ -152,7 +168,7 @@ export function NodeShape({ node, box, selected, hot, boundary = false, labelLef
             )}
           </g>
         )}
-        <text textAnchor="middle" fontSize={size ?? 12} fill={ink} pointerEvents="none">
+        <text textAnchor="middle" fontSize={textSize} fill={ink} pointerEvents="none">
           {lines.map((l, i) => (
             <tspan key={i} x={cx} y={top + i * lh}>
               {l}
@@ -333,10 +349,10 @@ export const UNASSIGNED_LANE = "__unassigned__";
 /** Подпись дорожки: одна строка крупно, если помещается; иначе две строки мельче, с переносом по слову и многоточием. */
 function laneLabelLines(name: string, laneH: number): { text: string; size: number }[] {
   if (name.length <= laneH / 8) return [{ text: name, size: 15 }];
-  const perLine = Math.max(4, Math.floor(laneH / 7));
+  const perLine = Math.max(4, Math.floor(laneH / 6.8));
   const lines: string[] = [];
   let rest = name.trim();
-  while (rest && lines.length < 2) {
+  while (rest && lines.length < 3) {
     if (rest.length <= perLine) {
       lines.push(rest);
       rest = "";
@@ -348,14 +364,22 @@ function laneLabelLines(name: string, laneH: number): { text: string; size: numb
     rest = rest.slice(cut).trim();
   }
   if (rest) lines[lines.length - 1] = lines[lines.length - 1].slice(0, Math.max(1, perLine - 1)).trimEnd() + "…";
-  return lines.map((text) => ({ text, size: 12 }));
+  return lines.map((text) => ({ text, size: lines.length > 2 ? 10.5 : 11.5 }));
 }
 
 /** Фон дорожек с подписями; lanes кликабельны только если передан data-атрибут (в редакторе). */
-export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: ProcessLogicModel; width: number; hotLane?: number | null; selectedLaneId?: string | null }) {
+export function LanesLayer({ model, width, hotLane, selectedLaneId, title }: { model: ProcessLogicModel; width: number; hotLane?: number | null; selectedLaneId?: string | null; title?: string }) {
   const heights = laneHeights(model);
   return (
     <>
+      {title && (
+        <g data-pool-title>
+          <rect x={LANE_X} y={10} width={Math.max(0, width - LANE_X)} height={30} fill="#e8eef7" stroke="#000" strokeWidth={1} />
+          <text x={LANE_X + 8} y={30} fontSize={14} fontFamily="Arial, sans-serif" fill="#111827" pointerEvents="none">
+            {title}
+          </text>
+        </g>
+      )}
       {Array.from({ length: laneCount(model) }, (_, i) => {
         const id = model.roles[i]?.id ?? UNASSIGNED_LANE;
         const name = model.roles[i]?.name ?? "Без исполнителя";
@@ -370,7 +394,7 @@ export function LanesLayer({ model, width, hotLane, selectedLaneId }: { model: P
               {lines.map((line, li) => (
                 <text
                   key={li}
-                  transform={`translate(${LANE_X + LABEL_W / 2 + (lines.length === 1 ? 5 : li === 0 ? 4 : -6)} ${top + laneH / 2}) rotate(-90)`}
+                  transform={`translate(${LANE_X + LABEL_W / 2 + (lines.length === 1 ? 5 : lines.length === 2 ? (li === 0 ? 7 : -7) : (1 - li) * 12)} ${top + laneH / 2}) rotate(-90)`}
                   textAnchor="middle"
                   fontSize={line.size}
                   fill={li === 0 ? "#000000" : "#334155"}

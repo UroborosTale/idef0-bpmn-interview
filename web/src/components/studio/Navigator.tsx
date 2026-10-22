@@ -580,6 +580,7 @@ export default function Navigator({
               {host && menuItem("Открыть диаграмму BPMN", () => onOpenDoc(bpmnDoc(menuFn.id)))}
               {canAddChild && onFunctionAction && menuItem(structured ? "Добавить операцию" : "Добавить подфункцию", () => onFunctionAction("add-child", menuFn.id))}
               {menuItem("Добавить рядом", () => onAddFunction(menuFn.idef0_parent ?? null))}
+              {menuItem("Найти…", () => (searchRef.current?.focus(), searchRef.current?.select()), false, "Ctrl+F")}
               {host && !model.nodes.some((x) => x.bpmn_scope === menuFn.id) && onFunctionAction && menuItem("Создать заготовку диаграммы BPMN", () => onFunctionAction("skeleton", menuFn.id))}
               {onRenameFunction && menuItem("Переименовать", () => startRename(menuFn.id), false, "F2")}
               {onSetOp &&
@@ -606,6 +607,7 @@ export default function Navigator({
         <>
           {menuItem(structured ? "Добавить подпроцесс" : "Добавить функцию", () => onAddFunction(null))}
           {onPaste && menuItem("Вставить на верхний уровень", () => onPaste(null), !clipboard, "Ctrl+V")}
+          {menuItem("Найти…", () => (searchRef.current?.focus(), searchRef.current?.select()), false, "Ctrl+F")}
           {onWizard && menuItem("Мастер структуры…", onWizard)}
         </>
       )}

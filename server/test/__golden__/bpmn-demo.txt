@@ -171,7 +171,7 @@ extra store 1194,484 18×20 «Система электронного докум
 extra data 688,366 18×20 «Договор поставки» link[697,390 697,386]
 extra annotation 100,760 180×60 «Типовая форма договора поставки» link[1203,480 190,760]
 pool Pool_p_suppl 1298,870 170×40
-message Msg_o22_m1 Pool_p_suppl→Node_o22_signedBack [1383,870 1383,708 1402.5,708 1402.5,506]
+message Msg_o22_m1 Pool_p_suppl→Node_o22_signedBack [1383,870 1383,715 1402.5,715 1402.5,506]
 # BPMN C090.03.01 2032×760
 lane r_erp 80,60 1852×150
 lane r_logist 80,210 1852×150

@@ -4,7 +4,7 @@ import { generateBpmn, type BpmnDiagramData } from "../pipeline/bpmn.js";
 import { arrowLabelPlacement, buildIdef0Diagrams, frameInfo, idef0Codes, type Idef0Block, type Idef0DiagramData } from "../pipeline/idef0.js";
 import { BPMN_SHEET_MARGIN, bpmnFrameDefaults, bpmnFrameShown, bpmnSheetWorld, frameGeometry, frameShown, type FrameDefaults, type FrameGeometry, type IdefFrame, FRAME_FONT, FRAME_H } from "../shared/idef0Frame.js";
 import { noteBox, tunnelArcs } from "../shared/idef0Layout.js";
-import { isStructured, processCodeOf } from "../shared/codes.js";
+import { blockNumbers, isStructured, processCodeOf } from "../shared/codes.js";
 import { LABEL_W, LANE_X } from "../shared/bpmnGeometry.js";
 import { scaleGlyphs, triggerGlyph, type Glyph } from "../shared/events.js";
 import { MARKER_R, markerCenters } from "../shared/bpmnTriggers.js";
@@ -701,7 +701,7 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
   const lanesTop = d.lanes.length ? Math.min(...d.lanes.map((l) => l.y)) : d.pool.y;
   const bandH = Math.max(30, lanesTop - 1);
   const titleH = Math.round(bandH * 0.68);
-  page.rect(bx0, 1, bw0, titleH, { fill: "#e8eef7", weightPt: 1, align: "left", text: `${code} ${sheetName}`.trim() || name, fontPx: 14, color: "#000000" });
+  page.rect(bx0, 1, bw0, titleH, { fill: "#e8eef7", weightPt: 1, align: "left", text: [scope ? blockNumbers(model).get(scope) : "", `${code} ${sheetName}`.trim() || name].filter(Boolean).join(" "), fontPx: 14, color: "#000000" });
   page.rect(bx0, 1 + titleH, bw0, bandH - titleH, { fill: "#e8eef7", weightPt: 1 });
   // пул и дорожки
   // как в Business Studio, контейнер кончается там же, где дорожки (документы и аннотации стоят ниже него)

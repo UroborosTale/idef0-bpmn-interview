@@ -3,12 +3,10 @@ fn s1 220,220 170×90
 fn s2 560,370 170×90
 arrow control:s1:c_order266 [176,140 240,140 240,174 240,220] label@179,136/start «Приказ Минобрнауки России от 24.03.2025 № 266»
 arrow control:s1:c_tk196 [266,174 266,220] label@269,158/start «Трудовой кодекс РФ ст.196»
-arrow control:s1:c_list [292,174 292,220] label@295,170/start «Список направлений обучения»
-arrow input:s1:d_need [50,234 220,234] label@135,232/middle «Сотрудник нуждающийся в
-обучении»
-arrow input:s1:d_mandate [50,274 220,274] label@135,278/middle «Поручение руководства»
-arrow output:s1:d_unapproved [390,234 560,234] label@475,232/middle «Несогласованная заявка на
-обучение»
+arrow control:s1:c_list [292,174 292,220] label@295,184/start «Список направлений обучения»
+arrow input:s1:d_need [0,234 220,234] label@110,238/middle «Сотрудник нуждающийся в обучении»
+arrow input:s1:d_mandate [0,274 220,274] label@110,278/middle «Поручение руководства»
+arrow output:s1:d_unapproved [390,234 1080,234] label@735,238/middle «Несогласованная заявка на обучение»
 arrow role:s1:r_initiator [240,350 240,310] label@243,364/start «Инициатор заявки на обучение»
 arrow role:s1:r_spec [266,556 266,310]
 arrow role:s1:r_mgr [292,538 292,310]
@@ -17,18 +15,15 @@ arrow role:s1:r_dirhr [344,502 344,310]
 arrow system:s1:s_elma [370,484 370,310]
 arrow control:s2:c_law273 [580,324 580,370] label@583,296/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
 Российской Федерации»»
-arrow control:s2:c_tk187 [606,324 606,370] label@609,320/start «Трудовой кодекс РФ ст.187»
+arrow control:s2:c_tk187 [606,324 606,370] label@609,334/start «Трудовой кодекс РФ ст.187»
 arrow control:s2:c_order266 [176,140 632,140 632,324 632,370]
 arrow link:s2:d_confirmed [390,252 414,252 414,384 560,384] label@487,379/middle «Подтверждённая заявка на обучение»
-arrow input:s2:d_dismissal [390,424 560,424] label@475,416/middle «Уведомление об отчислении
-сотрудника от образовательной
+arrow input:s2:d_dismissal [0,424 560,424] label@280,422/middle «Уведомление об отчислении сотрудника от образовательной
 организации»
-arrow output:s2:d_trained [730,384 900,384] label@815,388/middle «Обученный сотрудник»
-arrow output:s2:d_eduSection [730,415 900,415] label@815,407/middle «Актуализированный раздел об
-образовании в карточке
+arrow output:s2:d_trained [730,384 1080,384] label@905,388/middle «Обученный сотрудник»
+arrow output:s2:d_eduSection [730,415 1080,415] label@905,413/middle «Актуализированный раздел об образовании в карточке
 сотрудника»
-arrow output:s2:d_dismissed [730,446 900,446] label@815,444/middle «Уведомление сотруднику о его
-отчислении»
+arrow output:s2:d_dismissed [730,446 1080,446] label@905,450/middle «Уведомление сотруднику о его отчислении»
 arrow role:s2:r_emp [710,500 710,460] label@713,514/start «Сотрудник прошедший обучение»
 arrow role:s2:r_spec [266,556 684,556 684,460] label@274,552/start «Специалист отдела обучения и развития персонала»
 arrow role:s2:r_mgr [292,538 658,538 658,460] label@300,534/start «Руководитель инициатора заявки на обучение»
@@ -40,28 +35,24 @@ fn o11 220,220 170×90
 fn o12 560,370 170×90
 fn o13 900,520 170×90
 arrow control:o11:c_order266 [240,174 240,220] label@243,158/start «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow control:o11:c_list [266,174 266,220] label@269,170/start «Список направлений обучения»
-arrow input:o11:d_need [50,234 220,234] label@135,232/middle «Сотрудник нуждающийся в
-обучении»
-arrow input:o11:d_mandate [50,265 220,265] label@135,269/middle «Поручение руководства»
-arrow link:o11:d_returned [730,384 746,384 746,190 192,190 192,296 220,296] label@469,185/middle «Заявка возвращена на доработку»
+arrow control:o11:c_list [266,174 266,220] label@269,184/start «Список направлений обучения»
+arrow input:o11:d_need [0,234 220,234] label@110,238/middle «Сотрудник нуждающийся в обучении»
+arrow input:o11:d_mandate [0,265 220,265] label@110,269/middle «Поручение руководства»
+arrow link:o11:d_returned [730,384 746,384 746,190 192,190 192,296 220,296] label@469,171/middle «Заявка возвращена на доработку»
 arrow role:o11:r_initiator [240,350 240,310] label@243,364/start «Инициатор заявки на обучение»
 arrow role:o11:r_elma [280,652 280,310]
 arrow system:o11:s_elma [320,634 320,310]
 arrow control:o12:c_tk196 [580,324 580,370] label@583,320/start «Трудовой кодекс РФ ст.196»
 arrow link:o12:d_formed [390,234 406,234 406,384 560,384] label@483,379/middle «Сформированная заявка на обучение»
-arrow output:o12:d_unapproved [730,415 900,415] label@815,413/middle «Несогласованная заявка на
-обучение»
-arrow role:o12:r_mgr [645,500 645,460] label@648,562/start «Руководитель инициатора заявки на обучение»
+arrow output:o12:d_unapproved [730,415 1380,415] label@1055,419/middle «Несогласованная заявка на обучение»
+arrow role:o12:r_mgr [645,500 645,460] label@648,506/start «Руководитель инициатора заявки на обучение»
 arrow role:o12:r_dird [677.5,500 677.5,460] label@680.5,550/start «Директор дирекции операционной эффективности»
-arrow role:o12:r_dirhr [710,500 710,460] label@713,514/start «Директор по персоналу и операционной эффективности»
+arrow role:o12:r_dirhr [710,500 710,460] label@713,486/start «Директор по персоналу и операционной эффективности»
 arrow role:o12:r_elma [280,652 612.5,652 612.5,460] label@288,648/start «ELMA365»
 arrow system:o12:s_elma [320,634 580,634 580,460] label@328,630/start «ELMA365»
 arrow link:o13:d_approved [730,420 762,420 762,534 900,534] label@831,529/middle «Согласованная заявка на обучение»
-arrow output:o13:d_impossible [1070,534 1240,534] label@1155,532/middle «Уведомление о невозможности
-исполнения заявки»
-arrow output:o13:d_confirmed [1070,574 1240,574] label@1155,572/middle «Подтверждённая заявка на
-обучение»
+arrow output:o13:d_impossible [1070,534 1380,534] label@1225,538/middle «Уведомление о невозможности исполнения заявки»
+arrow output:o13:d_confirmed [1070,574 1380,574] label@1225,578/middle «Подтверждённая заявка на обучение»
 arrow role:o13:r_spec [1000,650 1000,610] label@1003,664/start «Специалист отдела обучения и развития персонала»
 arrow role:o13:r_elma [280,652 960,652 960,610]
 arrow system:o13:s_elma [320,634 920,634 920,610]
@@ -71,21 +62,17 @@ fn o22 560,370 170×90
 arrow control:o21:c_law273 [240,174 240,220] label@243,146/start «Федеральный закон от 29.12.2012 № 273-ФЗ «Об образовании в
 Российской Федерации»»
 arrow control:o21:c_tk187 [202,140 266,140 266,174 266,220] label@205,124/start «Трудовой кодекс РФ ст.187»
-arrow control:o21:c_order266 [292,174 292,220] label@295,170/start «Приказ Минобрнауки России от 24.03.2025 № 266»
-arrow input:o21:d_confirmed [50,234 220,234] label@135,232/middle «Подтверждённая заявка на
-обучение»
-arrow input:o21:d_dismissal [50,274 220,274] label@135,266/middle «Уведомление об отчислении
-сотрудника от образовательной
+arrow control:o21:c_order266 [292,174 292,220] label@295,184/start «Приказ Минобрнауки России от 24.03.2025 № 266»
+arrow input:o21:d_confirmed [0,234 220,234] label@110,238/middle «Подтверждённая заявка на обучение»
+arrow input:o21:d_dismissal [0,274 220,274] label@110,272/middle «Уведомление об отчислении сотрудника от образовательной
 организации»
-arrow output:o21:d_dismissed [390,274 560,274] label@475,272/middle «Уведомление сотруднику о его
-отчислении»
+arrow output:o21:d_dismissed [390,274 1080,274] label@735,278/middle «Уведомление сотруднику о его отчислении»
 arrow role:o21:r_spec [240,520 240,310]
 arrow role:o21:r_elma [280,502 280,310]
 arrow system:o21:s_elma [320,484 320,310]
 arrow control:o22:c_tk187 [202,140 580,140 580,324 580,370]
 arrow link:o22:d_trained [390,234 406,234 406,384 560,384] label@483,379/middle «Обученный сотрудник»
-arrow output:o22:d_eduSection [730,384 900,384] label@815,376/middle «Актуализированный раздел об
-образовании в карточке
+arrow output:o22:d_eduSection [730,384 1080,384] label@905,382/middle «Актуализированный раздел об образовании в карточке
 сотрудника»
 arrow role:o22:r_spec [240,520 660,520 660,460] label@248,516/start «Специалист отдела обучения и развития персонала»
 arrow role:o22:r_emp [700,500 700,460] label@703,514/start «Сотрудник прошедший обучение»

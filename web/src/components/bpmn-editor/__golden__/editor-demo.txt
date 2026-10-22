@@ -101,9 +101,9 @@ flow o21_f12 o21_again→o21_cancel [1915,310 1915,334 2288,334 2288,303] «Не
 artifact o21_send:input:d_approvedReq 766,216 18×20 edge[775,236 775,240] «Согласованная заявка на закупку»
 artifact o21_send:store:s_edo 787,334 18×20 edge[796,334 796,330] «Система электронного документооборота»
 artifact o21_compare:output:d_chosen 1526,216 18×20 edge[1535,240 1535,236] «Выбранное коммерческое предложение»
-pool p_suppl 690,540 170×40 «Поставщики»
-message o21_m1 o21_send→p_suppl [775,330 775,447 753.8,447 753.8,540]
-message o21_m2 p_suppl→o21_got [796.3,540 796.3,433 1143.3,433 1143.3,302.4]
+pool p_suppl 690,390 170×40 «Поставщики»
+message o21_m1 o21_send→p_suppl [775,330 775,372 753.8,372 753.8,390]
+message o21_m2 p_suppl→o21_got [796.3,390 796.3,368 1143.3,368 1143.3,302.4]
 # редактор BPMN C090.02.02
 shape o22_start event/start 180,417 36×36 «Поставщик выбран»
 shape o22_m0 gateway/exclusive 370,410 50×50 «Слияние потоков»
@@ -134,8 +134,8 @@ flow o22_f13 o22_rework→o22_m0 [1345,390 1345,342 395,342 395,410]
 artifact o22_draft:input:d_chosen 576,366 18×20 edge[585,386 585,390] «Выбранное коммерческое предложение»
 artifact o22_draft:store:s_edo 576,484 18×20 edge[585,484 585,480] «Система электронного документооборота»
 artifact o22_sign:output:d_contract 1716,366 18×20 edge[1725,390 1725,386] «Договор поставки»
-pool p_suppl 1830,880 170×40 «Поставщики»
-message o22_m1 p_suppl→o22_signedBack [1915,880 1915,480]
+pool p_suppl 1830,730 170×40 «Поставщики»
+message o22_m1 p_suppl→o22_signedBack [1915,730 1915,480]
 # редактор BPMN C090.03.01
 shape o31_start1 event/start 180,117 36×36 «Наступил срок еженедельной проверки»
 shape o31_start2 event/start 180,267 36×36 «Обращение по поставке получено»
@@ -163,9 +163,9 @@ flow o31_f11 o31_date→o31_receive [1736,285 1800,285 1800,435 1840,435]
 flow o31_f12 o31_receive→o31_end [1990,435 2080,435]
 artifact o31_ask:input:d_contract 576,216 18×20 edge[585,236 585,240] «Договор поставки»
 artifact o31_receive:output:d_arrived 1906,366 18×20 edge[1915,390 1915,386] «Поставленное оборудование»
-pool p_suppl 500,690 170×40 «Поставщики»
-message o31_m1 o31_ask→p_suppl [585,330 585,522 563.8,522 563.8,690]
-message o31_m2 p_suppl→o31_status [606.3,690 606.3,502 768,502 768,303]
+pool p_suppl 500,540 170×40 «Поставщики»
+message o31_m1 o31_ask→p_suppl [585,330 585,447 563.8,447 563.8,540]
+message o31_m2 p_suppl→o31_status [606.3,540 606.3,433.5 768,433.5 768,303]
 # редактор BPMN C090.03.02
 shape o32_start event/start 180,457 36×36 «Поставка прибыла и приёмка подготовлена»
 shape o32_count task/manual 320,430 150×90 «Проверить комплектность поставки»
@@ -196,5 +196,5 @@ artifact o32_pay:store:s_erp 576,204 18×20 edge[585,204 585,200] «ERP «Зак
 artifact o32_act:output:d_act 1146,406 18×20 edge[1155,430 1155,426] «Акт приёмки оборудования»
 artifact o32_register:output:d_inUse 1336,86 18×20 edge[1345,110 1345,106] «Оборудование в эксплуатации»
 artifact o32_register:store:s_erp 1336,204 18×20 edge[1345,204 1345,200] «ERP «Закупки»»
-pool p_acc 1443,730 170×40 «Учёт основных средств»
-message o32_m1 o32_end→p_acc [1528,173 1528,730]
+pool p_acc 1443,580 170×40 «Учёт основных средств»
+message o32_m1 o32_end→p_acc [1528,173 1528,580]

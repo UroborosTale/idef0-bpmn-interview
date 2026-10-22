@@ -1,5 +1,5 @@
 import type { ProcessLogicModel, ProcessNode } from "../types/model.js";
-import { isStructured, processCodeOf } from "../shared/codes.js";
+import { blockNumbers, isStructured, processCodeOf } from "../shared/codes.js";
 import { functionsOf, idef0Codes as sharedCodes, idef0Extents, labelSpec, layoutIdef0, noteBox, offpageMarks, tunnelArcs, type ArrowKind, type LabelSide, type Pt } from "../shared/idef0Layout.js";
 import { wrapText } from "../shared/bpmnLabels.js";
 import { FRAME_FONT, frameGeometry, frameKey, frameShown, gridShown, type FrameDefaults, type FrameGeometry, type IdefFrame } from "../shared/idef0Frame.js";
@@ -147,9 +147,9 @@ function buildFunctionDiagram(model: ProcessLogicModel, parentId: string | null,
     labelOffset: a.labelOffset,
     ...(a.labelHidden ? { labelHidden: true } : {}),
     ...(a.bus ? { bus: true } : {}),
-    ...(a.code ? { code: a.code } : {}),
-    ...(a.codeAt ? { codeAt: a.codeAt } : {}),
-    ...(a.codeAnchor ? { codeAnchor: a.codeAnchor } : {}),
+    ...(model.show_icom && a.code ? { code: a.code } : {}),
+    ...(model.show_icom && a.codeAt ? { codeAt: a.codeAt } : {}),
+    ...(model.show_icom && a.codeAnchor ? { codeAnchor: a.codeAnchor } : {}),
     ...(a.offpageUp || a.offpageDown ? { offpageAt: offpageMarks(a) } : {}),
     ref: { kind: a.kind, nodeId: a.nodeId, entityId: a.entityId },
     // концы, лежащие на блоках: связь — от источника к потребителю, выход — от функции, остальное — в функцию
@@ -307,25 +307,22 @@ function frameSvg(geo: FrameGeometry, grid: boolean): string {
 
 /** Ключ рамки и надписи штампа по умолчанию для диаграммы (A-0, A0 или вложенной функции). */
 export function frameInfo(d: Pick<Idef0DiagramData, "code" | "title">, model: ProcessLogicModel, kind: "context" | "root" | "child", parentNodeId?: string): { key: string; defaults: FrameDefaults } {
-  if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: (d.title.includes(" — ") ? d.title.slice(d.title.indexOf(" — ") + 3) : d.title).replace(" (контекстная диаграмма)", ""), no: "1.0" } };
+  if (kind === "context") return { key: "ctx", defaults: { node: "A-0", title: model.process.name, no: "1.0" } };
   if (kind === "root") return { key: frameKey(null), defaults: { node: "A0", title: model.process.name, no: "1.0" } }; // в штампе Business Studio — только название, без кода
-  return { key: frameKey(parentNodeId ?? null), defaults: { node: d.code, title: d.title.includes(" — ") ? d.title.slice(d.title.indexOf(" — ") + 3) : d.title, no: "1.0" } };
+  // NODE — номер узла IDEF0 (A3, A4), а не код по Соглашению; TITLE — название функции без кода
+  return { key: frameKey(parentNodeId ?? null), defaults: { node: parentNodeId ? blockNumbers(model).get(parentNodeId) ?? "" : "", title: d.title.includes(" — ") ? d.title.slice(d.title.indexOf(" — ") + 3) : d.title, no: "1.0" } };
 }
 
 function renderSvg(d: Idef0DiagramData, frame?: { settings: IdefFrame | undefined; defaults: FrameDefaults }): string {
   const parts: string[] = [DEFS];
   for (const b of d.blocks) {
     const big = b.w >= 200; // блок контекстной диаграммы
-    parts.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#e8eef7" stroke="#1f2937" stroke-width="${big ? 1.8 : 1.6}" />`);
-    parts.push(textBlock(b.x + b.w / 2, b.y + b.h / 2 - (big ? 8 : 6), b.name, big ? 26 : 22, big ? 13 : 12));
-    parts.push(`<text x="${b.x + (big ? 8 : 6)}" y="${b.y + b.h - (big ? 8 : 6)}" font-size="10" font-family="Arial, sans-serif" fill="#4b5563">${esc(b.code)}</text>`);
+    parts.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#e8eef7" stroke="#1f2937" stroke-width="1" />`);
+    const caption = `${b.code} ${b.name}`.trim();
+    parts.push(textBlock(b.x + b.w / 2, b.y + b.h / 2 - (big ? 8 : 6), caption, big ? 26 : 22, big ? 13 : 12));
     // В12: метка фигуры — короткая серая подпись над блоком
     if (b.shapeLabel) parts.push(`<text x="${b.x}" y="${b.y - 4}" font-size="9" font-family="Arial, sans-serif" fill="#6b7280">${esc(b.shapeLabel)}</text>`);
-    if (b.hasChildren) {
-      // отметка «есть декомпозиция»: квадрат с плюсом в правом нижнем углу
-      const [mx, my] = [b.x + b.w - 18, b.y + b.h - 18];
-      parts.push(`<rect x="${mx}" y="${my}" width="12" height="12" fill="#fff" stroke="#1f2937" /><path d="M${mx + 3},${my + 6} H${mx + 9} M${mx + 6},${my + 3} V${my + 9}" stroke="#1f2937" />`);
-    }
+    // на печати и в выгрузке значка декомпозиции нет: он остаётся только в редакторе при наведении/выделении
     // В12: примечание к функции — жёлтый блок справа от неё
     const nb = b.note ? noteBox({ x: b.x, y: b.y, w: b.w, h: b.h }, b.note) : null;
     if (nb) {
