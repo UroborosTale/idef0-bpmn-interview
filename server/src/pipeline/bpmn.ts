@@ -8,7 +8,7 @@ import { idef0Codes } from "../shared/idef0Layout.js";
 import { scopeView } from "../shared/scope.js";
 import { linkPairs } from "../shared/validate.js";
 import { eventSpec, type EventPosition, type EventSpec, type TriggerType } from "../shared/events.js";
-import { artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, BOUNDARY_LABEL_EXTRA } from "../shared/bpmnArtifacts.js";
+import { artifactObstacle, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, BOUNDARY_LABEL_EXTRA } from "../shared/bpmnArtifacts.js";
 
 /** Диаграмма в структурированном виде (координаты в пикселях, как в BPMN DI) — для экспорта в VSDX. */
 export interface BpmnDiagramData {
@@ -23,7 +23,18 @@ export interface BpmnDiagramData {
   /** flowId — id потока модели (у служебных стрелок отсутствует); from/to — id фигур. */
   edges: { id: string; flowId?: string; from: string; to: string; points: [number, number][]; label?: string; isDefault?: boolean }[];
   /** data — документ, store — хранилище данных (информационная система), annotation — регламент; link — ассоциация с задачей. */
-  extras: { kind: "data" | "store" | "annotation"; name: string; x: number; y: number; w: number; h: number; link?: [number, number][]; linkDirection?: "to-task" | "from-task" | "none" }[];
+  extras: {
+    kind: "data" | "store" | "annotation";
+    name: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    link?: [number, number][];
+    linkDirection?: "to-task" | "from-task" | "none";
+    /** B5: все ассоциации одной сущности с задачами. */
+    links?: { points: [number, number][]; direction: "to-task" | "from-task" | "none" }[];
+  }[];
   /** Свёрнутые внешние пулы под диаграммой. */
   pools: { id: string; name: string; x: number; y: number; w: number; h: number }[];
   /** Потоки сообщений: id фигур-концов (фигура шага или пул). */
@@ -360,7 +371,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     const poolsTop = 40 + Math.max(START_Y + laneHeights.reduce((s, h) => s + h, 0) + 40, 120) + 20 + 50;
     const pools: RouteNode[] = [...poolBoxes(view.pools ?? [], messages, hb, poolsTop)].map(([id, box]) => ({ id: `Pool_${id}`, type: "pool", box }));
     const extraFlows = pools.length === 0 ? [] : messages.map((m) => ({ id: `msg:${m.id}`, from: poolEndId(m.from), to: poolEndId(m.to), message: true, fixed: fixedRoute(m.route) }));
-    return { obstacles: arts.map(artifactObstacle), withArtifacts: new Set(arts.filter((a) => !isStoreArtifact(a)).map((a) => nodeIdOf(a.nodeId))), withStores: new Set(arts.filter(isStoreArtifact).map((a) => nodeIdOf(a.nodeId))), extraNodes: [...extraNodes, ...pools], extraFlows };
+    return { obstacles: arts.map(artifactObstacle), withArtifacts: new Set(arts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind !== "store").map((l) => nodeIdOf(l.nodeId)))), withStores: new Set(arts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind === "store").map((l) => nodeIdOf(l.nodeId)))), extraNodes: [...extraNodes, ...pools], extraFlows };
   };
   const layout = await layoutLayered(layoutNodes, layoutEdges, laneHeights, layoutExtras);
 
@@ -390,7 +401,7 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
 
   // документы и хранилища данных у задач: документы над задачей, хранилища данных под ней, с ассоциациями
   const artifacts = artifactsOf(nodes, hostBoxes, { data: new Map(model.data.map((d) => [d.id, d.name])), systems: new Map(model.systems.map((s) => [s.id, s.name])) }, messageNodes);
-  const artId = (a: { nodeId: string; kind: string; entityId: string }) => `${a.kind === "store" ? "StoreRef" : "DataRef"}_${a.nodeId}_${a.entityId}`;
+  const artId = (a: { entityId: string; kind: string }) => `${a.kind === "store" ? "StoreRef" : "DataRef"}_${a.entityId}`;
 
   const events = createEventWriter();
   function pushEventXml(id: string, name: string, spec: EventSpec, attach?: { hostId: string; interrupting: boolean }) {
@@ -405,14 +416,14 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
     elementIndex[n.id] = id;
     if (n.type === "task") {
       const tag = taskTag(n.subtype);
-      const mine = artifacts.filter((a) => a.nodeId === n.id);
+      const mine = artifacts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind, edge: a.edge }]).filter((l) => l.nodeId === n.id && l.kind !== "store").map((l) => ({ a, l })));
       const inputAssoc = mine
-        .filter((a) => a.kind === "input")
-        .map((a) => `<bpmn:dataInputAssociation id="DIA_${n.id}_${a.entityId}"><bpmn:sourceRef>${artId(a)}</bpmn:sourceRef></bpmn:dataInputAssociation>`)
+        .filter(({ l }) => l.kind === "input")
+        .map(({ a }) => `<bpmn:dataInputAssociation id="DIA_${n.id}_${a.entityId}"><bpmn:sourceRef>${artId(a)}</bpmn:sourceRef></bpmn:dataInputAssociation>`)
         .join("");
       const outputAssoc = mine
-        .filter((a) => a.kind === "output")
-        .map((a) => `<bpmn:dataOutputAssociation id="DOA_${n.id}_${a.entityId}"><bpmn:targetRef>${artId(a)}</bpmn:targetRef></bpmn:dataOutputAssociation>`)
+        .filter(({ l }) => l.kind === "output")
+        .map(({ a }) => `<bpmn:dataOutputAssociation id="DOA_${n.id}_${a.entityId}"><bpmn:targetRef>${artId(a)}</bpmn:targetRef></bpmn:dataOutputAssociation>`)
         .join("");
       flowElementsXml.push(`<bpmn:${tag} id="${id}" name="${esc(n.name)}"${defaultAttr(n)}>${inputAssoc}${outputAssoc}${loopXml(n.loop)}</bpmn:${tag}>`);
     } else if (n.type === "subprocess") {
@@ -456,24 +467,28 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   const declared = new Set<string>();
   for (const a of artifacts) {
     const ref = artId(a);
+    const links = a.links ?? [{ nodeId: a.nodeId, kind: a.kind, edge: a.edge }];
     if (a.kind === "store") {
-      // хранилище данных (информационная система): связь с задачей — ассоциация без направления
+      // хранилище данных (информационная система): связь с каждой задачей — ассоциация без направления
       dataXml.push(`<bpmn:dataStoreReference id="${ref}" name="${esc(a.name)}" />`);
-      dataXml.push(`<bpmn:association id="Assoc_${ref}" sourceRef="${nodeIdOf(a.nodeId)}" targetRef="${ref}" associationDirection="None" />`);
+      for (const l of links) dataXml.push(`<bpmn:association id="Assoc_${ref}_${l.nodeId}" sourceRef="${nodeIdOf(l.nodeId)}" targetRef="${ref}" associationDirection="None" />`);
     } else {
       if (!declared.has(a.entityId)) {
         declared.add(a.entityId);
         dataXml.push(`<bpmn:dataObject id="DataObj_${a.entityId}" name="${esc(a.name)}" />`);
+        dataXml.push(`<bpmn:dataObjectReference id="${ref}" name="${esc(a.name)}" dataObjectRef="DataObj_${a.entityId}" />`);
       }
-      dataXml.push(`<bpmn:dataObjectReference id="${ref}" name="${esc(a.name)}" dataObjectRef="DataObj_${a.entityId}" />`);
     }
     const { x, y, w, h } = a.box;
-    diagramExtras.push({ kind: a.kind === "store" ? "store" : "data", name: a.name, x, y, w, h, link: a.edge, linkDirection: a.kind === "store" ? "none" : a.kind === "input" ? "to-task" : "from-task" });
+    const extraLinks = links.map((l) => ({ points: l.edge, direction: l.kind === "store" ? "none" as const : l.kind === "input" ? "to-task" as const : "from-task" as const }));
+    diagramExtras.push({ kind: a.kind === "store" ? "store" : "data", name: a.name, x, y, w, h, link: extraLinks[0]?.points, linkDirection: extraLinks[0]?.direction, links: extraLinks });
     dataShapesXml.push(
       `<bpmndi:BPMNShape id="${ref}_di" bpmnElement="${ref}"><dc:Bounds x="${Math.round(x)}" y="${Math.round(y)}" width="${w}" height="${h}" /><bpmndi:BPMNLabel><dc:Bounds x="${Math.round(x + w / 2 - 35)}" y="${Math.round(a.kind === "store" ? y + h + 1 : y - 13)}" width="70" height="12" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>`
     );
-    const assoc = a.kind === "store" ? `Assoc_${ref}` : a.kind === "input" ? `DIA_${a.nodeId}_${a.entityId}` : `DOA_${a.nodeId}_${a.entityId}`;
-    dataShapesXml.push(`<bpmndi:BPMNEdge id="${assoc}_di" bpmnElement="${assoc}">${wp(a.edge)}</bpmndi:BPMNEdge>`);
+    for (const l of links) {
+      const assoc = a.kind === "store" ? `Assoc_${ref}_${l.nodeId}` : l.kind === "input" ? `DIA_${l.nodeId}_${a.entityId}` : `DOA_${l.nodeId}_${a.entityId}`;
+      dataShapesXml.push(`<bpmndi:BPMNEdge id="${assoc}_di" bpmnElement="${assoc}">${wp(l.edge)}</bpmndi:BPMNEdge>`);
+    }
   }
 
   // controls as text annotations, associated with the tasks that reference them
@@ -560,8 +575,8 @@ export async function generateBpmn(model: ProcessLogicModel, scope: string | nul
   // стрелки и потоки сообщений прокладываются все вместе (shared/bpmnRouting.ts): без общих портов и наложений.
   // Два расчёта: для XML — со всеми событиями (свёрнутые стоят слева от блока), для диаграммы Visio — со свёрнутыми
   // триггерами: без их фигур и стрелок «событие → блок».
-  const withArtifacts = new Set(artifacts.filter((a) => !isStoreArtifact(a)).map((a) => a.nodeId));
-  const withStores = new Set(artifacts.filter(isStoreArtifact).map((a) => a.nodeId));
+  const withArtifacts = new Set(artifacts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind !== "store").map((l) => l.nodeId)));
+  const withStores = new Set(artifacts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind === "store").map((l) => l.nodeId)));
   const toBox = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x, y: b.y, w: b.width, h: b.height });
   // полосы дорожек: подпись события или шлюза не должна выходить за свою полосу, а отрезок — идти по её линии
   const laneBands = layout.laneBounds.map((b) => ({ top: b.y, bottom: b.y + b.height }));

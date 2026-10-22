@@ -71,13 +71,13 @@ describe("рамка листа IDEF0", () => {
     const base = generateIdef0(purchaseModel());
     expect(base.decompositionSvg).toContain("NODE:");
     expect(base.decompositionSvg).toContain("NO.:");
-    expect(base.decompositionSvg).toMatch(/stroke="#e4e4e4"/); // клетки
+    expect(base.decompositionSvg).toMatch(/stroke="#f5f5f5"/); // клетки
     expect(base.children[0].svg).toContain("A2");
 
     const m = purchaseModel();
     m.idef0_frames = { "": { grid: false, texts: { title: "Название <лист>", node: "ЛИСТ-1" } } };
     const noGrid = generateIdef0(m).decompositionSvg;
-    expect(noGrid).not.toMatch(/stroke="#e4e4e4"/);
+    expect(noGrid).not.toMatch(/stroke="#f5f5f5"/);
     expect(noGrid).toContain("ЛИСТ-1");
     expect(noGrid).toContain("Название &lt;лист&gt;"); // разметка экранируется
 

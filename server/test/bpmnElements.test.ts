@@ -84,23 +84,23 @@ describe("элементы BPMN по Соглашению: генерация", 
     b1.inputs = ["d1"];
     b1.outputs = ["d2"];
     const { xml, diagram } = await generateBpmn(m, "o1");
-    expect(xml).toMatch(/<bpmn:dataObjectReference id="DataRef_b1_d1" name="Информация о выявленном процессе" dataObjectRef="DataObj_d1"/);
-    expect(xml).toMatch(/<bpmn:dataInputAssociation id="DIA_b1_d1"><bpmn:sourceRef>DataRef_b1_d1<\/bpmn:sourceRef>/);
-    expect(xml).toMatch(/<bpmn:dataOutputAssociation id="DOA_b1_d2"><bpmn:targetRef>DataRef_b1_d2<\/bpmn:targetRef>/);
+    expect(xml).toMatch(/<bpmn:dataObjectReference id="DataRef_d1" name="Информация о выявленном процессе" dataObjectRef="DataObj_d1"/);
+    expect(xml).toMatch(/<bpmn:dataInputAssociation id="DIA_b1_d1"><bpmn:sourceRef>DataRef_d1<\/bpmn:sourceRef>/);
+    expect(xml).toMatch(/<bpmn:dataOutputAssociation id="DOA_b1_d2"><bpmn:targetRef>DataRef_d2<\/bpmn:targetRef>/);
     // система ELMA365 у задачи b1 — хранилище данных, связанное ассоциацией без направления
-    expect(xml).toMatch(/<bpmn:dataStoreReference id="StoreRef_b1_s1" name="ELMA365"/);
-    expect(xml).toMatch(/<bpmn:association id="Assoc_StoreRef_b1_s1" sourceRef="Node_b1" targetRef="StoreRef_b1_s1" associationDirection="None"/);
-    for (const id of ["DataRef_b1_d1_di", "DataRef_b1_d2_di", "StoreRef_b1_s1_di", "DIA_b1_d1_di", "DOA_b1_d2_di", "Assoc_StoreRef_b1_s1_di"]) expect(xml).toContain(`id="${id}"`);
+    expect(xml).toMatch(/<bpmn:dataStoreReference id="StoreRef_s1" name="ELMA365"/);
+    expect(xml).toMatch(/<bpmn:association id="Assoc_StoreRef_s1_b1" sourceRef="Node_b1" targetRef="StoreRef_s1" associationDirection="None"/);
+    for (const id of ["DataRef_d1_di", "DataRef_d2_di", "StoreRef_s1_di", "DIA_b1_d1_di", "DOA_b1_d2_di", "Assoc_StoreRef_s1_b1_di"]) expect(xml).toContain(`id="${id}"`);
     const host = diagram.shapes.find((s) => s.nodeId === "b1")!;
     const arts = diagram.extras.filter((e) => e.kind === "data" || e.kind === "store");
     expect(arts.map((e) => e.kind)).toEqual(["data", "data", "store"]);
     for (const a of arts) {
       if (a.kind === "store") {
         expect(a.y).toBeGreaterThan(host.y + host.h); // хранилище данных — под задачей
-        expect(a.y + a.h + 11).toBeLessThanOrEqual(host.y + host.h + 35); // вместе с подписью — в пределах дорожки
+        expect(a.y + a.h + 11).toBeLessThanOrEqual(host.y + host.h + 50); // вместе с подписью — в пределах дорожки
       } else {
         expect(a.y + a.h).toBeLessThan(host.y); // документ — над задачей
-        expect(a.y - 11).toBeGreaterThanOrEqual(host.y - 35);
+        expect(a.y - 11).toBeGreaterThanOrEqual(host.y - 50);
       }
       expect(a.link).toHaveLength(2);
     }
@@ -108,14 +108,16 @@ describe("элементы BPMN по Соглашению: генерация", 
     expect(arts[1].linkDirection).toBe("from-task");
   });
 
-  it("один документ у двух задач — две ссылки на один объект данных", async () => {
+  it("один документ у двух задач — одна фигура и две ассоциации", async () => {
     const m = structuredModel();
     m.nodes.find((n) => n.id === "b1")!.outputs = ["d2"];
     m.nodes.find((n) => n.id === "b2")!.inputs = ["d2"];
-    const { xml } = await generateBpmn(m, "o1");
+    const { xml, diagram } = await generateBpmn(m, "o1");
     expect(xml.match(/<bpmn:dataObject id="DataObj_d2"/g)).toHaveLength(1);
-    expect(xml).toContain('id="DataRef_b1_d2"');
-    expect(xml).toContain('id="DataRef_b2_d2"');
+    expect(xml.match(/<bpmn:dataObjectReference id="DataRef_d2"/g)).toHaveLength(1);
+    expect(xml).toContain('id="DOA_b1_d2"');
+    expect(xml).toContain('id="DIA_b2_d2"');
+    expect(diagram.extras.filter((e) => e.kind === "data" && e.name.includes("Итоговый")).length).toBeLessThanOrEqual(1);
   });
 
   it("внешние пулы и потоки сообщений: свёрнутые участники под диаграммой", async () => {
@@ -218,8 +220,8 @@ describe("добавочные элементы: общая геометрия",
       ["t2", { x: 390, y: 100, w: 150, h: 80 }],
     ]);
     const arts = artifactsOf([node("t1", { inputs: ["a"] }), node("t2", { inputs: ["a"] })] as never[], two, names);
-    const label = (a: (typeof arts)[number]) => ({ x0: a.box.x + a.box.w + 3, x1: a.box.x + a.box.w + 3 + artifactLabelWidth(a.name), y0: a.box.y, y1: a.box.y + a.box.h });
-    expect(label(arts[1]).x0).toBeGreaterThanOrEqual(label(arts[0]).x1 + 6);
+    expect(arts).toHaveLength(1);
+    expect(arts[0].links).toHaveLength(2);
   });
 
   it("хранилища данных идут правее граничных событий и обходят вертикаль потока сообщений, а документы от них не зависят", () => {

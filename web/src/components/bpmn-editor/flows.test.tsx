@@ -76,7 +76,7 @@ describe("центры фигур в одном ряду лежат на одн�
     const target = cy(m, "t");
     // шлюз тянут рядом с задачей, промахнувшись на 2 px: привязка по центру возвращает его на общую линию
     const gb = boxOf(m.nodes.find((n) => n.id === "g")!);
-    m = dropNodeIntoLane(moveNode(m, "g", gb.x + 200, snapTop(target - 25 + 2, 50)), "g");
+    m = dropNodeIntoLane(moveNode(m, "g", gb.x + 200, snapTop(target - 30 + 2, 60)), "g");
     expect(cy(m, "g")).toBe(target);
     // задача становится событием — центр остаётся на месте
     m = setNodeType(m, "t", "event");

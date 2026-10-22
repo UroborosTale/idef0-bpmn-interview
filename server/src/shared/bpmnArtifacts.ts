@@ -87,10 +87,12 @@ export interface Artifact {
   box: Box;
   /** Ломаная ассоциации: у входа и хранилища — от значка к задаче, у выхода — от задачи к значку. */
   edge: Pt[];
+  /** Все задачи, к которым относится эта сущность (B5: один значок на документ/хранилище). */
+  links?: { nodeId: string; kind: ArtifactKind; edge: Pt[] }[];
 }
 
-export const ARTIFACT_W = 18;
-export const ARTIFACT_H = 20;
+export const ARTIFACT_W = 24;
+export const ARTIFACT_H = 26;
 /** Отступ значка от границы задачи: значок укладывается в 30 пикселей над или под задачей в дорожке. */
 const ARTIFACT_GAP = 4;
 /** Подпись значка (кегль 10) стоит справа от него: до 18 знаков, около 96 пикселей в ширину. */
@@ -212,7 +214,38 @@ export function artifactsOf(
     }
     occupied.push(...group.map((a) => labelRect(a.box, a.name)));
   }
-  return out;
+  // B5: один значок на сущность. Первый значок группы остаётся на своём автоматическом месте, остальные
+  // использования становятся ассоциациями к нему. Так подписи «Excel»/«Реестр…» не повторяются у каждой задачи.
+  const grouped = new Map<string, typeof out>();
+  for (const a of out) {
+    const key = `${a.kind === "store" ? "store" : "data"}:${a.entityId}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), a]);
+  }
+  const edgeFromIcon = (icon: Box, host: Box, kind: ArtifactKind): Pt[] => {
+    const cx = icon.x + icon.w / 2;
+    const cy = icon.y + icon.h / 2;
+    const tx = Math.min(Math.max(cx, host.x + 10), host.x + host.w - 10);
+    const ty = Math.min(Math.max(cy, host.y + 10), host.y + host.h - 10);
+    if (cy < host.y) return kind === "output" ? [[tx, host.y], [cx, icon.y + icon.h]] : [[cx, icon.y + icon.h], [tx, host.y]];
+    if (cy > host.y + host.h) return kind === "output" ? [[tx, host.y + host.h], [cx, icon.y]] : [[cx, icon.y], [tx, host.y + host.h]];
+    const left = cx < host.x + host.w / 2;
+    return kind === "output"
+      ? [[left ? host.x : host.x + host.w, ty], [left ? icon.x + icon.w : icon.x, cy]]
+      : [[left ? icon.x + icon.w : icon.x, cy], [left ? host.x : host.x + host.w, ty]];
+  };
+  const result: Artifact[] = [];
+  for (const [key, list] of grouped) {
+    const first = list[0];
+    const links = list.map((a) => {
+      const host = boxes.get(a.nodeId);
+      return { nodeId: a.nodeId, kind: a.kind, edge: host ? edgeFromIcon(first.box, host, a.kind) : a.edge };
+    });
+    first.key = key;
+    first.links = links;
+    first.edge = links[0].edge;
+    result.push(first);
+  }
+  return result;
 }
 export const POOL_W = 170;
 export const POOL_H = 40;

@@ -7,7 +7,7 @@ import type { Pt } from "../editor-core/hooks";
 import { LANE_H, MAX_LANE_H, MIN_LANE_H, MIN_X, START_Y, clampLaneHeight, laneHeightOf, laneTops, sizeOf, type Box } from "@shared/bpmnGeometry";
 import { BOUNDARY_LABEL_EXTRA } from "@shared/bpmnArtifacts";
 import { mergeScope, scopeView } from "@shared/scope";
-import { POOL_H, artifactObstacle, artifactsOf, isStoreArtifact, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
+import { POOL_H, artifactObstacle, artifactsOf, boundaryBoxes, isBoundaryNode, messageEdges, poolBoxes, type Artifact } from "@shared/bpmnArtifacts";
 
 // Размеры фигур, дорожки и маршрутизация стрелок — общий модуль server/src/shared/bpmnGeometry.ts
 // (им же пользуется генератор BPMN), поэтому экспорт совпадает с нарисованным в редакторе.
@@ -16,6 +16,8 @@ export type { Box, EndKinds } from "@shared/bpmnGeometry";
 export type { Pt };
 
 export const GRID = 10;
+/** Версия правил авто-раскладки BPMN; меняется, когда старые позиции перестают соответствовать новым правилам. */
+export const LAYOUT_VERSION = 2;
 const COL_W = 190;
 
 /**
@@ -374,12 +376,29 @@ export function positionsFromBpmnXml(xml: string | null | undefined): Map<string
 export function withLayout(m: ProcessLogicModel, force = false, seed?: Map<string, { x: number; y: number }>, optimize = false): ProcessLogicModel {
   const all = visibleNodes(m);
   if (!force && all.every((n) => n.layout || isBoundary(n, all))) return m;
-  const res = optimize && force ? optimizedLayoutWithRows(m) : { positions: autoLayout(m), laneHeights: null };
+  const plain = { positions: autoLayout(m), laneHeights: null as number[] | null };
+  let res = optimize && force ? optimizedLayoutWithRows(m) : plain;
+  // Подбор не должен ухудшать картину: если из-за крупных фигур вариант со сжатием/рядами дал больше пересечений,
+  // возвращаем обычную раскладку по столбцам.
+  if (optimize && force && res.positions !== plain.positions) {
+    const asModel = (r: { positions: Map<string, { x: number; y: number }>; laneHeights: number[] | null }) => {
+      const laid: ProcessLogicModel = { ...m, nodes: m.nodes.map((n) => (r.positions.has(n.id) ? { ...n, layout: r.positions.get(n.id)! } : n)) };
+      return r.laneHeights ? withLaneHeights(laid, r.laneHeights) : laid;
+    };
+    const quality = (model: ProcessLogicModel) => {
+      const d = diagramLayout(model);
+      return routeQuality(d.shown.map((n) => ({ id: n.id, type: n.type, box: d.boxes.get(n.id)! })), d.flows.map((f) => ({ id: f.id, from: f.from, to: f.to })), d.routes);
+    };
+    const a = quality(asModel(plain));
+    const b = quality(asModel(res));
+    if (b.crossings > a.crossings || b.cuts > a.cuts) res = plain;
+  }
   const auto = res.positions;
   const pick = (id: string) => (!force && seed?.get(id)) || auto.get(id);
   const laid: ProcessLogicModel = { ...m, nodes: m.nodes.map((n) => (auto.has(n.id) && (force || !n.layout) ? { ...n, layout: pick(n.id)! } : n)) };
   // ряды веток сделали дорожки выше — высоты сохраняются в модели вместе с позициями
-  return res.laneHeights ? withLaneHeights(laid, res.laneHeights) : laid;
+  const out = res.laneHeights ? withLaneHeights(laid, res.laneHeights) : laid;
+  return force ? { ...out, layout_version: LAYOUT_VERSION } : out;
 }
 
 /** Расставляет шаги диаграмм операций, у которых нет позиций (например, модель пришла с сервера или из импорта). */
@@ -403,8 +422,8 @@ export function diagramLayout(m: ProcessLogicModel) {
   const extras = diagramExtras(m, shown, boxes);
   const tv = triggerView(m);
   const flows = tv.flows.filter((f) => boxes.has(f.from) && boxes.has(f.to));
-  const withArtifacts = new Set(extras.artifacts.filter((a) => !isStoreArtifact(a)).map((a) => a.nodeId));
-  const withStores = new Set(extras.artifacts.filter(isStoreArtifact).map((a) => a.nodeId));
+  const withArtifacts = new Set(extras.artifacts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind !== "store").map((l) => l.nodeId)));
+  const withStores = new Set(extras.artifacts.flatMap((a) => (a.links ?? [{ nodeId: a.nodeId, kind: a.kind }]).filter((l) => l.kind === "store").map((l) => l.nodeId)));
   const poolIds = new Set(extras.pools.map((p) => p.pool.id));
   const end = (id: string) => (poolIds.has(id) ? `pool:${id}` : id);
   const info = routeFlowsDetailed(

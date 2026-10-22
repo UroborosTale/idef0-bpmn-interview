@@ -93,7 +93,7 @@ describe("элементы BPMN по Соглашению в браузере", 
     await page.getByText(/сохранено/).first().waitFor();
     const xml = await (await fetch(`${WEB.replace("localhost:15173", "127.0.0.1:18787")}/api/sessions/${id}/export/bpmn?scope=o1`, { headers: { Cookie: (await ctx.cookies()).map((c) => `${c.name}=${c.value}`).join("; ") } })).text();
     expect(xml).toMatch(/<bpmn:boundaryEvent id="Node_be"[^>]*attachedToRef="Node_b1" cancelActivity="true"/);
-    expect(xml).toMatch(/<bpmn:dataStoreReference id="StoreRef_b1_sys1" name="ELMA365"/);
+    expect(xml).toMatch(/<bpmn:dataStoreReference id="StoreRef_sys1" name="ELMA365"/);
     expect(xml).toContain('<bpmn:participant id="Pool_pool1" name="B002.02.01 Анализ эффективности процессной модели" />');
     expect(xml).toMatch(/<bpmn:messageFlow id="Msg_msg1" name="Запрос на анализ" sourceRef="Node_b2" targetRef="Pool_pool1"/);
     expect(errors).toEqual([]);

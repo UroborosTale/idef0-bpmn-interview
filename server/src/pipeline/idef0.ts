@@ -291,12 +291,12 @@ export const arrowLabelPlacement = (a: Idef0Arrow) => labelSpec(a);
 function frameSvg(geo: FrameGeometry, grid: boolean): string {
   const out: string[] = [];
   if (grid) {
-    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#dadada" : "#e4e4e4"}" stroke-width="1" />`);
-    for (const l of geo.gridYs) out.push(`<line x1="${geo.sheet.x}" y1="${l.at}" x2="${geo.sheet.x + geo.sheet.w}" y2="${l.at}" stroke="#e4e4e4" stroke-width="1" />`);
+    for (const l of geo.gridXs) out.push(`<line x1="${l.at}" y1="${geo.sheet.y}" x2="${l.at}" y2="${geo.footer.y}" stroke="${l.major ? "#ececec" : "#f5f5f5"}" stroke-width="1" />`);
+    for (const l of geo.gridYs) out.push(`<line x1="${geo.sheet.x}" y1="${l.at}" x2="${geo.sheet.x + geo.sheet.w}" y2="${l.at}" stroke="${l.major ? "#ececec" : "#f5f5f5"}" stroke-width="1" />`);
   }
-  out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef7" stroke="#1f2937" />`);
-  for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" />`);
-  out.push(`<rect x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1.2" />`);
+  out.push(`<rect x="${geo.footer.x}" y="${geo.footer.y}" width="${geo.footer.w}" height="${geo.footer.h}" fill="#e8eef7" stroke="#1f2937" stroke-width="1" />`);
+  for (const x of geo.dividers) out.push(`<line x1="${x}" y1="${geo.footer.y}" x2="${x}" y2="${geo.footer.y + geo.footer.h}" stroke="#1f2937" stroke-width="1" />`);
+  out.push(`<rect x="${geo.sheet.x}" y="${geo.sheet.y}" width="${geo.sheet.w}" height="${geo.sheet.h}" fill="none" stroke="#1f2937" stroke-width="1" />`);
   for (const c of geo.cells) {
     const max = Math.floor(c.w / (FRAME_FONT * 0.55));
     const text = c.text.length > max ? c.text.slice(0, Math.max(1, max - 1)) + "…" : c.text;

@@ -12,7 +12,7 @@ import { handleCommonKeys, isTextInput, useBeforeUnload, useDraftPersistence, us
 import { DraftBanner } from "../editor-core/fields";
 import BpmnEditor from "../bpmn-editor/BpmnEditor";
 import Idef0Editor from "../idef0-editor/Idef0Editor";
-import { positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
+import { LAYOUT_VERSION, positionsFromBpmnXml, visibleNodes, withLayout, withScopeLayouts } from "../bpmn-editor/geometry";
 import { functionsOf, idef0Codes, withIdef0Layout } from "../idef0-editor/geometry";
 import { addFunction } from "../idef0-editor/ops";
 import { deleteNode, duplicateNode, replaceNodeObject, setEventDirection, setEventPosition, setEventTrigger, updateNode } from "../bpmn-editor/model-ops";
@@ -132,6 +132,8 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
   // как в Business Studio, в настольном приложении свойства и список проверок открываются по кнопке (Ctrl+E и меню объекта тоже открывают)
   const [propsOpen, setPropsOpen] = useState(!inDesktopShell());
   const [full, setFull] = useState(false);
+  // B7: модель со старой раскладкой — предлагаем пересчитать, но не трогаем позиции без согласия аналитика
+  const [layoutOutdated, setLayoutOutdated] = useState(() => (model.layout_version ?? 1) < LAYOUT_VERSION && model.nodes.some((n) => n.layout));
   const [exportError, setExportError] = useState<string | null>(null);
   const [problemsOpen, setProblemsOpen] = useState(!inDesktopShell());
   const [problemsTab, setProblemsTab] = useState<{ tab: "issues" | "gaps" | "proposals" | "tasks" | "questions" | "reports"; nonce: number } | null>(null);
@@ -1056,6 +1058,22 @@ export default function Studio({ session, busy, onSave, onOpenImport, onReopen }
         onDismiss={persisted.dismiss}
         onRestoreStale={persisted.restoreStale}
       />
+      {layoutOutdated && !locked && (
+        <div className="layout-notice" role="status">
+          <span>Раскладка этой модели сделана по старым правилам. Пересчитать её?</span>
+          <button
+            className="primary"
+            onClick={() => {
+              const next = withScopeLayouts(withLayout({ ...h.draftRef.current, layout_version: undefined }, true, undefined, true));
+              h.commit(next);
+              setLayoutOutdated(false);
+            }}
+          >
+            Пересчитать
+          </button>
+          <button onClick={() => setLayoutOutdated(false)}>Оставить</button>
+        </div>
+      )}
 
       <div className="ribbon-tabs" role="tablist" aria-label="Лента">
         {([["main", "Главная"], ["export", "Выгрузка и печать"]] as const).map(([key, title]) => (

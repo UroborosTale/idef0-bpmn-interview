@@ -719,7 +719,8 @@ function bpmnPage(d: BpmnDiagramData, name: string, model: ProcessLogicModel, sc
     page.polyline([[l.x + LABEL_W, l.y], [l.x + LABEL_W, l.y + l.h]], { weightPt: 1, line: "#94a3b8" });
   }
   for (const e of d.extras) {
-    if (e.link) page.polyline(e.link, { weightPt: 0.8, line: "#64748b", dash: true });
+    const links = e.links?.length ? e.links : e.link ? [{ points: e.link, direction: e.linkDirection ?? "none" }] : [];
+    for (const l of links) page.polyline(l.points, { weightPt: 0.8, line: "#64748b", dash: true });
     if (e.kind === "data") {
       page.rect(e.x, e.y, e.w, e.h, { fill: "#ffffff", weightPt: 1 });
       // подпись справа от значка, по его высоте (кегль 10) — как в редакторе: над задачей для неё нет места

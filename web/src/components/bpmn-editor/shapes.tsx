@@ -268,7 +268,8 @@ const GREY = "#64748b";
 /** Документ (вход или выход задачи) или хранилище данных (информационная система) со связью-ассоциацией с задачей. */
 export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; selected?: boolean }) {
   const { x, y, w, h } = a.box;
-  const d = a.edge.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
+  const edges = a.links?.length ? a.links.map((l) => l.edge) : [a.edge];
+  const d = (pts: [number, number][]) => pts.map(([px, py], i) => `${i === 0 ? "M" : "L"}${px} ${py}`).join(" ");
   const lines = wrapText(a.name, 18, 2);
   const labelW = Math.max(20, Math.max(...lines.map((l) => l.length)) * 5.6 + 6);
   const labelH = lines.length * 12 + 2;
@@ -278,7 +279,10 @@ export function ArtifactShape({ artifact: a, selected }: { artifact: Artifact; s
   return (
     <g data-artifact={a.nodeId} data-artifact-kind={a.kind} data-artifact-entity={a.entityId} style={{ cursor: "move" }}>
       <title>{`${a.kind === "input" ? "Входной документ" : a.kind === "output" ? "Выходной документ" : "Хранилище данных"}: ${a.name}`}</title>
-      <path d={d} fill="none" stroke={GREY} strokeWidth={1} strokeDasharray="2 2" markerEnd={arrow} />
+      <path d={d(edges[0])} fill="none" stroke={GREY} strokeWidth={1} strokeDasharray="2 2" markerEnd={arrow} />
+      {edges.slice(1).map((pts, i) => (
+        <path key={`e${i}`} d={d(pts)} fill="none" stroke={GREY} strokeWidth={1} strokeDasharray="2 2" markerEnd={arrow} pointerEvents="none" />
+      ))}
       {selected && <rect x={x - 3} y={y - 3} width={w + 6} height={h + 6} rx={3} fill="none" stroke="#2563eb" strokeWidth={1.5} strokeDasharray="3 2" pointerEvents="none" />}
       {a.kind === "store" ? (
         <g fill="#fff" stroke={INK} strokeWidth={1.1}>

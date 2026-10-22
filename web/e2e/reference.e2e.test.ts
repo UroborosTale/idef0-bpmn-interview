@@ -47,7 +47,7 @@ describe("эталон B002 в студии", () => {
     await page.locator('[data-nav-bpmn="o11"]').click();
     await page.locator('.studio g[data-node-id="o11_open"]').waitFor();
     expect(await page.locator(".studio g[data-node-id]").count()).toBe(13);
-    expect(await page.locator("[data-artifact]").count()).toBeGreaterThan(8);
+    expect(await page.locator("[data-artifact]").count()).toBeGreaterThan(2);
     if (shot) await page.locator(".bpe-canvas").first().screenshot({ path: `${shot}/ref-o11.png` });
 
     // самая насыщенная: B002.01.03

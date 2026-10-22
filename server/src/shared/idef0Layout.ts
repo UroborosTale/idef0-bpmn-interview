@@ -351,6 +351,15 @@ export function layoutIdef0<N extends NodeLike>(m: ModelLike<N>, parentId: strin
     hasChildren: hasChildren(m, node.id),
   }));
   const blockOf = new Map(functions.map((f) => [f.node.id, f] as const));
+  // I9: позиции из текста/импорта могут совпасть — блоки не должны накладываться друг на друга
+  for (let i = 1; i < functions.length; i++) {
+    for (let guard = 0; guard < functions.length; guard++) {
+      const b = functions[i].box;
+      const hit = functions.slice(0, i).find((f) => b.x < f.box.x + f.box.w + 8 && f.box.x < b.x + b.w + 8 && b.y < f.box.y + f.box.h + 8 && f.box.y < b.y + b.h + 8);
+      if (!hit) break;
+      b.y = hit.box.y + hit.box.h + 20;
+    }
+  }
   // I1: правый край листа — по самому правому блоку; внешние выходы доходят до него, а не обрываются в поле.
   // Запас справа — под самую длинную подпись выхода, чтобы она не вышла за лист.
   const outLabelW = Math.max(0, ...fnNodes.flatMap((n) => n.outputs.filter((id) => dataById.has(id)).map((id) => labelWidth(wrapLabel(dataById.get(id)!.name, "side")))));

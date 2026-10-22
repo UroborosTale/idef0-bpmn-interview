@@ -89,7 +89,7 @@ describe("эталон B002: структура по документам", () =
     expect(o33).toContain("<bpmn:intermediateCatchEvent");
     const o12 = (await generateBpmn(m, "o12")).xml;
     expect(o12).toContain("<bpmn:businessRuleTask");
-    expect(o12).toContain('<bpmn:dataStoreReference id="StoreRef_o12_card_s_elma" name="ELMA365"');
+    expect(o12).toContain('<bpmn:dataStoreReference id="StoreRef_s_elma" name="ELMA365"');
   }, 60_000);
 });
 

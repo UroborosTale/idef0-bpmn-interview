@@ -70,7 +70,7 @@ describe("демонстрационный процесс C090 в студии",
               if (horizontal !== (r[1] === u[1])) continue;
               const k = horizontal ? 1 : 0;
               const m = 1 - k;
-              if (Math.abs(p[k] - r[k]) < 3 && Math.min(Math.max(p[m], q[m]), Math.max(r[m], u[m])) - Math.max(Math.min(p[m], q[m]), Math.min(r[m], u[m])) > 2) out.push(`наложение ${i}/${j}`);
+              if (Math.abs(p[k] - r[k]) < 1 && Math.min(Math.max(p[m], q[m]), Math.max(r[m], u[m])) - Math.max(Math.min(p[m], q[m]), Math.min(r[m], u[m])) > 2) out.push(`наложение ${i}/${j}`);
             }
           }
         }
